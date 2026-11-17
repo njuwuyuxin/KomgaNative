@@ -1,50 +1,19 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:komga_api/komga_api.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:test/test.dart';
 
-/// 假的 dio 适配器：不发网络请求，按路径返回预设响应。
-class _FakeAdapter implements HttpClientAdapter {
-  _FakeAdapter(this.handler);
-
-  final Future<ResponseBody> Function(RequestOptions options) handler;
-
-  final List<RequestOptions> requests = <RequestOptions>[];
-
-  @override
-  Future<ResponseBody> fetch(
-    RequestOptions options,
-    Stream<Uint8List>? requestStream,
-    Future<void>? cancelFuture,
-  ) {
-    requests.add(options);
-    return handler(options);
-  }
-
-  @override
-  void close({bool force = false}) {}
-}
-
-ResponseBody _json(Object body, {int status = 200}) => ResponseBody.fromString(
-  jsonEncode(body),
-  status,
-  headers: <String, List<String>>{
-    Headers.contentTypeHeader: <String>[Headers.jsonContentType],
-  },
-);
-
-Dio _dioWith(_FakeAdapter adapter) => Dio()..httpClientAdapter = adapter;
+import 'support/fake_http.dart';
 
 void main() {
   final address = ServerAddress.parse('https://komga.example.com');
 
   group('withBasic', () {
     test('发 Basic Auth 头，并解析库列表', () async {
-      final adapter = _FakeAdapter(
-        (RequestOptions o) async => _json(<Object?>[
+      final adapter = FakeAdapter(
+        (_) async => jsonResponse(<Object?>[
           <String, Object?>{
             'id': 'lib1',
             'name': 'Comics',
@@ -57,7 +26,7 @@ void main() {
         address: address,
         username: 'me@example.com',
         password: 'secret',
-        dio: _dioWith(adapter),
+        dio: dioWith(adapter),
       );
 
       final libraries = await session.fetchLibraries();
@@ -78,14 +47,12 @@ void main() {
     });
 
     test('保留反代子路径', () async {
-      final adapter = _FakeAdapter(
-        (RequestOptions o) async => _json(<Object?>[]),
-      );
+      final adapter = FakeAdapter((_) async => jsonResponse(<Object?>[]));
       final session = KomgaSession.withBasic(
         address: ServerAddress.parse('https://host/komga'),
         username: 'u',
         password: 'p',
-        dio: _dioWith(adapter),
+        dio: dioWith(adapter),
       );
       await session.fetchLibraries();
       expect(
@@ -95,33 +62,33 @@ void main() {
     });
 
     test('401 折叠成认证错误（UI 提示"账号或密码不对"）', () async {
-      final adapter = _FakeAdapter(
-        (RequestOptions o) async => _json(<String, Object?>{}, status: 401),
+      final adapter = FakeAdapter(
+        (_) async => jsonResponse(<String, Object?>{}, status: 401),
       );
       final session = KomgaSession.withBasic(
         address: address,
         username: 'u',
         password: 'bad',
-        dio: _dioWith(adapter),
+        dio: dioWith(adapter),
       );
       expect(session.fetchLibraries(), throwsA(isA<KomgaAuthError>()));
     });
 
     test('500 折叠成服务端错误（可重试）', () async {
-      final adapter = _FakeAdapter(
-        (RequestOptions o) async => _json(<String, Object?>{}, status: 503),
+      final adapter = FakeAdapter(
+        (_) async => jsonResponse(<String, Object?>{}, status: 503),
       );
       final session = KomgaSession.withBasic(
         address: address,
         username: 'u',
         password: 'p',
-        dio: _dioWith(adapter),
+        dio: dioWith(adapter),
       );
       expect(session.fetchLibraries(), throwsA(isA<KomgaServerError>()));
     });
 
     test('连接失败折叠成网络错误', () async {
-      final adapter = _FakeAdapter(
+      final adapter = FakeAdapter(
         (RequestOptions o) async => throw DioException(
           requestOptions: o,
           type: DioExceptionType.connectionError,
@@ -132,20 +99,20 @@ void main() {
         address: address,
         username: 'u',
         password: 'p',
-        dio: _dioWith(adapter),
+        dio: dioWith(adapter),
       );
       expect(session.fetchLibraries(), throwsA(isA<KomgaNetworkError>()));
     });
 
     test('响应不是数组时抛协议错误（例如反代返回了 HTML）', () async {
-      final adapter = _FakeAdapter(
-        (RequestOptions o) async => _json(<String, Object?>{'oops': true}),
+      final adapter = FakeAdapter(
+        (_) async => jsonResponse(<String, Object?>{'oops': true}),
       );
       final session = KomgaSession.withBasic(
         address: address,
         username: 'u',
         password: 'p',
-        dio: _dioWith(adapter),
+        dio: dioWith(adapter),
       );
       expect(session.fetchLibraries(), throwsA(isA<KomgaProtocolError>()));
     });
@@ -153,8 +120,8 @@ void main() {
 
   group('withApiKey', () {
     test('发 X-API-Key 头并解析账号', () async {
-      final adapter = _FakeAdapter(
-        (RequestOptions o) async => _json(<String, Object?>{
+      final adapter = FakeAdapter(
+        (_) async => jsonResponse(<String, Object?>{
           'id': 'u1',
           'email': 'me@example.com',
           'roles': <String>['ADMIN', 'USER'],
@@ -163,7 +130,7 @@ void main() {
       final session = KomgaSession.withApiKey(
         address: address,
         apiKey: 'KEY-123',
-        dio: _dioWith(adapter),
+        dio: dioWith(adapter),
       );
 
       final account = await session.fetchAccount();
@@ -178,10 +145,10 @@ void main() {
     });
 
     test('创建 API Key：发送 comment 并取出 key', () async {
-      final adapter = _FakeAdapter((RequestOptions o) async {
+      final adapter = FakeAdapter((RequestOptions o) async {
         final body = jsonDecode(jsonEncode(o.data)) as Map<String, Object?>;
         expect(body['comment'], 'KomgaNative (test)');
-        return _json(<String, Object?>{
+        return jsonResponse(<String, Object?>{
           'id': 'k1',
           'key': 'NEW-KEY',
           'comment': 'KomgaNative (test)',
@@ -191,7 +158,7 @@ void main() {
         address: address,
         username: 'u',
         password: 'p',
-        dio: _dioWith(adapter),
+        dio: dioWith(adapter),
       );
 
       final key = await session.createApiKey(comment: 'KomgaNative (test)');
@@ -201,19 +168,76 @@ void main() {
     });
 
     test('服务端没返回 key 时抛协议错误，不把空串存起来', () async {
-      final adapter = _FakeAdapter(
-        (RequestOptions o) async => _json(<String, Object?>{'id': 'k1'}),
+      final adapter = FakeAdapter(
+        (_) async => jsonResponse(<String, Object?>{'id': 'k1'}),
       );
       final session = KomgaSession.withBasic(
         address: address,
         username: 'u',
         password: 'p',
-        dio: _dioWith(adapter),
+        dio: dioWith(adapter),
       );
       expect(
         session.createApiKey(comment: 'x'),
         throwsA(isA<KomgaProtocolError>()),
       );
+    });
+  });
+
+  group('请求头按资源类型分离', () {
+    KomgaSession sessionFor(FakeAdapter adapter) => KomgaSession.withApiKey(
+      address: address,
+      apiKey: 'K',
+      dio: dioWith(adapter),
+    );
+
+    test('JSON 请求声明 Accept: application/json', () async {
+      final adapter = FakeAdapter((_) async => jsonResponse(<Object?>[]));
+      await sessionFor(adapter).fetchLibraries();
+
+      expect(adapter.requests.single.headers['Accept'], 'application/json');
+    });
+
+    test('页图请求要字节 + 图片 Accept（实测服务器不认 application/json）', () async {
+      final adapter = FakeAdapter(
+        (_) async => bytesResponse(<int>[1, 2, 3], contentType: 'image/png'),
+      );
+      final bytes = await sessionFor(adapter).fetchPageImage('b1', 1);
+
+      final request = adapter.requests.single;
+      expect(bytes, <int>[1, 2, 3]);
+      expect(request.responseType, ResponseType.bytes);
+      expect(request.headers['Accept'], contains('image/'));
+      expect(
+        request.uri.toString(),
+        'https://komga.example.com/api/v1/books/b1/pages/1?zero_based=false',
+      );
+    });
+
+    test('缩略图只接受 image/jpeg，客户端不再发 application/json', () async {
+      final adapter = FakeAdapter(
+        (_) async => bytesResponse(<int>[9], contentType: 'image/jpeg'),
+      );
+      final bytes = await sessionFor(adapter).fetchSeriesThumbnail('s1');
+
+      final request = adapter.requests.single;
+      expect(bytes, <int>[9]);
+      expect(request.headers['Accept'], contains('image/'));
+      expect(request.headers['Accept'], contains('image/'));
+    });
+
+    test('去掉全局 Accept 后，JSON 与图片请求互不污染', () async {
+      final adapter = FakeAdapter(
+        (RequestOptions o) async => o.responseType == ResponseType.bytes
+            ? bytesResponse(<int>[1])
+            : jsonResponse(<Object?>[]),
+      );
+      final session = sessionFor(adapter);
+      await session.fetchBookThumbnail('b1');
+      await session.fetchLibraries();
+
+      expect(adapter.requests.first.headers['Accept'], contains('image/'));
+      expect(adapter.requests.last.headers['Accept'], 'application/json');
     });
   });
 }

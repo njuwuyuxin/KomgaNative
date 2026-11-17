@@ -3,7 +3,8 @@
 Komga 的跨平台客户端（iOS / Android / Android 墨水屏），阅读体验优先。
 
 > 状态：**M1 进行中**。
-> 已完成：M0 骨架（三套主题 + 黄金图闭环）、**服务器连接流程**（密码换 API Key / 直接粘贴 Key / 钥匙串保存 / 路由守卫 / 错误映射）。
+> 已完成：M0 骨架（三套主题 + 黄金图闭环）、**服务器连接流程**（密码换 API Key / 直接粘贴 Key / 钥匙串保存 / 路由守卫 / 错误映射）、
+> **API 契约验证**（对真实 Komga 1.30.1 实例端到端实测，见 [docs/komga-api-verification.md](docs/komga-api-verification.md)）。
 > 待完成：真实书架与系列数据、Drift 缓存、缩略图、i18n 与中文字体。
 
 ## 文档
@@ -13,6 +14,7 @@ Komga 的跨平台客户端（iOS / Android / Android 墨水屏），阅读体�
 | [docs/tech-selection.md](docs/tech-selection.md) | 技术选型：候选评分、技术栈、三大子系统设计、AI Agent 工程化、里程碑与风险 |
 | [docs/environment-setup.md](docs/environment-setup.md) | 环境搭建与双机切换：免管理员安装、验收标准、踩坑表 |
 | [docs/ci.md](docs/ci.md) | GitHub Actions：概念、免费额度与计费倍率、三条流水线、排障 |
+| [docs/komga-api-verification.md](docs/komga-api-verification.md) | Komga API 实测记录：复现步骤、证据表、发现的缺陷、仍未验证项 |
 | [AGENTS.md](AGENTS.md) | Agent 工作契约：命令、架构不变量、DoD、反模式 |
 
 ## CI
@@ -61,8 +63,11 @@ dart run tool/ci.dart check    # format + analyze + layers + 全部测试
 dart run tool/ci.dart golden   # 重新生成黄金图（仅 Windows，与 CI 一致）
 ```
 
-当前基线：**91 个测试**（纯 Dart 64 / Flutter 27），8 张黄金图覆盖
+当前基线：**129 个测试**（纯 Dart 95 / Flutter 34），8 张黄金图覆盖
 书架（手机 light / 平板 dark / 1.3 倍字号）、墨水屏设置、阅读器、连接页（light / eink）、启动页。
+
+其中 `packages/komga_api` 的 55 个测试里包含**两层真值校验**：
+`contract_test.dart` 拿官方 OpenAPI 校验客户端会构造的每个 URL；`fixtures_test.dart` 用真实服务器响应驱动解析层。
 
 ## 连接流程（已可用）
 

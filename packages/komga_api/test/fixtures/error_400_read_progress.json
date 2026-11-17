@@ -1,0 +1,1 @@
+{"timestamp":"2026-11-17T09:20:11.151+00:00","status":400,"error":"Bad Request","message":"Page argument (99) must be within 1 and book page count (3)","path":"/api/v1/books/0S8MSMVJ6389K/read-progress"}

@@ -1,0 +1,265 @@
+import 'package:komga_api/komga_api.dart';
+import 'package:komga_domain/komga_domain.dart';
+import 'package:test/test.dart';
+
+import 'support/fake_http.dart';
+import 'support/fixtures.dart';
+
+/// 用**真实服务器响应**（`test/fixtures/` 从 Komga 1.30.1 实例抓取）驱动解析层。
+///
+/// 假实现证明"我调了我以为的方法"；这一组测试证明"我以为的响应形状是真的"。
+/// 字段名、类型、时间戳格式的每一处假设，都能在这里被真实 payload 打红。
+const String _base = 'https://komga.example.com';
+
+KomgaSession _sessionWith(
+  FakeAdapter adapter, {
+  bool basic = false,
+  String apiKey = 'TESTKEY',
+}) {
+  final address = ServerAddress.parse(_base);
+  return basic
+      ? KomgaSession.withBasic(
+          address: address,
+          username: 'u',
+          password: 'p',
+          dio: dioWith(adapter),
+        )
+      : KomgaSession.withApiKey(
+          address: address,
+          apiKey: apiKey,
+          dio: dioWith(adapter),
+        );
+}
+
+FakeAdapter _replay(String body, {int status = 200}) =>
+    FakeAdapter((_) async => rawResponse(body, status: status));
+
+void main() {
+  group('真实响应 → 领域模型', () {
+    test('库列表：裸数组，字段 id/name/unavailable', () async {
+      final session = _sessionWith(_replay(fixture('libraries.json')));
+      final libraries = await session.fetchLibraries();
+
+      expect(libraries, hasLength(1));
+      expect(libraries.single.name, 'Verify');
+      expect(libraries.single.id, isNotEmpty);
+      expect(libraries.single.unavailable, isFalse);
+    });
+
+    test('账号：没有 username 字段，用 email 作展示名', () async {
+      final session = _sessionWith(_replay(fixture('users_me.json')));
+      final account = await session.fetchAccount();
+
+      expect(account.email, 'komga@example.com');
+      expect(account.displayName, 'komga@example.com');
+      expect(account.roles, contains('ADMIN'));
+      expect(account.isAdmin, isTrue);
+    });
+
+    test('系列分页：readingDirection 解析成 RTL，标题取 metadata.title', () async {
+      final session = _sessionWith(_replay(fixture('series_page.json')));
+      final page = await session.fetchSeries();
+
+      expect(page.totalElements, 1);
+      expect(page.items, hasLength(1));
+      expect(page.page, 0);
+      expect(page.size, 20);
+      expect(page.totalPages, 1);
+      expect(page.hasMore, isFalse);
+
+      final series = page.items.single;
+      expect(series.title, 'library');
+      expect(series.readingDirection, ReadingDirection.rightToLeft);
+      expect(series.booksCount, 1);
+      expect(series.booksReadCount, 0);
+      expect(series.progress, 0);
+    });
+
+    test('系列下的书：pagesCount / mediaProfile / number（服务器给的是 int）', () async {
+      final session = _sessionWith(_replay(fixture('series_books_page.json')));
+      final page = await session.fetchSeriesBooks('S1');
+
+      expect(page.totalElements, 1);
+      final book = page.items.single;
+      expect(book.name, 'Verify Series #1');
+      expect(book.pagesCount, 3);
+      expect(book.mediaProfile, MediaProfile.divina);
+      // OpenAPI 声明 string，服务器实际返回 int 1。
+      expect(book.number, '1');
+      expect(book.isUnread, isTrue);
+    });
+
+    test('未读的书：readProgress 为 null', () async {
+      final session = _sessionWith(_replay(fixture('book_unread.json')));
+      final book = await session.fetchBook('B1');
+
+      expect(book.readProgress, isNull);
+      expect(book.isUnread, isTrue);
+      expect(book.isCompleted, isFalse);
+      expect(book.pagesCount, 3);
+    });
+
+    test('在读的书：页码 1 基、带服务端时间戳', () async {
+      final session = _sessionWith(_replay(fixture('book_in_progress.json')));
+      final book = await session.fetchBook('B1');
+
+      final progress = book.readProgress;
+      expect(progress, isNotNull);
+      expect(progress?.page, 2);
+      expect(progress?.completed, isFalse);
+      expect(progress?.lastModified.year, 2026);
+      expect(book.isUnread, isFalse);
+    });
+
+    test('页列表：宽高/字节数可用，供双页排版算宽高比', () async {
+      final session = _sessionWith(_replay(fixture('book_pages.json')));
+      final pages = await session.fetchBookPages('B1');
+
+      expect(pages, hasLength(3));
+      final first = pages.first;
+      expect(first.number, 1);
+      expect(first.width, 800);
+      expect(first.height, 1200);
+      expect(first.mediaType, 'image/png');
+      expect(first.sizeBytes, greaterThan(0));
+      expect(first.aspectRatio, closeTo(2 / 3, 0.001));
+    });
+
+    test('创建 API Key：取出 key 字段', () async {
+      final session = _sessionWith(
+        _replay(fixture('api_key_created.json')),
+        basic: true,
+      );
+      final key = await session.createApiKey(comment: 'KomgaNative');
+
+      expect(key, hasLength(32));
+      expect(key, startsWith('TESTONLY'));
+    });
+
+    test('ondeck 空页也能解析（空态 UI 用）', () async {
+      final session = _sessionWith(_replay(fixture('ondeck.json')));
+      final page = await session.fetchOndeck();
+
+      expect(page.totalElements, 0);
+      expect(page.items, isEmpty);
+    });
+  });
+
+  group('错误体的多种形态（全部来自真实抓包）', () {
+    Future<KomgaError> capturedError(String name, {int? status}) async {
+      final session = _sessionWith(
+        _replay(fixture(name), status: status ?? 200),
+      );
+      try {
+        await session.fetchBook('B1');
+        fail('应该抛错');
+      } on KomgaError catch (error) {
+        return error;
+      }
+    }
+
+    test('401 → 认证错误', () async {
+      final error = await capturedError('error_401.json', status: 401);
+      expect(error, isA<KomgaAuthError>());
+      expect(error.statusCode, 401);
+    });
+
+    test('404 → 未找到', () async {
+      final error = await capturedError('error_404_book.json', status: 404);
+      expect(error, isA<KomgaNotFoundError>());
+    });
+
+    test('400 带人类可读 message → 提取出来（页码越界）', () async {
+      final error = await capturedError(
+        'error_400_read_progress.json',
+        status: 400,
+      );
+      expect(error, isA<KomgaBadRequestError>());
+      expect(error.message, contains('must be within 1 and book page count'));
+    });
+
+    test('400 但 body 为空 → 仍然给出可读消息，不崩', () async {
+      final error = await capturedError('empty_400.json', status: 400);
+      expect(error, isA<KomgaBadRequestError>());
+      expect(error.message, isNotEmpty);
+    });
+
+    test('400 + 机器码 ERR_1034 → 暴露 serverCode 供重试决策', () async {
+      final error = await capturedError(
+        'error_400_duplicate_comment.json',
+        status: 400,
+      );
+      expect(error, isA<KomgaBadRequestError>());
+      expect((error as KomgaBadRequestError).serverCode, 'ERR_1034');
+    });
+  });
+
+  group('撞上 comment 唯一约束时自动换一个重试', () {
+    test('第二次登录：首个请求 400 ERR_1034，重试带时间戳后成功', () async {
+      var attempt = 0;
+      final adapter = FakeAdapter((_) async {
+        attempt++;
+        return attempt == 1
+            ? rawResponse(
+                '{"timestamp":"2026-11-17T09:20:16Z","status":400,'
+                '"error":"Bad Request","message":"ERR_1034",'
+                '"path":"/api/v2/users/me/api-keys"}',
+                status: 400,
+              )
+            : rawResponse(fixture('api_key_created.json'));
+      });
+      final session = _sessionWith(adapter, basic: true);
+
+      final key = await session.createApiKey(comment: 'KomgaNative');
+
+      expect(key, hasLength(32));
+      expect(adapter.requests, hasLength(2));
+      expect(
+        (adapter.requests.first.data! as Map<String, Object?>)['comment'],
+        'KomgaNative',
+      );
+      expect(
+        (adapter.requests.last.data! as Map<String, Object?>)['comment'],
+        startsWith('KomgaNative '),
+      );
+    });
+  });
+
+  group('解析容错', () {
+    test('7 位小数的时间戳（服务器真实格式）能解析', () async {
+      const body =
+          '{"id":"b","seriesId":"s","name":"n","number":1,'
+          '"media":{"pagesCount":2,"mediaProfile":"DIVINA"},'
+          '"readProgress":{"page":1,"completed":false,'
+          '"lastModified":"2026-11-17T09:19:11.9617379Z"}}';
+      final session = _sessionWith(_replay(body));
+      final book = await session.fetchBook('b');
+
+      expect(book.readProgress, isNotNull);
+      expect(
+        book.readProgress?.lastModified.millisecondsSinceEpoch,
+        DateTime.utc(2026, 11, 17, 9, 19, 11, 961, 737).millisecondsSinceEpoch,
+      );
+    });
+
+    test('number 是字符串时原样保留（"1.5"）', () async {
+      const body =
+          '{"id":"b","seriesId":"s","name":"n","number":"1.5",'
+          '"media":{"pagesCount":2,"mediaProfile":"DIVINA"}}';
+      final session = _sessionWith(_replay(body));
+      final book = await session.fetchBook('b');
+      expect(book.number, '1.5');
+    });
+
+    test('readingDirection 为空串时退化成 unknown，不抛异常', () async {
+      const body =
+          '{"content":[{"id":"s","libraryId":"l","name":"x",'
+          '"metadata":{"title":"x","readingDirection":""}}],'
+          '"totalElements":1,"number":0,"size":20}';
+      final session = _sessionWith(_replay(body));
+      final page = await session.fetchSeries();
+
+      expect(page.items.single.readingDirection, ReadingDirection.unknown);
+    });
+  });
+}

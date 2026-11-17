@@ -51,9 +51,19 @@ docs/                         选型、环境、spec、ADR
 
 - [ ] 新增/修改的纯逻辑有单测；边界值（0、越界、未知、RTL、宽页）覆盖到
 - [ ] 新增 UI 有黄金图（`apps/app/test/golden/`），并且**用 `read_image` 自查过**
-- [ ] 涉及 API 的变更同步更新 `test/fixtures/`（M1 起）
+- [ ] 涉及 API 的变更：新端点先加进 `KomgaUrls`（contract_test 会自动覆盖），解析层用 `test/fixtures/` 里的**真实响应**驱动
 - [ ] `dart run tool/ci.dart check` 全绿
 - [ ] 相关 `docs/` 段落已更新
+
+## API 真值规则（重要）
+
+假实现（fake）只能证明"我调用了我以为的方法"，**不能**证明这个方法/字段/语义是真实的。
+Komga 的真实行为记录在 `docs/komga-api-verification.md`，已知与 OpenAPI 规格不符的地方至少两处
+（`BookDto.number` 实际是 int；`readingDirection` 规格无枚举且默认空串）。
+
+- 不允许在代码注释或文档里写"实测/已验证"，**除非**有对应证据（fixture、契约测试、或该文档里的一行记录）。
+- 新增端点：先抓真实响应存进 `packages/komga_api/test/fixtures/`，再写解析与测试。
+- 官方规格文件：`test/fixtures/openapi-1.30.1.json`，升级 Komga 版本时同步替换。
 
 ## 黄金图约定
 
@@ -82,8 +92,10 @@ docs/                         选型、环境、spec、ADR
 ## 当前阶段
 
 M1 进行中。
-已完成：M0 骨架 + **连接流程**（`lib/src/session/`：密钥串存储、密码换 API Key、路由守卫、错误映射）。
-待完成：真实书架/系列数据、Drift 缓存、缩略图、i18n 与中文字体、TOFU 自签名证书。
+已完成：M0 骨架 + **连接流程**（`lib/src/session/`：密钥串存储、密码换 API Key、路由守卫、错误映射）
++ **API 契约与真实响应验证**（`docs/komga-api-verification.md`）+ `komga_api` 的目录读取能力（系列/书/页/缩略图字节）。
+待完成：真实书架 UI（替换 `sample_data.dart`）、Drift 缓存、书架缩略图、i18n 与中文字体、TOFU 自签名证书。
 
 接服务器时注意：网络访问只能出现在 `lib/src/data/` 的 Repository 层，screen/widget 里禁止 `dio`。
-新增 API 调用时同步在 `test/support/fakes.dart` 补一个假实现，保持"可离线测试"。
+新增 API 调用时同步在 `test/support/fakes.dart` 补一个假实现，保持"可离线测试"；
+但**假实现不等于验证**，端点行为必须按上面"API 真值规则"落到 fixture 与契约测试里。

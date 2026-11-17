@@ -1,8 +1,11 @@
 /// Komga URL 构造。
 ///
-/// 参数细节来自官方 OpenAPI 1.30.1 实测：
-/// - 页图只支持 `convert=jpeg|png`，**没有 resize 参数**（降采样必须在客户端做）；
-/// - 页码默认 1 基（`zero_based=false`）。
+/// 参数细节已对**真实 Komga 1.30.1 实例**逐条实测，证据与复现步骤见
+/// `docs/komga-api-verification.md`，并由 `test/contract_test.dart` 对着
+/// `test/fixtures/openapi-1.30.1.json` 做机器校验。要点：
+/// - 页图只支持 `convert=jpeg|png`，**`width`/`height`/`scale` 会被静默忽略**
+///   （三种参数返回的字节 SHA 完全相同），降采样必须在客户端做；
+/// - 页码 1 基：`zero_based=false` 时 `pages/1` 是首页，`pages/0` 返回 400。
 class KomgaUrls {
   KomgaUrls(String baseUrl) : _base = _normalize(baseUrl);
 
@@ -19,6 +22,9 @@ class KomgaUrls {
   String get base => _base;
 
   String libraries() => '$_base/api/v1/libraries';
+
+  /// 当前用户（API Key 的归属者）。
+  String me() => '$_base/api/v2/users/me';
 
   String series({
     int page = 0,

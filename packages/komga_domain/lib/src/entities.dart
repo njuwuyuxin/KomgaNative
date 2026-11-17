@@ -210,6 +210,29 @@ class Book {
   bool get isCompleted => readProgress?.completed ?? false;
 }
 
+/// Komga 分页查询结果。
+///
+/// Komga 的 `page` 是 **0 基**（与阅读进度页码不同），`size` 是每页条数。
+class PageResult<T> {
+  const PageResult({
+    required this.items,
+    required this.totalElements,
+    required this.page,
+    required this.size,
+  });
+
+  final List<T> items;
+  final int totalElements;
+
+  /// 0 基页序号。
+  final int page;
+  final int size;
+
+  int get totalPages => size <= 0 ? 0 : (totalElements + size - 1) ~/ size;
+
+  bool get hasMore => (page + 1) * size < totalElements;
+}
+
 /// 设备形态，用于布局与阅读器默认值。
 enum FormFactor { phone, tablet, desktopLike }
 

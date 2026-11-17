@@ -75,7 +75,7 @@ void main() {
       );
       expect(
         mapDioException(make(DioExceptionType.badResponse, status: 400)),
-        isA<KomgaProtocolError>(),
+        isA<KomgaBadRequestError>(),
       );
     });
 
