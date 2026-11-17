@@ -4,11 +4,13 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/app.dart';
+import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/session/connection_service.dart';
 import 'package:komga_native/src/session/server_store.dart';
 import 'package:komga_native/src/session/session_controller.dart';
 
 import 'golden/golden_harness.dart';
+import 'support/fake_library.dart';
 import 'support/fakes.dart';
 
 /// 端到端冒烟：真实路由 + 真实会话守卫 + 假网络/假钥匙串。
@@ -30,6 +32,10 @@ void main() {
           serverStoreProvider.overrideWithValue(store),
           connectionServiceProvider.overrideWithValue(
             service ?? FakeConnectionService(),
+          ),
+          // 书架走假仓库：冒烟测试不该联网，也不能依赖真实服务器。
+          libraryRepositoryProvider.overrideWithValue(
+            FakeLibraryRepository(series: demoShelf()),
           ),
         ],
         child: const KomgaApp(),

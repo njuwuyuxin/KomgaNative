@@ -4,8 +4,9 @@ Komga 的跨平台客户端（iOS / Android / Android 墨水屏），阅读体�
 
 > 状态：**M1 进行中**。
 > 已完成：M0 骨架（三套主题 + 黄金图闭环）、**服务器连接流程**（密码换 API Key / 直接粘贴 Key / 钥匙串保存 / 路由守卫 / 错误映射）、
-> **API 契约验证**（对真实 Komga 1.30.1 实例端到端实测，见 [docs/komga-api-verification.md](docs/komga-api-verification.md)）。
-> 待完成：真实书架与系列数据、Drift 缓存、缩略图、i18n 与中文字体。
+> **API 契约验证**（对真实 Komga 1.30.1 实例端到端实测，见 [docs/komga-api-verification.md](docs/komga-api-verification.md)）、
+> **真实书架**（`/api/v1/series` 分页 + 搜索 + 按库筛选 + 封面 + 下拉刷新 + 空/错态）。
+> 待完成：系列详情与书列表、阅读器接真实书页与进度同步、Drift 离线缓存、i18n 与中文字体。
 
 ## 文档
 
@@ -63,8 +64,8 @@ dart run tool/ci.dart check    # format + analyze + layers + 全部测试
 dart run tool/ci.dart golden   # 重新生成黄金图（仅 Windows，与 CI 一致）
 ```
 
-当前基线：**129 个测试**（纯 Dart 95 / Flutter 34），8 张黄金图覆盖
-书架（手机 light / 平板 dark / 1.3 倍字号）、墨水屏设置、阅读器、连接页（light / eink）、启动页。
+当前基线：**161 个测试**（纯 Dart 95 / Flutter 66），**11 张黄金图**覆盖
+书架（手机 light / 平板 dark / 1.3 倍字号 / 墨水屏 / 空态 / 错误态）、墨水屏设置、阅读器、连接页（light / eink）、启动页。
 
 其中 `packages/komga_api` 的 55 个测试里包含**两层真值校验**：
 `contract_test.dart` 拿官方 OpenAPI 校验客户端会构造的每个 URL；`fixtures_test.dart` 用真实服务器响应驱动解析层。
@@ -77,8 +78,21 @@ dart run tool/ci.dart golden   # 重新生成黄金图（仅 Windows，与 CI �
 3. **API Key 模式**：在 Komga 后台建好 Key 直接粘贴（适合开了双步验证）；
 4. 连接失败按类型给不同建议（401 → 检查凭据；网络错误 → 检查地址/同网段；非 Komga 响应 → 检查反代）。
 
+## 书架（已可用）
+
+数据流：`LibraryScreen`（只画状态）← `ShelfController`（分页/搜索/筛选/竞态）← `LibraryRepository`（唯一碰网络的地方）← `KomgaSession`。
+
+- 分页 + 滚到底自动预取（距底 600px，太晚会有"卡一下"的体感）；
+- 搜索 350ms 防抖；按库筛选；下拉刷新（空态/错误态也能拉）；
+- 封面走 `/series/{id}/thumbnail`，字节进 48 张的 LRU 缓存，失败只显示占位图**不影响整页**；
+- 错误按语义分四类（凭据失效 → Sign out / 网络 / 服务端 / 协议），失败不清空已有内容；
+- 请求带 generation 号，快速切库/边搜边刷新时旧响应不会覆盖新结果；
+- 网格按"最大列宽 190"自适应：手机 2 列、平板 5 列、墨水屏 4 列，不用断点写死。
+
 ## 已知边界
 
-- 书架数据仍是 `apps/app/lib/src/data/sample_data.dart`（下一步接 `/api/v1/libraries` + `/api/v1/series`）。
-- UI 文案暂为英文：i18n（ARB + 中文字体）与书架一起做，避免现在把 CJK 字体塞进黄金图。
+- **点系列还不能进入详情**：下一片做"系列 → 书列表 → 阅读器"，届时接 `/api/v1/books` 与阅读进度。
+- 阅读器仍是占位（`lib/src/data/sample_data.dart` 只剩一本假书）。
+- UI 文案暂为英文：i18n（ARB + 中文字体）之后一次性替换，避免现在把 CJK 字体塞进黄金图。
 - 自签名证书 TOFU 流程未做（当前用系统信任链）；M1.2 补"指纹确认"页。
+- 书架的离线缓存（Drift）未做：断网时只有内存里的当前列表。

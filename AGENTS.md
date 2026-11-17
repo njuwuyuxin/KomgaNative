@@ -92,10 +92,18 @@ Komga 的真实行为记录在 `docs/komga-api-verification.md`，已知与 Open
 ## 当前阶段
 
 M1 进行中。
-已完成：M0 骨架 + **连接流程**（`lib/src/session/`：密钥串存储、密码换 API Key、路由守卫、错误映射）
-+ **API 契约与真实响应验证**（`docs/komga-api-verification.md`）+ `komga_api` 的目录读取能力（系列/书/页/缩略图字节）。
-待完成：真实书架 UI（替换 `sample_data.dart`）、Drift 缓存、书架缩略图、i18n 与中文字体、TOFU 自签名证书。
+已完成：M0 骨架 + **连接流程**（`lib/src/session/`）+ **API 契约与真实响应验证**（`docs/komga-api-verification.md`）
++ `komga_api` 的目录读取（系列/书/页/缩略图字节）+ **真实书架**
+（`lib/src/data/library_repository.dart`、`lib/src/providers/library_providers.dart`、`lib/src/screens/library_screen.dart`：
+分页、350ms 搜索防抖、按库筛选、下拉刷新、封面 LRU、空/错态、请求竞态）。
+待完成：系列详情与书列表、阅读器真实书页与进度同步、Drift 离线缓存、i18n 与中文字体、TOFU 自签名证书。
 
 接服务器时注意：网络访问只能出现在 `lib/src/data/` 的 Repository 层，screen/widget 里禁止 `dio`。
 新增 API 调用时同步在 `test/support/fakes.dart` 补一个假实现，保持"可离线测试"；
 但**假实现不等于验证**，端点行为必须按上面"API 真值规则"落到 fixture 与契约测试里。
+
+书架层的既有约定（改动前先看）：
+- UI 只认 `ShelfFailure`（`lib/src/data/shelf_failure.dart`），不认 `KomgaError`；
+- 封面失败必须返回 `null`，绝不让装饰性资源打断整页；
+- 失败时**不清空**已有内容（刷新失败只在底部提示）；
+- 新的列表/分页逻辑一律走 `ShelfController` 的 generation 竞态保护，不要在页面里自己发请求。

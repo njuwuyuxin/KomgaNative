@@ -4,12 +4,16 @@ import 'package:komga_domain/komga_domain.dart';
 
 /// 系列封面卡片：书架网格的基本单元。
 ///
-/// M0 用「渐变色 + 首字」占位，M1 接入 `/series/{id}/thumbnail`。
+/// [cover] 负责真实封面（由调用方提供，设计系统不关心它从哪来）；
+/// 为空时退化成「渐变色 + 首字」占位，因此断网/缺图也不会破版。
 class SeriesTile extends StatelessWidget {
-  const SeriesTile({required this.series, this.onTap, super.key});
+  const SeriesTile({required this.series, this.onTap, this.cover, super.key});
 
   final Series series;
   final VoidCallback? onTap;
+
+  /// 封面内容，铺满封面区域（通常是一张 `Image`）。
+  final Widget? cover;
 
   static const List<Color> _placeholderColors = <Color>[
     Color(0xFF4F6BFF),
@@ -54,40 +58,24 @@ class SeriesTile extends StatelessWidget {
               Expanded(
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(AppRadii.md),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: <Color>[
-                          _placeholder,
-                          Color.lerp(_placeholder, Colors.black, 0.35)!,
-                        ],
-                      ),
-                    ),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: <Widget>[
-                        Center(
-                          child: Text(
-                            _initial,
-                            style: theme.textTheme.displayMedium?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                            ),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: <Widget>[
+                      cover ??
+                          _PlaceholderCover(
+                            color: _placeholder,
+                            initial: _initial,
+                          ),
+                      if (series.booksCount > 0)
+                        Positioned(
+                          right: AppSpacing.xs,
+                          bottom: AppSpacing.xs,
+                          child: _CountBadge(
+                            read: series.booksReadCount,
+                            total: series.booksCount,
                           ),
                         ),
-                        if (series.booksCount > 0)
-                          Positioned(
-                            right: AppSpacing.xs,
-                            bottom: AppSpacing.xs,
-                            child: _CountBadge(
-                              read: series.booksReadCount,
-                              total: series.booksCount,
-                            ),
-                          ),
-                      ],
-                    ),
+                    ],
                   ),
                 ),
               ),
@@ -139,6 +127,36 @@ class _CountBadge extends StatelessWidget {
           '$read/$total',
           style: Theme.of(context).textTheme.labelSmall
               ?.copyWith(color: Colors.white),
+        ),
+      ),
+    );
+  }
+}
+
+/// 没有封面时的占位：渐变底 + 标题首字。
+///
+/// 用标题算色相，让同一系列每次渲染颜色一致（黄金图才稳定）。
+class _PlaceholderCover extends StatelessWidget {
+  const _PlaceholderCover({required this.color, required this.initial});
+
+  final Color color;
+  final String initial;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[color, Color.lerp(color, Colors.black, 0.35)!],
+        ),
+      ),
+      child: Center(
+        child: Text(
+          initial,
+          style: Theme.of(context).textTheme.displayMedium
+              ?.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
         ),
       ),
     );

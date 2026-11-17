@@ -1,6 +1,12 @@
+import 'dart:typed_data';
+
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:komga_design_system/komga_design_system.dart';
+import 'package:komga_domain/komga_domain.dart';
+import 'package:komga_native/src/data/shelf_failure.dart';
+import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/screens/connection_screen.dart';
 import 'package:komga_native/src/screens/library_screen.dart';
 import 'package:komga_native/src/screens/reader_screen.dart';
@@ -9,13 +15,14 @@ import 'package:komga_native/src/screens/splash_screen.dart';
 import 'package:komga_native/src/session/server_store.dart';
 import 'package:komga_native/src/session/session_controller.dart';
 
+import '../support/fake_library.dart';
 import '../support/fakes.dart';
 import 'golden_harness.dart';
 
 /// UI 基线矩阵。
 ///
 /// 覆盖三件事：形态（手机/平板/墨水屏）、主题（light/dark/eink）、文本缩放。
-/// 新增页面时必须同时新增基线，否则这条流水线没有意义。
+/// 书架走真实 Repository 接口 + 假数据（含真实 PNG 封面），因此不联网但版式真实。
 void main() {
   setUpAll(loadAppFonts);
 
@@ -26,35 +33,101 @@ void main() {
     ),
   ];
 
-  testWidgets('library@phone_light', (WidgetTester tester) async {
+  Future<void> pumpShelfGolden(
+    WidgetTester tester, {
+    required String name,
+    required Size size,
+    required ThemeData theme,
+    double textScale = 1.0,
+    List<Series>? series,
+    ShelfFailure? failure,
+  }) async {
+    final data = series ?? demoShelf();
+    final repository = FakeLibraryRepository(
+      series: data,
+      libraries: demoLibraries(),
+      seriesFailure: failure,
+    );
+
+    // 用仓库自己吐出的那份 bytes 预热 ImageCache：key（MemoryImage）与页面里
+    // 生成的完全一致，图片才会在第一帧就画出来。
+    final covers = <Uint8List>[];
+    if (failure == null) {
+      for (final s in data) {
+        final bytes = await repository.seriesCover(s.id);
+        if (bytes != null) covers.add(bytes);
+      }
+    }
+
     await pumpGoldenScreen(
       tester,
       screen: const LibraryScreen(),
+      size: size,
+      theme: theme,
+      textScale: textScale,
+      overrides: <Override>[
+        libraryRepositoryProvider.overrideWithValue(repository),
+      ],
+      precacheCovers: covers,
+    );
+    await expectGolden(tester, name);
+  }
+
+  testWidgets('library@phone_light', (WidgetTester tester) async {
+    await pumpShelfGolden(
+      tester,
+      name: 'library@phone_light',
       size: GoldenSizes.phone,
       theme: AppTheme.light(),
     );
-    await expectGolden(tester, 'library@phone_light');
   });
 
   testWidgets('library@tablet_dark', (WidgetTester tester) async {
-    await pumpGoldenScreen(
+    await pumpShelfGolden(
       tester,
-      screen: const LibraryScreen(),
+      name: 'library@tablet_dark',
       size: GoldenSizes.tablet,
       theme: AppTheme.dark(),
     );
-    await expectGolden(tester, 'library@tablet_dark');
   });
 
   testWidgets('library@phone_light_text1.3', (WidgetTester tester) async {
-    await pumpGoldenScreen(
+    await pumpShelfGolden(
       tester,
-      screen: const LibraryScreen(),
+      name: 'library@phone_light_text1.3',
       size: GoldenSizes.phone,
       theme: AppTheme.light(),
       textScale: 1.3,
     );
-    await expectGolden(tester, 'library@phone_light_text1.3');
+  });
+
+  testWidgets('library@eink', (WidgetTester tester) async {
+    await pumpShelfGolden(
+      tester,
+      name: 'library@eink',
+      size: GoldenSizes.eink,
+      theme: AppTheme.eink(),
+    );
+  });
+
+  testWidgets('library_empty@phone_light', (WidgetTester tester) async {
+    await pumpShelfGolden(
+      tester,
+      name: 'library_empty@phone_light',
+      size: GoldenSizes.phone,
+      theme: AppTheme.light(),
+      series: const <Series>[],
+    );
+  });
+
+  testWidgets('library_error@eink', (WidgetTester tester) async {
+    await pumpShelfGolden(
+      tester,
+      name: 'library_error@eink',
+      size: GoldenSizes.eink,
+      theme: AppTheme.eink(),
+      failure: const NetworkFailure(),
+    );
   });
 
   testWidgets('settings@eink', (WidgetTester tester) async {
