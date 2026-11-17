@@ -35,6 +35,11 @@ class FakeLibraryRepository implements LibraryRepository {
   final List<Series> seriesData;
   final List<Book> ondeckData;
 
+  /// 记录"标记系列已读/未读"的调用。
+  final List<({String seriesId, bool read})> seriesReadCalls =
+      <({String seriesId, bool read})>[];
+  ShelfFailure? seriesReadFailure;
+
   /// 非 final：测试里可以先失败、再改成功来验证"重试"。
   ShelfFailure? seriesFailure;
   ShelfFailure? librariesFailure;
@@ -145,6 +150,13 @@ class FakeLibraryRepository implements LibraryRepository {
       page: page,
       size: size,
     );
+  }
+
+  @override
+  Future<void> setSeriesRead(String seriesId, {required bool read}) async {
+    seriesReadCalls.add((seriesId: seriesId, read: read));
+    final failure = seriesReadFailure;
+    if (failure != null) throw failure;
   }
 
   @override

@@ -81,12 +81,12 @@ dart run tool/ci.dart check    # format + analyze + layers + 全部测试
 dart run tool/ci.dart golden   # 重新生成黄金图（仅 Windows，与 CI 一致）
 ```
 
-当前基线：**369 个测试**（纯 Dart 169 / Flutter 200），**27 张黄金图**覆盖
+当前基线：**377 个测试**（纯 Dart 174 / Flutter 203），**27 张黄金图**覆盖
 书架（手机 light / 平板 dark / 1.3 倍字号 / 墨水屏 / 空态 / 错误态 / **离线态**）、系列详情（手机 / 平板 / 墨水屏）、
 阅读器（单页 dark+eink、双页 dark+eink、纵向 dark、设置面板 dark+eink）、墨水屏设置（含存储占用）、连接页（light / eink）、
 证书面板（手机 / 平板 / 墨水屏）、启动页。
 
-其中 `packages/komga_api` 的 95 个测试里包含**两层真值校验**：
+其中 `packages/komga_api` 的 100 个测试里包含**两层真值校验**：
 `contract_test.dart` 拿官方 OpenAPI 校验客户端会构造的每个 URL；`fixtures_test.dart` 用真实服务器响应驱动解析层。
 反代与证书的异常形态同样用**真实抓包**（`test/fixtures/proxy-400-plain-http.html`）和真实异常类型驱动（`errors_test.dart`）；
 离线缓存的回退决策由 11 个用例覆盖（命中/未命中/404/401/5xx/缓存自身故障）。
@@ -118,6 +118,8 @@ dart run tool/ci.dart golden   # 重新生成黄金图（仅 Windows，与 CI �
 
 - 头部：封面 + 标题 + "N of M read" + 进度条 + 阅读方向（来自 `metadata.readingDirection`）；
 - 书列表：封图、`#卷号 · 书名`、页数、已读完打勾；点一本书进阅读器（把已抓到的 `Book` 一起带过去，省一次请求）；
+- **标记整系列已读/未读**：右上角菜单，一条 `POST`/`DELETE /series/{id}/read-progress` 完成
+  （接口经真实实例验证，见 [docs/series-queries.md](docs/series-queries.md)），本地 outbox 同步覆盖；
 - 一次要 100 本（多数系列够用）；真超过 100 本时底部明说 "Showing 100 of N"，**不装作全都在**；
 - 空系列、加载失败（可重试）、下拉刷新与书架同一套语义。
 

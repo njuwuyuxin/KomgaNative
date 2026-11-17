@@ -26,6 +26,10 @@ class ProgressSyncService {
 
   ProgressStore get store => _store;
 
+  /// 用户显式改了阅读状态（标记已读/未读）后调用：本地那份 pending 已过期。
+  Future<void> forceAdopt(String bookId, ReadProgress? remote) =>
+      _store.forceAdopt(bookId, remote);
+
   /// 记一页进度：先落盘，再尽力提交（不阻塞调用方）。
   Future<void> save(
     String bookId, {

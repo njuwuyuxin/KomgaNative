@@ -36,6 +36,12 @@ abstract interface class LibraryRepository {
   /// "继续阅读"（Komga 的 ondeck：在读过、还没读完的书）。
   Future<PageResult<Book>> ondeck({int size = 20});
 
+  /// 把整个系列标记已读/未读：服务端一条请求 + 本地进度一起改。
+  ///
+  /// 本地也要改，是因为 outbox 里可能还留着这本书没提交的旧进度：
+  /// 只改服务端的话，界面会显示"刚标记未读，书架却还是读过"。
+  Future<void> setSeriesRead(String seriesId, {required bool read});
+
   /// 系列封面。返回 `null` 表示"没有封面"——装饰性资源**不允许**让整页报错。
   Future<Uint8List?> seriesCover(String seriesId);
 
@@ -134,6 +140,35 @@ class KomgaLibraryRepository implements LibraryRepository {
         page: result.page,
         size: result.size,
       );
+    } on KomgaError catch (error) {
+      throw shelfFailureOf(error);
+    }
+  }
+
+  @override
+  Future<void> setSeriesRead(String seriesId, {required bool read}) async {
+    try {
+      // 先拿书列表：标记完要把本地进度逐本对齐，否则 overlay 会让界面回退。
+      final books = await _session.fetchSeriesBooks(seriesId, size: 100);
+      if (read) {
+        await _session.markSeriesRead(seriesId);
+      } else {
+        await _session.markSeriesUnread(seriesId);
+      }
+      // 实测：标记已读后 page = 该书页数；标记未读后服务端 readProgress = null。
+      final now = DateTime.now().toUtc();
+      for (final book in books.items) {
+        await _sync.forceAdopt(
+          book.id,
+          read
+              ? ReadProgress(
+                  page: book.pagesCount,
+                  completed: true,
+                  lastModified: now,
+                )
+              : null,
+        );
+      }
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);
     }

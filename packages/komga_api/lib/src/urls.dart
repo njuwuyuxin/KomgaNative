@@ -83,6 +83,10 @@ class KomgaUrls {
   String bookReadProgress(String bookId) =>
       '$_base/api/v1/books/$bookId/read-progress';
 
+  /// 系列级进度：`POST` = 全部标记已读，`DELETE` = 全部标记未读（实测 204）。
+  String seriesReadProgress(String seriesId) =>
+      '$_base/api/v1/series/$seriesId/read-progress';
+
   String ondeck({int size = 20}) =>
       _withQuery('$_base/api/v1/books/ondeck', {'size': '$size'});
 

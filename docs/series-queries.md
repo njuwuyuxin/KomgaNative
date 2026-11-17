@@ -45,6 +45,27 @@ $hk = @{ 'X-API-Key' = $key }
 （不是"存在未读书"的系列）。`IN_PROGRESS` 的完整语义（部分读）没有在这个库里
 造出数据验证——UI 文案只说"在读"，不承诺具体判定边界。
 
+## 系列级标记已读/未读
+
+OpenAPI 里 `/api/v1/series/{seriesId}/read-progress` 声明了两个操作：
+
+- `POST`：`summary: Mark series as read`，返回 204；
+- `DELETE`：`summary: Mark series as unread`，返回 204。
+
+对真实实例（`Verify Series #1`，1 本书 3 页）验证：
+
+| 请求 | 之后 `booksReadCount` | 书上的 `readProgress` |
+|---|---|---|
+| `POST /api/v1/series/0S8NJYAVNZ9DJ/read-progress` | 1/1 | `completed=true`, `page=3`（= 该书页数，不是 1） |
+| `DELETE /api/v1/series/0S8NJYAVNZ9DJ/read-progress` | 0/1 | `null`（不是 `completed=false`） |
+
+这就是"整系列标记"不需要逐本请求的证据。客户端对应：
+
+- `KomgaSession.markSeriesRead` / `markSeriesUnread` / `markBookUnread`；
+- `contract_test.dart` 覆盖 `POST`/`DELETE` 的 series read-progress 与 `DELETE` 的 book read-progress；
+- 写服务端之后，`ProgressStore.forceAdopt` 会把本地 outbox 里同一本书的旧进度覆盖掉，
+  否则"刚标记未读、书架却还显示读过"。
+
 ## 客户端落地
 
 - `packages/komga_domain/lib/src/queries.dart`：`SeriesSort` / `SeriesReadStatus`（语言无关的枚举）

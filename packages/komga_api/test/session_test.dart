@@ -293,4 +293,30 @@ void main() {
       expect(adapter.requests.last.headers['Accept'], 'application/json');
     });
   });
+
+  group('系列级进度', () {
+    test('标记系列已读/未读走 POST/DELETE，204 无 body 也算成功', () async {
+      final adapter = FakeAdapter((_) async => rawResponse('', status: 204));
+      final session = KomgaSession.withApiKey(
+        address: address,
+        apiKey: 'key',
+        dio: dioWith(adapter),
+      );
+
+      await session.markSeriesRead('s1');
+      await session.markSeriesUnread('s1');
+      await session.markBookUnread('b1');
+
+      expect(
+        adapter.requests
+            .map((RequestOptions r) => '${r.method} ${r.uri.path}')
+            .toList(),
+        <String>[
+          'POST /api/v1/series/s1/read-progress',
+          'DELETE /api/v1/series/s1/read-progress',
+          'DELETE /api/v1/books/b1/read-progress',
+        ],
+      );
+    });
+  });
 }

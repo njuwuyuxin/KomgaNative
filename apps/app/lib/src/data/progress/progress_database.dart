@@ -139,4 +139,22 @@ class ProgressDatabase extends _$ProgressDatabase {
       ),
     );
   }
+
+  /// 强制采纳：忽略本地 pending，直接覆盖（用户显式标记已读/未读之后用）。
+  Future<void> forceAdopt(String bookId, ReadProgress? remote) async {
+    if (remote == null) {
+      await (delete(localProgress)..where((t) => t.bookId.equals(bookId))).go();
+      return;
+    }
+    await into(localProgress).insertOnConflictUpdate(
+      LocalProgressCompanion.insert(
+        bookId: bookId,
+        page: remote.page,
+        completed: remote.completed,
+        updatedAt: DateTime.now().toUtc(),
+        serverLastModified: Value<DateTime?>(remote.lastModified.toUtc()),
+        pendingSeq: const Value<int?>(null),
+      ),
+    );
+  }
 }

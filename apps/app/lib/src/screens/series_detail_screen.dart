@@ -7,6 +7,7 @@ import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
+import 'package:komga_native/src/providers/series_read_provider.dart';
 import 'package:komga_native/src/screens/reader_screen.dart';
 import 'package:komga_native/src/widgets/book_download_button.dart';
 import 'package:komga_native/src/widgets/offline_banner.dart';
@@ -23,6 +24,21 @@ class SeriesDetailScreen extends ConsumerWidget {
     ref.invalidate(seriesDetailProvider(seriesId));
     ref.invalidate(seriesBooksProvider(seriesId));
     await ref.read(seriesBooksProvider(seriesId).future);
+  }
+
+  /// 标记整系列已读/未读；失败时用 SnackBar 说明，不把详情页变成错误页。
+  Future<void> _markSeriesRead(
+    BuildContext context,
+    WidgetRef ref, {
+    required bool read,
+  }) async {
+    try {
+      await ref.read(seriesReadProvider.notifier).setRead(seriesId, read: read);
+    } on ShelfFailure catch (failure) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(failure.message)));
+    }
   }
 
   @override
@@ -43,6 +59,27 @@ class SeriesDetailScreen extends ConsumerWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
+        actions: <Widget>[
+          PopupMenuButton<String>(
+            key: const Key('series-mark-menu'),
+            icon: const Icon(Icons.done_all),
+            tooltip: 'Mark read',
+            onSelected: (String value) =>
+                unawaited(_markSeriesRead(context, ref, read: value == 'read')),
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+              const PopupMenuItem<String>(
+                key: Key('series-mark-read'),
+                value: 'read',
+                child: Text('Mark all read'),
+              ),
+              const PopupMenuItem<String>(
+                key: Key('series-mark-unread'),
+                value: 'unread',
+                child: Text('Mark all unread'),
+              ),
+            ],
+          ),
+        ],
       ),
       body: Column(
         children: <Widget>[

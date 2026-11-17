@@ -275,6 +275,23 @@ class KomgaSession {
     await _patchJson(_urls.bookReadProgress(bookId), body);
   }
 
+  /// 把一本书标记为未读（`DELETE /books/{id}/read-progress`，实测 204，进度被清空）。
+  Future<void> markBookUnread(String bookId) =>
+      _deleteVoid(_urls.bookReadProgress(bookId));
+
+  /// 把整个系列标记为已读（`POST /series/{id}/read-progress`）。
+  ///
+  /// 实测：204 无 body；之后每本书 `readProgress.completed = true`、
+  /// `page = 该书页数`（不是 1）。
+  Future<void> markSeriesRead(String seriesId) =>
+      _postVoid(_urls.seriesReadProgress(seriesId));
+
+  /// 把整个系列标记为未读（`DELETE /series/{id}/read-progress`）。
+  ///
+  /// 实测：204；之后每本书的 `readProgress` 变成 null（不是 completed=false）。
+  Future<void> markSeriesUnread(String seriesId) =>
+      _deleteVoid(_urls.seriesReadProgress(seriesId));
+
   void close() => _dio.close(force: true);
 
   Future<Object?> _getJson(String url) async {
@@ -346,6 +363,24 @@ class KomgaSession {
       // 204 No Content：不要读 data。
       await _dio.patch<Object?>(url, data: body, options: _jsonOptions);
       // PATCH 能成功说明网络是通的：撤掉离线提示，不必等下一次 GET。
+      _cache?.reportOnline(_scope);
+    } on DioException catch (e) {
+      throw mapDioException(e);
+    }
+  }
+
+  Future<void> _postVoid(String url) async {
+    try {
+      await _dio.post<Object?>(url, options: _jsonOptions);
+      _cache?.reportOnline(_scope);
+    } on DioException catch (e) {
+      throw mapDioException(e);
+    }
+  }
+
+  Future<void> _deleteVoid(String url) async {
+    try {
+      await _dio.delete<Object?>(url, options: _jsonOptions);
       _cache?.reportOnline(_scope);
     } on DioException catch (e) {
       throw mapDioException(e);

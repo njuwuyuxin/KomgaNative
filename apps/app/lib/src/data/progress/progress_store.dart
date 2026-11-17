@@ -54,6 +54,12 @@ abstract interface class ProgressStore {
 
   /// 采纳服务端进度（有 pending 时不写）。
   Future<void> adoptRemote(String bookId, ReadProgress? remote);
+
+  /// **强制**采纳服务端进度：清掉本地 pending 后写入。
+  ///
+  /// 只用于"用户显式改了阅读状态"（标记已读/未读）——此时本地那份未提交进度
+  /// 已经过期，继续保留会让界面显示"我刚标记未读，但书架还是读过"。
+  Future<void> forceAdopt(String bookId, ReadProgress? remote);
 }
 
 class DriftProgressStore implements ProgressStore {
@@ -89,6 +95,10 @@ class DriftProgressStore implements ProgressStore {
   @override
   Future<void> adoptRemote(String bookId, ReadProgress? remote) =>
       _db.adoptRemote(bookId, remote);
+
+  @override
+  Future<void> forceAdopt(String bookId, ReadProgress? remote) =>
+      _db.forceAdopt(bookId, remote);
 
   static ProgressRecord _toRecord(LocalProgressData row) => ProgressRecord(
     page: row.page,
@@ -174,6 +184,20 @@ class InMemoryProgressStore implements ProgressStore {
   Future<void> adoptRemote(String bookId, ReadProgress? remote) async {
     final current = _records[bookId];
     if (current?.isPending ?? false) return;
+    if (remote == null) {
+      _records.remove(bookId);
+      return;
+    }
+    _records[bookId] = ProgressRecord(
+      page: remote.page,
+      completed: remote.completed,
+      updatedAt: DateTime.now().toUtc(),
+      serverLastModified: remote.lastModified.toUtc(),
+    );
+  }
+
+  @override
+  Future<void> forceAdopt(String bookId, ReadProgress? remote) async {
     if (remote == null) {
       _records.remove(bookId);
       return;
