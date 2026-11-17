@@ -64,7 +64,7 @@
 
 | 文件 | 触发 | 机器 | 做什么 |
 |---|---|---|---|
-| `ci.yml` | push to main、PR、手动 | `windows-latest` | `dart run tool/ci.dart check`：格式 + 分析 + 分层规则 + 61 个测试 + 5 张黄金图 |
+| `ci.yml` | push to main、PR、手动 | `windows-latest` | `dart run tool/ci.dart check`：格式 + 分析 + 分层规则 + 全部测试 + 黄金图比对 |
 | `build-android.yml` | push to main（代码路径变化）、手动 | `ubuntu-latest` | `flutter build apk --release` → 上传 APK artifact |
 | `build-ios.yml` | push / PR / `v*` tag / 手动 | `macos-latest` | `flutter build ios --release --no-codesign` → 上传 `.app.zip` |
 
@@ -72,6 +72,36 @@
 
 **为什么 iOS 现在也跟 push**：仓库是 public，macOS runner 免费。三条流水线都跑，PR 能同时看到"Android 能编、iOS 能编"。
 **如果转私有**：删掉 `build-ios.yml` 的 `pull_request` 与 `push` 触发，只留 `workflow_dispatch` 和 tag。
+
+### 3.1 产物（artifact）怎么拿
+
+两条构建流水线都会上传产物，**保留 14 天**（`retention-days: 14`），过期后该次运行的 Artifacts 区域为空：
+
+| 产物名 | 内容 | 来源 |
+|---|---|---|
+| `komga-native-apk` | `app-release.apk`（debug 签名，仅验证构建链路） | `build-android.yml` |
+| `komga-native-ios-unsigned` | `Runner.app.zip`（**未签名**，`--no-codesign`） | `build-ios.yml` |
+
+网页：仓库 → **Actions** → 点某次运行 → 页面底部 **Artifacts** → 下载。
+
+命令行：**artifacts 下载需要认证**（对匿名请求返回 `401`，public 仓库也一样），
+所以需要一个 `repo` 权限的 token：
+
+```powershell
+$token = $env:GITHUB_TOKEN          # 或本地 PAT
+$run = Invoke-RestMethod -Headers @{Authorization="Bearer $token"} `
+  "https://api.github.com/repos/<user>/KomgaNative/actions/workflows/build-ios.yml/runs?per_page=1"
+$art = Invoke-RestMethod -Headers @{Authorization="Bearer $token"} `
+  "https://api.github.com/repos/<user>/KomgaNative/actions/runs/$($run.workflow_runs[0].id)/artifacts"
+$id = $art.artifacts[0].id
+curl.exe -L -H "Authorization: Bearer $token" `
+  "https://api.github.com/repos/<user>/KomgaNative/actions/artifacts/$id/zip" -o ios.zip
+```
+
+> **未签名的 `.app.zip` 装不到 iPhone 上**。它只能证明"能编过"，或者用来检查包内容。
+> 真机安装需要签名（Apple ID 免费 provisioning，7 天有效；或付费开发者账号），
+> 要么在 Mac 上用 Xcode 重签，要么在 CI 里配好证书走 `flutter build ipa`（见 §8）。
+
 
 ---
 
