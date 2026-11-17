@@ -48,7 +48,8 @@
 ## 后果
 
 - `apps/app` 新增依赖：`drift`、`path_provider`；dev：`drift_dev`、`build_runner`、`sqlite3`（测试里开内存库）。
-  生成的 `*.g.dart` 入库（Agent 环境不保证随时能跑 codegen）。
+  生成的 `*.g.dart` **不入库**（仓库 `.gitignore` 的既有规则），由 `dart run tool/ci.dart check`
+  的 `codegen` 步骤按需生成（生成物缺失或源文件更新时才跑），所以本地与 CI 仍是同一条命令。
 - Windows 上 `flutter test` 直接可跑内存库（Flutter 3.50 的 native assets 会构建 sqlite），
   不需要额外的 dll 注入。
 - 表结构变更必须写 migration；v1 没有历史数据，暂不引入 schema 测试。

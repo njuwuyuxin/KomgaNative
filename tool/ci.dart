@@ -33,6 +33,7 @@ Future<void> main(List<String> args) async {
   final command = args.isEmpty ? 'check' : args.first;
   final code = switch (command) {
     'check' => await check(),
+    'codegen' => await codegen(),
     'fix' => await fix(),
     'analyze' => await analyze(),
     'test' => await test(),
@@ -49,7 +50,8 @@ Future<int> help({String? unknown}) async {
   stdout.writeln('''
 KomgaNative CI
 
-  check     格式检查 + 静态分析 + 分层规则 + 全部测试（默认）
+  check     生成代码（按需）+ 格式检查 + 静态分析 + 分层规则 + 全部测试（默认）
+  codegen   只跑生成代码（drift；生成物不入库，CI 上由 check 自动触发）
   fix       自动格式化 + dart fix --apply
   analyze   只跑静态分析
   test      只跑测试（纯 Dart 包用 dart test，Flutter 包用 flutter test）
@@ -63,6 +65,7 @@ KomgaNative CI
 
 Future<int> check() async {
   final steps = <({String name, Future<int> Function() run})>[
+    (name: 'codegen', run: codegen),
     (name: 'format', run: formatCheck),
     (name: 'analyze', run: analyze),
     (name: 'layers', run: layerCheck),
@@ -103,6 +106,40 @@ Future<int> formatCheck() => runProc('dart', <String>[
   '--set-exit-if-changed',
   '.',
 ]);
+
+/// 生成代码（drift）；只在需要时跑。
+///
+/// 仓库的 `.gitignore` 忽略 `*.g.dart`（生成物不入库），但 CI 是全新 clone，
+/// 不生成就编译不过。放在门禁里而不是加一个 CI step：本地与 CI 仍走同一条命令，
+/// 不会出现"CI 能过、本地不能"的双轨问题。
+///
+/// 判据是"生成物缺失 / 源文件更新"，不做无条件构建——build_runner 首次要 AOT 编译
+/// 构建器（约 40s），每次 check 都跑太浪费。
+Future<int> codegen() async {
+  const source = 'apps/app/lib/src/data/progress/progress_database.dart';
+  const generated = 'apps/app/lib/src/data/progress/progress_database.g.dart';
+
+  final sourceFile = File(source);
+  if (!sourceFile.existsSync()) {
+    stdout.writeln('没有 drift 源文件，跳过 codegen');
+    return 0;
+  }
+  final generatedFile = File(generated);
+  final upToDate =
+      generatedFile.existsSync() &&
+      !sourceFile.lastModifiedSync().isAfter(generatedFile.lastModifiedSync());
+  if (upToDate) {
+    stdout.writeln('生成物已是最新，跳过 codegen');
+    return 0;
+  }
+
+  stdout.writeln('生成物缺失或过期 → dart run build_runner build');
+  return runProc('dart', <String>[
+    'run',
+    'build_runner',
+    'build',
+  ], workingDirectory: 'apps/app');
+}
 
 Future<int> analyze() => runProc('dart', <String>['analyze', '.']);
 
