@@ -209,6 +209,7 @@ git push origin HEAD:refs/heads/wip/<你的名字>
 | 构建极慢 / 杀软扫描 | Defender 实时扫描 | 排除 `D:\DevTools`、项目 `build\`、`.dart_tool`、`.gradle` |
 | `sdkmanager` 提示某 `platforms;android-3x` 找不到 | 该版本号不存在 | 忽略；AGP 会在首次构建时自动下载匹配版本 |
 | 重开终端后 `flutter` 仍不可用 | 用户 PATH 未刷新 | 注销重登，或 `refreshenv`（choco 提供） |
+| 真机装 release APK 后连任何服务器都提示"无法连接"，同机浏览器正常 | `INTERNET` 权限只在 `src/debug` / `src/profile` 的 manifest 里，release 不合并 | 权限必须写进 `apps/app/android/app/src/main/AndroidManifest.xml`；已有 `test/platform/android_manifest_test.dart` 钉住，拿到 APK 可用 `aapt2 dump permissions app-release.apk` 复核 |
 
 **Gradle 镜像**（可选，写进 `%USERPROFILE%\.gradle\init.gradle`）：
 

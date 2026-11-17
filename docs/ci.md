@@ -82,6 +82,12 @@
 | `komga-native-apk` | `app-release.apk`（debug 签名，仅验证构建链路） | `build-android.yml` |
 | `komga-native-ios-unsigned` | `Runner.app.zip`（**未签名**，`--no-codesign`） | `build-ios.yml` |
 
+> **release APK 的 Android 权限只来自 `apps/app/android/app/src/main/AndroidManifest.xml`**：
+> `src/debug` / `src/profile` 里的 `INTERNET` 不会合并进 release。缺了它，真机装包后任何地址都提示
+> "无法连接到 xxx"（系统直接拒绝 socket），而模拟器的 debug 包完全正常——2026-11-17 真机测试踩过。
+> 源码由 `apps/app/test/platform/android_manifest_test.dart` 钉住；拿到 artifact 后也可用
+> `aapt2 dump permissions app-release.apk` 复核。
+
 网页：仓库 → **Actions** → 点某次运行 → 页面底部 **Artifacts** → 下载。
 
 命令行：**artifacts 下载需要认证**（对匿名请求返回 `401`，public 仓库也一样），

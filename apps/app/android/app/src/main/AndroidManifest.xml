@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 必须放在 main：debug/profile 的 manifest 里也有这条，但 release 只会合并 main。
+         漏掉它的症状是"真机装 release 包后任何地址都提示无法连接，浏览器却能打开"——
+         Android 会直接拒绝 socket（Operation not permitted），连接页只能报网络错误。 -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="komga_native"
         android:name="${applicationName}"
