@@ -1,13 +1,17 @@
 import 'dart:typed_data';
 
+import 'package:drift/native.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
+import 'package:komga_native/src/data/cache/drift_http_cache.dart';
+import 'package:komga_native/src/data/cache/http_cache_database.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
 import 'package:komga_native/src/data/reader_prefs_store.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
+import 'package:komga_native/src/providers/cache_providers.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/providers/reader_prefs_provider.dart';
 import 'package:komga_native/src/providers/reader_providers.dart';
@@ -51,6 +55,7 @@ void main() {
     double textScale = 1.0,
     List<Series>? series,
     ShelfFailure? failure,
+    bool offline = false,
   }) async {
     final data = series ?? demoShelf();
     final repository = FakeLibraryRepository(
@@ -69,6 +74,10 @@ void main() {
       }
     }
 
+    // 离线提示由缓存实例广播：必须在首帧之前报告，基线才画得出来。
+    final cache = DriftHttpCache(HttpCacheDatabase(NativeDatabase.memory()));
+    if (offline) cache.reportOffline('https://komga.example.com');
+
     await pumpGoldenScreen(
       tester,
       screen: const LibraryScreen(),
@@ -77,6 +86,7 @@ void main() {
       textScale: textScale,
       overrides: <Override>[
         libraryRepositoryProvider.overrideWithValue(repository),
+        httpCacheProvider.overrideWithValue(cache),
       ],
       precacheImages: covers,
     );
@@ -117,6 +127,16 @@ void main() {
       name: 'library@eink',
       size: GoldenSizes.eink,
       theme: AppTheme.eink(),
+    );
+  });
+
+  testWidgets('library_offline@phone_light', (WidgetTester tester) async {
+    await pumpShelfGolden(
+      tester,
+      name: 'library_offline@phone_light',
+      size: GoldenSizes.phone,
+      theme: AppTheme.light(),
+      offline: true,
     );
   });
 
@@ -207,7 +227,14 @@ void main() {
       screen: const SettingsScreen(),
       size: GoldenSizes.eink,
       theme: AppTheme.eink(),
-      overrides: memorySession(connected: true),
+      overrides: <Override>[
+        ...memorySession(connected: true),
+        // 设置页会读缓存占用：换成内存库，避免 path_provider 平台通道，
+        // 也让"Nothing cached yet"成为确定值（否则基线随本机缓存漂移）。
+        httpCacheProvider.overrideWithValue(
+          DriftHttpCache(HttpCacheDatabase(NativeDatabase.memory())),
+        ),
+      ],
     );
     await expectGolden(tester, 'settings@eink');
   });

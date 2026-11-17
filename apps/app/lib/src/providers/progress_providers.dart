@@ -8,6 +8,7 @@ import 'package:komga_native/src/data/progress/progress_database.dart';
 import 'package:komga_native/src/data/progress/progress_store.dart';
 import 'package:komga_native/src/data/progress/progress_sync_service.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
+import 'package:komga_native/src/providers/cache_providers.dart';
 import 'package:komga_native/src/session/session_controller.dart';
 import 'package:komga_sync_engine/komga_sync_engine.dart';
 import 'package:path_provider/path_provider.dart';
@@ -58,6 +59,8 @@ Future<void> _uploadProgress(Ref ref, ProgressTarget target) async {
     address: session.server.address,
     apiKey: session.server.apiKey,
     trust: session.server.tls,
+    // 只为"PATCH 成功即在线"这一个信号：网络恢复后，补交成功的同时撤掉离线提示。
+    cache: ref.read(httpCacheProvider),
   );
   try {
     await komga.updateReadProgress(

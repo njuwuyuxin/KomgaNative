@@ -1,12 +1,16 @@
+import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
+import 'package:komga_native/src/data/cache/drift_http_cache.dart';
+import 'package:komga_native/src/data/cache/http_cache_database.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
 import 'package:komga_native/src/data/reader_prefs_store.dart';
 import 'package:komga_native/src/data/progress/progress_store.dart';
 import 'package:komga_native/src/data/progress/progress_sync_service.dart';
+import 'package:komga_native/src/providers/cache_providers.dart';
 import 'package:komga_native/src/providers/progress_providers.dart';
 import 'package:komga_native/src/providers/reader_prefs_provider.dart';
 import 'package:komga_native/src/providers/reader_providers.dart';
@@ -31,6 +35,7 @@ Future<InMemoryReaderPrefsStore> pumpReader(
   ReaderPrefs? initialPrefs,
   FakeWakeLock? wakeLock,
   ProgressStore? progressStore,
+  bool offline = false,
 }) async {
   tester.view.physicalSize = const Size(390 * 3, 844 * 3);
   tester.view.devicePixelRatio = 3;
@@ -49,6 +54,10 @@ Future<InMemoryReaderPrefsStore> pumpReader(
     ),
   );
 
+  /// 离线提示由缓存实例广播；先报告，再建树，顶栏图标才会在首帧出现。
+  final cache = DriftHttpCache(HttpCacheDatabase(NativeDatabase.memory()));
+  if (offline) cache.reportOffline('https://komga.example.com');
+
   await tester.pumpWidget(
     ProviderScope(
       overrides: <Override>[
@@ -56,6 +65,7 @@ Future<InMemoryReaderPrefsStore> pumpReader(
         progressSyncProvider.overrideWithValue(sync),
         readerPrefsStoreProvider.overrideWithValue(prefsStore),
         wakeLockProvider.overrideWithValue(wakeLock ?? FakeWakeLock()),
+        httpCacheProvider.overrideWithValue(cache),
         if (forceEink) settingsProvider.overrideWith(EinkSettings.new),
       ],
       child: MaterialApp(

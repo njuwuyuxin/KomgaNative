@@ -5,6 +5,7 @@ import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/session/session_controller.dart';
+import 'package:komga_native/src/widgets/offline_banner.dart';
 import 'package:komga_native/src/widgets/shelf_views.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -56,6 +57,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       ),
       body: Column(
         children: <Widget>[
+          // 断网时提示"看的是缓存"，并给一次重新联网的机会。
+          OfflineBanner(onRetry: () => unawaited(controller.refresh())),
           if (_searching)
             Padding(
               padding: const EdgeInsets.fromLTRB(

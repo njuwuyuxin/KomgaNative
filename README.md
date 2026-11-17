@@ -2,7 +2,7 @@
 
 Komga 的跨平台客户端（iOS / Android / Android 墨水屏），阅读体验优先。
 
-> 状态：**M1 进行中**。
+> 状态：**M1 收尾 / v1 功能补完中**（阶段计划见 [docs/roadmap.md](docs/roadmap.md)）。
 > 已完成：M0 骨架（三套主题 + 黄金图闭环）、**服务器连接流程**（密码换 API Key / 直接粘贴 Key / 钥匙串保存 / 路由守卫 / 错误映射）、
 > **API 契约验证**（对真实 Komga 1.30.1 实例端到端实测，见 [docs/komga-api-verification.md](docs/komga-api-verification.md)）、
 > **反代与 TLS 处理**（`http` 端口自动升级 `https`、证书不受信任时固定指纹 + 用户确认，见 [docs/tls-and-proxy.md](docs/tls-and-proxy.md)）、
@@ -11,10 +11,11 @@ Komga 的跨平台客户端（iOS / Android / Android 墨水屏），阅读体�
 > **阅读器 v2**（单页 / 双页跨页 / 纵向连续三种模式，按系列方向自动选默认值；
 > 真实页图、点击翻页、双指缩放、从上次位置继续、进度回写 Komga；墨水屏白底黑字；
 > 阅读设置面板：模式/亮度/常亮/跳页，偏好持久化）、
-> **进度 outbox**（Drift 落盘、断网不丢、联网/回前台自动补交、多设备按服务端 `lastModified` 对账）。
+> **进度 outbox**（Drift 落盘、断网不丢、联网/回前台自动补交、多设备按服务端 `lastModified` 对账）、
+> **离线缓存**（书架/封面/页图 GET 响应落盘，断网看到上次的内容并显示离线提示条，见 [docs/offline-cache.md](docs/offline-cache.md)）。
 > 已在 **Android 模拟器 + 本机 Komga 实例**上跑通"连接 → 书架 → 系列 → 阅读 → 进度"全链路，
 > 并在**一台公网 NAS（openresty 反代 + 证书已过期）**上验证了真实登录路径。
-> 待完成：阅读设置持久化（亮度/常亮/快速跳页）、进度 outbox 与多设备对账、Drift 离线缓存、i18n 与中文字体。
+> 待完成：阅读器补完（预取/缩略图导航/整本下载）、继续阅读与筛选、多服务器与存储管理、i18n 与中文字体、形态适配（见 roadmap）。
 
 ## 文档
 
@@ -28,7 +29,9 @@ Komga 的跨平台客户端（iOS / Android / Android 墨水屏），阅读体�
 | [docs/reader.md](docs/reader.md) | 阅读器：三层分工、模式规则、设置与持久化的取舍、常亮通道的实现边界 |
 | [docs/adr/0001-certificate-trust.md](docs/adr/0001-certificate-trust.md) | ADR：为什么用 TOFU + 固定指纹，而不是"忽略证书" |
 | [docs/adr/0002-progress-outbox-and-drift.md](docs/adr/0002-progress-outbox-and-drift.md) | ADR：进度 outbox 与 Drift 落盘（表结构、seq 回执、对账基准） |
-| [docs/adr/0001-certificate-trust.md](docs/adr/0001-certificate-trust.md) | ADR：为什么用 TOFU + 固定指纹，而不是"忽略证书" |
+| [docs/offline-cache.md](docs/offline-cache.md) | 离线与缓存：能看什么、容量与淘汰、分区、验证 |
+| [docs/adr/0003-http-response-cache.md](docs/adr/0003-http-response-cache.md) | ADR：为什么把缓存钩在传输层、为什么与进度库分文件 |
+| [docs/roadmap.md](docs/roadmap.md) | 剩余功能分阶段计划（C–I）与验收口径 |
 | [AGENTS.md](AGENTS.md) | Agent 工作契约：命令、架构不变量、DoD、反模式 |
 
 ## CI
@@ -77,14 +80,15 @@ dart run tool/ci.dart check    # format + analyze + layers + 全部测试
 dart run tool/ci.dart golden   # 重新生成黄金图（仅 Windows，与 CI 一致）
 ```
 
-当前基线：**308 个测试**（纯 Dart 141 / Flutter 167），**23 张黄金图**覆盖
-书架（手机 light / 平板 dark / 1.3 倍字号 / 墨水屏 / 空态 / 错误态）、系列详情（手机 / 平板 / 墨水屏）、
-阅读器（单页 dark+eink、双页 dark+eink、纵向 dark、设置面板 dark+eink）、墨水屏设置、连接页（light / eink）、
+当前基线：**337 个测试**（纯 Dart 165 / Flutter 172），**24 张黄金图**覆盖
+书架（手机 light / 平板 dark / 1.3 倍字号 / 墨水屏 / 空态 / 错误态 / **离线态**）、系列详情（手机 / 平板 / 墨水屏）、
+阅读器（单页 dark+eink、双页 dark+eink、纵向 dark、设置面板 dark+eink）、墨水屏设置（含存储占用）、连接页（light / eink）、
 证书面板（手机 / 平板 / 墨水屏）、启动页。
 
-其中 `packages/komga_api` 的 80 个测试里包含**两层真值校验**：
+其中 `packages/komga_api` 的 91 个测试里包含**两层真值校验**：
 `contract_test.dart` 拿官方 OpenAPI 校验客户端会构造的每个 URL；`fixtures_test.dart` 用真实服务器响应驱动解析层。
-反代与证书的异常形态同样用**真实抓包**（`test/fixtures/proxy-400-plain-http.html`）和真实异常类型驱动（`errors_test.dart`）。
+反代与证书的异常形态同样用**真实抓包**（`test/fixtures/proxy-400-plain-http.html`）和真实异常类型驱动（`errors_test.dart`）；
+离线缓存的回退决策由 11 个用例覆盖（命中/未命中/404/401/5xx/缓存自身故障）。
 阅读器的几何（单页适配、双页分组、纵向偏移/页码映射）在 `packages/komga_reader_engine` 里是纯函数，32 个用例表驱动覆盖。
 
 ## 连接流程（已可用）
@@ -164,6 +168,19 @@ Drift 留给书架/页图缓存与进度 outbox。坏存档一律回默认值。
 表结构、为什么合一张表、为什么 PATCH 成功后要把服务端基准置空，见
 [ADR 0002](docs/adr/0002-progress-outbox-and-drift.md)。
 
+## 离线：看过的东西还能看
+
+缓存钩在 `KomgaSession` 的 GET 上（不是每个 Repository 各写一遍）：成功写盘，
+**网络类失败 / 5xx** 才回退；404/401/403 不回退——资源被删或登录失效时要如实报错。
+细节与取舍见 [docs/offline-cache.md](docs/offline-cache.md)、[ADR 0003](docs/adr/0003-http-response-cache.md)。
+
+- 缓存什么：系列列表、系列详情、书列表、页列表、页图、封面；
+- 容量：图片 256 MB 按 LRU 淘汰；JSON 每服务器 400 条按最久未用裁剪，**不参与字节淘汰**
+  （它很小，却是"书能不能打开"的前提）；
+- 分区：按服务器 `baseUrl`，多服务器不串数据；查询串进缓存键，搜索/分页互不覆盖；
+- 提示：传输层观测到失败就显示「Offline · showing saved content」，任意请求成功（含进度 PATCH）后自动消失；
+- 管理：设置 → Storage 看占用、一键清空（只清缓存，不动进度）。
+
 ## 连接到你的 Komga（NAS）
 
 1. 地址填 `http://<NAS 局域网 IP>:<端口>`，例如 `http://192.168.1.10:25600`（也支持 `https://` 与反代子路径 `https://host/komga`）；
@@ -214,8 +231,8 @@ debug 包（模拟器 / `flutter run`）自带这条权限，所以这个坑只�
 
 ## 已知边界
 
-- **断网还不能"打开书"**：进度不丢（有 outbox），但书架/页图没有内容缓存，
-  断网冷启动是错误页；内容缓存（书架 JSON + 页图 + 容量上限）是下一片；
+- **离线只覆盖"看过的东西"**：没访问过的页断网仍打不开（整本下载属于阶段 D）；
+  离线时也不做凭据校验——登录态失效要联网才会发现；
 - **常亮只在 Android 生效**：iOS 侧通道没实现（`MissingPluginException` 静默降级为"不常亮"），
   没有 macOS 环境验证，宁可留空也不写没跑过的 `AppDelegate`；
 - **亮度是应用内遮罩**，不改系统亮度（那需要新插件），夜里够用但不是系统级调光；

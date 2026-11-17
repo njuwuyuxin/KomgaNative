@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:komga_api/src/errors.dart';
+import 'package:komga_api/src/http_cache.dart';
 import 'package:komga_api/src/parsers.dart';
 import 'package:komga_api/src/tls.dart';
 import 'package:komga_api/src/urls.dart';
@@ -16,11 +17,19 @@ import 'package:komga_domain/komga_domain.dart';
 ///
 /// 端点与参数已对真实 Komga 1.30.1 实例验证，见 `docs/komga-api-verification.md`。
 class KomgaSession {
-  KomgaSession._(this._dio, this.address) : _urls = KomgaUrls(address.baseUrl);
+  KomgaSession._(this._dio, this.address, this._cache)
+    : _urls = KomgaUrls(address.baseUrl);
 
   final Dio _dio;
   final KomgaUrls _urls;
   final ServerAddress address;
+
+  /// 可选的离线缓存：GET 成功写、网络类失败读（见 [HttpCache]）。
+  final HttpCache? _cache;
+
+  /// 缓存分区键。用地址而不是账号：同一服务器换账号看到的内容一样，
+  /// 分开存只会白白多一份。
+  String get _scope => address.baseUrl;
 
   /// Komga 要求 API Key 的 `comment` 在同一账号内唯一，重复时返回 400 + 该错误码。
   static const String duplicateCommentCode = 'ERR_1034';
@@ -31,10 +40,12 @@ class KomgaSession {
     Dio? dio,
     Duration timeout = const Duration(seconds: 10),
     TlsTrust? trust,
+    HttpCache? cache,
   }) {
     return KomgaSession._(
       _buildDio(dio, timeout, <String, String>{'X-API-Key': apiKey}, trust),
       address,
+      cache,
     );
   }
 
@@ -45,6 +56,7 @@ class KomgaSession {
     Dio? dio,
     Duration timeout = const Duration(seconds: 10),
     TlsTrust? trust,
+    HttpCache? cache,
   }) {
     final token = base64Encode(utf8.encode('$username:$password'));
     return KomgaSession._(
@@ -52,6 +64,7 @@ class KomgaSession {
         'Authorization': 'Basic $token',
       }, trust),
       address,
+      cache,
     );
   }
 
@@ -263,9 +276,51 @@ class KomgaSession {
   Future<Object?> _getJson(String url) async {
     try {
       final response = await _dio.get<Object?>(url, options: _jsonOptions);
+      await _rememberJson(url, response.data);
+      _cache?.reportOnline(_scope);
       return response.data;
     } on DioException catch (e) {
-      throw mapDioException(e);
+      final error = mapDioException(e);
+      final cached = await _cachedJson(url, error);
+      if (cached != null) return cached;
+      throw error;
+    }
+  }
+
+  /// 只有"连不上"或"服务端 5xx"才允许拿旧数据顶一下。
+  ///
+  /// 404 说明资源真的被删了，拿缓存只会让用户看到已经不存在的东西；
+  /// 401/403 更不行——那是登录态问题，不是离网。
+  bool _canServeStale(KomgaError error) =>
+      error is KomgaNetworkError || error is KomgaServerError;
+
+  Future<Object?> _cachedJson(String url, KomgaError error) async {
+    final cache = _cache;
+    if (cache == null || !_canServeStale(error)) return null;
+    cache.reportOffline(_scope);
+    final Uint8List? body;
+    try {
+      body = await cache.read(_scope, url);
+    } on Object {
+      return null;
+    }
+    if (body == null) return null;
+    try {
+      return jsonDecode(utf8.decode(body));
+    } on FormatException {
+      // 缓存坏了当没命中：宁可报"连不上"，也别把乱码当数据交给解析层。
+      return null;
+    }
+  }
+
+  Future<void> _rememberJson(String url, Object? data) async {
+    final cache = _cache;
+    if (cache == null || data == null) return;
+    try {
+      final body = Uint8List.fromList(utf8.encode(jsonEncode(data)));
+      await cache.write(_scope, url, CacheKind.json, body);
+    } on Object {
+      // 写缓存失败（磁盘满/权限）只影响离线能力，不能让在线请求跟着失败。
     }
   }
 
@@ -286,6 +341,8 @@ class KomgaSession {
     try {
       // 204 No Content：不要读 data。
       await _dio.patch<Object?>(url, data: body, options: _jsonOptions);
+      // PATCH 能成功说明网络是通的：撤掉离线提示，不必等下一次 GET。
+      _cache?.reportOnline(_scope);
     } on DioException catch (e) {
       throw mapDioException(e);
     }
@@ -300,12 +357,45 @@ class KomgaSession {
           responseType: ResponseType.bytes,
         ),
       );
-      final data = response.data;
-      if (data is Uint8List) return data;
-      if (data is List<int>) return Uint8List.fromList(data);
-      throw const KomgaProtocolError('服务器返回的不是图片数据');
+      final bytes = _asBytes(response.data);
+      if (bytes == null) {
+        throw const KomgaProtocolError('服务器返回的不是图片数据');
+      }
+      await _rememberBytes(url, bytes);
+      _cache?.reportOnline(_scope);
+      return bytes;
     } on DioException catch (e) {
-      throw mapDioException(e);
+      final error = mapDioException(e);
+      final cached = await _cachedBytes(url, error);
+      if (cached != null) return cached;
+      throw error;
+    }
+  }
+
+  Uint8List? _asBytes(Object? data) {
+    if (data is Uint8List) return data;
+    if (data is List<int>) return Uint8List.fromList(data);
+    return null;
+  }
+
+  Future<Uint8List?> _cachedBytes(String url, KomgaError error) async {
+    final cache = _cache;
+    if (cache == null || !_canServeStale(error)) return null;
+    cache.reportOffline(_scope);
+    try {
+      return await cache.read(_scope, url);
+    } on Object {
+      return null;
+    }
+  }
+
+  Future<void> _rememberBytes(String url, Uint8List bytes) async {
+    final cache = _cache;
+    if (cache == null) return;
+    try {
+      await cache.write(_scope, url, CacheKind.image, bytes);
+    } on Object {
+      // 同上：缓存写失败不影响本次读取。
     }
   }
 

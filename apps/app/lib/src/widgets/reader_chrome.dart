@@ -109,6 +109,7 @@ class ReaderBar extends StatelessWidget {
     required this.palette,
     required this.mode,
     required this.onOpenSettings,
+    this.offline = false,
     super.key,
   });
 
@@ -123,6 +124,10 @@ class ReaderBar extends StatelessWidget {
   /// 当前生效的模式：图标跟着它变，用户一眼知道自己在什么模式。
   final ReadingMode mode;
   final VoidCallback onOpenSettings;
+
+  /// 当前内容可能来自缓存（断网/服务端不可用）。只在顶栏放一个小图标：
+  /// 阅读区里放横幅会挤掉画面，而翻页本身照常。
+  final bool offline;
 
   @override
   Widget build(BuildContext context) {
@@ -150,6 +155,17 @@ class ReaderBar extends StatelessWidget {
               ),
             ),
           ),
+          if (offline) ...<Widget>[
+            Tooltip(
+              message: 'Offline · showing saved pages',
+              child: Icon(
+                Icons.cloud_off_outlined,
+                size: 16,
+                color: palette.muted,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.xs),
+          ],
           Text(pageLabel, style: TextStyle(color: palette.muted)),
           IconButton(
             key: const Key('reader-settings-button'),

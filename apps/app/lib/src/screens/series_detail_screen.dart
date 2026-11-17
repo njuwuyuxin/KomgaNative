@@ -8,6 +8,7 @@ import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/screens/reader_screen.dart';
+import 'package:komga_native/src/widgets/offline_banner.dart';
 import 'package:komga_native/src/widgets/shelf_views.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -42,19 +43,26 @@ class SeriesDetailScreen extends ConsumerWidget {
           overflow: TextOverflow.ellipsis,
         ),
       ),
-      body: switch ((error, page)) {
-        (final Object failure, _) => _ErrorView(
-          failure: failure,
-          onRetry: () => unawaited(_refresh(ref)),
-        ),
-        (null, final PageResult<Book> data) => _BooksView(
-          series: series,
-          books: data,
-          seriesId: seriesId,
-          onRefresh: () => _refresh(ref),
-        ),
-        _ => const _BooksSkeleton(),
-      },
+      body: Column(
+        children: <Widget>[
+          OfflineBanner(onRetry: () => unawaited(_refresh(ref))),
+          Expanded(
+            child: switch ((error, page)) {
+              (final Object failure, _) => _ErrorView(
+                failure: failure,
+                onRetry: () => unawaited(_refresh(ref)),
+              ),
+              (null, final PageResult<Book> data) => _BooksView(
+                series: series,
+                books: data,
+                seriesId: seriesId,
+                onRefresh: () => _refresh(ref),
+              ),
+              _ => const _BooksSkeleton(),
+            },
+          ),
+        ],
+      ),
     );
   }
 }

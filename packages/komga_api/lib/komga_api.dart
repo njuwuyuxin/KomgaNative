@@ -6,6 +6,7 @@
 library;
 
 export 'src/errors.dart';
+export 'src/http_cache.dart';
 export 'src/session.dart';
 export 'src/tls.dart';
 export 'src/transport.dart';

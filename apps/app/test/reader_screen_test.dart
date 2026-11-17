@@ -20,6 +20,13 @@ void main() {
     expect(repository.pageImageCalls, greaterThanOrEqualTo(1));
   });
 
+  testWidgets('离线时顶栏出现缓存提示（阅读区不挤占）', (WidgetTester tester) async {
+    await pumpReader(tester, book: demoReaderBook(), offline: true);
+
+    expect(find.byIcon(Icons.cloud_off_outlined), findsOneWidget);
+    expect(find.text('1 / 3'), findsOneWidget);
+  });
+
   testWidgets('有进度时从上次那一页继续', (WidgetTester tester) async {
     final book = Book(
       id: 'b1',

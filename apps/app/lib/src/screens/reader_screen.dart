@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
+import 'package:komga_native/src/providers/cache_providers.dart';
 import 'package:komga_native/src/providers/progress_providers.dart';
 import 'package:komga_native/src/providers/reader_prefs_provider.dart';
 import 'package:komga_native/src/providers/reader_providers.dart';
@@ -311,17 +312,28 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
               child: Column(
                 children: <Widget>[
                   if (_chromeVisible)
-                    ReaderBar(
-                      title: book?.name ?? 'Book',
-                      pageLabel: _pageLabel(mode, page, total, spread),
-                      palette: palette,
-                      mode: mode,
-                      onOpenSettings: () => _openSettings(
-                        palette: palette,
-                        page: page,
-                        total: total,
-                      ),
-                      onClose: () => context.pop(),
+                    ValueListenableBuilder<bool>(
+                      valueListenable: ref.watch(offlineProvider),
+                      builder:
+                          (BuildContext context, bool offline, Widget? _) =>
+                              ReaderBar(
+                                title: book?.name ?? 'Book',
+                                pageLabel: _pageLabel(
+                                  mode,
+                                  page,
+                                  total,
+                                  spread,
+                                ),
+                                palette: palette,
+                                mode: mode,
+                                offline: offline,
+                                onOpenSettings: () => _openSettings(
+                                  palette: palette,
+                                  page: page,
+                                  total: total,
+                                ),
+                                onClose: () => context.pop(),
+                              ),
                     ),
                   Expanded(
                     child: switch (mode) {

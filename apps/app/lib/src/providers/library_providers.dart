@@ -6,6 +6,7 @@ import 'package:komga_api/komga_api.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/library_repository.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
+import 'package:komga_native/src/providers/cache_providers.dart';
 import 'package:komga_native/src/providers/progress_providers.dart';
 import 'package:komga_native/src/session/session_controller.dart';
 
@@ -21,6 +22,8 @@ final Provider<LibraryRepository> libraryRepositoryProvider =
         address: session.server.address,
         apiKey: session.server.apiKey,
         trust: session.server.tls,
+        // 书架/封面/系列/书列表都走这个会话：GET 成功落盘，断网回退。
+        cache: ref.watch(httpCacheProvider),
       );
       ref.onDispose(komga.close);
       return KomgaLibraryRepository(komga, ref.watch(progressSyncProvider));

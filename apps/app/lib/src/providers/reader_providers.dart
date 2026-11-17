@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_api/komga_api.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/reader_repository.dart';
+import 'package:komga_native/src/providers/cache_providers.dart';
 import 'package:komga_native/src/providers/progress_providers.dart';
 import 'package:komga_native/src/session/session_controller.dart';
 
@@ -18,6 +19,8 @@ final Provider<ReaderRepository> readerRepositoryProvider =
         address: session.server.address,
         apiKey: session.server.apiKey,
         trust: session.server.tls,
+        // 页图/页列表落盘：看过的页断网还能翻回去。
+        cache: ref.watch(httpCacheProvider),
       );
       ref.onDispose(komga.close);
       return KomgaReaderRepository(komga, ref.watch(progressSyncProvider));

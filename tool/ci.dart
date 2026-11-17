@@ -116,19 +116,30 @@ Future<int> formatCheck() => runProc('dart', <String>[
 /// 判据是"生成物缺失 / 源文件更新"，不做无条件构建——build_runner 首次要 AOT 编译
 /// 构建器（约 40s），每次 check 都跑太浪费。
 Future<int> codegen() async {
-  const source = 'apps/app/lib/src/data/progress/progress_database.dart';
-  const generated = 'apps/app/lib/src/data/progress/progress_database.g.dart';
+  const driftSources = <({String source, String generated})>[
+    (
+      source: 'apps/app/lib/src/data/progress/progress_database.dart',
+      generated: 'apps/app/lib/src/data/progress/progress_database.g.dart',
+    ),
+    (
+      source: 'apps/app/lib/src/data/cache/http_cache_database.dart',
+      generated: 'apps/app/lib/src/data/cache/http_cache_database.g.dart',
+    ),
+  ];
 
-  final sourceFile = File(source);
-  if (!sourceFile.existsSync()) {
-    stdout.writeln('没有 drift 源文件，跳过 codegen');
-    return 0;
+  var stale = false;
+  for (final pair in driftSources) {
+    final sourceFile = File(pair.source);
+    if (!sourceFile.existsSync()) continue;
+    final generatedFile = File(pair.generated);
+    final upToDate =
+        generatedFile.existsSync() &&
+        !sourceFile.lastModifiedSync().isAfter(
+          generatedFile.lastModifiedSync(),
+        );
+    if (!upToDate) stale = true;
   }
-  final generatedFile = File(generated);
-  final upToDate =
-      generatedFile.existsSync() &&
-      !sourceFile.lastModifiedSync().isAfter(generatedFile.lastModifiedSync());
-  if (upToDate) {
+  if (!stale) {
     stdout.writeln('生成物已是最新，跳过 codegen');
     return 0;
   }
