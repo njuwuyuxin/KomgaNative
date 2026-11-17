@@ -16,6 +16,7 @@ final Provider<ReaderRepository> readerRepositoryProvider =
       final komga = KomgaSession.withApiKey(
         address: session.server.address,
         apiKey: session.server.apiKey,
+        trust: session.server.tls,
       );
       ref.onDispose(komga.close);
       return KomgaReaderRepository(komga);

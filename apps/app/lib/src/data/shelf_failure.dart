@@ -56,6 +56,17 @@ class ProtocolFailure extends ShelfFailure {
       );
 }
 
+/// 证书不再受信任：用户接受过的那张证书变了（续期/被替换）。
+///
+/// 必须重新走一次连接流程让用户确认——静默接受新证书等于把 TOFU 作废。
+class CertificateFailure extends ShelfFailure {
+  const CertificateFailure()
+    : super(
+        'Server certificate changed',
+        hint: 'Reconnect and review the certificate before trusting it again.',
+      );
+}
+
 /// 兜底：不该发生，但绝不让 UI 看到裸异常。
 class UnexpectedFailure extends ShelfFailure {
   const UnexpectedFailure(this.detail)
@@ -70,7 +81,9 @@ ShelfFailure shelfFailureOf(KomgaError error) => switch (error) {
   KomgaNetworkError() => const NetworkFailure(),
   KomgaServerError() => const ServerFailure(),
   KomgaCancelledError() => const NetworkFailure(),
+  KomgaTlsError() => const CertificateFailure(),
   KomgaNotFoundError() ||
   KomgaProtocolError() ||
-  KomgaBadRequestError() => const ProtocolFailure(),
+  KomgaBadRequestError() ||
+  KomgaHttpsRequiredError() => const ProtocolFailure(),
 };

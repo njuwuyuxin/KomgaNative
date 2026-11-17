@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:komga_api/src/errors.dart';
 import 'package:komga_api/src/parsers.dart';
+import 'package:komga_api/src/tls.dart';
 import 'package:komga_api/src/urls.dart';
 import 'package:komga_domain/komga_domain.dart';
 
@@ -29,9 +30,10 @@ class KomgaSession {
     required String apiKey,
     Dio? dio,
     Duration timeout = const Duration(seconds: 10),
+    TlsTrust? trust,
   }) {
     return KomgaSession._(
-      _buildDio(dio, timeout, <String, String>{'X-API-Key': apiKey}),
+      _buildDio(dio, timeout, <String, String>{'X-API-Key': apiKey}, trust),
       address,
     );
   }
@@ -42,14 +44,46 @@ class KomgaSession {
     required String password,
     Dio? dio,
     Duration timeout = const Duration(seconds: 10),
+    TlsTrust? trust,
   }) {
     final token = base64Encode(utf8.encode('$username:$password'));
     return KomgaSession._(
       _buildDio(dio, timeout, <String, String>{
         'Authorization': 'Basic $token',
-      }),
+      }, trust),
       address,
     );
+  }
+
+  /// 探测这个地址实际出示的证书，**不校验、不携带任何凭据**。
+  ///
+  /// 用途只有一个：证书被系统拒绝时，把"到底是哪张证书"摊给用户看
+  /// （CN、颁发者、有效期、指纹），让他决定是否信任。
+  /// 返回 null 表示没拿到证书（DNS/端口不通等，此时问题不在证书）。
+  static Future<ServerCertificate?> probeCertificate({
+    required ServerAddress address,
+    Duration timeout = const Duration(seconds: 10),
+  }) async {
+    final trust = TlsTrust.probe();
+    final dio = Dio()..httpClientAdapter = trust.adapter();
+    dio.options
+      ..connectTimeout = timeout
+      ..receiveTimeout = timeout;
+    try {
+      await dio.getUri<Object?>(
+        Uri.parse(KomgaUrls(address.baseUrl).libraries()),
+        options: Options(
+          headers: const <String, String>{'Accept': 'application/json'},
+          // 401/404 都无所谓：握手成功就说明证书已经拿到了。
+          validateStatus: (int? status) => true,
+        ),
+      );
+    } on DioException {
+      // 证书被拒（预期路径）或网络不通，都靠 [trust.presented] 判断。
+    } finally {
+      dio.close(force: true);
+    }
+    return trust.presented;
   }
 
   /// **不要**在这里设置 `Accept`：缩略图端点只接受 `image/jpeg`，
@@ -58,8 +92,13 @@ class KomgaSession {
     Dio? provided,
     Duration timeout,
     Map<String, String> headers,
+    TlsTrust? trust,
   ) {
     final dio = provided ?? Dio();
+    // 只有自己造的 Dio 才能换 adapter：外部注入的（测试）保留其配置。
+    if (provided == null && trust != null) {
+      dio.httpClientAdapter = trust.adapter();
+    }
     dio.options
       ..connectTimeout = timeout
       ..receiveTimeout = timeout

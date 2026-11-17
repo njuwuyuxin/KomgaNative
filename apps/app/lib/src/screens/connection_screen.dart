@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/session/session_controller.dart';
+import 'package:komga_native/src/widgets/certificate_panel.dart';
 
 /// 首次连接 / 重新连接页。
 ///
@@ -60,6 +61,7 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
     final submitting = disconnected?.submitting ?? false;
     final error = disconnected?.error;
     final hint = disconnected?.hint;
+    final certificate = disconnected?.certificate;
 
     // HTTP + 非本机时提前警告，避免用户把密码明文发到公网。
     String? insecureWarning;
@@ -177,7 +179,18 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
                       foreground: theme.colorScheme.onErrorContainer,
                     ),
                   ],
-                  if (error != null) ...<Widget>[
+                  if (certificate != null) ...<Widget>[
+                    const SizedBox(height: AppSpacing.md),
+                    CertificatePanel(
+                      certificate: certificate,
+                      busy: submitting,
+                      onTrust: () =>
+                          ref.read(sessionProvider.notifier).trustCertificate(),
+                      onCancel: () => ref
+                          .read(sessionProvider.notifier)
+                          .cancelCertificatePrompt(),
+                    ),
+                  ] else if (error != null) ...<Widget>[
                     const SizedBox(height: AppSpacing.md),
                     _Banner(
                       icon: Icons.error_outline,

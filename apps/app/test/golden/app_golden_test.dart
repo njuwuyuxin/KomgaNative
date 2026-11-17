@@ -14,8 +14,10 @@ import 'package:komga_native/src/screens/reader_screen.dart';
 import 'package:komga_native/src/screens/series_detail_screen.dart';
 import 'package:komga_native/src/screens/settings_screen.dart';
 import 'package:komga_native/src/screens/splash_screen.dart';
+import 'package:komga_native/src/session/certificate_prompt.dart';
 import 'package:komga_native/src/session/server_store.dart';
 import 'package:komga_native/src/session/session_controller.dart';
+import 'package:komga_native/src/widgets/certificate_panel.dart';
 
 import '../support/fake_library.dart';
 import '../support/fake_reader.dart';
@@ -278,5 +280,71 @@ void main() {
       settle: false,
     );
     await expectGolden(tester, 'splash@phone_light');
+  });
+
+  /// 证书面板：三形态各一张。这是用户唯一能核对指纹的地方，
+  /// 墨水屏上如果挤成一团/被裁掉，就等于没法判断。
+  Widget certificateProbe() => Scaffold(
+    body: SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: CertificatePanel(
+          certificate: CertificatePrompt(
+            commonName: '*.yasai.site',
+            issuerName: 'E7',
+            fingerprint: '74:F8:1F:E1:67:D9:9B:4C',
+            selfSigned: false,
+            expiresAt: DateTime.utc(2026, 7, 19),
+          ),
+          onTrust: () {},
+          onCancel: () {},
+        ),
+      ),
+    ),
+  );
+
+  Future<void> pumpCertificateGolden(
+    WidgetTester tester, {
+    required String name,
+    required Size size,
+    required ThemeData theme,
+    double textScale = 1.0,
+  }) async {
+    await pumpGoldenScreen(
+      tester,
+      screen: certificateProbe(),
+      size: size,
+      theme: theme,
+      textScale: textScale,
+    );
+    await expectGolden(tester, name);
+  }
+
+  testWidgets('certificate@phone_light', (WidgetTester tester) async {
+    await pumpCertificateGolden(
+      tester,
+      name: 'certificate@phone_light',
+      size: GoldenSizes.phone,
+      theme: AppTheme.light(),
+    );
+  });
+
+  testWidgets('certificate@tablet_dark', (WidgetTester tester) async {
+    await pumpCertificateGolden(
+      tester,
+      name: 'certificate@tablet_dark',
+      size: GoldenSizes.tablet,
+      theme: AppTheme.dark(),
+    );
+  });
+
+  testWidgets('certificate@eink', (WidgetTester tester) async {
+    await pumpCertificateGolden(
+      tester,
+      name: 'certificate@eink',
+      size: GoldenSizes.eink,
+      theme: AppTheme.eink(),
+      textScale: 1.3,
+    );
   });
 }

@@ -7,5 +7,6 @@ library;
 
 export 'src/errors.dart';
 export 'src/session.dart';
+export 'src/tls.dart';
 export 'src/transport.dart';
 export 'src/urls.dart';

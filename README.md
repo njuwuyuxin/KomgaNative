@@ -5,10 +5,12 @@ Komga 的跨平台客户端（iOS / Android / Android 墨水屏），阅读体�
 > 状态：**M1 进行中**。
 > 已完成：M0 骨架（三套主题 + 黄金图闭环）、**服务器连接流程**（密码换 API Key / 直接粘贴 Key / 钥匙串保存 / 路由守卫 / 错误映射）、
 > **API 契约验证**（对真实 Komga 1.30.1 实例端到端实测，见 [docs/komga-api-verification.md](docs/komga-api-verification.md)）、
+> **反代与 TLS 处理**（`http` 端口自动升级 `https`、证书不受信任时固定指纹 + 用户确认，见 [docs/tls-and-proxy.md](docs/tls-and-proxy.md)）、
 > **真实书架**（`/api/v1/series` 分页 + 搜索 + 按库筛选 + 封面 + 下拉刷新 + 空/错态）、
 > **系列详情**（`/api/v1/series/{id}` + 书列表 + 点书进阅读器）、
 > **阅读器 v1**（真实页图、点击翻页、双指缩放、从上次位置继续、进度回写 Komga）。
-> 已在 **Android 模拟器 + 真实 Komga 实例**上跑通"连接 → 书架 → 系列 → 阅读 → 进度"全链路。
+> 已在 **Android 模拟器 + 本机 Komga 实例**上跑通"连接 → 书架 → 系列 → 阅读 → 进度"全链路，
+> 并在**一台公网 NAS（openresty 反代 + 证书已过期）**上验证了真实登录路径。
 > 待完成：双页/纵向连续模式、进度 outbox 与多设备对账、Drift 离线缓存、i18n 与中文字体。
 
 ## 文档
@@ -19,6 +21,8 @@ Komga 的跨平台客户端（iOS / Android / Android 墨水屏），阅读体�
 | [docs/environment-setup.md](docs/environment-setup.md) | 环境搭建与双机切换：免管理员安装、验收标准、踩坑表 |
 | [docs/ci.md](docs/ci.md) | GitHub Actions：概念、免费额度与计费倍率、三条流水线、排障 |
 | [docs/komga-api-verification.md](docs/komga-api-verification.md) | Komga API 实测记录：复现步骤、证据表、发现的缺陷、仍未验证项 |
+| [docs/tls-and-proxy.md](docs/tls-and-proxy.md) | 反代与证书：真实现象（明文 400 / 证书过期）、客户端行为矩阵、复现方式 |
+| [docs/adr/0001-certificate-trust.md](docs/adr/0001-certificate-trust.md) | ADR：为什么用 TOFU + 固定指纹，而不是"忽略证书" |
 | [AGENTS.md](AGENTS.md) | Agent 工作契约：命令、架构不变量、DoD、反模式 |
 
 ## CI
@@ -67,12 +71,13 @@ dart run tool/ci.dart check    # format + analyze + layers + 全部测试
 dart run tool/ci.dart golden   # 重新生成黄金图（仅 Windows，与 CI 一致）
 ```
 
-当前基线：**190 个测试**（纯 Dart 101 / Flutter 89），**15 张黄金图**覆盖
+当前基线：**226 个测试**（纯 Dart 122 / Flutter 104），**18 张黄金图**覆盖
 书架（手机 light / 平板 dark / 1.3 倍字号 / 墨水屏 / 空态 / 错误态）、系列详情（手机 / 平板 / 墨水屏）、
-阅读器（手机 dark / 墨水屏）、墨水屏设置、连接页（light / eink）、启动页。
+阅读器（手机 dark / 墨水屏）、墨水屏设置、连接页（light / eink）、证书面板（手机 / 平板 / 墨水屏）、启动页。
 
-其中 `packages/komga_api` 的 55 个测试里包含**两层真值校验**：
+其中 `packages/komga_api` 的 80 个测试里包含**两层真值校验**：
 `contract_test.dart` 拿官方 OpenAPI 校验客户端会构造的每个 URL；`fixtures_test.dart` 用真实服务器响应驱动解析层。
+反代与证书的异常形态同样用**真实抓包**（`test/fixtures/proxy-400-plain-http.html`）和真实异常类型驱动（`errors_test.dart`）。
 
 ## 连接流程（已可用）
 
@@ -115,13 +120,18 @@ dart run tool/ci.dart golden   # 重新生成黄金图（仅 Windows，与 CI �
 1. 地址填 `http://<NAS 局域网 IP>:<端口>`，例如 `http://192.168.1.10:25600`（也支持 `https://` 与反代子路径 `https://host/komga`）；
 2. **内网 http 是支持的**：Android 已放行明文（`usesCleartextTraffic`），iOS 已配 ATS 例外；
    只有"公网地址 + 明文 http"才会弹红色警告——局域网不会；
-3. 用邮箱 + 密码登录：客户端会调 `POST /api/v2/users/me/api-keys` 建一把 comment 形如
+3. **端口其实只开 HTTPS 也没关系**：反代会回 `400 The plain HTTP request was sent to HTTPS port`，
+   客户端识别到这条就把协议自动换成 `https://` 重试，成功后保存的是能用的那个地址；
+4. **证书过期/自签名**：会弹一个面板列出证书的 CN、颁发者、到期日和 SHA-256 指纹，
+   点 `Connect anyway` 才继续。确认后只固定这一张证书——以后换证书会再问一次，不会静默放行；
+5. 用邮箱 + 密码登录：客户端会调 `POST /api/v2/users/me/api-keys` 建一把 comment 形如
    `KomgaNative <UTC 时间戳>` 的 Key（同账号重名会被服务端拒绝，撞上会自动换一个重试）；
-4. 之后**只保存 Key**（Keychain / Keystore），不再保存密码；可以在 Komga 后台随时吊销这把 Key；
-5. 也可以直接用 API Key 模式：Komga → 账号设置 → API keys 里建一把粘进来。
+6. 之后**只保存 Key**（Keychain / Keystore），不再保存密码；可以在 Komga 后台随时吊销这把 Key；
+7. 也可以直接用 API Key 模式：Komga → 账号设置 → API keys 里建一把粘进来。
 
 排障：连不上先确认手机与 NAS 同一网段、端口没被防火墙挡、`http://` 与端口写全；
-若地址被反代改写成网页，会提示"响应无法识别"。
+若地址被反代改写成网页，会提示"响应无法识别"；若提示"证书不受信任"，先核对面板里的指纹
+（`sha256sum` 或浏览器里能看到同一张证书），确认是自己服务器再点继续。
 
 ## 模拟器实测记录（2026-11-17）
 
@@ -137,6 +147,7 @@ dart run tool/ci.dart golden   # 重新生成黄金图（仅 Windows，与 CI �
 | 进度回写 + 最后一页 `completed` | ✅ 服务端 `page=8 completed=true`，系列 `1/2` |
 | 返回后刷新进度 | ⚠️ 初次实测**不刷新**（仍显示 `0 of 2`），已修复并复测通过（返回后 `2 of 2`、徽标 `2/2`） |
 | 返回书架不跳回顶部 | ⚠️ 第一版修复把列表重置导致跳顶，改为 `refreshInPlace` 后复测通过 |
+| 真实 NAS（openresty 反代，证书 2026-07-19 过期） | ✅ 首次 `http://…:4433` 被反代回 400 → 自动升级 `https` → 弹出证书面板 → `Connect anyway` 后登录成功（见 [docs/tls-and-proxy.md](docs/tls-and-proxy.md)） |
 
 ## 已知边界
 
@@ -144,5 +155,6 @@ dart run tool/ci.dart golden   # 重新生成黄金图（仅 Windows，与 CI �
 - **墨水屏上阅读器仍是深色底**：应该改成白底减少全刷，下一片处理；
 - **进度回写是直接 PATCH**：`sync_engine` 的 outbox/多设备对账要等 Drift 落地后接入（断网时进度会丢）；
 - UI 文案暂为英文：i18n（ARB + 中文字体）之后一次性替换，避免现在把 CJK 字体塞进黄金图。
-- 自签名证书 TOFU 流程未做（当前用系统信任链）；M1.2 补"指纹确认"页。
+- 证书信任是**按叶证书指纹固定**：服务器续期后需要再确认一次（有意为之，不是 bug）；
+  不做自签名 CA 链校验与双向 TLS。
 - 书架的离线缓存（Drift）未做：断网时只有内存里的当前列表。

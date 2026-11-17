@@ -61,6 +61,18 @@ class ServerAddress {
     );
   }
 
+  /// 换协议但保留 host/port/path。
+  ///
+  /// 用途：用户把 `https://host:4433` 写成了 `http://host:4433`，反代会直接
+  /// 400（"明文请求打到了 HTTPS 端口"）。这时不该让用户自己去改输入框——
+  /// 换一次协议重试就能连上。
+  ServerAddress withScheme(String scheme) {
+    if (scheme != 'http' && scheme != 'https') {
+      throw FormatException('Unsupported scheme: $scheme');
+    }
+    return ServerAddress._(uri.replace(scheme: scheme));
+  }
+
   /// 用于"这个地址能不能明文"的提示。
   ///
   /// 判断的是"会不会把凭据明文发到公网"，而不是"是不是 HTTPS"：

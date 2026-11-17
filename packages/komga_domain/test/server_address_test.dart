@@ -113,6 +113,18 @@ void main() {
         equals(ServerAddress.parse('https://example.com')),
       );
     });
+
+    test('withScheme 只换协议，host/port/path 原样保留', () {
+      final http = ServerAddress.parse('http://manga.example.com:4433/komga');
+      final https = http.withScheme('https');
+      expect(https.baseUrl, 'https://manga.example.com:4433/komga');
+      expect(https.port, 4433);
+      expect(https.isHttps, isTrue);
+      // 反向也成立，且幂等。
+      expect(https.withScheme('http'), http);
+      expect(http.withScheme('http'), http);
+      expect(() => http.withScheme('ftp'), throwsA(isA<FormatException>()));
+    });
   });
 
   group('Account', () {

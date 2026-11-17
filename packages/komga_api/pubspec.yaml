@@ -8,6 +8,11 @@ environment:
 resolution: workspace
 
 dependencies:
+  # 只用来算证书的 SHA-256 指纹（TOFU 固定叶证书）。选它而不是手写 SHA-256：
+  # 密码学原语手写一遍就是给自己挖坑；`crypto` 是 Dart 官方包，且已在依赖树里
+  # （此前是 test/coverage 的传递依赖），升级为直接依赖不新增任何包。
+  # 理由见 docs/adr/0002-certificate-trust.md。
+  crypto: ^3.0.8
   dio: ^5.11.1
   komga_domain:
     path: ../komga_domain
