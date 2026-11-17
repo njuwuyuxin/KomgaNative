@@ -148,6 +148,7 @@ class ReaderBar extends StatelessWidget {
       child: Row(
         children: <Widget>[
           IconButton(
+            key: const Key('reader-close-button'),
             onPressed: onClose,
             icon: const Icon(Icons.arrow_back),
             color: palette.foreground,
@@ -292,6 +293,7 @@ class ReaderControls extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: <Widget>[
           IconButton(
+            key: const Key('reader-previous-button'),
             onPressed: onPrevious,
             icon: const Icon(Icons.chevron_left),
             color: palette.foreground,
@@ -303,6 +305,7 @@ class ReaderControls extends StatelessWidget {
             style: TextStyle(color: palette.muted),
           ),
           IconButton(
+            key: const Key('reader-next-button'),
             onPressed: onNext,
             icon: const Icon(Icons.chevron_right),
             color: palette.foreground,

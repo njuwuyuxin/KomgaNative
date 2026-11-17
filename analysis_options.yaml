@@ -9,6 +9,7 @@ analyzer:
     - "**/*.g.dart"
     - "**/*.freezed.dart"
     - "packages/komga_api/lib/generated/**"
+    - "apps/app/lib/l10n/app_localizations*.dart"
     - "**/.dart_tool/**"
 
 linter:

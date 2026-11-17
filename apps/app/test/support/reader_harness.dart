@@ -37,6 +37,7 @@ Future<InMemoryReaderPrefsStore> pumpReader(
   bool forceEink = false,
   ReaderPrefs? initialPrefs,
   FakeWakeLock? wakeLock,
+  FakeHardwareKeys? hardwareKeys,
   ProgressStore? progressStore,
   bool offline = false,
   void Function(Book next)? onOpenNext,
@@ -70,6 +71,9 @@ Future<InMemoryReaderPrefsStore> pumpReader(
         progressSyncProvider.overrideWithValue(sync),
         readerPrefsStoreProvider.overrideWithValue(prefsStore),
         wakeLockProvider.overrideWithValue(wakeLock ?? FakeWakeLock()),
+        hardwareKeysProvider.overrideWithValue(
+          hardwareKeys ?? FakeHardwareKeys(),
+        ),
         httpCacheProvider.overrideWithValue(cache),
         if (forceEink) settingsProvider.overrideWith(EinkSettings.new),
         ...extraOverrides,

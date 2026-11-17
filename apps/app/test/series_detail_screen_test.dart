@@ -21,8 +21,12 @@ void main() {
     WidgetTester tester,
     FakeLibraryRepository repository, {
     String seriesId = 's1',
+    Size logicalSize = const Size(390, 844),
   }) async {
-    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.physicalSize = Size(
+      logicalSize.width * 3,
+      logicalSize.height * 3,
+    );
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
 
@@ -142,5 +146,30 @@ void main() {
 
     expect(repository.booksCalls, greaterThan(before), reason: '返回后应重新拉书列表');
     expect(repository.seriesByIdCalls, greaterThan(1), reason: '系列信息也要刷新');
+  });
+
+  testWidgets('宽屏（≥1024）是两栏：左头部、右书列表', (WidgetTester tester) async {
+    await pumpDetail(
+      tester,
+      FakeLibraryRepository(series: demoShelf()),
+      logicalSize: const Size(1024, 768),
+    );
+    await tester.pumpAndSettle();
+
+    // 头部信息在左栏，书行在右栏：两者的水平中心必须明显分开。
+    final header = tester.getRect(find.text('5 of 12 read'));
+    final book = tester.getRect(find.byKey(const Key('book-s1-b1')));
+    expect(header.center.dx, lessThan(1024 * 0.5));
+    expect(book.center.dx, greaterThan(1024 * 0.5));
+    expect(find.byType(SeriesDetailScreen), findsOneWidget);
+  });
+
+  testWidgets('手机宽度仍是单栏（头部在书列表上方）', (WidgetTester tester) async {
+    await pumpDetail(tester, FakeLibraryRepository(series: demoShelf()));
+    await tester.pumpAndSettle();
+
+    final header = tester.getRect(find.text('5 of 12 read'));
+    final book = tester.getRect(find.byKey(const Key('book-s1-b1')));
+    expect(header.center.dy, lessThan(book.center.dy));
   });
 }

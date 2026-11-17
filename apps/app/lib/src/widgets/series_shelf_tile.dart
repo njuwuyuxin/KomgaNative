@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
+import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -18,6 +19,7 @@ class SeriesShelfTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final cover = ref.watch(seriesCoverProvider(series.id));
     final Uint8List? bytes = switch (cover) {
       AsyncData<Uint8List?>(:final value) => value,
@@ -25,7 +27,12 @@ class SeriesShelfTile extends ConsumerWidget {
     };
 
     return SeriesTile(
+      key: Key('series-${series.id}'),
       series: series,
+      // 整张卡片是一个按钮：读屏只念这一句，不把封面首字/角标/标题分开念。
+      semanticsLabel:
+          '${series.title}, '
+          '${l10n.readOfTotal(series.booksReadCount, series.booksCount)}',
       onTap: onTap,
       cover: bytes == null || bytes.isEmpty
           ? null

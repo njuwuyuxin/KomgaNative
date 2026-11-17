@@ -6,14 +6,27 @@ import 'package:komga_domain/komga_domain.dart';
 ///
 /// [cover] 负责真实封面（由调用方提供，设计系统不关心它从哪来）；
 /// 为空时退化成「渐变色 + 首字」占位，因此断网/缺图也不会破版。
+///
+/// [semanticsLabel] 是读屏播报的整句文案。设计系统不持有 l10n，
+/// 默认只播报标题；调用方（如 `SeriesShelfTile`）负责传入本地化的
+/// "标题 + 已读进度"。
 class SeriesTile extends StatelessWidget {
-  const SeriesTile({required this.series, this.onTap, this.cover, super.key});
+  const SeriesTile({
+    required this.series,
+    this.onTap,
+    this.cover,
+    this.semanticsLabel,
+    super.key,
+  });
 
   final Series series;
   final VoidCallback? onTap;
 
   /// 封面内容，铺满封面区域（通常是一张 `Image`）。
   final Widget? cover;
+
+  /// 读屏播报文案；为空时只播报标题（不硬编码任何语言的"已读"）。
+  final String? semanticsLabel;
 
   static const List<Color> _placeholderColors = <Color>[
     Color(0xFF4F6BFF),
@@ -44,7 +57,7 @@ class SeriesTile extends StatelessWidget {
     return Semantics(
       container: true,
       button: onTap != null,
-      label: '${series.title}，${series.booksReadCount}/${series.booksCount} 已读',
+      label: semanticsLabel ?? series.title,
       onTap: onTap,
       // 读屏时只播报上面这一句，而不是把封面首字、角标、标题逐条念一遍。
       child: ExcludeSemantics(

@@ -59,6 +59,18 @@
   **不报错**——"下一本"是锦上添花，不能因为它把读完的页面变成错误页。
 - 完成判定同时用于进度回写，所以"看到完成条"与"服务端 completed=true"是同一个条件。
 
+## 硬件键：音量键翻页
+
+`HardwareKeys`（`packages/komga_platform/lib/src/hardware_keys.dart`）把原生音量键变成
+`Stream<PageTurnKey>`；阅读器 `initState` 订阅、`dispose` 取消：
+
+- 音量上 = 上一页，音量下 = 下一页（阅读顺序，不跟 RTL 反转）；双页模式按"一屏"翻；
+- 纵向连续模式忽略按键，滚动仍交给 `ListView`；
+- Android 在 `MainActivity.dispatchKeyEvent` 里消费 ACTION_DOWN（系统音量不再变化）；
+  iOS/桌面没有实现，`MissingPluginException` 静默降级为空流。
+
+实现边界、事件消费的全局副作用与验证状态见 [docs/a11y-and-input.md](a11y-and-input.md)。
+
 ## 屏幕常亮
 
 `packages/komga_platform/lib/src/wakelock.dart` 走 `komganative/device` 通道，Android 侧在

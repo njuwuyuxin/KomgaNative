@@ -86,17 +86,47 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   int _jumpToken = 0;
   int _jumpPage = 1;
 
+  /// 音量键翻页：订阅在 initState，取消在 dispose。
+  StreamSubscription<PageTurnKey>? _volumeKeys;
+
+  /// dispose 里不能再碰 `ref`（widget 已卸载），所以 initState 先存一份。
+  HardwareKeys? _hardwareKeys;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    final hardwareKeys = ref.read(hardwareKeysProvider);
+    _hardwareKeys = hardwareKeys;
+    // 只有阅读器在前台时，原生侧才消费音量键；退出时立刻交还系统。
+    unawaited(hardwareKeys.setActive(true));
+    _volumeKeys = hardwareKeys.volumeKeys.listen(_onVolumeKey);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    unawaited(_hardwareKeys?.setActive(false));
+    _volumeKeys?.cancel();
     _saveTimer?.cancel();
     super.dispose();
+  }
+
+  /// 音量上 = 上一页，音量下 = 下一页（阅读顺序，不跟着 RTL 反转）。
+  ///
+  /// 纵向模式直接忽略：滚动由 ListView 负责，再按键翻页会跟滚动位置打架。
+  /// 页数据还没到时也忽略——此时 `_turn` 没有 total 可用。
+  void _onVolumeKey(PageTurnKey key) {
+    if (!mounted) return;
+    final pages = ref.read(readerPagesProvider(widget.bookId)).value;
+    if (pages == null || pages.isEmpty) return;
+    final total = pages.length;
+    final mode = _modeFor(ref.read(readerPrefsProvider));
+    if (mode == ReadingMode.verticalScroll) return;
+    final spreads = _spreadsFor(pages, mode);
+    final page = _resolvePage(total);
+    final spreadIndex = spreads.isEmpty ? -1 : spreadIndexOf(spreads, page - 1);
+    _turn(key == PageTurnKey.next ? 1 : -1, total, mode, spreadIndex, spreads);
   }
 
   /// 切后台/锁屏时立刻落一次进度：只靠防抖会丢掉"看完就退出"的那一页。

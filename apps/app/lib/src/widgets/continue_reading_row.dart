@@ -76,52 +76,60 @@ class _ContinueCard extends ConsumerWidget {
             ?.readingDirection ??
         ReadingDirection.unknown;
     final progress = book.readProgress;
+    final progressLabel = progress == null
+        ? l10n.bookPages(book.pagesCount)
+        : l10n.continueReadingProgress(progress.page, book.pagesCount);
 
-    return InkWell(
+    // 整张卡片是一个按钮：读屏念「书名 + 进度」，不逐条念封面/标题/页码。
+    // 卡片宽 96、高 196，满足最小点击区（48）要求。
+    return Semantics(
       key: Key('continue-${book.id}'),
+      container: true,
+      button: true,
+      label: '${book.name}, $progressLabel',
       onTap: () => onOpen(book, direction),
-      child: SizedBox(
-        width: 96,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            ClipRRect(
-              borderRadius: BorderRadius.circular(AppRadii.sm),
-              child: SizedBox(
-                width: 96,
-                height: 136,
-                child: cover == null
-                    ? ColoredBox(
-                        color: theme.colorScheme.surfaceContainerHighest,
-                      )
-                    : Image.memory(
-                        cover,
-                        fit: BoxFit.cover,
-                        gaplessPlayback: true,
-                      ),
-              ),
+      child: ExcludeSemantics(
+        child: InkWell(
+          onTap: () => onOpen(book, direction),
+          child: SizedBox(
+            width: 96,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadii.sm),
+                  child: SizedBox(
+                    width: 96,
+                    height: 136,
+                    child: cover == null
+                        ? ColoredBox(
+                            color: theme.colorScheme.surfaceContainerHighest,
+                          )
+                        : Image.memory(
+                            cover,
+                            fit: BoxFit.cover,
+                            gaplessPlayback: true,
+                          ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  book.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelMedium,
+                ),
+                Text(
+                  progressLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              book.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.labelMedium,
-            ),
-            Text(
-              progress == null
-                  ? l10n.bookPages(book.pagesCount)
-                  : l10n.continueReadingProgress(
-                      progress.page,
-                      book.pagesCount,
-                    ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

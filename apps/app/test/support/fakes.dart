@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:komga_api/komga_api.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/providers/settings_provider.dart';
@@ -13,6 +15,25 @@ class FakeWakeLock implements WakeLock {
 
   @override
   Future<void> setEnabled(bool value) async => calls.add(value);
+}
+
+/// 可手动发事件的音量键：测试"按键 → 翻页"不用碰平台通道。
+class FakeHardwareKeys implements HardwareKeys {
+  final StreamController<PageTurnKey> _controller =
+      StreamController<PageTurnKey>.broadcast();
+
+  @override
+  Stream<PageTurnKey> get volumeKeys => _controller.stream;
+
+  /// 阅读器进入/退出时的开关，测试可断言"退出后音量键交还系统"。
+  final List<bool> activeCalls = <bool>[];
+
+  @override
+  Future<void> setActive(bool active) async => activeCalls.add(active);
+
+  void emit(PageTurnKey key) => _controller.add(key);
+
+  Future<void> close() => _controller.close();
 }
 
 /// 墨水屏档位的设置（默认设置是普通设备）。

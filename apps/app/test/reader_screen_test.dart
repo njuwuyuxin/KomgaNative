@@ -3,9 +3,11 @@ import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
+import 'package:komga_platform/komga_platform.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_reader.dart';
+import 'support/fakes.dart';
 import 'support/reader_harness.dart';
 
 /// 阅读器的基础行为：打开/翻页/进度/失败态，以及三种模式的渲染。
@@ -138,6 +140,58 @@ void main() {
     await tester.pump(const Duration(milliseconds: 700));
 
     expect(find.text('2 / 3'), findsOneWidget);
+  });
+
+  group('音量键翻页', () {
+    testWidgets('音量下下一页、音量上上一页（单页）', (WidgetTester tester) async {
+      final keys = FakeHardwareKeys();
+      await pumpReader(tester, book: demoReaderBook(), hardwareKeys: keys);
+      expect(find.text('1 / 3'), findsOneWidget);
+
+      keys.emit(PageTurnKey.next);
+      await tester.pumpAndSettle();
+      expect(find.text('2 / 3'), findsOneWidget);
+
+      keys.emit(PageTurnKey.previous);
+      await tester.pumpAndSettle();
+      expect(find.text('1 / 3'), findsOneWidget);
+
+      await keys.close();
+    });
+
+    testWidgets('双页模式按屏翻页', (WidgetTester tester) async {
+      final keys = FakeHardwareKeys();
+      await pumpReader(tester, book: demoReaderBook(), hardwareKeys: keys);
+      await pickMode(tester, ReaderModeChoice.double);
+      expect(find.text('1 / 3'), findsOneWidget);
+
+      keys.emit(PageTurnKey.next);
+      await tester.pumpAndSettle();
+      expect(find.text('2–3 / 3'), findsOneWidget);
+
+      keys.emit(PageTurnKey.previous);
+      await tester.pumpAndSettle();
+      expect(find.text('1 / 3'), findsOneWidget);
+
+      await keys.close();
+    });
+
+    testWidgets('纵向连续模式忽略音量键（滚动优先）', (WidgetTester tester) async {
+      final keys = FakeHardwareKeys();
+      await pumpReader(
+        tester,
+        book: demoReaderBook(),
+        direction: ReadingDirection.vertical,
+        hardwareKeys: keys,
+      );
+      expect(find.byKey(const Key('reader-vertical-list')), findsOneWidget);
+
+      keys.emit(PageTurnKey.next);
+      await tester.pumpAndSettle();
+
+      expect(find.text('1 / 3'), findsOneWidget);
+      await keys.close();
+    });
   });
 
   group('双页跨页', () {

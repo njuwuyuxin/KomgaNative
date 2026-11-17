@@ -58,3 +58,12 @@ final NotifierProvider<ReaderPrefsController, ReaderPrefs> readerPrefsProvider =
 final Provider<WakeLock> wakeLockProvider = Provider<WakeLock>(
   (Ref ref) => ChannelWakeLock(),
 );
+
+/// 音量键翻页。单独成 provider 是为了测试能注入假事件流。
+final Provider<HardwareKeys> hardwareKeysProvider = Provider<HardwareKeys>((
+  Ref ref,
+) {
+  final keys = ChannelHardwareKeys();
+  ref.onDispose(keys.dispose);
+  return keys;
+});

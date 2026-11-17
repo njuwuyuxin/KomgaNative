@@ -14,10 +14,12 @@ Komga 的跨平台客户端（iOS / Android / Android 墨水屏），阅读体�
 > **进度 outbox**（Drift 落盘、断网不丢、联网/回前台自动补交、多设备按服务端 `lastModified` 对账）、
 > **离线缓存**（书架/封面/页图 GET 响应落盘，断网看到上次的内容并显示离线提示条，见 [docs/offline-cache.md](docs/offline-cache.md)）、
 > **多服务器与存储管理**（设置页切换/删除服务器、缓存与下载占用、清空离线内容）、
-> **国际化**（English / 中文 / 跟随系统；ARB + `flutter gen-l10n`，见 [docs/i18n.md](docs/i18n.md)）。
+> **国际化**（English / 中文 / 跟随系统；ARB + `flutter gen-l10n`，见 [docs/i18n.md](docs/i18n.md)）、
+> **形态适配与无障碍（阶段 H 首轮）**（Android 音量键翻页、读屏语义与 48 点击区、
+> 系列详情平板两栏；见 [docs/a11y-and-input.md](docs/a11y-and-input.md)）。
 > 已在 **Android 模拟器 + 本机 Komga 实例**上跑通"连接 → 书架 → 系列 → 阅读 → 进度"全链路，
 > 并在**一台公网 NAS（openresty 反代 + 证书已过期）**上验证了真实登录路径。
-> 待完成：中文字体子集（黄金图里验证中文排版）、形态适配与无障碍（见 roadmap）。
+> 待完成：中文字体子集（黄金图里验证中文排版）、墨水屏对比度/灰度选项（见 roadmap 阶段 H 的边界）。
 
 ## 文档
 
@@ -34,6 +36,7 @@ Komga 的跨平台客户端（iOS / Android / Android 墨水屏），阅读体�
 | [docs/adr/0002-progress-outbox-and-drift.md](docs/adr/0002-progress-outbox-and-drift.md) | ADR：进度 outbox 与 Drift 落盘（表结构、seq 回执、对账基准） |
 | [docs/offline-cache.md](docs/offline-cache.md) | 离线与缓存：能看什么、容量与淘汰、分区、验证 |
 | [docs/i18n.md](docs/i18n.md) | 国际化：ARB 组织、生成流程、语言设置与"数据层文案未本地化"的边界 |
+| [docs/a11y-and-input.md](docs/a11y-and-input.md) | 无障碍与输入：音量键翻页、读屏语义、48 点击区、平板两栏、墨水屏边界 |
 | [docs/adr/0003-http-response-cache.md](docs/adr/0003-http-response-cache.md) | ADR：为什么把缓存钩在传输层、为什么与进度库分文件 |
 | [docs/roadmap.md](docs/roadmap.md) | 剩余功能分阶段计划（C–I）与验收口径 |
 | [AGENTS.md](AGENTS.md) | Agent 工作契约：命令、架构不变量、DoD、反模式 |
@@ -84,8 +87,8 @@ dart run tool/ci.dart check    # format + analyze + layers + 全部测试
 dart run tool/ci.dart golden   # 重新生成黄金图（仅 Windows，与 CI 一致）
 ```
 
-当前基线：**387 个测试**（纯 Dart 174 / Flutter 213），**27 张黄金图**覆盖
-书架（手机 light / 平板 dark / 1.3 倍字号 / 墨水屏 / 空态 / 错误态 / **离线态**）、系列详情（手机 / 平板 / 墨水屏）、
+当前基线：**399 个测试**（纯 Dart 160 / Flutter 239），**28 张黄金图**覆盖
+书架（手机 light / 平板 dark / 1.3 倍字号 / 墨水屏 / 空态 / 错误态 / **离线态**）、系列详情（手机 / 平板两栏 dark / 平板两栏 light / 墨水屏）、
 阅读器（单页 dark+eink、双页 dark+eink、纵向 dark、设置面板 dark+eink）、墨水屏设置（含存储占用）、连接页（light / eink）、
 证书面板（手机 / 平板 / 墨水屏）、启动页。
 
@@ -121,6 +124,8 @@ dart run tool/ci.dart golden   # 重新生成黄金图（仅 Windows，与 CI �
 
 - 头部：封面 + 标题 + "N of M read" + 进度条 + 阅读方向（来自 `metadata.readingDirection`）；
 - 书列表：封图、`#卷号 · 书名`、页数、已读完打勾；点一本书进阅读器（把已抓到的 `Book` 一起带过去，省一次请求）；
+- **平板两栏**：宽 ≥1024 时左头部 / 右书列表（`WindowSizeClass.expanded`），手机、横屏手机、
+  758×1024 墨水屏保持单栏；两栏实现见 `widgets/series_two_pane.dart`；
 - **标记整系列已读/未读**：右上角菜单，一条 `POST`/`DELETE /series/{id}/read-progress` 完成
   （接口经真实实例验证，见 [docs/series-queries.md](docs/series-queries.md)），本地 outbox 同步覆盖；
 - 一次要 100 本（多数系列够用）；真超过 100 本时底部明说 "Showing 100 of N"，**不装作全都在**；
@@ -155,10 +160,23 @@ dart run tool/ci.dart golden   # 重新生成黄金图（仅 Windows，与 CI �
 | 阅读模式 | 跟随书 / 单页 / 双页 / 纵向；**持久化**，下次打开新书沿用 |
 | 亮度 | 阅读区盖一层黑遮罩（下限 20%，不会全黑），不吃点击，翻页照常 |
 | 常亮 | 进阅读器置真、退出置假（Android `FLAG_KEEP_SCREEN_ON`，见 [docs/reader.md](docs/reader.md)） |
+| 音量键 | 仅 Android：音量上 = 上一页，音量下 = 下一页；单页/双页生效，纵向连续忽略 |
 | 跳页 | 拖到目标页松手才跳；纵向模式滚到对应偏移 |
 
 偏好存在 secure storage（`komganative.reader.v1`），不是 Drift：几个字段不需要查询能力，
 Drift 留给书架/页图缓存与进度 outbox。坏存档一律回默认值。
+
+## 无障碍、输入与形态适配（阶段 H 首轮）
+
+- **音量键翻页**：Android 原生 `dispatchKeyEvent` 捕获音量键并消费，经 `komganative/device`
+  通道发给 `ChannelHardwareKeys`；阅读器单页/双页映射为上一页/下一页，纵向模式忽略。
+  iOS 与桌面没有实现，`MissingPluginException` 静默降级为空流；
+- **读屏语义**：书架卡片、继续阅读卡片、系列书行各是一句完整标签；阅读器顶/底栏与下载按钮
+  沿用 `IconButton` 的 tooltip 语义；文案全部来自 `context.l10n`，`SeriesTile` 不再硬编码「已读」；
+- **点击区**：图标按钮默认 48×48，自定义卡片（96×196）与书行整行可点；
+- **平板两栏**：系列详情在 ≥1024 时左头部 / 右书列表；窄屏路径不变；
+- 细节、验收与**未验证项**（Kotlin 未本机编译、iOS 常亮未做、墨水屏灰度选项未做）见
+  [docs/a11y-and-input.md](docs/a11y-and-input.md)。
 
 ## 进度：先落盘，再补交
 
@@ -258,6 +276,11 @@ debug 包（模拟器 / `flutter run`）自带这条权限，所以这个坑只�
   离线时也不做凭据校验——登录态失效要联网才会发现；
 - **常亮只在 Android 生效**：iOS 侧通道没实现（`MissingPluginException` 静默降级为"不常亮"），
   没有 macOS 环境验证，宁可留空也不写没跑过的 `AppDelegate`；
+- **音量键翻页只在 Android 生效**：原生侧会消费音量键（整个 Activity 都不再调系统音量，
+  不只是阅读器）；Kotlin 已通过本地 `flutter build apk --debug`，但未在真机验证按键行为，
+  见 [docs/a11y-and-input.md](docs/a11y-and-input.md)；
+- **墨水屏没有对比度/灰度选项**：只有固定的 e-ink 主题（零动画/零阴影/纯黑白 + 阅读器白底），
+  没有运行时调节，也没有真实墨水屏设备上的残影验收；
 - **亮度是应用内遮罩**，不改系统亮度（那需要新插件），夜里够用但不是系统级调光；
 - **阅读偏好是全局的**，不按书记忆（系列的条漫/竖向已由元数据兜住，双页是个人习惯）；
 - **数据层文案尚未本地化**：`ShelfFailure.message/hint`（书架/系列/阅读器的错误态）与

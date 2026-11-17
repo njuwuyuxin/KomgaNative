@@ -58,16 +58,45 @@ void main() {
         MaterialApp(
           theme: AppTheme.light(),
           home: const Scaffold(
-            body: SizedBox(width: 200, child: SeriesTile(series: series)),
+            body: SizedBox(
+              width: 200,
+              child: SeriesTile(
+                series: series,
+                semanticsLabel: 'Frieren, 4 of 10 read',
+              ),
+            ),
           ),
         ),
       );
 
       expect(find.text('Frieren'), findsOneWidget);
       expect(find.text('4/10'), findsOneWidget);
-      expect(find.bySemanticsLabel('Frieren，4/10 已读'), findsOneWidget);
+      // 标签由调用方本地化；设计系统自己不再硬编码「已读」。
+      expect(find.bySemanticsLabel('Frieren, 4 of 10 read'), findsOneWidget);
       expect(find.byType(LinearProgressIndicator), findsOneWidget);
       // 必须在测试体结束前释放：框架会在 tearDown 之前校验未释放的 handle。
+      handle.dispose();
+    });
+
+    testWidgets('没有语义文案时只播报标题', (tester) async {
+      final handle = tester.ensureSemantics();
+      const series = Series(
+        id: 's1',
+        libraryId: 'l1',
+        title: 'Frieren',
+        booksCount: 10,
+        booksReadCount: 4,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: const Scaffold(
+            body: SizedBox(width: 200, child: SeriesTile(series: series)),
+          ),
+        ),
+      );
+
+      expect(find.bySemanticsLabel('Frieren'), findsOneWidget);
       handle.dispose();
     });
 

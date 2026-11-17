@@ -98,15 +98,42 @@
 - **中文字体子集/中文黄金图未做**：黄金图测试环境仍只加载 Roboto，`settings@eink` 里
   「中文」二字显示为占位方块（真机系统字体正常）。引入可再分发的中文字体子集需要单独评审体积与许可。
 
-## 阶段 H：形态适配与无障碍
+## 阶段 H：形态适配与无障碍（✅ 已完成 2026-11-17）
 
 **目标**：平板不是放大的手机，墨水屏不是深色主题。
 
-- 平板/折叠双栏（书架 + 系列详情并排），`WindowSizeClass` 一次性决策。
-- 墨水屏：对比度/灰度选项、翻页无动画、可关闭阴影；大按钮布局。
-- 无障碍：语义标签、最小点击区域、屏幕阅读器顺序、动态字号（1.3×）不溢出。
-- 硬件：音量键翻页（Android），iOS 常亮通道实现（仅 CI 编译验证，明确标注未真机验证）。
-- 验收：平板双栏黄金图、语义测试、1.3× 字号无溢出、硬件键映射单测。
+**落地**：
+
+- **音量键翻页（Android）**：`MainActivity.dispatchKeyEvent` 捕获音量键并消费，经
+  `komganative/device` 通道发给 `ChannelHardwareKeys`；阅读器单页/双页映射为
+  上一页/下一页，纵向连续忽略。抽象在 `komga_platform/hardware_keys.dart`，
+  `MissingPluginException` 静默降级为空流。+5 测试（平台 2 / 阅读器 3）。
+- **读屏语义与点击区**：书架卡片、继续阅读卡片、系列书行改为整块 `Semantics` 按钮标签；
+  阅读器顶/底栏与下载按钮沿用 `IconButton` 的 tooltip 语义；`SeriesTile` 的硬编码
+  「已读」改成调用方传入的 `semanticsLabel`（app 里用 `l10n.readOfTotal`）。
+  自定义卡片 96×196、书行整行可点、图标按钮 48×48。+4 语义测试。
+- **平板两栏**：系列详情在 `WindowSizeClass.expanded`（≥1024）左头部 / 右书列表；
+  手机、横屏手机、758×1024 墨水屏保持单栏。实现拆到 `widgets/series_two_pane.dart`，
+  `series_detail_screen.dart` 从 418 行降到 195 行。+2 布局测试。
+- **墨水屏**：沿用既有 e-ink 主题（零动画/零阴影/纯黑白）与阅读器白底黑字；本次只做
+  "大点击区"与既有主题的整理，不新增运行时对比度/灰度开关。
+
+**验收**：`dart run tool/ci.dart check` 全绿（本地）；黄金图 `series@tablet_dark` 按两栏
+**有意重新生成**，新增 `series@tablet_two_pane`；手机/墨水屏金图未变。文档
+[docs/a11y-and-input.md](a11y-and-input.md) 记录实现、验收与未验证项。
+
+**边界（本次未做）**：
+
+- **iOS 常亮仍未实现**：没有 macOS 环境验证，`MissingPluginException` 静默降级为
+  "不常亮"；宁可留空，也不写没跑过的 `AppDelegate`。iOS 音量键同样没有实现。
+- **Kotlin 已本地编译、未真机验证**：`flutter build apk --debug` 通过（Gradle
+  `assembleDebug`），但没有在真机上确认"按音量键翻页且不调系统音量"。iOS 音量键没有实现。
+- **墨水屏对比度/灰度选项未做**：只有固定的 e-ink 主题，没有用户可调曲线/灰度；
+  也没有 Boox/Kindle 真机的残影/刷新主观验收。
+- **没有用 TalkBack / VoiceOver 人工走查**：语义测试只到语义树。
+- **1.3× 字号只有既有基线**：书架、证书面板有 1.3× 金图；系列两栏与阅读器没有新增
+  1.3× 基线。
+
 
 ## 阶段 I：发布打磨
 
