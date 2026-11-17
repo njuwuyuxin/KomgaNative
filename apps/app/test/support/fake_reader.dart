@@ -86,7 +86,7 @@ class FakeReaderRepository implements ReaderRepository {
   }
 
   @override
-  Future<void> saveProgress(
+  Future<void> uploadProgress(
     String bookId, {
     required int page,
     required bool completed,

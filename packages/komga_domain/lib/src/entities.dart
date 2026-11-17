@@ -208,6 +208,21 @@ class Book {
 
   bool get isUnread => readProgress == null;
   bool get isCompleted => readProgress?.completed ?? false;
+
+  /// 换一个阅读进度（本地进度叠加用）。
+  ///
+  /// 用独立方法而不是 `copyWith(readProgress: null)`：那种写法分不清
+  /// "不改" 和 "清空"，而"服务端把进度删了"恰恰需要清空。
+  Book withProgress(ReadProgress? progress) => Book(
+    id: id,
+    seriesId: seriesId,
+    name: name,
+    number: number,
+    pagesCount: pagesCount,
+    mediaProfile: mediaProfile,
+    sizeBytes: sizeBytes,
+    readProgress: progress,
+  );
 }
 
 /// Komga 分页查询结果。

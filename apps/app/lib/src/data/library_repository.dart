@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:komga_api/komga_api.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/byte_cache.dart';
+import 'package:komga_native/src/data/progress/progress_sync_service.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 
 /// 书架/系列详情的数据来源。
@@ -37,11 +38,18 @@ abstract interface class LibraryRepository {
 }
 
 /// 真实实现：包一层 [KomgaSession]，把 `KomgaError` 翻成 [ShelfFailure]。
+///
+/// 书列表会用 [ProgressSyncService] 做一次"本地进度叠加"：断网时读到的进度
+/// 还没提交，但用户看到的必须是**自己刚读到的位置**，不是服务端的旧值。
 class KomgaLibraryRepository implements LibraryRepository {
-  KomgaLibraryRepository(this._session, {int coverCacheCapacity = 48})
-    : _covers = ByteLruCache(capacity: coverCacheCapacity);
+  KomgaLibraryRepository(
+    this._session,
+    this._sync, {
+    int coverCacheCapacity = 48,
+  }) : _covers = ByteLruCache(capacity: coverCacheCapacity);
 
   final KomgaSession _session;
+  final ProgressSyncService _sync;
   final ByteLruCache _covers;
 
   @override
@@ -88,7 +96,17 @@ class KomgaLibraryRepository implements LibraryRepository {
     int size = 100,
   }) async {
     try {
-      return await _session.fetchSeriesBooks(seriesId, page: page, size: size);
+      final result = await _session.fetchSeriesBooks(
+        seriesId,
+        page: page,
+        size: size,
+      );
+      return PageResult<Book>(
+        items: await _sync.overlay(result.items),
+        totalElements: result.totalElements,
+        page: result.page,
+        size: result.size,
+      );
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);
     }

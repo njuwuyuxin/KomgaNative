@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
+import 'package:komga_native/src/providers/progress_providers.dart';
 import 'package:komga_native/src/providers/reader_prefs_provider.dart';
 import 'package:komga_native/src/providers/reader_providers.dart';
 import 'package:komga_native/src/providers/settings_provider.dart';
@@ -116,16 +117,17 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   Future<void> _persist(int page, int total) async {
     if (page == _lastSaved) return;
     try {
+      // 先落盘再提交：断网/切后台都不会丢这一页（见 ADR 0002）。
       await ref
-          .read(readerRepositoryProvider)
-          .saveProgress(
+          .read(progressSyncProvider)
+          .save(
             widget.bookId,
             page: page,
             completed: _isCompleted(page: page, total: total),
           );
       _lastSaved = page;
     } on ShelfFailure {
-      // 进度回写失败不打断阅读：下次翻页会再试，切后台时也会再 flush 一次。
+      // 连本地库都写不进去才会走到这里（磁盘满/库损坏）；阅读不因此中断。
     }
   }
 

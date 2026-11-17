@@ -6,7 +6,9 @@ import 'package:komga_api/komga_api.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/app.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
+import 'package:komga_native/src/providers/progress_providers.dart';
 import 'package:komga_native/src/providers/reader_providers.dart';
+import 'package:komga_native/src/data/progress/progress_store.dart';
 import 'package:komga_native/src/session/connection_service.dart';
 import 'package:komga_native/src/session/server_store.dart';
 import 'package:komga_native/src/session/session_controller.dart';
@@ -36,6 +38,8 @@ void main() {
           connectionServiceProvider.overrideWithValue(
             service ?? FakeConnectionService(),
           ),
+          // 进度同步走内存库：冒烟测试不该打开 sqlite，也不该碰 path_provider 通道。
+          progressStoreProvider.overrideWithValue(InMemoryProgressStore()),
           // 书架与阅读器都走假仓库：冒烟测试不该联网，也不能依赖真实服务器。
           libraryRepositoryProvider.overrideWithValue(
             FakeLibraryRepository(series: demoShelf()),

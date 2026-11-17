@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:komga_api/komga_api.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/byte_cache.dart';
+import 'package:komga_native/src/data/progress/progress_sync_service.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 
 /// 阅读器的数据来源。
@@ -11,6 +12,9 @@ import 'package:komga_native/src/data/shelf_failure.dart';
 /// 封面只是装饰，失败就退回占位图。
 abstract interface class ReaderRepository {
   /// 书的基本信息（页数、阅读进度）。书被删时返回 null。
+  ///
+  /// 返回的 `readProgress` 已经叠加过**本地未提交进度**：断网读完一章再打开，
+  /// 位置不会退回服务端的旧值。
   Future<Book?> book(String bookId);
 
   /// 每一页的尺寸/字节数；页码与 [PageInfo.number] 都是 1 基。
@@ -19,8 +23,9 @@ abstract interface class ReaderRepository {
   /// 第 [page] 页的图片字节（1 基）。
   Future<Uint8List> pageImage(String bookId, int page);
 
-  /// 回写阅读进度。页码 1 基；到最后一页时 [completed] 置真。
-  Future<void> saveProgress(
+  /// 只负责**把进度发给服务端**。落盘与重试在 `ProgressSyncService`，
+  /// 这里不再"直连 PATCH 一发了之"（断网就会丢）。
+  Future<void> uploadProgress(
     String bookId, {
     required int page,
     required bool completed,
@@ -28,10 +33,11 @@ abstract interface class ReaderRepository {
 }
 
 class KomgaReaderRepository implements ReaderRepository {
-  KomgaReaderRepository(this._session, {int pageCacheCapacity = 8})
+  KomgaReaderRepository(this._session, this._sync, {int pageCacheCapacity = 8})
     : _pages = ByteLruCache(capacity: pageCacheCapacity);
 
   final KomgaSession _session;
+  final ProgressSyncService _sync;
 
   /// 页图单张通常几百 KB 到 2 MB，缓存 8 张足够覆盖"前后翻页"而不会吃爆内存。
   final ByteLruCache _pages;
@@ -39,7 +45,8 @@ class KomgaReaderRepository implements ReaderRepository {
   @override
   Future<Book?> book(String bookId) async {
     try {
-      return await _session.fetchBook(bookId);
+      final book = await _session.fetchBook(bookId);
+      return await _sync.overlayOne(book);
     } on KomgaNotFoundError {
       return null;
     } on KomgaError catch (error) {
@@ -72,7 +79,7 @@ class KomgaReaderRepository implements ReaderRepository {
   }
 
   @override
-  Future<void> saveProgress(
+  Future<void> uploadProgress(
     String bookId, {
     required int page,
     required bool completed,

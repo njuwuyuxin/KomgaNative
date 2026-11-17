@@ -6,6 +6,7 @@ import 'package:komga_api/komga_api.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/library_repository.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
+import 'package:komga_native/src/providers/progress_providers.dart';
 import 'package:komga_native/src/session/session_controller.dart';
 
 /// 书架仓库：由当前会话构造，会话变了就重建（并关掉旧的 dio 连接）。
@@ -22,7 +23,7 @@ final Provider<LibraryRepository> libraryRepositoryProvider =
         trust: session.server.tls,
       );
       ref.onDispose(komga.close);
-      return KomgaLibraryRepository(komga);
+      return KomgaLibraryRepository(komga, ref.watch(progressSyncProvider));
     });
 
 /// 当前账号可见的库（用于筛选条）。

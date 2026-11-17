@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_api/komga_api.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/reader_repository.dart';
+import 'package:komga_native/src/providers/progress_providers.dart';
 import 'package:komga_native/src/session/session_controller.dart';
 
 /// 阅读器仓库：跟着会话走，会话变了就重建并关掉旧连接。
@@ -19,7 +20,7 @@ final Provider<ReaderRepository> readerRepositoryProvider =
         trust: session.server.tls,
       );
       ref.onDispose(komga.close);
-      return KomgaReaderRepository(komga);
+      return KomgaReaderRepository(komga, ref.watch(progressSyncProvider));
     });
 
 final readerBookProvider = FutureProvider.family<Book?, String>((

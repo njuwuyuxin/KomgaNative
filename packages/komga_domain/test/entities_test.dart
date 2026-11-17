@@ -48,6 +48,45 @@ void main() {
     });
   });
 
+  group('Book', () {
+    Book book({ReadProgress? progress}) => Book(
+      id: 'b',
+      seriesId: 's',
+      name: 'Vol. 1',
+      number: '1',
+      pagesCount: 10,
+      readProgress: progress,
+    );
+
+    test('withProgress 能换也能清空（copyWith 分不清这两种意图）', () {
+      final progress = ReadProgress(
+        page: 3,
+        completed: false,
+        lastModified: DateTime.utc(2026, 1, 1),
+      );
+
+      final withProgress = book().withProgress(progress);
+      expect(withProgress.readProgress, progress);
+      expect(withProgress.id, 'b', reason: '其它字段原样保留');
+
+      expect(book(progress: progress).withProgress(null).readProgress, isNull);
+    });
+
+    test('未读/读完的判断', () {
+      expect(book().isUnread, isTrue);
+      expect(
+        book(
+          progress: ReadProgress(
+            page: 10,
+            completed: true,
+            lastModified: DateTime.utc(2026, 1, 1),
+          ),
+        ).isCompleted,
+        isTrue,
+      );
+    });
+  });
+
   group('Series', () {
     test('进度按已读/总数计算并夹在 0..1', () {
       expect(

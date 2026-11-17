@@ -10,7 +10,8 @@ Komga 的跨平台客户端（iOS / Android / Android 墨水屏），阅读体�
 > **系列详情**（`/api/v1/series/{id}` + 书列表 + 点书进阅读器）、
 > **阅读器 v2**（单页 / 双页跨页 / 纵向连续三种模式，按系列方向自动选默认值；
 > 真实页图、点击翻页、双指缩放、从上次位置继续、进度回写 Komga；墨水屏白底黑字；
-> 阅读设置面板：模式/亮度/常亮/跳页，偏好持久化）。
+> 阅读设置面板：模式/亮度/常亮/跳页，偏好持久化）、
+> **进度 outbox**（Drift 落盘、断网不丢、联网/回前台自动补交、多设备按服务端 `lastModified` 对账）。
 > 已在 **Android 模拟器 + 本机 Komga 实例**上跑通"连接 → 书架 → 系列 → 阅读 → 进度"全链路，
 > 并在**一台公网 NAS（openresty 反代 + 证书已过期）**上验证了真实登录路径。
 > 待完成：阅读设置持久化（亮度/常亮/快速跳页）、进度 outbox 与多设备对账、Drift 离线缓存、i18n 与中文字体。
@@ -25,6 +26,8 @@ Komga 的跨平台客户端（iOS / Android / Android 墨水屏），阅读体�
 | [docs/komga-api-verification.md](docs/komga-api-verification.md) | Komga API 实测记录：复现步骤、证据表、发现的缺陷、仍未验证项 |
 | [docs/tls-and-proxy.md](docs/tls-and-proxy.md) | 反代与证书：真实现象（明文 400 / 证书过期）、客户端行为矩阵、复现方式 |
 | [docs/reader.md](docs/reader.md) | 阅读器：三层分工、模式规则、设置与持久化的取舍、常亮通道的实现边界 |
+| [docs/adr/0001-certificate-trust.md](docs/adr/0001-certificate-trust.md) | ADR：为什么用 TOFU + 固定指纹，而不是"忽略证书" |
+| [docs/adr/0002-progress-outbox-and-drift.md](docs/adr/0002-progress-outbox-and-drift.md) | ADR：进度 outbox 与 Drift 落盘（表结构、seq 回执、对账基准） |
 | [docs/adr/0001-certificate-trust.md](docs/adr/0001-certificate-trust.md) | ADR：为什么用 TOFU + 固定指纹，而不是"忽略证书" |
 | [AGENTS.md](AGENTS.md) | Agent 工作契约：命令、架构不变量、DoD、反模式 |
 
@@ -74,7 +77,7 @@ dart run tool/ci.dart check    # format + analyze + layers + 全部测试
 dart run tool/ci.dart golden   # 重新生成黄金图（仅 Windows，与 CI 一致）
 ```
 
-当前基线：**281 个测试**（纯 Dart 139 / Flutter 142），**23 张黄金图**覆盖
+当前基线：**309 个测试**（纯 Dart 141 / Flutter 168），**23 张黄金图**覆盖
 书架（手机 light / 平板 dark / 1.3 倍字号 / 墨水屏 / 空态 / 错误态）、系列详情（手机 / 平板 / 墨水屏）、
 阅读器（单页 dark+eink、双页 dark+eink、纵向 dark、设置面板 dark+eink）、墨水屏设置、连接页（light / eink）、
 证书面板（手机 / 平板 / 墨水屏）、启动页。
@@ -144,6 +147,23 @@ dart run tool/ci.dart golden   # 重新生成黄金图（仅 Windows，与 CI �
 偏好存在 secure storage（`komganative.reader.v1`），不是 Drift：几个字段不需要查询能力，
 Drift 留给书架/页图缓存与进度 outbox。坏存档一律回默认值。
 
+## 进度：先落盘，再补交
+
+翻页不再直连 PATCH：先写本地 Drift（`local_progress`），再尽力上传。
+断网、切后台、服务端 5xx 都不会丢这一页。
+
+- **合并**：同一本书只保留最新一条（翻页很密，堆队列没有意义）；
+- **回执**：提交成功要 `seq` 匹配才清空——提交期间又翻页时，新进度必须留下；
+- **补交时机**：启动、**会话恢复/重新登录后**、回到前台、下次翻页（真机踩到过"启动时会话还没恢复"的时序坑）；
+- **对账**：只信服务端 `lastModified`，不用设备墙钟；`decideSync` 决定"推送/采纳/忽略"，
+  采纳时写回本地；服务端把进度删了（标记未读）本地也清空；
+- **本地优先展示**：书架与阅读器 resume 都会叠加本地未提交进度，
+  所以"断网读完 → 重新打开"看到的是自己读到的那一页，不是服务端的旧值；
+- **401/403**：保留队列但本轮停手，重新登录后再补交。
+
+表结构、为什么合一张表、为什么 PATCH 成功后要把服务端基准置空，见
+[ADR 0002](docs/adr/0002-progress-outbox-and-drift.md)。
+
 ## 连接到你的 Komga（NAS）
 
 1. 地址填 `http://<NAS 局域网 IP>:<端口>`，例如 `http://192.168.1.10:25600`（也支持 `https://` 与反代子路径 `https://host/komga`）；
@@ -188,15 +208,18 @@ debug 包（模拟器 / `flutter run`）自带这条权限，所以这个坑只�
 | 墨水屏阅读器 | ✅ 白底黑字（顶栏/底栏/页码同套配色），不再黑底全刷 |
 | 阅读设置：亮度 | ✅ 拖到 20% 后整页变暗；**杀进程重启后仍是 20%**（存档生效） |
 | 阅读设置：常亮 | ✅ 打开后 `dumpsys window` 出现 `fl=KEEP_SCREEN_ON`，关掉即消失 |
+| 进度 outbox：离线翻页 | ✅ 停掉服务端翻到第 4 页 → 杀进程 → 服务端仍是第 3 页 |
+| 进度 outbox：冷启动补交 | ✅ 重启 App 后服务端变成 `page:4, completed:true`（`lastModified` 是新时间） |
+| 进度 outbox：积压补交 | ✅ 修 bug 前积压的第 2 页，冷启动后被自动补交 |
 
 ## 已知边界
 
+- **断网还不能"打开书"**：进度不丢（有 outbox），但书架/页图没有内容缓存，
+  断网冷启动是错误页；内容缓存（书架 JSON + 页图 + 容量上限）是下一片；
 - **常亮只在 Android 生效**：iOS 侧通道没实现（`MissingPluginException` 静默降级为"不常亮"），
   没有 macOS 环境验证，宁可留空也不写没跑过的 `AppDelegate`；
 - **亮度是应用内遮罩**，不改系统亮度（那需要新插件），夜里够用但不是系统级调光；
 - **阅读偏好是全局的**，不按书记忆（系列的条漫/竖向已由元数据兜住，双页是个人习惯）；
-- **进度回写是直接 PATCH**：`sync_engine` 的 outbox/多设备对账要等 Drift 落地后接入（断网时进度会丢）；
 - UI 文案暂为英文：i18n（ARB + 中文字体）之后一次性替换，避免现在把 CJK 字体塞进黄金图。
 - 证书信任是**按叶证书指纹固定**：服务器续期后需要再确认一次（有意为之，不是 bug）；
   不做自签名 CA 链校验与双向 TLS。
-- 书架的离线缓存（Drift）未做：断网时只有内存里的当前列表。

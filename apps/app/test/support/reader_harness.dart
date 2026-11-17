@@ -5,10 +5,14 @@ import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
 import 'package:komga_native/src/data/reader_prefs_store.dart';
+import 'package:komga_native/src/data/progress/progress_store.dart';
+import 'package:komga_native/src/data/progress/progress_sync_service.dart';
+import 'package:komga_native/src/providers/progress_providers.dart';
 import 'package:komga_native/src/providers/reader_prefs_provider.dart';
 import 'package:komga_native/src/providers/reader_providers.dart';
 import 'package:komga_native/src/providers/settings_provider.dart';
 import 'package:komga_native/src/screens/reader_screen.dart';
+import 'package:komga_sync_engine/komga_sync_engine.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'fake_reader.dart';
@@ -26,18 +30,30 @@ Future<InMemoryReaderPrefsStore> pumpReader(
   bool forceEink = false,
   ReaderPrefs? initialPrefs,
   FakeWakeLock? wakeLock,
+  ProgressStore? progressStore,
 }) async {
   tester.view.physicalSize = const Size(390 * 3, 844 * 3);
   tester.view.devicePixelRatio = 3;
   addTearDown(tester.view.reset);
 
   final prefsStore = InMemoryReaderPrefsStore(initialPrefs);
+  final readerRepository = repository ?? FakeReaderRepository();
+  // 进度同步用内存库 + 把上传直接交给假仓库：
+  // 这样"翻页 → 落盘 → 提交"三段都能在测试里断言，又不会碰真 sqlite。
+  final sync = ProgressSyncService(
+    store: progressStore ?? InMemoryProgressStore(),
+    upload: (ProgressTarget target) => readerRepository.uploadProgress(
+      target.bookId,
+      page: target.page,
+      completed: target.completed,
+    ),
+  );
+
   await tester.pumpWidget(
     ProviderScope(
       overrides: <Override>[
-        readerRepositoryProvider.overrideWithValue(
-          repository ?? FakeReaderRepository(),
-        ),
+        readerRepositoryProvider.overrideWithValue(readerRepository),
+        progressSyncProvider.overrideWithValue(sync),
         readerPrefsStoreProvider.overrideWithValue(prefsStore),
         wakeLockProvider.overrideWithValue(wakeLock ?? FakeWakeLock()),
         if (forceEink) settingsProvider.overrideWith(EinkSettings.new),

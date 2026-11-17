@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_native/src/providers/settings_provider.dart';
 import 'package:komga_native/src/providers/router_provider.dart';
+import 'package:komga_native/src/widgets/progress_sync_scope.dart';
 
 /// 应用根。
 ///
@@ -17,13 +18,15 @@ class KomgaApp extends ConsumerWidget {
     final router = ref.watch(routerProvider);
     final einkTheme = AppTheme.eink();
 
-    return MaterialApp.router(
-      title: 'KomgaNative',
-      debugShowCheckedModeBanner: false,
-      theme: settings.forceEink ? einkTheme : AppTheme.light(),
-      darkTheme: settings.forceEink ? einkTheme : AppTheme.dark(),
-      themeMode: settings.forceEink ? ThemeMode.light : settings.themeMode,
-      routerConfig: router,
+    return ProgressSyncScope(
+      child: MaterialApp.router(
+        title: 'KomgaNative',
+        debugShowCheckedModeBanner: false,
+        theme: settings.forceEink ? einkTheme : AppTheme.light(),
+        darkTheme: settings.forceEink ? einkTheme : AppTheme.dark(),
+        themeMode: settings.forceEink ? ThemeMode.light : settings.themeMode,
+        routerConfig: router,
+      ),
     );
   }
 }

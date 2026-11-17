@@ -5,7 +5,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:komga_api/komga_api.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/library_repository.dart';
+import 'package:komga_native/src/data/progress/progress_store.dart';
+import 'package:komga_native/src/data/progress/progress_sync_service.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
+import 'package:komga_sync_engine/komga_sync_engine.dart';
 
 /// 假的 dio 适配器：按路径回放响应并记录请求。
 class _Adapter implements HttpClientAdapter {
@@ -37,13 +40,19 @@ ResponseBody _rawJson(String body, {int status = 200}) =>
       },
     );
 
+/// 仓库只做网络 + 叠加；测试里给一个"永远没有本地进度"的同步服务，
+/// 叠加就不改变任何东西（本文件测的是 URL/解析，不是 outbox）。
 KomgaLibraryRepository _repository(_Adapter adapter) {
   final session = KomgaSession.withApiKey(
     address: ServerAddress.parse('https://komga.example.com'),
     apiKey: 'KEY',
     dio: Dio()..httpClientAdapter = adapter,
   );
-  return KomgaLibraryRepository(session);
+  final sync = ProgressSyncService(
+    store: InMemoryProgressStore(),
+    upload: (ProgressTarget target) async {},
+  );
+  return KomgaLibraryRepository(session, sync);
 }
 
 void main() {
