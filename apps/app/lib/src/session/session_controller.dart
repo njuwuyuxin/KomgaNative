@@ -259,10 +259,19 @@ class SessionController extends Notifier<SessionState> {
     state = const SessionDisconnected();
   }
 
+  /// 切换到一个已保存的服务器（不重新验证 Key；失效时用请求的 401 兜底）。
+  ///
+  /// 先把活动服务器写回存储，再切状态：这样"切换后杀掉进程"也能恢复到新的那台。
+  Future<void> switchTo(StoredServer server) async {
+    await _store.save(server);
+    state = SessionConnected(server);
+  }
+
   Future<void> signOut() async {
     _pendingAction = null;
     _pendingAddress = null;
     _pendingCertificate = null;
+    // 只清"活动"标记：多服务器列表里别的服务器不该被一次 Disconnect 忘掉。
     await _store.clear();
     state = const SessionDisconnected();
   }
@@ -274,6 +283,11 @@ final Provider<ServerStore> serverStoreProvider = Provider<ServerStore>(
 
 final Provider<ConnectionService> connectionServiceProvider =
     Provider<ConnectionService>((Ref ref) => LiveConnectionService());
+
+/// 已保存的服务器列表（设置页展示/切换）。
+final serverListProvider = FutureProvider<List<StoredServer>>((Ref ref) {
+  return ref.watch(serverStoreProvider).all();
+});
 
 final NotifierProvider<SessionController, SessionState> sessionProvider =
     NotifierProvider<SessionController, SessionState>(SessionController.new);

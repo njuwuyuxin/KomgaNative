@@ -166,6 +166,9 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
       statement.where((t) => t.scope.equals(filter));
     }
     await statement.go();
+    // "清空离线内容"也要清下载记录：否则"已下载"徽标会指向已经被删掉的页。
+    // 按服务器清空时不删全局下载记录（记录里没有服务器字段，删了会误伤别的库）。
+    if (scope == null) await delete(downloadedBooks).go();
   }
 
   // ---- 整本下载记录 ----

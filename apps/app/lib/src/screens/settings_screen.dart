@@ -1,12 +1,13 @@
-import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_native/src/providers/cache_providers.dart';
 import 'package:komga_native/src/providers/download_providers.dart';
 import 'package:komga_native/src/providers/settings_provider.dart';
+import 'package:komga_native/src/session/server_store.dart';
 import 'package:komga_native/src/session/session_controller.dart';
+import 'package:material_ui/material_ui.dart';
 
-/// 设置页：外观 + 当前连接。
+/// 设置页：外观 + 多服务器 + 存储 + 关于。
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
@@ -15,7 +16,9 @@ class SettingsScreen extends ConsumerWidget {
     final settings = ref.watch(settingsProvider);
     final controller = ref.read(settingsProvider.notifier);
     final session = ref.watch(sessionProvider);
-    final server = session is SessionConnected ? session.server : null;
+    final current = session is SessionConnected ? session.server : null;
+    final servers =
+        ref.watch(serverListProvider).value ?? const <StoredServer>[];
     final usage = ref.watch(cacheUsageProvider);
     final downloads = ref.watch(downloadsUsageProvider).value;
     final cacheUsage = usage.value;
@@ -67,26 +70,42 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           const Divider(),
-          const _SectionHeader('Server'),
-          if (server == null)
+          const _SectionHeader('Servers'),
+          if (servers.isEmpty)
             const ListTile(
-              title: Text('Not connected'),
-              subtitle: Text('Go back to the connect screen to sign in again'),
-            )
-          else ...<Widget>[
+              title: Text('No saved servers'),
+              subtitle: Text('Connect to a Komga server to get started'),
+            ),
+          for (final item in servers)
             ListTile(
-              title: Text(
-                server.accountEmail.isEmpty ? 'Connected' : server.accountEmail,
+              key: Key('server-${item.id}'),
+              leading: Icon(
+                item.id == current?.id
+                    ? Icons.check_circle
+                    : Icons.dns_outlined,
+                color: item.id == current?.id
+                    ? Theme.of(context).colorScheme.primary
+                    : null,
               ),
-              subtitle: Text(server.address.baseUrl),
-              leading: const Icon(Icons.dns_outlined),
+              title: Text(item.label),
+              subtitle: Text(item.address.baseUrl),
+              trailing: IconButton(
+                key: Key('server-remove-${item.id}'),
+                tooltip: 'Remove server',
+                icon: const Icon(Icons.delete_outline),
+                onPressed: () => _removeServer(context, ref, item),
+              ),
+              onTap: item.id == current?.id
+                  ? null
+                  : () => ref.read(sessionProvider.notifier).switchTo(item),
             ),
-            ListTile(
-              title: const Text('Disconnect'),
-              leading: const Icon(Icons.logout),
-              onTap: () => ref.read(sessionProvider.notifier).signOut(),
-            ),
-          ],
+          ListTile(
+            key: const Key('server-add'),
+            leading: const Icon(Icons.add),
+            title: const Text('Add server'),
+            subtitle: const Text('Signs out of the current server'),
+            onTap: () => ref.read(sessionProvider.notifier).signOut(),
+          ),
           const Divider(),
           const _SectionHeader('Storage'),
           ListTile(
@@ -111,7 +130,17 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const Divider(),
           const _SectionHeader('About'),
-          const ListTile(title: Text('Version'), trailing: Text('0.1.0 (M1)')),
+          const ListTile(title: Text('Version'), trailing: Text('0.1.0 (v1)')),
+          ListTile(
+            key: const Key('settings-licenses'),
+            leading: const Icon(Icons.description_outlined),
+            title: const Text('Open source licenses'),
+            onTap: () => showLicensePage(
+              context: context,
+              applicationName: 'KomgaNative',
+              applicationVersion: '0.1.0',
+            ),
+          ),
         ],
       ),
     );
@@ -122,9 +151,46 @@ class SettingsScreen extends ConsumerWidget {
 Future<void> _clearCache(BuildContext context, WidgetRef ref) async {
   await ref.read(httpCacheProvider).clear();
   ref.invalidate(cacheUsageProvider);
+  ref.invalidate(downloadsUsageProvider);
   if (!context.mounted) return;
   ScaffoldMessenger.of(context)
       .showSnackBar(const SnackBar(content: Text('Offline content cleared')));
+}
+
+/// 删除一台已保存的服务器（需要确认：删掉就要重新输入地址和 Key）。
+Future<void> _removeServer(
+  BuildContext context,
+  WidgetRef ref,
+  StoredServer server,
+) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (BuildContext context) => AlertDialog(
+      title: const Text('Remove server?'),
+      content: Text(
+        '${server.address.baseUrl} will be removed from this device. '
+        'You can add it again later.',
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('Remove'),
+        ),
+      ],
+    ),
+  );
+  if (!(confirmed ?? false)) return;
+
+  final session = ref.read(sessionProvider);
+  await ref.read(serverStoreProvider).remove(server);
+  ref.invalidate(serverListProvider);
+  if (session is SessionConnected && session.server.id == server.id) {
+    await ref.read(sessionProvider.notifier).signOut();
+  }
 }
 
 class _SectionHeader extends StatelessWidget {

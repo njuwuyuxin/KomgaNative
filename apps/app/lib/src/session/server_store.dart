@@ -27,10 +27,16 @@ class StoredServer {
   /// 之后所有请求只放行这张证书，证书一换就必须重新询问。
   final String? certificateFingerprint;
 
+  /// 服务器身份：同一台服务器换账号只保留最后一条（内容相同，没必要存两份）。
+  String get id => address.baseUrl;
+
   /// 建会话时用的信任策略。
   TlsTrust get tls => certificateFingerprint == null
       ? TlsTrust.strict()
       : TlsTrust.pinned(certificateFingerprint!);
+
+  /// 展示名：优先账号邮箱，没有就用地址。
+  String get label => accountEmail.isEmpty ? address.baseUrl : accountEmail;
 
   StoredServer copyWith({String? certificateFingerprint}) => StoredServer(
     address: address,
@@ -81,17 +87,30 @@ class StoredServer {
 }
 
 /// 会话持久化。抽象出来是为了让"连接流程"的测试不依赖钥匙串。
+///
+/// 多服务器语义：
+/// - [load] 返回**当前活动**服务器；
+/// - [save] 保存并设为活动（同一地址覆盖旧记录）；
+/// - [all] 返回全部已保存服务器；
+/// - [remove] 删掉某一台（若它是活动服务器，活动指针一并清空）；
+/// - [clear] 只清"活动"标记，不删列表（"Disconnect" 不等于"忘掉所有服务器"）。
 abstract interface class ServerStore {
   Future<StoredServer?> load();
 
+  Future<List<StoredServer>> all();
+
   Future<void> save(StoredServer server);
+
+  Future<void> remove(StoredServer server);
 
   Future<void> clear();
 }
 
 /// 真机实现：Keychain / Keystore。
 ///
-/// 用一个 JSON blob 存全部会话信息，避免多次跨平台调用，也避免把 API Key 拆成明文文件。
+/// 用一个 JSON blob 存全部服务器信息，避免多次跨平台调用，也避免把 API Key 拆成明文文件。
+/// v2 格式：`{"active": {...}, "servers": [{...}, ...]}`；
+/// 读到 v1（直接是一个 server 对象）时自动升级，不让老用户掉登录。
 class SecureServerStore implements ServerStore {
   SecureServerStore({FlutterSecureStorage? storage})
     : _storage = storage ?? const FlutterSecureStorage();
@@ -102,40 +121,148 @@ class SecureServerStore implements ServerStore {
 
   @override
   Future<StoredServer?> load() async {
-    final raw = await _storage.read(key: _key);
-    if (raw == null || raw.isEmpty) return null;
-    try {
-      final decoded = jsonDecode(raw);
-      if (decoded is! Map<String, Object?>) return null;
-      final server = StoredServer.fromJson(decoded);
-      // 损坏/空 Key 视为未登录，避免带着空 Key 去打服务器。
-      if (server.apiKey.isEmpty) return null;
-      return server;
-    } on FormatException {
-      return null;
-    }
+    final state = await _read();
+    return state.active;
   }
 
   @override
-  Future<void> save(StoredServer server) =>
-      _storage.write(key: _key, value: jsonEncode(server.toJson()));
+  Future<List<StoredServer>> all() async => (await _read()).servers;
 
   @override
-  Future<void> clear() => _storage.delete(key: _key);
+  Future<void> save(StoredServer server) async {
+    final state = await _read();
+    final servers = <StoredServer>[
+      for (final existing in state.servers)
+        if (existing.id != server.id) existing,
+      server,
+    ];
+    await _write(_ServerState(active: server, servers: servers));
+  }
+
+  @override
+  Future<void> remove(StoredServer server) async {
+    final state = await _read();
+    final servers = state.servers
+        .where((StoredServer s) => s.id != server.id)
+        .toList(growable: false);
+    final active = state.active?.id == server.id ? null : state.active;
+    await _write(_ServerState(active: active, servers: servers));
+  }
+
+  @override
+  Future<void> clear() async {
+    final state = await _read();
+    await _write(_ServerState(active: null, servers: state.servers));
+  }
+
+  Future<_ServerState> _read() async {
+    final raw = await _storage.read(key: _key);
+    if (raw == null || raw.isEmpty) return const _ServerState();
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, Object?>) return const _ServerState();
+
+      // v2
+      final servers = decoded['servers'];
+      if (servers is List<Object?>) {
+        final list = servers
+            .whereType<Map<Object?, Object?>>()
+            .map(_toServer)
+            .whereType<StoredServer>()
+            .where((StoredServer s) => s.apiKey.isNotEmpty)
+            .toList(growable: false);
+        final activeRaw = decoded['active'];
+        final active = activeRaw is Map<Object?, Object?>
+            ? _toServer(activeRaw)
+            : null;
+        return _ServerState(
+          active: (active != null && active.apiKey.isNotEmpty) ? active : null,
+          servers: list,
+        );
+      }
+
+      // v1：整个 blob 就是一个 server
+      final legacy = _toServer(decoded);
+      if (legacy == null || legacy.apiKey.isEmpty) return const _ServerState();
+      return _ServerState(active: legacy, servers: <StoredServer>[legacy]);
+    } on FormatException {
+      return const _ServerState();
+    }
+  }
+
+  Future<void> _write(_ServerState state) async {
+    if (state.servers.isEmpty) {
+      await _storage.delete(key: _key);
+      return;
+    }
+    await _storage.write(
+      key: _key,
+      value: jsonEncode(<String, Object?>{
+        'active': state.active?.toJson(),
+        'servers': <Object?>[
+          for (final server in state.servers) server.toJson(),
+        ],
+      }),
+    );
+  }
+
+  static StoredServer? _toServer(Map<Object?, Object?> json) {
+    try {
+      return StoredServer.fromJson(Map<String, Object?>.from(json));
+    } on FormatException {
+      // 地址非法（手工改过/别的 App 的 key）就当这条不存在。
+      return null;
+    }
+  }
+}
+
+class _ServerState {
+  const _ServerState({this.active, this.servers = const <StoredServer>[]});
+
+  final StoredServer? active;
+  final List<StoredServer> servers;
 }
 
 /// 测试/预览用。
 class InMemoryServerStore implements ServerStore {
-  InMemoryServerStore([this._server]);
+  InMemoryServerStore([StoredServer? server])
+    : _active = server,
+      _servers = server == null ? <StoredServer>[] : <StoredServer>[server];
 
-  StoredServer? _server;
+  /// 直接给多台（设置页/切换测试用）。
+  InMemoryServerStore.withAll(
+    List<StoredServer> servers, {
+    StoredServer? active,
+  }) : _active = active,
+       _servers = List<StoredServer>.of(servers);
+
+  StoredServer? _active;
+  List<StoredServer> _servers;
 
   @override
-  Future<StoredServer?> load() async => _server;
+  Future<StoredServer?> load() async => _active;
 
   @override
-  Future<void> save(StoredServer server) async => _server = server;
+  Future<List<StoredServer>> all() async => List<StoredServer>.of(_servers);
 
   @override
-  Future<void> clear() async => _server = null;
+  Future<void> save(StoredServer server) async {
+    _servers = <StoredServer>[
+      for (final existing in _servers)
+        if (existing.id != server.id) existing,
+      server,
+    ];
+    _active = server;
+  }
+
+  @override
+  Future<void> remove(StoredServer server) async {
+    _servers = _servers
+        .where((StoredServer s) => s.id != server.id)
+        .toList(growable: false);
+    if (_active?.id == server.id) _active = null;
+  }
+
+  @override
+  Future<void> clear() async => _active = null;
 }
