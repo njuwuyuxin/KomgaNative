@@ -80,7 +80,7 @@ dart run tool/ci.dart check    # format + analyze + layers + 全部测试
 dart run tool/ci.dart golden   # 重新生成黄金图（仅 Windows，与 CI 一致）
 ```
 
-当前基线：**356 个测试**（纯 Dart 165 / Flutter 191），**26 张黄金图**覆盖
+当前基线：**359 个测试**（纯 Dart 165 / Flutter 194），**26 张黄金图**覆盖
 书架（手机 light / 平板 dark / 1.3 倍字号 / 墨水屏 / 空态 / 错误态 / **离线态**）、系列详情（手机 / 平板 / 墨水屏）、
 阅读器（单页 dark+eink、双页 dark+eink、纵向 dark、设置面板 dark+eink）、墨水屏设置（含存储占用）、连接页（light / eink）、
 证书面板（手机 / 平板 / 墨水屏）、启动页。
@@ -103,6 +103,7 @@ dart run tool/ci.dart golden   # 重新生成黄金图（仅 Windows，与 CI �
 
 数据流：`LibraryScreen`（只画状态）← `ShelfController`（分页/搜索/筛选/竞态）← `LibraryRepository`（唯一碰网络的地方）← `KomgaSession`。
 
+- **继续阅读**：书架顶部一行 ondeck（读过没读完的书），读完会自动消失；点击带着系列阅读方向直接进阅读器；
 - 分页 + 滚到底自动预取（距底 600px，太晚会有"卡一下"的体感）；
 - 搜索 350ms 防抖；按库筛选；下拉刷新（空态/错误态也能拉）；
 - 封面走 `/series/{id}/thumbnail`，字节进 48 张的 LRU 缓存，失败只显示占位图**不影响整页**；

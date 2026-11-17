@@ -56,12 +56,18 @@ void main() {
     List<Series>? series,
     ShelfFailure? failure,
     bool offline = false,
+    List<Book>? ondeck,
   }) async {
     final data = series ?? demoShelf();
+    // 正常书架给两本"继续阅读"；空态/错误态不给（那一行本来就不该出现）。
+    final continueBooks =
+        ondeck ??
+        (failure == null && data.isNotEmpty ? demoOndeck() : const <Book>[]);
     final repository = FakeLibraryRepository(
       series: data,
       libraries: demoLibraries(),
       seriesFailure: failure,
+      ondeck: continueBooks,
     );
 
     // 用仓库自己吐出的那份 bytes 预热 ImageCache：key（MemoryImage）与页面里
@@ -70,6 +76,10 @@ void main() {
     if (failure == null) {
       for (final s in data) {
         final bytes = await repository.seriesCover(s.id);
+        if (bytes != null) covers.add(bytes);
+      }
+      for (final b in continueBooks) {
+        final bytes = await repository.bookCover(b.id);
         if (bytes != null) covers.add(bytes);
       }
     }

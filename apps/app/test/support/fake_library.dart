@@ -15,14 +15,17 @@ class FakeLibraryRepository implements LibraryRepository {
   FakeLibraryRepository({
     List<Library>? libraries,
     List<Series>? series,
+    List<Book>? ondeck,
     this.seriesFailure,
     this.librariesFailure,
     this.booksFailure,
     this.detailFailure,
+    this.ondeckFailure,
     this.coverDirectory = 'test/fixtures/covers',
     this.coverNames = const <String>['c1', 'c2', 'c3', 'c4', 'c5', 'c6'],
   }) : librariesData = libraries ?? const <Library>[],
-       seriesData = series ?? const <Series>[] {
+       seriesData = series ?? const <Series>[],
+       ondeckData = ondeck ?? const <Book>[] {
     for (var i = 0; i < seriesData.length; i++) {
       _coverBySeries[seriesData[i].id] = coverNames[i % coverNames.length];
     }
@@ -30,12 +33,14 @@ class FakeLibraryRepository implements LibraryRepository {
 
   final List<Library> librariesData;
   final List<Series> seriesData;
+  final List<Book> ondeckData;
 
   /// 非 final：测试里可以先失败、再改成功来验证"重试"。
   ShelfFailure? seriesFailure;
   ShelfFailure? librariesFailure;
   ShelfFailure? booksFailure;
   ShelfFailure? detailFailure;
+  ShelfFailure? ondeckFailure;
 
   /// 每个系列生成多少本书。
   int bookCount = 6;
@@ -101,6 +106,18 @@ class FakeLibraryRepository implements LibraryRepository {
       items: items,
       totalElements: filtered.length,
       page: page,
+      size: size,
+    );
+  }
+
+  @override
+  Future<PageResult<Book>> ondeck({int size = 20}) async {
+    final failure = ondeckFailure;
+    if (failure != null) throw failure;
+    return PageResult<Book>(
+      items: ondeckData.take(size).toList(growable: false),
+      totalElements: ondeckData.length,
+      page: 0,
       size: size,
     );
   }
@@ -231,6 +248,34 @@ List<Series> demoShelf() => const <Series>[
     title: 'Pluto',
     booksCount: 8,
     booksReadCount: 8,
+  ),
+];
+
+/// 黄金图/UI 测试用的"继续阅读"：两本在读的书（系列都在 [demoShelf] 里）。
+List<Book> demoOndeck() => <Book>[
+  Book(
+    id: 's1-b1',
+    seriesId: 's1',
+    name: 'Vol. 1',
+    number: '1',
+    pagesCount: 12,
+    readProgress: ReadProgress(
+      page: 5,
+      completed: false,
+      lastModified: DateTime.utc(2026, 11, 1),
+    ),
+  ),
+  Book(
+    id: 's5-b2',
+    seriesId: 's5',
+    name: 'Vol. 2',
+    number: '2',
+    pagesCount: 8,
+    readProgress: ReadProgress(
+      page: 3,
+      completed: false,
+      lastModified: DateTime.utc(2026, 11, 2),
+    ),
   ),
 ];
 

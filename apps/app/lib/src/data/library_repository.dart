@@ -31,6 +31,9 @@ abstract interface class LibraryRepository {
     int size = 100,
   });
 
+  /// "继续阅读"（Komga 的 ondeck：在读过、还没读完的书）。
+  Future<PageResult<Book>> ondeck({int size = 20});
+
   /// 系列封面。返回 `null` 表示"没有封面"——装饰性资源**不允许**让整页报错。
   Future<Uint8List?> seriesCover(String seriesId);
 
@@ -101,6 +104,24 @@ class KomgaLibraryRepository implements LibraryRepository {
         page: page,
         size: size,
       );
+      return PageResult<Book>(
+        items: await _sync.overlay(result.items),
+        totalElements: result.totalElements,
+        page: result.page,
+        size: result.size,
+      );
+    } on KomgaError catch (error) {
+      throw shelfFailureOf(error);
+    }
+  }
+
+  /// "继续阅读"：Komga 的 ondeck（在读过、还没读完的书）。
+  ///
+  /// 同样叠加本地未提交进度：断网读完最后一页但还没补交时，书架不该还显示旧页码。
+  @override
+  Future<PageResult<Book>> ondeck({int size = 20}) async {
+    try {
+      final result = await _session.fetchOndeck(size: size);
       return PageResult<Book>(
         items: await _sync.overlay(result.items),
         totalElements: result.totalElements,

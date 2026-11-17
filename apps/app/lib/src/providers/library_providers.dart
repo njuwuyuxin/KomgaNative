@@ -70,6 +70,11 @@ final bookCoverProvider = FutureProvider.family<Uint8List?, String>((
   return ref.watch(libraryRepositoryProvider).bookCover(bookId);
 });
 
+/// 继续阅读（在读过、还没读完的书）。空列表/失败都只是"不显示这一行"。
+final ondeckProvider = FutureProvider<PageResult<Book>>((Ref ref) {
+  return ref.watch(libraryRepositoryProvider).ondeck();
+});
+
 /// 书架一屏的状态。
 ///
 /// 刻意不用 `AsyncValue`：书架同时存在"有数据 + 正在追加下一页 + 追加失败"
