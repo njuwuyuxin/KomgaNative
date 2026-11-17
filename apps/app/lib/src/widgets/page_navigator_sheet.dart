@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_design_system/komga_design_system.dart';
+import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/providers/reader_providers.dart';
 import 'package:komga_native/src/widgets/reader_palette.dart';
 import 'package:material_ui/material_ui.dart';
@@ -50,6 +51,7 @@ class PageNavigatorSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return SafeArea(
       child: Column(
         children: <Widget>[
@@ -63,7 +65,7 @@ class PageNavigatorSheet extends StatelessWidget {
             child: Row(
               children: <Widget>[
                 Text(
-                  'Pages',
+                  l10n.pagesTitle,
                   style: TextStyle(
                     color: palette.foreground,
                     fontSize: 16,
@@ -72,7 +74,7 @@ class PageNavigatorSheet extends StatelessWidget {
                 ),
                 const Spacer(),
                 Text(
-                  '$currentPage / $total',
+                  l10n.readerPageOf(currentPage, total),
                   style: TextStyle(color: palette.muted),
                 ),
                 IconButton(
@@ -80,7 +82,7 @@ class PageNavigatorSheet extends StatelessWidget {
                   onPressed: () => Navigator.of(context).pop(),
                   icon: const Icon(Icons.close),
                   color: palette.foreground,
-                  tooltip: 'Close',
+                  tooltip: l10n.close,
                 ),
               ],
             ),

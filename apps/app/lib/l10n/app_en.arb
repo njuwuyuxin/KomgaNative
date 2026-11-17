@@ -1,0 +1,237 @@
+{
+  "@@locale": "en",
+  "libraryTitle": "Library",
+  "settingsTitle": "Settings",
+  "retry": "Retry",
+  "cancel": "Cancel",
+  "remove": "Remove",
+  "close": "Close",
+  "all": "All",
+  "unavailable": "Unavailable",
+  "calculating": "Calculating…",
+  "nothingCachedYet": "Nothing cached yet",
+
+  "search": "Search",
+  "closeSearch": "Close search",
+  "searchSeriesHint": "Search series",
+  "signOut": "Sign out",
+  "noSeriesYet": "No series yet",
+  "noMatches": "No matches",
+  "emptyShelfHint": "Add comics in Komga, then pull to refresh.",
+  "noSearchMatchesHint": "Try a different keyword, or clear the search.",
+  "continueReading": "Continue reading",
+  "seriesCount": "{count} series",
+  "@seriesCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "shelfSortTooltip": "Sort",
+  "shelfFilterTooltip": "Filter",
+  "defaultOrder": "Default order",
+  "sortTitleAsc": "Title A-Z",
+  "sortTitleDesc": "Title Z-A",
+  "sortRecentlyAdded": "Recently added",
+  "sortRecentlyRead": "Recently read",
+  "statusUnread": "Unread",
+  "statusInProgress": "In progress",
+  "statusRead": "Read",
+  "offlineSavedContent": "Offline · showing saved content",
+
+  "seriesFallbackTitle": "Series",
+  "seriesButton": "Series",
+  "markReadTooltip": "Mark read",
+  "markAllRead": "Mark all read",
+  "markAllUnread": "Mark all unread",
+  "noBooksYet": "No books yet",
+  "noBooksHint": "This series has no readable books in Komga yet.",
+  "showingBooks": "Showing {shown} of {total} books",
+  "@showingBooks": {
+    "placeholders": {
+      "shown": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
+  "readOfTotal": "{read} of {total} read",
+  "@readOfTotal": {
+    "placeholders": {
+      "read": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
+  "readsRightToLeft": "Reads right to left",
+  "readsLeftToRight": "Reads left to right",
+  "readsVertical": "Vertical (webtoon)",
+  "readsWebtoon": "Webtoon",
+  "bookPages": "{count} pages",
+  "@bookPages": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "bookReadPages": "Read · {count} pages",
+  "@bookReadPages": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "readerTitle": "Reader",
+  "readerOpenFailed": "Failed to open this book",
+  "readerPageFailed": "Failed to load this page",
+  "readerNoPages": "This book has no pages",
+  "readerBookFallback": "Book",
+  "offlineSavedPages": "Offline · showing saved pages",
+  "pageThumbnailsTooltip": "Page thumbnails",
+  "readingSettingsTooltip": "Reading settings",
+  "finished": "Finished",
+  "finishedNext": "Finished · next {title}",
+  "@finishedNext": {
+    "placeholders": {
+      "title": {"type": "String"}
+    }
+  },
+  "nextBook": "Next book",
+  "previousPage": "Previous page",
+  "nextPage": "Next page",
+  "pagesTitle": "Pages",
+  "readingSettings": "Reading settings",
+  "readingMode": "Reading mode",
+  "brightness": "Brightness",
+  "brightnessPercent": "{percent}%",
+  "@brightnessPercent": {
+    "placeholders": {
+      "percent": {"type": "int"}
+    }
+  },
+  "keepScreenAwake": "Keep screen awake",
+  "keepScreenAwakeHint": "Stop the screen from sleeping while reading",
+  "goToPage": "Go to page",
+  "readerPageOf": "{page} / {total}",
+  "@readerPageOf": {
+    "placeholders": {
+      "page": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
+  "readerSpreadOf": "{from}–{to} / {total}",
+  "@readerSpreadOf": {
+    "placeholders": {
+      "from": {"type": "int"},
+      "to": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
+  "continueReadingProgress": "p. {page} / {total}",
+  "@continueReadingProgress": {
+    "placeholders": {
+      "page": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
+  "readerModeAuto": "Follow the book",
+  "readerModeAutoHint": "Webtoon books scroll, the rest open page by page",
+  "readerModeSingle": "Single page",
+  "readerModeSingleHint": "One page at a time",
+  "readerModeDouble": "Double page",
+  "readerModeDoubleHint": "Two pages side by side, right to left for manga",
+  "readerModeVertical": "Vertical scroll",
+  "readerModeVerticalHint": "Continuous strip, like a webtoon",
+
+  "connectSubtitle": "Connect to your Komga server",
+  "serverAddress": "Server address",
+  "serverAddressHint": "https://komga.example.com",
+  "account": "Account",
+  "apiKey": "API key",
+  "email": "Email",
+  "password": "Password",
+  "showPassword": "Show password",
+  "hidePassword": "Hide password",
+  "apiKeyHint": "Komga → Account settings → API keys",
+  "insecureWarning": "This address is outside your local network and uses plain HTTP. If the port only accepts HTTPS the app switches automatically; otherwise your credentials would be sent unencrypted.",
+  "connect": "Connect",
+  "passwordFootnote": "Your password is only used once to create an API key; the key is stored in the system keychain.",
+
+  "certificateUntrusted": "The server’s certificate is not trusted",
+  "certificateExpiredReason": "This certificate expired on {date}.",
+  "@certificateExpiredReason": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "certificateSelfSignedReason": "This certificate is self-signed.",
+  "certificateUntrustedReason": "This certificate was not issued by a trusted authority.",
+  "issuedTo": "Issued to",
+  "issuedBy": "Issued by",
+  "selfSignedSuffix": "{issuer} (self-signed)",
+  "@selfSignedSuffix": {
+    "placeholders": {
+      "issuer": {"type": "String"}
+    }
+  },
+  "expiredOn": "Expired on",
+  "validUntil": "Valid until",
+  "sha256": "SHA-256",
+  "certificateAdvice": "Only continue if you run this server. Continuing pins this exact certificate; a different one will be blocked next time.",
+  "connectAnyway": "Connect anyway",
+  "unknownDate": "unknown",
+
+  "cancelDownload": "Cancel download",
+  "downloadRetryTooltip": "{error} · tap to retry",
+  "@downloadRetryTooltip": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "downloadedTapToRemove": "Downloaded · tap to remove",
+  "downloadForOffline": "Download for offline reading",
+  "removeDownloadTitle": "Remove download?",
+  "removeDownloadBody": "The cached pages for this book will be deleted. You can still read it online.",
+
+  "appearance": "Appearance",
+  "theme": "Theme",
+  "themeSystem": "System",
+  "themeLight": "Light",
+  "themeDark": "Dark",
+  "einkMode": "E-ink mode",
+  "einkModeHint": "Disable animation, shadows and color; maximize contrast",
+  "language": "Language",
+  "languageSystem": "System",
+  "languageEnglish": "English",
+  "languageChinese": "Chinese",
+  "servers": "Servers",
+  "noSavedServers": "No saved servers",
+  "noSavedServersHint": "Connect to a Komga server to get started",
+  "removeServerTooltip": "Remove server",
+  "addServer": "Add server",
+  "addServerHint": "Signs out of the current server",
+  "storage": "Storage",
+  "offlineContent": "Offline content",
+  "cachedItems": "{size} · {count} items",
+  "@cachedItems": {
+    "placeholders": {
+      "size": {"type": "String"},
+      "count": {"type": "int"}
+    }
+  },
+  "clear": "Clear",
+  "downloadedBooks": "Downloaded books",
+  "downloadedUsage": "{count} books · {size}",
+  "@downloadedUsage": {
+    "placeholders": {
+      "count": {"type": "int"},
+      "size": {"type": "String"}
+    }
+  },
+  "about": "About",
+  "version": "Version",
+  "openSourceLicenses": "Open source licenses",
+  "offlineContentCleared": "Offline content cleared",
+  "removeServerTitle": "Remove server?",
+  "removeServerBody": "{url} will be removed from this device. You can add it again later.",
+  "@removeServerBody": {
+    "placeholders": {
+      "url": {"type": "String"}
+    }
+  }
+}

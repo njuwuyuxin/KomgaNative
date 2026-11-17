@@ -1,6 +1,10 @@
+import 'dart:ui' show Locale;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:komga_domain/komga_domain.dart';
+import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
+import 'package:komga_native/src/widgets/reader_mode_text.dart';
 import 'package:komga_reader_engine/komga_reader_engine.dart';
 
 void main() {
@@ -98,10 +102,15 @@ void main() {
       );
     });
 
-    test('每种选择都有标签与说明（面板上不能出现空行）', () {
+    test('每种选择都有中英文标签与说明（面板上不能出现空行）', () {
+      final en = lookupAppLocalizations(const Locale('en'));
+      final zh = lookupAppLocalizations(const Locale('zh'));
       for (final choice in ReaderModeChoice.values) {
-        expect(choice.label, isNotEmpty);
-        expect(choice.hint, isNotEmpty);
+        expect(readerModeLabel(en, choice), isNotEmpty);
+        expect(readerModeHint(en, choice), isNotEmpty);
+        expect(readerModeLabel(zh, choice), isNotEmpty);
+        expect(readerModeHint(zh, choice), isNotEmpty);
+        expect(readerModeLabel(en, choice), isNot(readerModeLabel(zh, choice)));
       }
     });
   });

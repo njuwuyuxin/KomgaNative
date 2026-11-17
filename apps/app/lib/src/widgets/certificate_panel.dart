@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:komga_design_system/komga_design_system.dart';
+import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/session/certificate_prompt.dart';
 
 /// 证书不受信任时给用户看的面板。
@@ -23,8 +24,14 @@ class CertificatePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final reason = certificate.expired
+        ? l10n.certificateExpiredReason(certificate.expiresText)
+        : certificate.selfSigned
+        ? l10n.certificateSelfSignedReason
+        : l10n.certificateUntrustedReason;
 
     return Container(
       key: const Key('certificate-panel'),
@@ -44,7 +51,7 @@ class CertificatePanel extends StatelessWidget {
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Text(
-                  'The server’s certificate is not trusted',
+                  l10n.certificateUntrusted,
                   style: theme.textTheme.titleSmall?.copyWith(
                     color: scheme.onErrorContainer,
                   ),
@@ -54,28 +61,29 @@ class CertificatePanel extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            certificate.reason,
+            reason,
             style: theme.textTheme.bodySmall?.copyWith(
               color: scheme.onErrorContainer,
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
-          _Row(label: 'Issued to', value: certificate.commonName),
+          _Row(label: l10n.issuedTo, value: certificate.commonName),
           _Row(
-            label: 'Issued by',
+            label: l10n.issuedBy,
             value: certificate.selfSigned
-                ? '${certificate.issuerName} (self-signed)'
+                ? l10n.selfSignedSuffix(certificate.issuerName)
                 : certificate.issuerName,
           ),
           _Row(
-            label: certificate.expired ? 'Expired on' : 'Valid until',
-            value: certificate.expiresText,
+            label: certificate.expired ? l10n.expiredOn : l10n.validUntil,
+            value: certificate.expiresAt == null
+                ? l10n.unknownDate
+                : certificate.expiresText,
           ),
-          _Row(label: 'SHA-256', value: certificate.fingerprint),
+          _Row(label: l10n.sha256, value: certificate.fingerprint),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Only continue if you run this server. Continuing pins this exact '
-            'certificate; a different one will be blocked next time.',
+            l10n.certificateAdvice,
             style: theme.textTheme.bodySmall?.copyWith(
               color: scheme.onErrorContainer,
             ),
@@ -96,7 +104,7 @@ class CertificatePanel extends StatelessWidget {
                     foregroundColor: scheme.onErrorContainer,
                   ),
                   onPressed: busy ? null : onCancel,
-                  child: const Text('Cancel'),
+                  child: Text(l10n.cancel),
                 ),
                 FilledButton(
                   style: FilledButton.styleFrom(
@@ -104,7 +112,7 @@ class CertificatePanel extends StatelessWidget {
                     foregroundColor: scheme.errorContainer,
                   ),
                   onPressed: busy ? null : onTrust,
-                  child: const Text('Connect anyway'),
+                  child: Text(l10n.connectAnyway),
                 ),
               ],
             ),

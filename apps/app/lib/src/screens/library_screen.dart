@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
+import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/screens/reader_screen.dart';
@@ -58,19 +59,20 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final state = ref.watch(shelfProvider);
     final controller = ref.read(shelfProvider.notifier);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Library'),
+        title: Text(l10n.libraryTitle),
         actions: <Widget>[
           const ShelfSortButton(),
           const ShelfFilterButton(),
           IconButton(
             onPressed: _toggleSearch,
             icon: Icon(_searching ? Icons.close : Icons.search),
-            tooltip: _searching ? 'Close search' : 'Search',
+            tooltip: _searching ? l10n.closeSearch : l10n.search,
           ),
           const SizedBox(width: AppSpacing.sm),
         ],
@@ -98,7 +100,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 textInputAction: TextInputAction.search,
                 onChanged: controller.search,
                 decoration: InputDecoration(
-                  hintText: 'Search series',
+                  hintText: l10n.searchSeriesHint,
                   prefixIcon: const Icon(Icons.search),
                   isDense: true,
                   border: OutlineInputBorder(
@@ -143,6 +145,7 @@ class _ShelfBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     if (state.loading && state.series.isEmpty) {
       return const ShelfSkeleton();
     }
@@ -157,7 +160,7 @@ class _ShelfBody extends StatelessWidget {
           icon: Icons.cloud_off_outlined,
           title: failure.message,
           message: failure.hint,
-          actionLabel: needsSignIn ? 'Sign out' : 'Retry',
+          actionLabel: needsSignIn ? l10n.signOut : l10n.retry,
           onAction: needsSignIn ? onSignOut : () => unawaited(onRefresh()),
         ),
       );
@@ -169,10 +172,10 @@ class _ShelfBody extends StatelessWidget {
         status: StatusView(
           key: const Key('shelf-empty'),
           icon: Icons.auto_stories_outlined,
-          title: state.query.isEmpty ? 'No series yet' : 'No matches',
+          title: state.query.isEmpty ? l10n.noSeriesYet : l10n.noMatches,
           message: state.query.isEmpty
-              ? 'Add comics in Komga, then pull to refresh.'
-              : 'Try a different keyword, or clear the search.',
+              ? l10n.emptyShelfHint
+              : l10n.noSearchMatchesHint,
         ),
       );
     }

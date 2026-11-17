@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_design_system/komga_design_system.dart';
+import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/providers/cache_providers.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -21,6 +22,7 @@ class OfflineBanner extends ConsumerWidget {
       valueListenable: offline,
       builder: (BuildContext context, bool isOffline, Widget? _) {
         if (!isOffline) return const SizedBox.shrink();
+        final l10n = AppLocalizations.of(context);
         final theme = Theme.of(context);
         final foreground = theme.colorScheme.onSecondaryContainer;
         return Material(
@@ -37,14 +39,14 @@ class OfflineBanner extends ConsumerWidget {
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Text(
-                    'Offline · showing saved content',
+                    l10n.offlineSavedContent,
                     style: theme.textTheme.labelMedium?.copyWith(
                       color: foreground,
                     ),
                   ),
                 ),
                 if (onRetry != null)
-                  TextButton(onPressed: onRetry, child: const Text('Retry')),
+                  TextButton(onPressed: onRetry, child: Text(l10n.retry)),
               ],
             ),
           ),

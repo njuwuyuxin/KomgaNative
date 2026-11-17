@@ -8,6 +8,8 @@ import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/screens/library_screen.dart';
+import 'package:komga_native/l10n/app_localizations.dart';
+import 'package:komga_native/l10n/l10n.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_library.dart';
@@ -29,6 +31,9 @@ void main() {
           libraryRepositoryProvider.overrideWithValue(repository),
         ],
         child: MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: appLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           theme: AppTheme.light(),
           home: const LibraryScreen(),
         ),

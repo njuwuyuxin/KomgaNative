@@ -16,21 +16,6 @@ extension ReaderModeChoiceX on ReaderModeChoice {
     ReaderModeChoice.double => ReadingMode.doublePage,
     ReaderModeChoice.vertical => ReadingMode.verticalScroll,
   };
-
-  String get label => switch (this) {
-    ReaderModeChoice.auto => 'Follow the book',
-    ReaderModeChoice.single => 'Single page',
-    ReaderModeChoice.double => 'Double page',
-    ReaderModeChoice.vertical => 'Vertical scroll',
-  };
-
-  String get hint => switch (this) {
-    ReaderModeChoice.auto => 'Webtoon books scroll, the rest open page by page',
-    ReaderModeChoice.single => 'One page at a time',
-    ReaderModeChoice.double =>
-      'Two pages side by side, right to left for manga',
-    ReaderModeChoice.vertical => 'Continuous strip, like a webtoon',
-  };
 }
 
 /// 阅读器偏好（全局，不分书）。

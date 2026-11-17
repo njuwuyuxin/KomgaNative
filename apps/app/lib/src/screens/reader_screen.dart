@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:komga_domain/komga_domain.dart';
+import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/cache_providers.dart';
@@ -268,11 +269,17 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     );
   }
 
-  String _pageLabel(ReadingMode mode, int page, int total, List<int> spread) {
+  String _pageLabel(
+    AppLocalizations l10n,
+    ReadingMode mode,
+    int page,
+    int total,
+    List<int> spread,
+  ) {
     if (mode == ReadingMode.doublePage && spread.length > 1) {
-      return '${spread.first + 1}–${spread.last + 1} / $total';
+      return l10n.readerSpreadOf(spread.first + 1, spread.last + 1, total);
     }
-    return '$page / $total';
+    return l10n.readerPageOf(page, total);
   }
 
   Future<void> _openSettings({
@@ -291,6 +298,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final palette = ReaderPalette.of(
       isEink: ref.watch(settingsProvider).forceEink,
     );
@@ -318,7 +326,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       return ReaderFailure(
         failure: const ProtocolFailure(),
         palette: palette,
-        title: 'This book has no pages',
+        title: l10n.readerNoPages,
         onRetry: () => ref.invalidate(readerPagesProvider(widget.bookId)),
       );
     }
@@ -369,8 +377,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                       builder:
                           (BuildContext context, bool offline, Widget? _) =>
                               ReaderBar(
-                                title: book?.name ?? 'Book',
+                                title: book?.name ?? l10n.readerBookFallback,
                                 pageLabel: _pageLabel(
+                                  l10n,
                                   mode,
                                   page,
                                   total,

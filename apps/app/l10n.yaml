@@ -1,0 +1,12 @@
+# ARB → Dart 代码生成配置（flutter gen-l10n）。
+#
+# 生成物在 lib/l10n/ 下，**不要手改**：改 ARB 后重新生成。
+# synthetic-package 在 Flutter 3.50 已不可启用（默认就是关闭），所以这里不写。
+arb-dir: lib/l10n
+template-arb-file: app_en.arb
+output-localization-file: app_localizations.dart
+output-class: AppLocalizations
+# null 检查由生成代码负责：调用点直接 AppLocalizations.of(context)，不再判空。
+nullable-getter: false
+# 生成后跑 dart format，保证门禁的格式检查能过。
+format: true

@@ -1,22 +1,24 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_domain/komga_domain.dart';
+import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:material_ui/material_ui.dart';
 
-/// 排序选项的界面文案（i18n 时集中在这里换）。
-String sortLabel(SeriesSort sort) => switch (sort) {
-  SeriesSort.titleAsc => 'Title A-Z',
-  SeriesSort.titleDesc => 'Title Z-A',
-  SeriesSort.recentlyAdded => 'Recently added',
-  SeriesSort.recentlyRead => 'Recently read',
+/// 排序选项的界面文案。
+String _sortLabel(AppLocalizations l10n, SeriesSort sort) => switch (sort) {
+  SeriesSort.titleAsc => l10n.sortTitleAsc,
+  SeriesSort.titleDesc => l10n.sortTitleDesc,
+  SeriesSort.recentlyAdded => l10n.sortRecentlyAdded,
+  SeriesSort.recentlyRead => l10n.sortRecentlyRead,
 };
 
 /// 阅读状态筛选的界面文案。
-String readStatusLabel(SeriesReadStatus status) => switch (status) {
-  SeriesReadStatus.unread => 'Unread',
-  SeriesReadStatus.inProgress => 'In progress',
-  SeriesReadStatus.read => 'Read',
-};
+String _readStatusLabel(AppLocalizations l10n, SeriesReadStatus status) =>
+    switch (status) {
+      SeriesReadStatus.unread => l10n.statusUnread,
+      SeriesReadStatus.inProgress => l10n.statusInProgress,
+      SeriesReadStatus.read => l10n.statusRead,
+    };
 
 /// 书架排序按钮。
 ///
@@ -27,10 +29,11 @@ class ShelfSortButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final sort = ref.watch(shelfProvider.select((ShelfState s) => s.sort));
     return PopupMenuButton<String>(
       key: const Key('shelf-sort-menu'),
-      tooltip: 'Sort',
+      tooltip: l10n.shelfSortTooltip,
       icon: const Icon(Icons.sort),
       initialValue: sort?.name ?? '',
       onSelected: (String value) => ref
@@ -43,12 +46,12 @@ class ShelfSortButton extends ConsumerWidget {
                   ),
           ),
       itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-        const PopupMenuItem<String>(value: '', child: Text('Default order')),
+        PopupMenuItem<String>(value: '', child: Text(l10n.defaultOrder)),
         for (final option in SeriesSort.values)
           PopupMenuItem<String>(
             value: option.name,
             key: Key('shelf-sort-${option.name}'),
-            child: Text(sortLabel(option)),
+            child: Text(_sortLabel(l10n, option)),
           ),
       ],
     );
@@ -61,12 +64,13 @@ class ShelfFilterButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final status = ref.watch(
       shelfProvider.select((ShelfState s) => s.readStatus),
     );
     return PopupMenuButton<String>(
       key: const Key('shelf-filter-menu'),
-      tooltip: 'Filter',
+      tooltip: l10n.shelfFilterTooltip,
       icon: const Icon(Icons.filter_list),
       initialValue: status?.name ?? '',
       onSelected: (String value) => ref
@@ -79,16 +83,16 @@ class ShelfFilterButton extends ConsumerWidget {
                   ),
           ),
       itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-        const PopupMenuItem<String>(
-          key: Key('shelf-filter-all'),
+        PopupMenuItem<String>(
+          key: const Key('shelf-filter-all'),
           value: '',
-          child: Text('All'),
+          child: Text(l10n.all),
         ),
         for (final option in SeriesReadStatus.values)
           PopupMenuItem<String>(
             key: Key('shelf-filter-${option.name}'),
             value: option.name,
-            child: Text(readStatusLabel(option)),
+            child: Text(_readStatusLabel(l10n, option)),
           ),
       ],
     );

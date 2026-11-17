@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
+import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/widgets/series_shelf_tile.dart';
 import 'package:material_ui/material_ui.dart';
@@ -95,6 +96,7 @@ class ShelfPagingFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
 
     if (state.loadingMore) {
@@ -129,7 +131,7 @@ class ShelfPagingFooter extends StatelessWidget {
             TextButton(
               key: const Key('shelf-paging-retry'),
               onPressed: () => unawaited(onRetry()),
-              child: const Text('Retry'),
+              child: Text(l10n.retry),
             ),
           ],
         ),
@@ -141,7 +143,7 @@ class ShelfPagingFooter extends StatelessWidget {
         padding: const EdgeInsets.all(AppSpacing.md),
         child: Center(
           child: Text(
-            '${state.totalElements} series',
+            l10n.seriesCount(state.totalElements),
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -223,6 +225,7 @@ class LibraryFilterBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final libraries = ref.watch(librariesProvider);
     final items = switch (libraries) {
       AsyncData<List<Library>>(:final value) => value,
@@ -240,7 +243,7 @@ class LibraryFilterBar extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.only(right: AppSpacing.sm),
             child: ChoiceChip(
-              label: const Text('All'),
+              label: Text(l10n.all),
               selected: selected == null,
               onSelected: (bool _) => onSelected(null),
             ),

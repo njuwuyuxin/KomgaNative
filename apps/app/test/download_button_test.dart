@@ -7,6 +7,8 @@ import 'package:komga_native/src/data/download/download_service.dart';
 import 'package:komga_native/src/providers/download_providers.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/screens/series_detail_screen.dart';
+import 'package:komga_native/l10n/app_localizations.dart';
+import 'package:komga_native/l10n/l10n.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -65,6 +67,9 @@ void main() {
           downloadServiceProvider.overrideWithValue(download),
         ],
         child: MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: appLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           theme: AppTheme.light(),
           home: const SeriesDetailScreen(seriesId: 's1'),
         ),

@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_design_system/komga_design_system.dart';
+import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/providers/cache_providers.dart';
 import 'package:komga_native/src/providers/download_providers.dart';
 import 'package:komga_native/src/providers/settings_provider.dart';
@@ -13,6 +14,7 @@ class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final settings = ref.watch(settingsProvider);
     final controller = ref.read(settingsProvider.notifier);
     final session = ref.watch(sessionProvider);
@@ -26,33 +28,33 @@ class SettingsScreen extends ConsumerWidget {
     // 按值/错误位判断才不会把"算不出来"显示成永久 loading。
     final cacheSubtitle = cacheUsage != null
         ? (cacheUsage.isEmpty
-              ? 'Nothing cached yet'
-              : '${cacheUsage.humanSize} · ${cacheUsage.entries} items')
-        : (usage.hasError ? 'Unavailable' : 'Calculating…');
+              ? l10n.nothingCachedYet
+              : l10n.cachedItems(cacheUsage.humanSize, cacheUsage.entries))
+        : (usage.hasError ? l10n.unavailable : l10n.calculating);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(title: Text(l10n.settingsTitle)),
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
         children: <Widget>[
-          const _SectionHeader('Appearance'),
+          _SectionHeader(l10n.appearance),
           ListTile(
-            title: const Text('Theme'),
+            title: Text(l10n.theme),
             subtitle: Padding(
               padding: const EdgeInsets.only(top: AppSpacing.sm),
               child: SegmentedButton<ThemeMode>(
-                segments: const <ButtonSegment<ThemeMode>>[
+                segments: <ButtonSegment<ThemeMode>>[
                   ButtonSegment<ThemeMode>(
                     value: ThemeMode.system,
-                    label: Text('System'),
+                    label: Text(l10n.themeSystem),
                   ),
                   ButtonSegment<ThemeMode>(
                     value: ThemeMode.light,
-                    label: Text('Light'),
+                    label: Text(l10n.themeLight),
                   ),
                   ButtonSegment<ThemeMode>(
                     value: ThemeMode.dark,
-                    label: Text('Dark'),
+                    label: Text(l10n.themeDark),
                   ),
                 ],
                 selected: <ThemeMode>{settings.themeMode},
@@ -64,17 +66,41 @@ class SettingsScreen extends ConsumerWidget {
           SwitchListTile(
             value: settings.forceEink,
             onChanged: controller.setForceEink,
-            title: const Text('E-ink mode'),
-            subtitle: const Text(
-              'Disable animation, shadows and color; maximize contrast',
+            title: Text(l10n.einkMode),
+            subtitle: Text(l10n.einkModeHint),
+          ),
+          ListTile(
+            key: const Key('settings-language'),
+            title: Text(l10n.language),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.sm),
+              child: SegmentedButton<AppLanguage>(
+                segments: <ButtonSegment<AppLanguage>>[
+                  ButtonSegment<AppLanguage>(
+                    value: AppLanguage.system,
+                    label: Text(l10n.languageSystem),
+                  ),
+                  ButtonSegment<AppLanguage>(
+                    value: AppLanguage.en,
+                    label: Text(l10n.languageEnglish),
+                  ),
+                  ButtonSegment<AppLanguage>(
+                    value: AppLanguage.zh,
+                    label: Text(l10n.languageChinese),
+                  ),
+                ],
+                selected: <AppLanguage>{settings.language},
+                onSelectionChanged: (Set<AppLanguage> selection) =>
+                    controller.setLanguage(selection.first),
+              ),
             ),
           ),
           const Divider(),
-          const _SectionHeader('Servers'),
+          _SectionHeader(l10n.servers),
           if (servers.isEmpty)
-            const ListTile(
-              title: Text('No saved servers'),
-              subtitle: Text('Connect to a Komga server to get started'),
+            ListTile(
+              title: Text(l10n.noSavedServers),
+              subtitle: Text(l10n.noSavedServersHint),
             ),
           for (final item in servers)
             ListTile(
@@ -91,7 +117,7 @@ class SettingsScreen extends ConsumerWidget {
               subtitle: Text(item.address.baseUrl),
               trailing: IconButton(
                 key: Key('server-remove-${item.id}'),
-                tooltip: 'Remove server',
+                tooltip: l10n.removeServerTooltip,
                 icon: const Icon(Icons.delete_outline),
                 onPressed: () => _removeServer(context, ref, item),
               ),
@@ -102,39 +128,45 @@ class SettingsScreen extends ConsumerWidget {
           ListTile(
             key: const Key('server-add'),
             leading: const Icon(Icons.add),
-            title: const Text('Add server'),
-            subtitle: const Text('Signs out of the current server'),
+            title: Text(l10n.addServer),
+            subtitle: Text(l10n.addServerHint),
             onTap: () => ref.read(sessionProvider.notifier).signOut(),
           ),
           const Divider(),
-          const _SectionHeader('Storage'),
+          _SectionHeader(l10n.storage),
           ListTile(
-            title: const Text('Offline content'),
+            title: Text(l10n.offlineContent),
             subtitle: Text(cacheSubtitle),
             leading: const Icon(Icons.sd_storage_outlined),
             trailing: TextButton(
               onPressed: cacheUsage == null || cacheUsage.isEmpty
                   ? null
                   : () => _clearCache(context, ref),
-              child: const Text('Clear'),
+              child: Text(l10n.clear),
             ),
           ),
           ListTile(
-            title: const Text('Downloaded books'),
+            title: Text(l10n.downloadedBooks),
             subtitle: Text(
               downloads == null
                   ? '—'
-                  : '${downloads.entries} books · ${downloads.humanSize}',
+                  : l10n.downloadedUsage(
+                      downloads.entries,
+                      downloads.humanSize,
+                    ),
             ),
             leading: const Icon(Icons.download_done_outlined),
           ),
           const Divider(),
-          const _SectionHeader('About'),
-          const ListTile(title: Text('Version'), trailing: Text('0.1.0 (v1)')),
+          _SectionHeader(l10n.about),
+          ListTile(
+            title: Text(l10n.version),
+            trailing: const Text('0.1.0 (v1)'),
+          ),
           ListTile(
             key: const Key('settings-licenses'),
             leading: const Icon(Icons.description_outlined),
-            title: const Text('Open source licenses'),
+            title: Text(l10n.openSourceLicenses),
             onTap: () => showLicensePage(
               context: context,
               applicationName: 'KomgaNative',
@@ -149,12 +181,13 @@ class SettingsScreen extends ConsumerWidget {
 
 /// 清空离线内容。缓存是"可再生"的：清掉只影响断网能看什么，不影响进度。
 Future<void> _clearCache(BuildContext context, WidgetRef ref) async {
+  final l10n = AppLocalizations.of(context);
   await ref.read(httpCacheProvider).clear();
   ref.invalidate(cacheUsageProvider);
   ref.invalidate(downloadsUsageProvider);
   if (!context.mounted) return;
   ScaffoldMessenger.of(context)
-      .showSnackBar(const SnackBar(content: Text('Offline content cleared')));
+      .showSnackBar(SnackBar(content: Text(l10n.offlineContentCleared)));
 }
 
 /// 删除一台已保存的服务器（需要确认：删掉就要重新输入地址和 Key）。
@@ -165,23 +198,23 @@ Future<void> _removeServer(
 ) async {
   final confirmed = await showDialog<bool>(
     context: context,
-    builder: (BuildContext context) => AlertDialog(
-      title: const Text('Remove server?'),
-      content: Text(
-        '${server.address.baseUrl} will be removed from this device. '
-        'You can add it again later.',
-      ),
-      actions: <Widget>[
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(true),
-          child: const Text('Remove'),
-        ),
-      ],
-    ),
+    builder: (BuildContext context) {
+      final l10n = AppLocalizations.of(context);
+      return AlertDialog(
+        title: Text(l10n.removeServerTitle),
+        content: Text(l10n.removeServerBody(server.address.baseUrl)),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(l10n.remove),
+          ),
+        ],
+      );
+    },
   );
   if (!(confirmed ?? false)) return;
 

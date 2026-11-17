@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:komga_design_system/komga_design_system.dart';
+import 'package:komga_native/l10n/app_localizations.dart';
 
 /// 自适应外壳：手机用底部导航，平板/桌面用侧边导航。
 ///
@@ -10,25 +11,25 @@ class AdaptiveShell extends StatelessWidget {
 
   final StatefulNavigationShell shell;
 
-  static const List<({IconData icon, IconData selectedIcon, String label})>
-  _destinations = <({IconData icon, IconData selectedIcon, String label})>[
-    (
-      icon: Icons.grid_view_outlined,
-      selectedIcon: Icons.grid_view,
-      label: 'Library',
-    ),
-    (
-      icon: Icons.settings_outlined,
-      selectedIcon: Icons.settings,
-      label: 'Settings',
-    ),
-  ];
-
   void _onSelect(int index) =>
       shell.goBranch(index, initialLocation: index == shell.currentIndex);
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final destinations =
+        <({IconData icon, IconData selectedIcon, String label})>[
+          (
+            icon: Icons.grid_view_outlined,
+            selectedIcon: Icons.grid_view,
+            label: l10n.libraryTitle,
+          ),
+          (
+            icon: Icons.settings_outlined,
+            selectedIcon: Icons.settings,
+            label: l10n.settingsTitle,
+          ),
+        ];
     final sizeClass = WindowSizeClass.of(MediaQuery.sizeOf(context).width);
 
     if (!sizeClass.useNavigationRail) {
@@ -38,7 +39,7 @@ class AdaptiveShell extends StatelessWidget {
           selectedIndex: shell.currentIndex,
           onDestinationSelected: _onSelect,
           destinations: <Widget>[
-            for (final d in _destinations)
+            for (final d in destinations)
               NavigationDestination(
                 icon: Icon(d.icon),
                 selectedIcon: Icon(d.selectedIcon),
@@ -57,7 +58,7 @@ class AdaptiveShell extends StatelessWidget {
             onDestinationSelected: _onSelect,
             labelType: NavigationRailLabelType.all,
             destinations: <NavigationRailDestination>[
-              for (final d in _destinations)
+              for (final d in destinations)
                 NavigationRailDestination(
                   icon: Icon(d.icon),
                   selectedIcon: Icon(d.selectedIcon),

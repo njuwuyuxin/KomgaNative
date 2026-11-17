@@ -12,10 +12,12 @@ Komga 的跨平台客户端（iOS / Android / Android 墨水屏），阅读体�
 > 真实页图、点击翻页、双指缩放、从上次位置继续、进度回写 Komga；墨水屏白底黑字；
 > 阅读设置面板：模式/亮度/常亮/跳页，偏好持久化）、
 > **进度 outbox**（Drift 落盘、断网不丢、联网/回前台自动补交、多设备按服务端 `lastModified` 对账）、
-> **离线缓存**（书架/封面/页图 GET 响应落盘，断网看到上次的内容并显示离线提示条，见 [docs/offline-cache.md](docs/offline-cache.md)）。
+> **离线缓存**（书架/封面/页图 GET 响应落盘，断网看到上次的内容并显示离线提示条，见 [docs/offline-cache.md](docs/offline-cache.md)）、
+> **多服务器与存储管理**（设置页切换/删除服务器、缓存与下载占用、清空离线内容）、
+> **国际化**（English / 中文 / 跟随系统；ARB + `flutter gen-l10n`，见 [docs/i18n.md](docs/i18n.md)）。
 > 已在 **Android 模拟器 + 本机 Komga 实例**上跑通"连接 → 书架 → 系列 → 阅读 → 进度"全链路，
 > 并在**一台公网 NAS（openresty 反代 + 证书已过期）**上验证了真实登录路径。
-> 待完成：阅读器补完（预取/缩略图导航/整本下载）、继续阅读与筛选、多服务器与存储管理、i18n 与中文字体、形态适配（见 roadmap）。
+> 待完成：中文字体子集（黄金图里验证中文排版）、形态适配与无障碍（见 roadmap）。
 
 ## 文档
 
@@ -31,6 +33,7 @@ Komga 的跨平台客户端（iOS / Android / Android 墨水屏），阅读体�
 | [docs/adr/0001-certificate-trust.md](docs/adr/0001-certificate-trust.md) | ADR：为什么用 TOFU + 固定指纹，而不是"忽略证书" |
 | [docs/adr/0002-progress-outbox-and-drift.md](docs/adr/0002-progress-outbox-and-drift.md) | ADR：进度 outbox 与 Drift 落盘（表结构、seq 回执、对账基准） |
 | [docs/offline-cache.md](docs/offline-cache.md) | 离线与缓存：能看什么、容量与淘汰、分区、验证 |
+| [docs/i18n.md](docs/i18n.md) | 国际化：ARB 组织、生成流程、语言设置与"数据层文案未本地化"的边界 |
 | [docs/adr/0003-http-response-cache.md](docs/adr/0003-http-response-cache.md) | ADR：为什么把缓存钩在传输层、为什么与进度库分文件 |
 | [docs/roadmap.md](docs/roadmap.md) | 剩余功能分阶段计划（C–I）与验收口径 |
 | [AGENTS.md](AGENTS.md) | Agent 工作契约：命令、架构不变量、DoD、反模式 |
@@ -81,7 +84,7 @@ dart run tool/ci.dart check    # format + analyze + layers + 全部测试
 dart run tool/ci.dart golden   # 重新生成黄金图（仅 Windows，与 CI 一致）
 ```
 
-当前基线：**383 个测试**（纯 Dart 174 / Flutter 209），**27 张黄金图**覆盖
+当前基线：**387 个测试**（纯 Dart 174 / Flutter 213），**27 张黄金图**覆盖
 书架（手机 light / 平板 dark / 1.3 倍字号 / 墨水屏 / 空态 / 错误态 / **离线态**）、系列详情（手机 / 平板 / 墨水屏）、
 阅读器（单页 dark+eink、双页 dark+eink、纵向 dark、设置面板 dark+eink）、墨水屏设置（含存储占用）、连接页（light / eink）、
 证书面板（手机 / 平板 / 墨水屏）、启动页。
@@ -193,7 +196,8 @@ Drift 留给书架/页图缓存与进度 outbox。坏存档一律回默认值。
 
 `设置` 页分四块：
 
-- **外观**：主题（跟随系统 / 亮 / 暗）、墨水屏模式（关动画/阴影/彩色，最大化对比度）；
+- **外观**：主题（跟随系统 / 亮 / 暗）、墨水屏模式（关动画/阴影/彩色，最大化对比度）、
+  **语言**（跟随系统 / English / 中文，选择即生效并持久化到 secure storage）；
 - **服务器**：保存多台 Komga（地址 + 账号 + Key），点一下切换，可逐台删除；
   `Add server` 退出当前会话去连新服务器——**Disconnect 只清"当前"，不会忘掉整个列表**；
 - **存储**：离线内容占用与条数、已下载书籍数量与体积；`Clear` 同时清掉缓存与下载记录
@@ -256,6 +260,11 @@ debug 包（模拟器 / `flutter run`）自带这条权限，所以这个坑只�
   没有 macOS 环境验证，宁可留空也不写没跑过的 `AppDelegate`；
 - **亮度是应用内遮罩**，不改系统亮度（那需要新插件），夜里够用但不是系统级调光；
 - **阅读偏好是全局的**，不按书记忆（系列的条漫/竖向已由元数据兜住，双页是个人习惯）；
-- UI 文案暂为英文：i18n（ARB + 中文字体）之后一次性替换，避免现在把 CJK 字体塞进黄金图。
+- **数据层文案尚未本地化**：`ShelfFailure.message/hint`（书架/系列/阅读器的错误态）与
+  `SessionController` 生成的连接失败 `error/hint` 仍是数据层写死的文本（英文为主，部分历史文案为中文），
+  不随语言设置切换；详见 [docs/i18n.md](docs/i18n.md#边界数据层文案尚未本地化)；
+- **中文字体子集未做**：黄金图测试只加载 Roboto，没有 CJK 字形，所以还没有中文黄金图；
+  `settings@eink` 里语言选项的「中文」二字在测试字体下显示为占位方块（真机使用系统字体，显示正常）。
+  这属于 roadmap 阶段 G 的剩余项，不是文案缺失；
 - 证书信任是**按叶证书指纹固定**：服务器续期后需要再确认一次（有意为之，不是 bug）；
   不做自签名 CA 链校验与双向 TLS。

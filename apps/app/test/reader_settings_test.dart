@@ -19,8 +19,13 @@ void main() {
     expect(find.text('Keep screen awake'), findsOneWidget);
     expect(find.text('GO TO PAGE'), findsOneWidget);
     // 四个模式选项都在（含"跟随书"）。
-    for (final choice in ReaderModeChoice.values) {
-      expect(find.text(choice.label), findsOneWidget);
+    for (final label in <String>[
+      'Follow the book',
+      'Single page',
+      'Double page',
+      'Vertical scroll',
+    ]) {
+      expect(find.text(label), findsOneWidget);
     }
   });
 

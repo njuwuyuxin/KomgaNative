@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
+import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/session/session_controller.dart';
 import 'package:komga_native/src/widgets/certificate_panel.dart';
 
@@ -55,6 +56,7 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final session = ref.watch(sessionProvider);
     final disconnected = session is SessionDisconnected ? session : null;
@@ -70,10 +72,7 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
     try {
       final address = ServerAddress.parse(_url.text);
       if (address.isInsecureRemote) {
-        insecureWarning =
-            'This address is outside your local network and uses plain HTTP. '
-            'If the port only accepts HTTPS the app switches automatically; '
-            'otherwise your credentials would be sent unencrypted.';
+        insecureWarning = l10n.insecureWarning;
       }
     } on FormatException {
       insecureWarning = null;
@@ -92,7 +91,7 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
                   Text('KomgaNative', style: theme.textTheme.headlineMedium),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    'Connect to your Komga server',
+                    l10n.connectSubtitle,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -103,24 +102,24 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
                     enabled: !submitting,
                     keyboardType: TextInputType.url,
                     autocorrect: false,
-                    decoration: const InputDecoration(
-                      labelText: 'Server address',
-                      hintText: 'https://komga.example.com',
-                      prefixIcon: Icon(Icons.dns_outlined),
+                    decoration: InputDecoration(
+                      labelText: l10n.serverAddress,
+                      hintText: l10n.serverAddressHint,
+                      prefixIcon: const Icon(Icons.dns_outlined),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.md),
                   SegmentedButton<_AuthMode>(
-                    segments: const <ButtonSegment<_AuthMode>>[
+                    segments: <ButtonSegment<_AuthMode>>[
                       ButtonSegment<_AuthMode>(
                         value: _AuthMode.account,
-                        label: Text('Account'),
-                        icon: Icon(Icons.person_outline),
+                        label: Text(l10n.account),
+                        icon: const Icon(Icons.person_outline),
                       ),
                       ButtonSegment<_AuthMode>(
                         value: _AuthMode.apiKey,
-                        label: Text('API key'),
-                        icon: Icon(Icons.key_outlined),
+                        label: Text(l10n.apiKey),
+                        icon: const Icon(Icons.key_outlined),
                       ),
                     ],
                     selected: <_AuthMode>{_mode},
@@ -135,9 +134,9 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
                       controller: _username,
                       enabled: !submitting,
                       autocorrect: false,
-                      decoration: const InputDecoration(
-                        labelText: 'Email',
-                        prefixIcon: Icon(Icons.alternate_email),
+                      decoration: InputDecoration(
+                        labelText: l10n.email,
+                        prefixIcon: const Icon(Icons.alternate_email),
                       ),
                     ),
                     const SizedBox(height: AppSpacing.md),
@@ -146,7 +145,7 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
                       enabled: !submitting,
                       obscureText: !_showPassword,
                       decoration: InputDecoration(
-                        labelText: 'Password',
+                        labelText: l10n.password,
                         prefixIcon: const Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
                           onPressed: () =>
@@ -157,8 +156,8 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
                                 : Icons.visibility,
                           ),
                           tooltip: _showPassword
-                              ? 'Hide password'
-                              : 'Show password',
+                              ? l10n.hidePassword
+                              : l10n.showPassword,
                         ),
                       ),
                     ),
@@ -167,10 +166,10 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
                       controller: _apiKey,
                       enabled: !submitting,
                       autocorrect: false,
-                      decoration: const InputDecoration(
-                        labelText: 'API key',
-                        hintText: 'Komga → Account settings → API keys',
-                        prefixIcon: Icon(Icons.key_outlined),
+                      decoration: InputDecoration(
+                        labelText: l10n.apiKey,
+                        hintText: l10n.apiKeyHint,
+                        prefixIcon: const Icon(Icons.key_outlined),
                       ),
                     ),
                   if (insecureWarning != null) ...<Widget>[
@@ -211,12 +210,11 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
                             height: 18,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text('Connect'),
+                        : Text(l10n.connect),
                   ),
                   const SizedBox(height: AppSpacing.md),
                   Text(
-                    'Your password is only used once to create an API key; '
-                    'the key is stored in the system keychain.',
+                    l10n.passwordFootnote,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),

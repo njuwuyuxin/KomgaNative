@@ -38,19 +38,14 @@ class CertificatePrompt {
   bool get expired => expiresAt != null && expiresAt!.isBefore(DateTime.now());
 
   /// `2026-07-19`（证书有效期是 UTC，展示也只说日期，避免时区误解）。
+  ///
+  /// 没有到期时间时返回空串：文案由界面层用本地化的"未知"补上。
   String get expiresText {
     final date = expiresAt;
-    if (date == null) return 'unknown';
+    if (date == null) return '';
     final utc = date.toUtc();
     final month = utc.month.toString().padLeft(2, '0');
     final day = utc.day.toString().padLeft(2, '0');
     return '${utc.year}-$month-$day';
-  }
-
-  /// 一句话说明为什么系统不认它。
-  String get reason {
-    if (expired) return 'This certificate expired on $expiresText.';
-    if (selfSigned) return 'This certificate is self-signed.';
-    return 'This certificate was not issued by a trusted authority.';
   }
 }

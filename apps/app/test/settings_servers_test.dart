@@ -8,6 +8,8 @@ import 'package:komga_native/src/providers/cache_providers.dart';
 import 'package:komga_native/src/screens/settings_screen.dart';
 import 'package:komga_native/src/session/server_store.dart';
 import 'package:komga_native/src/session/session_controller.dart';
+import 'package:komga_native/l10n/app_localizations.dart';
+import 'package:komga_native/l10n/l10n.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:drift/native.dart';
 
@@ -35,6 +37,9 @@ void main() {
           ),
         ],
         child: MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: appLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           theme: AppTheme.light(),
           home: const SettingsScreen(),
         ),

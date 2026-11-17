@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
+import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -24,6 +25,7 @@ class ContinueReadingRow extends ConsumerWidget {
     final books = ref.watch(ondeckProvider).value?.items;
     if (books == null || books.isEmpty) return const SizedBox.shrink();
 
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -35,7 +37,7 @@ class ContinueReadingRow extends ConsumerWidget {
             AppSpacing.md,
             AppSpacing.xs,
           ),
-          child: Text('Continue reading', style: theme.textTheme.titleSmall),
+          child: Text(l10n.continueReading, style: theme.textTheme.titleSmall),
         ),
         SizedBox(
           height: 196,
@@ -63,6 +65,7 @@ class _ContinueCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final cover = ref.watch(bookCoverProvider(book.id)).value;
     // 阅读方向存在系列元数据里，不在书上；这里多一次按系列的查询（有 family 缓存）。
@@ -107,8 +110,11 @@ class _ContinueCard extends ConsumerWidget {
             ),
             Text(
               progress == null
-                  ? '${book.pagesCount} pages'
-                  : 'p. ${progress.page} / ${book.pagesCount}',
+                  ? l10n.bookPages(book.pagesCount)
+                  : l10n.continueReadingProgress(
+                      progress.page,
+                      book.pagesCount,
+                    ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.labelSmall?.copyWith(

@@ -51,7 +51,7 @@ Future<int> help({String? unknown}) async {
 KomgaNative CI
 
   check     生成代码（按需）+ 格式检查 + 静态分析 + 分层规则 + 全部测试（默认）
-  codegen   只跑生成代码（drift；生成物不入库，CI 上由 check 自动触发）
+  codegen   只跑生成代码（drift + l10n；生成物不入库，CI 上由 check 自动触发）
   fix       自动格式化 + dart fix --apply
   analyze   只跑静态分析
   test      只跑测试（纯 Dart 包用 dart test，Flutter 包用 flutter test）
@@ -107,15 +107,62 @@ Future<int> formatCheck() => runProc('dart', <String>[
   '.',
 ]);
 
-/// 生成代码（drift）；只在需要时跑。
+/// 生成代码（drift + l10n）；只在需要时跑。
 ///
 /// 仓库的 `.gitignore` 忽略 `*.g.dart`（生成物不入库），但 CI 是全新 clone，
 /// 不生成就编译不过。放在门禁里而不是加一个 CI step：本地与 CI 仍走同一条命令，
 /// 不会出现"CI 能过、本地不能"的双轨问题。
 ///
 /// 判据是"生成物缺失 / 源文件更新"，不做无条件构建——build_runner 首次要 AOT 编译
-/// 构建器（约 40s），每次 check 都跑太浪费。
+/// 构建器（约 40s），每次 check 都跑太浪费。l10n 的判断同理：ARB 或 l10n.yaml
+/// 比生成物新才跑 `flutter gen-l10n`，保证全新 clone 与改文案后的门禁都能过。
 Future<int> codegen() async {
+  final l10nCode = await _codegenL10n();
+  final driftCode = await _codegenDrift();
+  return l10nCode != 0 ? l10nCode : driftCode;
+}
+
+Future<int> _codegenL10n() async {
+  const config = 'apps/app/l10n.yaml';
+  const sources = <String>[
+    config,
+    'apps/app/lib/l10n/app_en.arb',
+    'apps/app/lib/l10n/app_zh.arb',
+  ];
+  const generated = <String>[
+    'apps/app/lib/l10n/app_localizations.dart',
+    'apps/app/lib/l10n/app_localizations_en.dart',
+    'apps/app/lib/l10n/app_localizations_zh.dart',
+  ];
+
+  final configFile = File(config);
+  if (!configFile.existsSync()) {
+    stdout.writeln('没有 $config，跳过 l10n 生成');
+    return 0;
+  }
+
+  var newestSource = configFile.lastModifiedSync();
+  for (final path in sources) {
+    final file = File(path);
+    if (!file.existsSync()) continue;
+    final modified = file.lastModifiedSync();
+    if (modified.isAfter(newestSource)) newestSource = modified;
+  }
+
+  final upToDate = generated.every((String path) {
+    final file = File(path);
+    return file.existsSync() && !newestSource.isAfter(file.lastModifiedSync());
+  });
+  if (upToDate) {
+    stdout.writeln('l10n 生成物已是最新，跳过 gen-l10n');
+    return 0;
+  }
+
+  stdout.writeln('l10n 生成物缺失或过期 → flutter gen-l10n');
+  return runProc('flutter', <String>['gen-l10n'], workingDirectory: 'apps/app');
+}
+
+Future<int> _codegenDrift() async {
   const driftSources = <({String source, String generated})>[
     (
       source: 'apps/app/lib/src/data/progress/progress_database.dart',
@@ -140,11 +187,11 @@ Future<int> codegen() async {
     if (!upToDate) stale = true;
   }
   if (!stale) {
-    stdout.writeln('生成物已是最新，跳过 codegen');
+    stdout.writeln('drift 生成物已是最新，跳过 codegen');
     return 0;
   }
 
-  stdout.writeln('生成物缺失或过期 → dart run build_runner build');
+  stdout.writeln('drift 生成物缺失或过期 → dart run build_runner build');
   return runProc('dart', <String>[
     'run',
     'build_runner',

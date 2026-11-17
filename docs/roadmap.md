@@ -69,13 +69,34 @@
 清空离线内容同时清下载记录、开源许可页；+6 测试，设置页金图更新。
 （重命名服务器未做：地址+邮箱已足够区分，改名属于低频操作，留到有需求再加。）
 
-## 阶段 G：国际化与中文字体
+## 阶段 G：国际化与中文字体（✅ 已完成 2026-11-17）
 
 **目标**：默认跟随系统语言，中英文完整，中文不再依赖系统字体碰运气。
 
 - `flutter_localizations` + ARB（`lib/l10n/`），文案全部外置；语言设置（跟随系统 / English / 中文）。
 - 中文黄金图：测试环境加载中文字体子集，保证中文排版可验证。
 - 验收：`flutter gen-l10n` 无缺失 key、语言切换测试、中文黄金图。
+
+**落地**：
+- `apps/app/l10n.yaml` + `lib/l10n/app_en.arb` / `app_zh.arb`，`flutter gen-l10n` 生成
+  `lib/l10n/app_localizations.dart`（`nullable-getter: false`，不手改生成物）；
+  门禁的 `codegen` 步骤会在 ARB/l10n.yaml 变新或生成物缺失时自动生成，全新 clone 也能过。
+- 所有用户可见静态 UI 文案（书架/系列/阅读器/设置/连接/证书/离线提示/下载按钮/书架菜单/错误态按钮）
+  已外置；英文值与改造前逐字一致。`l10n.dart` 用 `material_ui` 提供的
+  `GlobalMaterialLocalizations.delegates`（生成代码里的 flutter_localizations 版本与
+  material_ui 的 `MaterialLocalizations` 不是同一类型，中文会直接抛异常）。
+- `SettingsState.language`（system/en/zh）+ 设置页 Appearance 区的 Language 选择；
+  选择即生效并持久化到 secure storage（`komganative.settings.v1`），坏存档/未知值回 system。
+- 测试：+4（`test/l10n_test.dart`：中英文案不同、完整 App 切换语言并落盘、坏存档回 system、
+  `appLanguageFromCode` 坏值表）；现有测试全部保持通过；英文黄金图不变，仅
+  `settings@eink` 因新增 Language 行更新。
+- 文档：[docs/i18n.md](i18n.md) 记录 ARB 组织、生成流程、delegates 取舍与边界。
+
+**边界（本次未做，留给后续切片）**：
+- **数据层文案未本地化**：`ShelfFailure.message/hint` 与 `SessionController` 的连接失败
+  `error/hint` 仍是数据层写死的文本，不随语言切换（详见 [docs/i18n.md](i18n.md)）。
+- **中文字体子集/中文黄金图未做**：黄金图测试环境仍只加载 Roboto，`settings@eink` 里
+  「中文」二字显示为占位方块（真机系统字体正常）。引入可再分发的中文字体子集需要单独评审体积与许可。
 
 ## 阶段 H：形态适配与无障碍
 

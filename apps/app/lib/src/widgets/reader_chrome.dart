@@ -1,5 +1,6 @@
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
+import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/widgets/reader_palette.dart';
 import 'package:komga_reader_engine/komga_reader_engine.dart';
@@ -22,13 +23,14 @@ class ReaderFailure extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final message = failure is ShelfFailure ? failure as ShelfFailure : null;
     return Scaffold(
       backgroundColor: palette.background,
       appBar: AppBar(
         backgroundColor: palette.background,
         foregroundColor: palette.foreground,
-        title: const Text('Reader'),
+        title: Text(l10n.readerTitle),
       ),
       body: Center(
         child: Padding(
@@ -43,7 +45,7 @@ class ReaderFailure extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.md),
               Text(
-                title ?? message?.message ?? 'Failed to open this book',
+                title ?? message?.message ?? l10n.readerOpenFailed,
                 style: TextStyle(color: palette.foreground),
                 textAlign: TextAlign.center,
               ),
@@ -56,7 +58,7 @@ class ReaderFailure extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: AppSpacing.lg),
-              FilledButton(onPressed: onRetry, child: const Text('Retry')),
+              FilledButton(onPressed: onRetry, child: Text(l10n.retry)),
             ],
           ),
         ),
@@ -80,6 +82,7 @@ class PageError extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final message = error is ShelfFailure ? error as ShelfFailure : null;
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -91,11 +94,11 @@ class PageError extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.sm),
         Text(
-          message?.message ?? 'Failed to load this page',
+          message?.message ?? l10n.readerPageFailed,
           style: TextStyle(color: palette.muted),
         ),
         const SizedBox(height: AppSpacing.sm),
-        TextButton(onPressed: onRetry, child: const Text('Retry')),
+        TextButton(onPressed: onRetry, child: Text(l10n.retry)),
       ],
     );
   }
@@ -136,6 +139,7 @@ class ReaderBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.sm,
@@ -147,7 +151,7 @@ class ReaderBar extends StatelessWidget {
             onPressed: onClose,
             icon: const Icon(Icons.arrow_back),
             color: palette.foreground,
-            tooltip: 'Close',
+            tooltip: l10n.close,
           ),
           Expanded(
             child: Text(
@@ -162,7 +166,7 @@ class ReaderBar extends StatelessWidget {
           ),
           if (offline) ...<Widget>[
             Tooltip(
-              message: 'Offline · showing saved pages',
+              message: l10n.offlineSavedPages,
               child: Icon(
                 Icons.cloud_off_outlined,
                 size: 16,
@@ -177,14 +181,14 @@ class ReaderBar extends StatelessWidget {
             onPressed: onOpenPages,
             icon: const Icon(Icons.grid_view_outlined),
             color: palette.foreground,
-            tooltip: 'Page thumbnails',
+            tooltip: l10n.pageThumbnailsTooltip,
           ),
           IconButton(
             key: const Key('reader-settings-button'),
             onPressed: onOpenSettings,
             icon: Icon(iconForMode(mode)),
             color: palette.foreground,
-            tooltip: 'Reading settings',
+            tooltip: l10n.readingSettingsTooltip,
           ),
         ],
       ),
@@ -219,10 +223,14 @@ class ReaderFinishedBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final next = nextBook;
-    final label = next == null
-        ? 'Finished'
-        : 'Finished · next ${next.number.isEmpty ? next.name : '#${next.number}'}';
+    final nextLabel = next == null
+        ? null
+        : (next.number.isEmpty ? next.name : '#${next.number}');
+    final label = nextLabel == null
+        ? l10n.finished
+        : l10n.finishedNext(nextLabel);
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.md,
@@ -246,13 +254,13 @@ class ReaderFinishedBar extends StatelessWidget {
               key: const Key('reader-next-book'),
               style: TextButton.styleFrom(foregroundColor: palette.foreground),
               onPressed: onNext,
-              child: const Text('Next book'),
+              child: Text(l10n.nextBook),
             ),
           TextButton(
             key: const Key('reader-back-series'),
             style: TextButton.styleFrom(foregroundColor: palette.muted),
             onPressed: onBack,
-            child: const Text('Series'),
+            child: Text(l10n.seriesButton),
           ),
         ],
       ),
@@ -277,6 +285,7 @@ class ReaderControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.all(AppSpacing.sm),
       child: Row(
@@ -287,15 +296,18 @@ class ReaderControls extends StatelessWidget {
             icon: const Icon(Icons.chevron_left),
             color: palette.foreground,
             disabledColor: palette.outline,
-            tooltip: 'Previous page',
+            tooltip: l10n.previousPage,
           ),
-          Text('$pagesCount pages', style: TextStyle(color: palette.muted)),
+          Text(
+            l10n.bookPages(pagesCount),
+            style: TextStyle(color: palette.muted),
+          ),
           IconButton(
             onPressed: onNext,
             icon: const Icon(Icons.chevron_right),
             color: palette.foreground,
             disabledColor: palette.outline,
-            tooltip: 'Next page',
+            tooltip: l10n.nextPage,
           ),
         ],
       ),

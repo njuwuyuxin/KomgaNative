@@ -6,6 +6,8 @@ import 'package:komga_native/src/data/cache/drift_http_cache.dart';
 import 'package:komga_native/src/data/cache/http_cache_database.dart';
 import 'package:komga_native/src/providers/cache_providers.dart';
 import 'package:komga_native/src/widgets/offline_banner.dart';
+import 'package:komga_native/l10n/app_localizations.dart';
+import 'package:komga_native/l10n/l10n.dart';
 import 'package:material_ui/material_ui.dart';
 
 void main() {
@@ -27,6 +29,9 @@ void main() {
       ProviderScope(
         overrides: <Override>[httpCacheProvider.overrideWithValue(cache)],
         child: MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: appLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(body: OfflineBanner(onRetry: onRetry)),
         ),
       ),

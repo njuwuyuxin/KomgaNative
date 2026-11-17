@@ -10,6 +10,8 @@ import 'package:komga_native/src/data/reader_prefs.dart';
 import 'package:komga_native/src/data/reader_prefs_store.dart';
 import 'package:komga_native/src/data/progress/progress_store.dart';
 import 'package:komga_native/src/data/progress/progress_sync_service.dart';
+import 'package:komga_native/l10n/app_localizations.dart';
+import 'package:komga_native/l10n/l10n.dart';
 import 'package:komga_native/src/providers/cache_providers.dart';
 import 'package:komga_native/src/providers/progress_providers.dart';
 import 'package:komga_native/src/providers/reader_prefs_provider.dart';
@@ -73,6 +75,9 @@ Future<InMemoryReaderPrefsStore> pumpReader(
         ...extraOverrides,
       ],
       child: MaterialApp(
+        locale: const Locale('en'),
+        localizationsDelegates: appLocalizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         theme: forceEink ? AppTheme.eink() : AppTheme.dark(),
         home: ReaderScreen(
           bookId: bookId,

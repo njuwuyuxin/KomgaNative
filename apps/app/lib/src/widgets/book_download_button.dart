@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_domain/komga_domain.dart';
+import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/providers/download_providers.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -15,6 +16,7 @@ class BookDownloadButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final status = ref.watch(downloadsProvider)[book.id];
     final downloaded = ref.watch(downloadedProvider(book.id)).value;
@@ -24,7 +26,7 @@ class BookDownloadButton extends ConsumerWidget {
       final progress = status!.progress!;
       return IconButton(
         key: Key('book-download-${book.id}'),
-        tooltip: 'Cancel download',
+        tooltip: l10n.cancelDownload,
         onPressed: () => controller.cancel(book.id),
         icon: SizedBox(
           width: 20,
@@ -41,7 +43,7 @@ class BookDownloadButton extends ConsumerWidget {
     if (error != null) {
       return IconButton(
         key: Key('book-download-${book.id}'),
-        tooltip: '$error · tap to retry',
+        tooltip: l10n.downloadRetryTooltip(error),
         onPressed: () {
           controller.dismiss(book.id);
           unawaited(controller.start(book));
@@ -53,7 +55,7 @@ class BookDownloadButton extends ConsumerWidget {
     if (downloaded != null) {
       return IconButton(
         key: Key('book-download-${book.id}'),
-        tooltip: 'Downloaded · tap to remove',
+        tooltip: l10n.downloadedTapToRemove,
         onPressed: () => _confirmDelete(context, controller),
         icon: Icon(Icons.download_done, color: theme.colorScheme.primary),
       );
@@ -61,7 +63,7 @@ class BookDownloadButton extends ConsumerWidget {
 
     return IconButton(
       key: Key('book-download-${book.id}'),
-      tooltip: 'Download for offline reading',
+      tooltip: l10n.downloadForOffline,
       onPressed: () => unawaited(controller.start(book)),
       icon: const Icon(Icons.download_outlined),
     );
@@ -73,23 +75,23 @@ class BookDownloadButton extends ConsumerWidget {
   ) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (BuildContext context) => AlertDialog(
-        title: const Text('Remove download?'),
-        content: const Text(
-          'The cached pages for this book will be deleted. '
-          'You can still read it online.',
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
+      builder: (BuildContext context) {
+        final l10n = AppLocalizations.of(context);
+        return AlertDialog(
+          title: Text(l10n.removeDownloadTitle),
+          content: Text(l10n.removeDownloadBody),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(l10n.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(l10n.remove),
+            ),
+          ],
+        );
+      },
     );
     if (confirmed ?? false) await controller.delete(book);
   }

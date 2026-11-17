@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
+import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/providers/series_read_provider.dart';
@@ -43,6 +44,7 @@ class SeriesDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final detail = ref.watch(seriesDetailProvider(seriesId));
     final books = ref.watch(seriesBooksProvider(seriesId));
     final series = detail.value;
@@ -55,7 +57,7 @@ class SeriesDetailScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          series?.title ?? 'Series',
+          series?.title ?? l10n.seriesFallbackTitle,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -63,19 +65,19 @@ class SeriesDetailScreen extends ConsumerWidget {
           PopupMenuButton<String>(
             key: const Key('series-mark-menu'),
             icon: const Icon(Icons.done_all),
-            tooltip: 'Mark read',
+            tooltip: l10n.markReadTooltip,
             onSelected: (String value) =>
                 unawaited(_markSeriesRead(context, ref, read: value == 'read')),
             itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-              const PopupMenuItem<String>(
-                key: Key('series-mark-read'),
+              PopupMenuItem<String>(
+                key: const Key('series-mark-read'),
                 value: 'read',
-                child: Text('Mark all read'),
+                child: Text(l10n.markAllRead),
               ),
-              const PopupMenuItem<String>(
-                key: Key('series-mark-unread'),
+              PopupMenuItem<String>(
+                key: const Key('series-mark-unread'),
                 value: 'unread',
-                child: Text('Mark all unread'),
+                child: Text(l10n.markAllUnread),
               ),
             ],
           ),
@@ -113,6 +115,7 @@ class _ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final message = failure is ShelfFailure ? failure as ShelfFailure : null;
     return RefreshableStatus(
       onRefresh: () async => onRetry(),
@@ -121,7 +124,7 @@ class _ErrorView extends StatelessWidget {
         icon: Icons.cloud_off_outlined,
         title: message?.message ?? const UnexpectedFailure('').message,
         message: message?.hint,
-        actionLabel: 'Retry',
+        actionLabel: l10n.retry,
         onAction: onRetry,
       ),
     );
@@ -143,6 +146,7 @@ class _BooksView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final truncated = books.items.length < books.totalElements;
 
@@ -156,13 +160,13 @@ class _BooksView extends StatelessWidget {
             child: _SeriesHeader(series: series, seriesId: seriesId),
           ),
           if (books.items.isEmpty)
-            const SliverFillRemaining(
+            SliverFillRemaining(
               hasScrollBody: false,
               child: StatusView(
-                key: Key('series-empty'),
+                key: const Key('series-empty'),
                 icon: Icons.menu_book_outlined,
-                title: 'No books yet',
-                message: 'This series has no readable books in Komga yet.',
+                title: l10n.noBooksYet,
+                message: l10n.noBooksHint,
               ),
             )
           else
@@ -181,7 +185,7 @@ class _BooksView extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.all(AppSpacing.md),
                 child: Text(
-                  'Showing ${books.items.length} of ${books.totalElements} books',
+                  l10n.showingBooks(books.items.length, books.totalElements),
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
@@ -204,6 +208,7 @@ class _SeriesHeader extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final cover = ref.watch(seriesCoverProvider(seriesId));
     final bytes = switch (cover) {
@@ -242,14 +247,14 @@ class _SeriesHeader extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(
-                  series?.title ?? 'Series',
+                  series?.title ?? l10n.seriesFallbackTitle,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.titleMedium,
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 Text(
-                  '$read of $total read',
+                  l10n.readOfTotal(read, total),
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -267,7 +272,7 @@ class _SeriesHeader extends ConsumerWidget {
                     series!.readingDirection != ReadingDirection.unknown) ...[
                   const SizedBox(height: AppSpacing.sm),
                   Text(
-                    _directionLabel(series!.readingDirection),
+                    _directionLabel(l10n, series!.readingDirection),
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -281,14 +286,16 @@ class _SeriesHeader extends ConsumerWidget {
     );
   }
 
-  static String _directionLabel(ReadingDirection direction) =>
-      switch (direction) {
-        ReadingDirection.rightToLeft => 'Reads right to left',
-        ReadingDirection.leftToRight => 'Reads left to right',
-        ReadingDirection.vertical => 'Vertical (webtoon)',
-        ReadingDirection.webtoon => 'Webtoon',
-        ReadingDirection.unknown => '',
-      };
+  static String _directionLabel(
+    AppLocalizations l10n,
+    ReadingDirection direction,
+  ) => switch (direction) {
+    ReadingDirection.rightToLeft => l10n.readsRightToLeft,
+    ReadingDirection.leftToRight => l10n.readsLeftToRight,
+    ReadingDirection.vertical => l10n.readsVertical,
+    ReadingDirection.webtoon => l10n.readsWebtoon,
+    ReadingDirection.unknown => '',
+  };
 }
 
 /// 一本书：封图 + 标题 + 页数/已读状态，点进去读。
@@ -305,6 +312,7 @@ class _BookRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final cover = ref.watch(bookCoverProvider(book.id));
     final bytes = switch (cover) {
@@ -340,8 +348,8 @@ class _BookRow extends ConsumerWidget {
       ),
       subtitle: Text(
         completed
-            ? 'Read · ${book.pagesCount} pages'
-            : '${book.pagesCount} pages',
+            ? l10n.bookReadPages(book.pagesCount)
+            : l10n.bookPages(book.pagesCount),
         style: theme.textTheme.bodySmall?.copyWith(
           color: theme.colorScheme.onSurfaceVariant,
         ),

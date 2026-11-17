@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_design_system/komga_design_system.dart';
+import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
 import 'package:komga_native/src/providers/reader_prefs_provider.dart';
+import 'package:komga_native/src/widgets/reader_mode_text.dart';
 import 'package:komga_native/src/widgets/reader_palette.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -56,6 +58,7 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final prefs = ref.watch(readerPrefsProvider);
     final controller = ref.read(readerPrefsProvider.notifier);
     final palette = widget.palette;
@@ -90,13 +93,13 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
                 ),
               ),
               Text(
-                'Reading settings',
+                l10n.readingSettings,
                 style: textStyle.titleMedium?.copyWith(
                   color: palette.foreground,
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
-              _Label('Reading mode', palette: palette),
+              _Label(l10n.readingMode, palette: palette),
               for (final choice in ReaderModeChoice.values)
                 _ModeRow(
                   choice: choice,
@@ -105,7 +108,7 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
                   onTap: () => controller.setMode(choice),
                 ),
               const SizedBox(height: AppSpacing.md),
-              _Label('Brightness', palette: palette),
+              _Label(l10n.brightness, palette: palette),
               Row(
                 children: <Widget>[
                   Icon(Icons.brightness_low, color: palette.muted, size: 20),
@@ -123,7 +126,7 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
                   SizedBox(
                     width: 44,
                     child: Text(
-                      '${(prefs.brightness * 100).round()}%',
+                      l10n.brightnessPercent((prefs.brightness * 100).round()),
                       textAlign: TextAlign.end,
                       style: textStyle.bodySmall?.copyWith(
                         color: palette.muted,
@@ -138,13 +141,13 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
                 onChanged: controller.setKeepAwake,
                 activeThumbColor: palette.foreground,
                 title: Text(
-                  'Keep screen awake',
+                  l10n.keepScreenAwake,
                   style: textStyle.bodyMedium?.copyWith(
                     color: palette.foreground,
                   ),
                 ),
                 subtitle: Text(
-                  'Stop the screen from sleeping while reading',
+                  l10n.keepScreenAwakeHint,
                   style: textStyle.bodySmall?.copyWith(color: palette.muted),
                 ),
               ),
@@ -152,10 +155,13 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
                 const SizedBox(height: AppSpacing.sm),
                 Row(
                   children: <Widget>[
-                    _Label('Go to page', palette: palette),
+                    _Label(l10n.goToPage, palette: palette),
                     const Spacer(),
                     Text(
-                      '${_dragging?.round() ?? widget.page} / ${widget.total}',
+                      l10n.readerPageOf(
+                        _dragging?.round() ?? widget.page,
+                        widget.total,
+                      ),
                       style: textStyle.bodySmall?.copyWith(
                         color: palette.muted,
                       ),
@@ -226,6 +232,7 @@ class _ModeRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     return InkWell(
       key: Key('reader-mode-${choice.name}'),
@@ -248,7 +255,7 @@ class _ModeRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Text(
-                    choice.label,
+                    readerModeLabel(l10n, choice),
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: palette.foreground,
                       fontWeight: selected ? FontWeight.w600 : null,
@@ -258,7 +265,7 @@ class _ModeRow extends StatelessWidget {
                   // 而用户真正需要解释的只有"我正要选的那个"。
                   if (selected)
                     Text(
-                      choice.hint,
+                      readerModeHint(l10n, choice),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: palette.muted,
                       ),
