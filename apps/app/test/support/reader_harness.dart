@@ -30,12 +30,15 @@ Future<InMemoryReaderPrefsStore> pumpReader(
   WidgetTester tester, {
   FakeReaderRepository? repository,
   Book? book,
+  String bookId = 'b1',
   ReadingDirection direction = ReadingDirection.leftToRight,
   bool forceEink = false,
   ReaderPrefs? initialPrefs,
   FakeWakeLock? wakeLock,
   ProgressStore? progressStore,
   bool offline = false,
+  void Function(Book next)? onOpenNext,
+  List<Override> extraOverrides = const <Override>[],
 }) async {
   tester.view.physicalSize = const Size(390 * 3, 844 * 3);
   tester.view.devicePixelRatio = 3;
@@ -67,10 +70,16 @@ Future<InMemoryReaderPrefsStore> pumpReader(
         wakeLockProvider.overrideWithValue(wakeLock ?? FakeWakeLock()),
         httpCacheProvider.overrideWithValue(cache),
         if (forceEink) settingsProvider.overrideWith(EinkSettings.new),
+        ...extraOverrides,
       ],
       child: MaterialApp(
         theme: forceEink ? AppTheme.eink() : AppTheme.dark(),
-        home: ReaderScreen(bookId: 'b1', book: book, direction: direction),
+        home: ReaderScreen(
+          bookId: bookId,
+          book: book,
+          direction: direction,
+          onOpenNext: onOpenNext,
+        ),
       ),
     ),
   );

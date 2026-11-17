@@ -48,6 +48,17 @@
 - 黄金图 `reader_pages@phone_dark`：缩略图是**真实异步解码**，基线要在 `act` 之后
   放一小段真实时间（`settleAfterActWithRealTime`），否则截到的是黑块（踩过）。
 
+## 书末：下一本 / 回系列
+
+读到最后一页（双页模式：最后一屏含末页）时，底栏上方出现一条 `Finished`：
+
+- **下一本**：按系列书列表的顺序取下一本；点它 = `pushReplacement` 打开。
+  用替换而不是压栈：连读十本不必按十次返回，书架层级始终是"系列 → 当前这本"。
+- **Series**：退回系列详情。
+- 拿不到下一本（已是最后一本 / 离线没缓存 / 系列超过 100 本）时只显示 `Finished`，
+  **不报错**——"下一本"是锦上添花，不能因为它把读完的页面变成错误页。
+- 完成判定同时用于进度回写，所以"看到完成条"与"服务端 completed=true"是同一个条件。
+
 ## 屏幕常亮
 
 `packages/komga_platform/lib/src/wakelock.dart` 走 `komganative/device` 通道，Android 侧在

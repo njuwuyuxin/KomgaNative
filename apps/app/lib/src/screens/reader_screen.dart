@@ -46,6 +46,7 @@ class ReaderScreen extends ConsumerStatefulWidget {
     required this.bookId,
     this.book,
     this.direction = ReadingDirection.unknown,
+    this.onOpenNext,
     super.key,
   });
 
@@ -55,6 +56,12 @@ class ReaderScreen extends ConsumerStatefulWidget {
   final Book? book;
 
   final ReadingDirection direction;
+
+  /// "下一本"的打开方式。
+  ///
+  /// 生产环境不传：阅读器自己用 go_router 替换当前页（返回仍是系列详情）。
+  /// 测试传回调，避免为了一个按钮把整棵路由搬进 widget 测试。
+  final void Function(Book next)? onOpenNext;
 
   @override
   ConsumerState<ReaderScreen> createState() => _ReaderScreenState();
@@ -198,6 +205,22 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     );
   }
 
+  /// 打开下一本：**替换**当前页而不是压栈。
+  ///
+  /// 压栈的话连读十本要按十次返回才能回系列；替换后"读完一本 → 下一本"始终是
+  /// "系列 → 当前这本"的两层结构。
+  void _openNext(Book next) {
+    final handler = widget.onOpenNext;
+    if (handler != null) {
+      handler(next);
+      return;
+    }
+    context.pushReplacement(
+      '/reader/${next.id}',
+      extra: ReaderArgs(book: next, direction: widget.direction),
+    );
+  }
+
   /// 设置面板里跳到某页：单页/双页直接换页，纵向模式额外发一次滚动跳转。
   void _jumpToPage(int page, int total) {
     final target = page.clamp(1, total);
@@ -321,6 +344,16 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       ReadingMode.verticalScroll => false,
     };
 
+    final completed = _isCompleted(page: page, total: total);
+    // 只在完成态查"下一本"：没读完时多一次列表请求纯属浪费。
+    final nextBook = completed && book != null
+        ? ref
+              .watch(
+                nextBookProvider((seriesId: book.seriesId, bookId: book.id)),
+              )
+              .value
+        : null;
+
     return WakeLockScope(
       enabled: prefs.keepAwake,
       child: Scaffold(
@@ -386,6 +419,15 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                       ),
                     },
                   ),
+                  if (_chromeVisible && completed)
+                    ReaderFinishedBar(
+                      palette: palette,
+                      nextBook: nextBook,
+                      onNext: nextBook == null
+                          ? null
+                          : () => _openNext(nextBook),
+                      onBack: () => context.pop(),
+                    ),
                   if (_chromeVisible)
                     ReaderControls(
                       pagesCount: total,

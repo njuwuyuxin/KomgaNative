@@ -5,6 +5,7 @@ import 'package:komga_api/komga_api.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/reader_repository.dart';
 import 'package:komga_native/src/providers/cache_providers.dart';
+import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/providers/progress_providers.dart';
 import 'package:komga_native/src/session/session_controller.dart';
 
@@ -49,4 +50,22 @@ final readerPageImageProvider = FutureProvider.family<Uint8List, PageRequest>((
   PageRequest req,
 ) {
   return ref.watch(readerRepositoryProvider).pageImage(req.bookId, req.page);
+});
+
+/// 查"下一本"的键：书 id + 所属系列。
+typedef NextBookQuery = ({String seriesId, String bookId});
+
+/// 同一系列里的下一本（按服务端返回顺序，也就是卷号顺序）。
+///
+/// 返回 null 的四种情况都**正常**：当前是最后一本、书列表还没加载出来、
+/// 离线且没有缓存、系列超过 100 本（列表只取前 100）。"下一本"是读完后的
+/// 锦上添花，不能因为它让书末报错。
+final nextBookProvider = FutureProvider.family<Book?, NextBookQuery>((
+  Ref ref,
+  NextBookQuery query,
+) async {
+  final page = await ref.watch(libraryRepositoryProvider).books(query.seriesId);
+  final index = page.items.indexWhere((Book book) => book.id == query.bookId);
+  if (index < 0 || index + 1 >= page.items.length) return null;
+  return page.items[index + 1];
 });

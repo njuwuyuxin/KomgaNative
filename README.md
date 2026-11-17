@@ -80,7 +80,7 @@ dart run tool/ci.dart check    # format + analyze + layers + 全部测试
 dart run tool/ci.dart golden   # 重新生成黄金图（仅 Windows，与 CI 一致）
 ```
 
-当前基线：**351 个测试**（纯 Dart 165 / Flutter 186），**25 张黄金图**覆盖
+当前基线：**356 个测试**（纯 Dart 165 / Flutter 191），**26 张黄金图**覆盖
 书架（手机 light / 平板 dark / 1.3 倍字号 / 墨水屏 / 空态 / 错误态 / **离线态**）、系列详情（手机 / 平板 / 墨水屏）、
 阅读器（单页 dark+eink、双页 dark+eink、纵向 dark、设置面板 dark+eink）、墨水屏设置（含存储占用）、连接页（light / eink）、
 证书面板（手机 / 平板 / 墨水屏）、启动页。

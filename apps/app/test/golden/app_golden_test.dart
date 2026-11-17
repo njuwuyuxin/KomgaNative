@@ -353,6 +353,23 @@ void main() {
     );
   });
 
+  testWidgets('reader_finished@phone_dark', (WidgetTester tester) async {
+    await pumpReaderGolden(
+      tester,
+      name: 'reader_finished@phone_dark',
+      size: GoldenSizes.phone,
+      theme: AppTheme.dark(),
+      precachePages: <int>[1, 2, 3],
+      act: (WidgetTester t) async {
+        for (var i = 0; i < 2; i++) {
+          final rect = t.getRect(find.byKey(const Key('reader-tap-layer')));
+          await t.tapAt(Offset(rect.right - rect.width * 0.05, rect.center.dy));
+          await t.pumpAndSettle();
+        }
+      },
+    );
+  });
+
   testWidgets('reader_pages@phone_dark', (WidgetTester tester) async {
     await pumpReaderGolden(
       tester,
