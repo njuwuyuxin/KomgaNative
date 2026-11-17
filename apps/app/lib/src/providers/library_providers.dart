@@ -169,6 +169,15 @@ class ShelfController extends Notifier<ShelfState> {
     return _load(reset: true);
   }
 
+  /// 从系列页/阅读器返回时用：**保留当前列表与滚动位置**，静默换新数据。
+  ///
+  /// 直接 `ref.invalidate(shelfProvider)` 会把列表清空、页面跳回顶部——
+  /// 在大书库里读一本就回到顶部，体验很差（真机上撞到过）。
+  Future<void> refreshInPlace() {
+    _debounce?.cancel();
+    return _load(reset: true, keepItems: true);
+  }
+
   /// 滚到底部时追加下一页。
   Future<void> loadMore() async {
     if (state.loading || state.loadingMore || !state.hasMore) return;
@@ -200,13 +209,14 @@ class ShelfController extends Notifier<ShelfState> {
     _debounce = Timer(searchDebounce, () => unawaited(_load(reset: true)));
   }
 
-  Future<void> _load({required bool reset}) async {
+  Future<void> _load({required bool reset, bool keepItems = false}) async {
     final generation = ++_generation;
     final targetPage = reset ? 0 : state.page + 1;
+    final keepVisible = keepItems && state.series.isNotEmpty;
 
     state = reset
         ? state.copyWith(
-            loading: true,
+            loading: !keepVisible,
             clearFailure: true,
             clearLoadMoreFailure: true,
           )

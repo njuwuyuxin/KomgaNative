@@ -165,6 +165,29 @@ void main() {
     expect(repository.seriesCalls.last.libraryId, 'l2');
   });
 
+  test('refreshInPlace：保留列表与滚动位置，静默换新数据', () async {
+    final repository = FakeLibraryRepository(series: demoShelf());
+    final container = containerWith(repository);
+    await settle();
+    final callsBefore = repository.seriesCalls.length;
+
+    final gate = Completer<void>();
+    repository.gate = gate;
+    final future = container.read(shelfProvider.notifier).refreshInPlace();
+    await settle();
+
+    // 请求还在飞：列表不能清空，也不能回到骨架屏状态。
+    expect(container.read(shelfProvider).series, hasLength(6));
+    expect(container.read(shelfProvider).loading, isFalse);
+
+    gate.complete();
+    await future;
+    await settle();
+
+    expect(container.read(shelfProvider).series, hasLength(6));
+    expect(repository.seriesCalls.length, greaterThan(callsBefore));
+  });
+
   test('竞态：旧请求后回来也不会覆盖新结果', () async {
     final repository = FakeLibraryRepository(
       series: demoShelf(),

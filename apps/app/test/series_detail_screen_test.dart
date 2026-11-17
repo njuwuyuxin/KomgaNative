@@ -121,4 +121,21 @@ void main() {
     expect(find.text('Vol. 3'), findsWidgets);
     expect(find.text('1 / 21'), findsWidgets, reason: '阅读器应显示真实页数');
   });
+
+  testWidgets('读完返回会刷新系列进度（不能在真机上显示 0 of N）', (WidgetTester tester) async {
+    final repository = FakeLibraryRepository(series: demoShelf());
+    await pumpDetail(tester, repository);
+    await tester.pumpAndSettle();
+    final before = repository.booksCalls;
+
+    await tester.tap(find.textContaining('Vol. 3'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ReaderScreen), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Close'));
+    await tester.pumpAndSettle();
+
+    expect(repository.booksCalls, greaterThan(before), reason: '返回后应重新拉书列表');
+    expect(repository.seriesByIdCalls, greaterThan(1), reason: '系列信息也要刷新');
+  });
 }

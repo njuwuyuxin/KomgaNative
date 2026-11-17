@@ -56,19 +56,55 @@ void main() {
       );
     });
 
-    test('内网明文与公网明文的区分（用于安全提示）', () {
+    test('明文告警只针对公网地址（家用 NAS 内网 http 不该告警）', () {
+      // 内网：不告警，否则用户会把告警当噪音忽略掉。
+      for (final host in <String>[
+        'http://192.168.1.10:25600',
+        'http://10.0.2.2:25600',
+        'http://172.16.5.4:8080',
+        'http://169.254.1.1',
+        'http://localhost:25600',
+        'http://nas.local:25600',
+        'http://[fe80::1]:25600',
+        'http://[fd00::1]:25600',
+      ]) {
+        expect(
+          ServerAddress.parse(host).isInsecureRemote,
+          isFalse,
+          reason: '$host 属于内网/本机，不该告警',
+        );
+      }
+
+      // 公网明文：必须告警。
+      for (final host in <String>[
+        'http://komga.example.com',
+        'http://8.8.8.8:25600',
+        'http://172.32.0.1',
+        'http://192.169.0.1',
+      ]) {
+        expect(
+          ServerAddress.parse(host).isInsecureRemote,
+          isTrue,
+          reason: '$host 是公网明文，应告警',
+        );
+      }
+
+      // HTTPS 永远不告警（哪怕内网）。
       expect(
-        ServerAddress.parse('http://192.168.1.10').isInsecureRemote,
-        isTrue,
-      );
-      expect(
-        ServerAddress.parse('http://localhost:25600').isInsecureRemote,
+        ServerAddress.parse('https://192.168.1.10').isInsecureRemote,
         isFalse,
       );
-      expect(
-        ServerAddress.parse('https://k.example.com').isInsecureRemote,
-        isFalse,
-      );
+    });
+
+    test('isPrivateHost 只认标准内网段与家用命名', () {
+      expect(ServerAddress.parse('192.168.31.7').isPrivateHost, isTrue);
+      expect(ServerAddress.parse('172.15.0.1').isPrivateHost, isFalse);
+      expect(ServerAddress.parse('172.31.255.255').isPrivateHost, isTrue);
+      expect(ServerAddress.parse('11.0.0.1').isPrivateHost, isFalse);
+      expect(ServerAddress.parse('nas.local').isPrivateHost, isTrue);
+      expect(ServerAddress.parse('komga.lan').isPrivateHost, isTrue);
+      expect(ServerAddress.parse('komga.example.com').isPrivateHost, isFalse);
+      expect(ServerAddress.parse('[fc00::1]').isPrivateHost, isTrue);
     });
 
     test('相等性基于规范化后的 URI', () {

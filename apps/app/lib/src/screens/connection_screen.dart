@@ -67,8 +67,8 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
       final address = ServerAddress.parse(_url.text);
       if (address.isInsecureRemote) {
         insecureWarning =
-            'This address uses plain HTTP outside your local network. '
-            'Your credentials will be sent unencrypted.';
+            'This address is outside your local network and uses plain HTTP. '
+            'Your credentials would be sent unencrypted.';
       }
     } on FormatException {
       insecureWarning = null;

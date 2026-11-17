@@ -124,6 +124,7 @@ class _BooksView extends StatelessWidget {
               itemCount: books.items.length,
               itemBuilder: (BuildContext context, int index) => _BookRow(
                 book: books.items[index],
+                seriesId: seriesId,
                 direction: series?.readingDirection ?? ReadingDirection.unknown,
               ),
               separatorBuilder: (BuildContext context, int index) =>
@@ -246,9 +247,14 @@ class _SeriesHeader extends ConsumerWidget {
 
 /// 一本书：封图 + 标题 + 页数/已读状态，点进去读。
 class _BookRow extends ConsumerWidget {
-  const _BookRow({required this.book, required this.direction});
+  const _BookRow({
+    required this.book,
+    required this.seriesId,
+    required this.direction,
+  });
 
   final Book book;
+  final String seriesId;
   final ReadingDirection direction;
 
   @override
@@ -300,10 +306,15 @@ class _BookRow extends ConsumerWidget {
             ? theme.colorScheme.primary
             : theme.colorScheme.onSurfaceVariant,
       ),
-      onTap: () => context.push(
-        '/reader/${book.id}',
-        extra: ReaderArgs(book: book, direction: direction),
-      ),
+      onTap: () async {
+        await context.push(
+          '/reader/${book.id}',
+          extra: ReaderArgs(book: book, direction: direction),
+        );
+        // 从阅读器回来时进度已经变了：不刷新的话"读完还是 0 of N"（真机上撞到过）。
+        ref.invalidate(seriesDetailProvider(seriesId));
+        ref.invalidate(seriesBooksProvider(seriesId));
+      },
     );
   }
 }

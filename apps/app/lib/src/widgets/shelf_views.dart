@@ -21,7 +21,7 @@ SliverGridDelegate shelfGridDelegate() =>
     );
 
 /// 书架网格 + 下拉刷新 + 滚到底自动预取。
-class ShelfGrid extends StatelessWidget {
+class ShelfGrid extends ConsumerWidget {
   const ShelfGrid({
     required this.state,
     required this.onRefresh,
@@ -37,7 +37,7 @@ class ShelfGrid extends StatelessWidget {
   final Future<void> Function() onLoadMore;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return RefreshIndicator(
       onRefresh: onRefresh,
       child: NotificationListener<ScrollNotification>(
@@ -62,7 +62,11 @@ class ShelfGrid extends StatelessWidget {
                   final series = state.series[index];
                   return SeriesShelfTile(
                     series: series,
-                    onTap: () => context.push('/series/${series.id}'),
+                    onTap: () async {
+                      await context.push('/series/${series.id}');
+                      // 系列页里可能读完了书：原地刷新进度，别把列表清空跳回顶部。
+                      await ref.read(shelfProvider.notifier).refreshInPlace();
+                    },
                   );
                 }, childCount: state.series.length),
               ),
