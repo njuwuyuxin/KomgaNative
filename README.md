@@ -92,7 +92,7 @@ dart run tool/ci.dart golden   # 重新生成黄金图（仅 Windows，与 CI �
 阅读器（单页 dark+eink、双页 dark+eink、纵向 dark、设置面板 dark+eink）、墨水屏设置（含存储占用）、连接页（light / eink）、
 证书面板（手机 / 平板 / 墨水屏）、启动页。
 
-其中 `packages/komga_api` 的 100 个测试里包含**两层真值校验**：
+其中 `packages/komga_api` 的 99 个测试里包含**两层真值校验**：
 `contract_test.dart` 拿官方 OpenAPI 校验客户端会构造的每个 URL；`fixtures_test.dart` 用真实服务器响应驱动解析层。
 反代与证书的异常形态同样用**真实抓包**（`test/fixtures/proxy-400-plain-http.html`）和真实异常类型驱动（`errors_test.dart`）；
 离线缓存的回退决策由 11 个用例覆盖（命中/未命中/404/401/5xx/缓存自身故障）。
