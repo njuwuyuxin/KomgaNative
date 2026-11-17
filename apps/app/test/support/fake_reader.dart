@@ -16,6 +16,7 @@ class FakeReaderRepository implements ReaderRepository {
     this.saveFailure,
     this.pageDirectory = 'test/fixtures/pages',
     this.pageNames = const <String>['p1', 'p2', 'p3'],
+    this.pageSizes,
   });
 
   /// 不给就用默认书（3 页、读到第 1 页）。
@@ -27,6 +28,10 @@ class FakeReaderRepository implements ReaderRepository {
 
   final String pageDirectory;
   final List<String> pageNames;
+
+  /// 每页尺寸（第 i 项对应第 i 页）；不给就全部 800×1200。
+  /// 双页测试需要"宽页单独成屏"，所以尺寸必须可控。
+  final List<({int width, int height})>? pageSizes;
 
   /// 记录每次进度回写，用来断言"翻到哪页就存哪页、最后一页标 completed"。
   final List<({int page, bool completed})> saved =
@@ -51,9 +56,15 @@ class FakeReaderRepository implements ReaderRepository {
   Future<List<PageInfo>> pages(String bookId) async {
     final failure = pagesFailure;
     if (failure != null) throw failure;
+    final sizes = pageSizes;
     return <PageInfo>[
       for (var i = 1; i <= pageCount; i++)
-        PageInfo(number: i, width: 800, height: 1200, mediaType: 'image/png'),
+        PageInfo(
+          number: i,
+          width: sizes == null ? 800 : sizes[(i - 1) % sizes.length].width,
+          height: sizes == null ? 1200 : sizes[(i - 1) % sizes.length].height,
+          mediaType: 'image/png',
+        ),
     ];
   }
 

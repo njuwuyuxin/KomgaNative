@@ -8,6 +8,7 @@ import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/providers/reader_providers.dart';
+import 'package:komga_native/src/providers/settings_provider.dart';
 import 'package:komga_native/src/screens/connection_screen.dart';
 import 'package:komga_native/src/screens/library_screen.dart';
 import 'package:komga_native/src/screens/reader_screen.dart';
@@ -18,6 +19,7 @@ import 'package:komga_native/src/session/certificate_prompt.dart';
 import 'package:komga_native/src/session/server_store.dart';
 import 'package:komga_native/src/session/session_controller.dart';
 import 'package:komga_native/src/widgets/certificate_panel.dart';
+import 'package:komga_reader_engine/komga_reader_engine.dart';
 
 import '../support/fake_library.dart';
 import '../support/fake_reader.dart';
@@ -212,9 +214,16 @@ void main() {
     required String name,
     required Size size,
     required ThemeData theme,
+    List<int> precachePages = const <int>[1],
+    Future<void> Function(WidgetTester tester)? act,
+    bool forceEink = false,
   }) async {
     final repository = FakeReaderRepository();
-    final pageBytes = await repository.warmPage(1);
+    final pageBytes = <Uint8List>[];
+    for (final page in precachePages) {
+      final bytes = await repository.warmPage(page);
+      if (bytes != null) pageBytes.add(bytes);
+    }
 
     await pumpGoldenScreen(
       tester,
@@ -223,12 +232,22 @@ void main() {
       theme: theme,
       overrides: <Override>[
         readerRepositoryProvider.overrideWithValue(repository),
+        // 阅读器配色跟着 settings.forceEink 走，与 AppTheme 必须成对换；
+        // 只换主题的话基线会画成黑底（踩过一次）。
+        if (forceEink) settingsProvider.overrideWith(EinkSettings.new),
       ],
-      precacheImages: pageBytes == null
-          ? const <Uint8List>[]
-          : <Uint8List>[pageBytes],
+      precacheImages: pageBytes,
+      act: act,
     );
     await expectGolden(tester, name);
+  }
+
+  /// 顶栏 → 阅读模式菜单 → 选中某项。
+  Future<void> pickMode(WidgetTester tester, ReadingMode mode) async {
+    await tester.tap(find.byKey(const Key('reader-mode-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(Key('reader-mode-${mode.name}')));
+    await tester.pumpAndSettle();
   }
 
   testWidgets('reader@phone_dark', (WidgetTester tester) async {
@@ -246,6 +265,49 @@ void main() {
       name: 'reader@eink',
       size: GoldenSizes.eink,
       theme: AppTheme.eink(),
+      forceEink: true,
+    );
+  });
+
+  testWidgets('reader_double@phone_dark', (WidgetTester tester) async {
+    await pumpReaderGolden(
+      tester,
+      name: 'reader_double@phone_dark',
+      size: GoldenSizes.phone,
+      theme: AppTheme.dark(),
+      precachePages: <int>[2, 3],
+      act: (WidgetTester t) async {
+        await pickMode(t, ReadingMode.doublePage);
+        final rect = t.getRect(find.byKey(const Key('reader-tap-layer')));
+        await t.tapAt(Offset(rect.right - rect.width * 0.05, rect.center.dy));
+      },
+    );
+  });
+
+  testWidgets('reader_double@eink', (WidgetTester tester) async {
+    await pumpReaderGolden(
+      tester,
+      name: 'reader_double@eink',
+      size: GoldenSizes.eink,
+      theme: AppTheme.eink(),
+      forceEink: true,
+      precachePages: <int>[2, 3],
+      act: (WidgetTester t) async {
+        await pickMode(t, ReadingMode.doublePage);
+        final rect = t.getRect(find.byKey(const Key('reader-tap-layer')));
+        await t.tapAt(Offset(rect.right - rect.width * 0.05, rect.center.dy));
+      },
+    );
+  });
+
+  testWidgets('reader_vertical@phone_dark', (WidgetTester tester) async {
+    await pumpReaderGolden(
+      tester,
+      name: 'reader_vertical@phone_dark',
+      size: GoldenSizes.phone,
+      theme: AppTheme.dark(),
+      precachePages: <int>[1, 2],
+      act: (WidgetTester t) => pickMode(t, ReadingMode.verticalScroll),
     );
   });
 

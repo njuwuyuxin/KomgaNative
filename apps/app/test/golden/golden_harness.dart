@@ -69,6 +69,8 @@ ThemeData withTestFont(ThemeData base) => base.copyWith(
 /// [precacheImages] 用于需要真实封面的页面：测试的假时钟不会推进图片解码，
 /// 必须先在真实事件循环里把字节解成 `ui.Image` 塞进 ImageCache，
 /// 否则截图里只有占位块（实测过，别指望 pumpAndSettle 能等出来）。
+///
+/// [act] 在首帧之后执行一次交互（例如切到双页模式），用来给"同一页面的不同状态"出基线。
 Future<void> pumpGoldenScreen(
   WidgetTester tester, {
   required Widget screen,
@@ -78,6 +80,7 @@ Future<void> pumpGoldenScreen(
   List<Override> overrides = const <Override>[],
   bool settle = true,
   List<Uint8List> precacheImages = const <Uint8List>[],
+  Future<void> Function(WidgetTester tester)? act,
 }) async {
   tester.view.physicalSize = Size(
     size.width * kGoldenDevicePixelRatio,
@@ -121,6 +124,11 @@ Future<void> pumpGoldenScreen(
     await tester.pumpAndSettle();
   } else {
     await tester.pump(const Duration(milliseconds: 50));
+  }
+
+  if (act != null) {
+    await act(tester);
+    await tester.pumpAndSettle();
   }
 }
 

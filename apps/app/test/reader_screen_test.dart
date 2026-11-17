@@ -5,10 +5,13 @@ import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/reader_providers.dart';
+import 'package:komga_native/src/providers/settings_provider.dart';
 import 'package:komga_native/src/screens/reader_screen.dart';
+import 'package:komga_reader_engine/komga_reader_engine.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_reader.dart';
+import 'support/fakes.dart';
 
 void main() {
   Future<void> pumpReader(
@@ -16,6 +19,7 @@ void main() {
     FakeReaderRepository repository, {
     Book? book,
     ReadingDirection direction = ReadingDirection.leftToRight,
+    bool forceEink = false,
   }) async {
     tester.view.physicalSize = const Size(390 * 3, 844 * 3);
     tester.view.devicePixelRatio = 3;
@@ -25,9 +29,10 @@ void main() {
       ProviderScope(
         overrides: <Override>[
           readerRepositoryProvider.overrideWithValue(repository),
+          if (forceEink) settingsProvider.overrideWith(EinkSettings.new),
         ],
         child: MaterialApp(
-          theme: AppTheme.dark(),
+          theme: forceEink ? AppTheme.eink() : AppTheme.dark(),
           home: ReaderScreen(bookId: 'b1', book: book, direction: direction),
         ),
       ),
@@ -45,6 +50,13 @@ void main() {
   Future<void> tapLeft(WidgetTester tester) async {
     final rect = tester.getRect(find.byKey(const Key('reader-tap-layer')));
     await tester.tapAt(Offset(rect.left + rect.width * 0.05, rect.center.dy));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> switchMode(WidgetTester tester, ReadingMode mode) async {
+    await tester.tap(find.byKey(const Key('reader-mode-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(Key('reader-mode-${mode.name}')));
     await tester.pumpAndSettle();
   }
 
@@ -170,5 +182,157 @@ void main() {
     await tester.pump(const Duration(milliseconds: 700));
 
     expect(find.text('2 / 3'), findsOneWidget);
+  });
+
+  group('双页跨页', () {
+    testWidgets('封面单独一屏，后两页并成一屏', (WidgetTester tester) async {
+      await pumpReader(tester, FakeReaderRepository(), book: demoReaderBook());
+      await switchMode(tester, ReadingMode.doublePage);
+
+      // 第 1 屏只有封面。
+      expect(find.text('1 / 3'), findsOneWidget);
+      expect(find.byType(Image), findsOneWidget);
+
+      await tapRight(tester);
+      expect(find.text('2–3 / 3'), findsOneWidget);
+      expect(find.byType(Image), findsNWidgets(2));
+    });
+
+    testWidgets('右到左时后一页画在左边', (WidgetTester tester) async {
+      await pumpReader(
+        tester,
+        FakeReaderRepository(),
+        book: demoReaderBook(),
+        direction: ReadingDirection.rightToLeft,
+      );
+      await switchMode(tester, ReadingMode.doublePage);
+      // RTL：点左侧才是"下一页"。
+      await tapLeft(tester);
+      expect(find.text('2–3 / 3'), findsOneWidget);
+
+      final page2 = tester.getTopLeft(find.byKey(const Key('reader-image-1')));
+      final page3 = tester.getTopLeft(find.byKey(const Key('reader-image-2')));
+      expect(page3.dx, lessThan(page2.dx), reason: '日漫后一页应在左');
+    });
+
+    testWidgets('宽页（跨页大图）单独占一屏，不和相邻页挤在一起', (WidgetTester tester) async {
+      final repository = FakeReaderRepository(
+        pageSizes: <({int width, int height})>[
+          (width: 800, height: 1200),
+          (width: 1600, height: 1000), // 宽页
+          (width: 800, height: 1200),
+        ],
+      );
+      await pumpReader(tester, repository, book: demoReaderBook());
+      await switchMode(tester, ReadingMode.doublePage);
+
+      await tapRight(tester);
+      expect(find.text('2 / 3'), findsOneWidget);
+      expect(find.byType(Image), findsOneWidget);
+    });
+
+    testWidgets('切模式不丢页码：单页第 2 页 ↔ 双页 2–3', (WidgetTester tester) async {
+      await pumpReader(tester, FakeReaderRepository(), book: demoReaderBook());
+      await tapRight(tester);
+      expect(find.text('2 / 3'), findsOneWidget);
+
+      await switchMode(tester, ReadingMode.doublePage);
+      expect(find.text('2–3 / 3'), findsOneWidget);
+
+      await switchMode(tester, ReadingMode.paged);
+      expect(find.text('2 / 3'), findsOneWidget);
+    });
+
+    testWidgets('最后一屏包含末页时也要标 completed', (WidgetTester tester) async {
+      final repository = FakeReaderRepository();
+      await pumpReader(tester, repository, book: demoReaderBook());
+      await switchMode(tester, ReadingMode.doublePage);
+      await tapRight(tester);
+      expect(find.text('2–3 / 3'), findsOneWidget);
+
+      await tester.pump(const Duration(milliseconds: 700));
+      // 页码停在 2（这一屏的起始页），但已到末尾，completed 必须为真；
+      // 否则系列进度会永远差一页。
+      expect(repository.saved.last, (page: 2, completed: true));
+    });
+  });
+
+  group('纵向连续', () {
+    testWidgets('条漫方向默认进纵向连续', (WidgetTester tester) async {
+      await pumpReader(
+        tester,
+        FakeReaderRepository(),
+        book: demoReaderBook(),
+        direction: ReadingDirection.webtoon,
+      );
+
+      expect(find.byKey(const Key('reader-vertical-list')), findsOneWidget);
+      expect(find.text('1 / 3'), findsOneWidget);
+    });
+
+    testWidgets('滚动后页码跟随，并把进度写回服务端', (WidgetTester tester) async {
+      final repository = FakeReaderRepository();
+      await pumpReader(
+        tester,
+        repository,
+        book: demoReaderBook(),
+        direction: ReadingDirection.vertical,
+      );
+
+      await tester.drag(
+        find.byKey(const Key('reader-vertical-list')),
+        const Offset(0, -300),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('2 / 3'), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 700));
+      expect(repository.saved.last.page, 2);
+    });
+
+    testWidgets('纵向模式不禁用底部按钮（只靠滚动）', (WidgetTester tester) async {
+      await pumpReader(
+        tester,
+        FakeReaderRepository(),
+        book: demoReaderBook(),
+        direction: ReadingDirection.vertical,
+      );
+
+      final prev = tester.widget<IconButton>(
+        find.widgetWithIcon(IconButton, Icons.chevron_left),
+      );
+      expect(prev.onPressed, isNull);
+    });
+  });
+
+  group('墨水屏', () {
+    testWidgets('阅读区改白底黑字（黑底会触发整屏全刷）', (WidgetTester tester) async {
+      await pumpReader(
+        tester,
+        FakeReaderRepository(),
+        book: demoReaderBook(),
+        forceEink: true,
+      );
+
+      final scaffold = tester.widget<Scaffold>(find.byType(Scaffold).first);
+      expect(scaffold.backgroundColor, AppTheme.einkPaper);
+
+      final title = tester.widget<Text>(find.text('Vol. 1'));
+      expect(title.style?.color, AppTheme.einkInk);
+    });
+
+    testWidgets('墨水屏纵向模式同样是白底', (WidgetTester tester) async {
+      await pumpReader(
+        tester,
+        FakeReaderRepository(),
+        book: demoReaderBook(),
+        direction: ReadingDirection.webtoon,
+        forceEink: true,
+      );
+
+      final scaffold = tester.widget<Scaffold>(find.byType(Scaffold).first);
+      expect(scaffold.backgroundColor, AppTheme.einkPaper);
+      expect(find.byKey(const Key('reader-vertical-list')), findsOneWidget);
+    });
   });
 }

@@ -5,7 +5,11 @@ import 'package:go_router/go_router.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/reader_providers.dart';
+import 'package:komga_native/src/providers/settings_provider.dart';
 import 'package:komga_native/src/widgets/reader_chrome.dart';
+import 'package:komga_native/src/widgets/reader_paged_view.dart';
+import 'package:komga_native/src/widgets/reader_palette.dart';
+import 'package:komga_native/src/widgets/reader_vertical_view.dart';
 import 'package:komga_reader_engine/komga_reader_engine.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -23,11 +27,15 @@ class ReaderArgs {
   final ReadingDirection direction;
 }
 
-/// 漫画阅读器（单页模式）。
+/// 漫画阅读器：单页 / 双页跨页 / 纵向连续。
 ///
-/// 这一版做的是"能读"：真实页图、点击翻页、双指缩放/拖动、返回时记住位置、
-/// 进度回写 Komga。双页/纵向连续（webtoon）由 `reader_engine` 的分组函数支撑，
-/// 在下一片接上（见 docs 的 M2 清单）。
+/// 分工：
+/// - 本类只做**编排**——当前页、阅读模式、进度回写、生命周期；
+/// - 绘制在 `ReaderPagedView` / `ReaderVerticalView`；
+/// - 几何在 `komga_reader_engine`（纯函数，单测覆盖）。
+///
+/// 模式默认值跟随系列元数据：条漫/竖向作品直接进纵向连续，其余先单页；
+/// 用户随时可以在顶栏切换，切完页码不丢。
 class ReaderScreen extends ConsumerStatefulWidget {
   const ReaderScreen({
     required this.bookId,
@@ -52,27 +60,17 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   /// 翻页后多久回写进度：连续翻页时只写最后停下的那一页。
   static const Duration _saveDelay = Duration(milliseconds: 600);
 
-  /// 预取前后几页，翻页时不用等网络。
+  /// 预取前后几页，翻页时不用等网络（纵向模式由 ListView 自己预取）。
   static const List<int> _prefetchOffsets = <int>[1, -1, 2];
 
-  /// 指针移动超过这个距离就不算点击（拖拽/缩放）。
-  static const double _tapSlop = 12;
-
-  /// 0 表示"还没翻过页"，此时用服务端进度恢复位置。
-  int _explicitPage = 0;
+  /// 1 基当前页；0 表示"还没翻过页"，此时用服务端进度恢复位置。
+  int _page = 0;
   int _lastSaved = 0;
-  double _zoom = 1;
-  Offset _pan = Offset.zero;
-  Offset _startFocal = Offset.zero;
-  double _startZoom = 1;
-  Offset _startPan = Offset.zero;
   bool _chromeVisible = true;
   Timer? _saveTimer;
 
-  /// 点击判定用自己的指针记账：`onTapUp` 与 `onScaleStart/Update` 在同一个
-  /// gesture arena 里会互相抢，实测 tap 会被 scale 吃掉，翻页完全不响应。
-  int _activePointers = 0;
-  Offset? _downAt;
+  /// null = 还没手动选过，跟随系列方向。
+  ReadingMode? _mode;
 
   @override
   void initState() {
@@ -95,13 +93,19 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     final total =
         ref.read(readerPagesProvider(widget.bookId)).value?.length ?? 0;
     if (total == 0) return;
-    final page = _currentPage(total);
-    unawaited(_persist(page, completed: page >= total));
+    unawaited(_persist(_resolvePage(total), total));
   }
 
-  int _currentPage(int total) {
+  ReadingMode _defaultMode(ReadingDirection direction) =>
+      direction.isScroll ? ReadingMode.verticalScroll : ReadingMode.paged;
+
+  /// 条漫/竖向作品默认纵向连续；双页是用户主动选的（元数据表达不了）。
+  ReadingMode _modeFor(ReadingDirection direction) =>
+      _mode ?? _defaultMode(direction);
+
+  int _resolvePage(int total) {
     if (total <= 0) return 1;
-    if (_explicitPage > 0) return _explicitPage.clamp(1, total);
+    if (_page > 0) return _page.clamp(1, total);
     final resumed =
         (widget.book ?? ref.read(readerBookProvider(widget.bookId)).value)
             ?.readProgress
@@ -110,22 +114,40 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     return resumed.clamp(1, total);
   }
 
-  Future<void> _persist(int page, {required bool completed}) async {
+  Future<void> _persist(int page, int total) async {
     if (page == _lastSaved) return;
     try {
       await ref
           .read(readerRepositoryProvider)
-          .saveProgress(widget.bookId, page: page, completed: completed);
+          .saveProgress(
+            widget.bookId,
+            page: page,
+            completed: _isCompleted(page: page, total: total),
+          );
       _lastSaved = page;
     } on ShelfFailure {
       // 进度回写失败不打断阅读：下次翻页会再试，切后台时也会再 flush 一次。
     }
   }
 
-  void _scheduleSave(int page, {required bool completed}) {
+  /// 是否已经读到结尾。
+  ///
+  /// 双页模式下"最后一屏"可能包含倒数两页，此时 `page` 到不了 `total`，
+  /// 只看页码会漏掉 `completed`，进度条永远差一页。
+  bool _isCompleted({required int page, required int total}) {
+    if (page >= total) return true;
+    if (_modeFor(widget.direction) != ReadingMode.doublePage) return false;
+    final pages = ref.read(readerPagesProvider(widget.bookId)).value;
+    if (pages == null || pages.isEmpty) return false;
+    final spreads = _spreadsFor(pages, ReadingMode.doublePage);
+    final index = spreadIndexOf(spreads, page - 1);
+    return index >= 0 && spreads[index].contains(pages.length - 1);
+  }
+
+  void _scheduleSave(int page, int total) {
     _saveTimer?.cancel();
     _saveTimer = Timer(_saveDelay, () {
-      unawaited(_persist(page, completed: completed));
+      unawaited(_persist(page, total));
     });
   }
 
@@ -147,50 +169,60 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     }
   }
 
-  void _turn({required int delta, required int current, required int total}) {
-    final target = (current + delta).clamp(1, total);
-    if (target == current) return;
-    setState(() {
-      _explicitPage = target;
-      _zoom = 1;
-      _pan = Offset.zero;
-    });
-    _prefetch(target, total);
-    _scheduleSave(target, completed: target >= total);
+  void _setPage(int page, int total, {bool prefetch = true}) {
+    if (page == _page) return;
+    setState(() => _page = page);
+    if (prefetch) _prefetch(page, total);
+    _scheduleSave(page, total);
   }
 
-  void _onTap(double dx, double width, int current, int total) {
-    final fraction = width <= 0 ? 0.5 : dx / width;
-    final rightToLeft = widget.direction == ReadingDirection.rightToLeft;
-    if (fraction < 0.33) {
-      // 左侧三分之一：LTR 往回翻，RTL 往前翻（日漫）。
-      _turn(delta: rightToLeft ? 1 : -1, current: current, total: total);
-    } else if (fraction > 0.67) {
-      _turn(delta: rightToLeft ? -1 : 1, current: current, total: total);
-    } else {
-      setState(() => _chromeVisible = !_chromeVisible);
+  /// 双页模式下翻页的粒度是"一跨页"，单页是"一页"。
+  void _turn(
+    int delta,
+    int total,
+    ReadingMode mode,
+    int spreadIndex,
+    List<List<int>> spreads,
+  ) {
+    if (mode == ReadingMode.verticalScroll) return;
+    if (mode == ReadingMode.doublePage && spreads.isNotEmpty) {
+      final next = (spreadIndex + delta).clamp(0, spreads.length - 1);
+      if (next == spreadIndex) return;
+      _setPage(spreads[next].first + 1, total);
+      return;
     }
+    final current = _resolvePage(total);
+    _setPage((current + delta).clamp(1, total), total);
   }
 
-  void _onScaleStart(ScaleStartDetails details) {
-    _startZoom = _zoom;
-    _startPan = _pan;
-    _startFocal = details.localFocalPoint;
+  List<List<int>> _spreadsFor(List<PageInfo> pages, ReadingMode mode) {
+    if (mode != ReadingMode.doublePage) {
+      return const <List<int>>[];
+    }
+    return buildSpreads(
+      pageCount: pages.length,
+      aspectAt: (int index) {
+        final info = pages[index];
+        return PageAspect(
+          width: info.width?.toDouble(),
+          height: info.height?.toDouble(),
+        );
+      },
+    );
   }
 
-  void _onScaleUpdate(ScaleUpdateDetails details) {
-    final nextZoom = (_startZoom * details.scale).clamp(1.0, 4.0);
-    setState(() {
-      _zoom = nextZoom;
-      // 缩放后单指拖动就是平移；缩回 1 时自动归位。
-      _pan = nextZoom <= 1.0
-          ? Offset.zero
-          : _startPan + (details.localFocalPoint - _startFocal);
-    });
+  String _pageLabel(ReadingMode mode, int page, int total, List<int> spread) {
+    if (mode == ReadingMode.doublePage && spread.length > 1) {
+      return '${spread.first + 1}–${spread.last + 1} / $total';
+    }
+    return '$page / $total';
   }
 
   @override
   Widget build(BuildContext context) {
+    final palette = ReaderPalette.of(
+      isEink: ref.watch(settingsProvider).forceEink,
+    );
     final bookAsync = ref.watch(readerBookProvider(widget.bookId));
     final book = widget.book ?? bookAsync.value;
     final pagesAsync = ref.watch(readerPagesProvider(widget.bookId));
@@ -200,132 +232,94 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     if (pagesError != null) {
       return ReaderFailure(
         failure: pagesError,
+        palette: palette,
         onRetry: () => ref.invalidate(readerPagesProvider(widget.bookId)),
       );
     }
     if (pages == null) {
-      return const Scaffold(
-        backgroundColor: Colors.black,
-        body: Center(child: CircularProgressIndicator(color: Colors.white70)),
+      return Scaffold(
+        backgroundColor: palette.background,
+        body: Center(child: CircularProgressIndicator(color: palette.muted)),
       );
     }
     if (pages.isEmpty) {
       return ReaderFailure(
         failure: const ProtocolFailure(),
+        palette: palette,
         title: 'This book has no pages',
         onRetry: () => ref.invalidate(readerPagesProvider(widget.bookId)),
       );
     }
 
     final total = pages.length;
-    final current = _currentPage(total);
-    final info = pages[current - 1];
-    final imageAsync = ref.watch(
-      readerPageImageProvider((bookId: widget.bookId, page: current)),
-    );
-    final bytes = imageAsync.value;
-    final imageError = imageAsync.error;
+    final mode = _modeFor(widget.direction);
+    final page = _resolvePage(total);
+    final spreads = _spreadsFor(pages, mode);
+    final spreadIndex = spreads.isEmpty ? -1 : spreadIndexOf(spreads, page - 1);
+    final spread = spreads.isEmpty
+        ? <int>[page - 1]
+        : spreads[spreadIndex < 0 ? 0 : spreadIndex];
+    final rightToLeft = widget.direction.isRightToLeft;
+    final canGoBack = switch (mode) {
+      ReadingMode.paged => page > 1,
+      ReadingMode.doublePage => spreadIndex > 0,
+      ReadingMode.verticalScroll => false,
+    };
+    final canGoForward = switch (mode) {
+      ReadingMode.paged => page < total,
+      ReadingMode.doublePage =>
+        spreadIndex >= 0 && spreadIndex < spreads.length - 1,
+      ReadingMode.verticalScroll => false,
+    };
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: palette.background,
       body: SafeArea(
         child: Column(
           children: <Widget>[
             if (_chromeVisible)
               ReaderBar(
                 title: book?.name ?? 'Book',
-                page: current,
-                pagesCount: total,
+                pageLabel: _pageLabel(mode, page, total, spread),
+                palette: palette,
+                mode: mode,
+                onModeChanged: (ReadingMode next) =>
+                    setState(() => _mode = next),
                 onClose: () => context.pop(),
               ),
             Expanded(
-              child: LayoutBuilder(
-                builder: (BuildContext context, BoxConstraints constraints) {
-                  final layout = computePagedLayout(
-                    pageWidth: info.width ?? 1000,
-                    pageHeight: info.height ?? 1500,
-                    viewport: SizeD(
-                      constraints.maxWidth,
-                      constraints.maxHeight,
-                    ),
-                    zoomFactor: _zoom,
-                    panX: _pan.dx,
-                    panY: _pan.dy,
-                  );
-                  return Listener(
-                    key: const Key('reader-tap-layer'),
-                    onPointerDown: (PointerDownEvent event) {
-                      _activePointers++;
-                      _downAt = _activePointers == 1
-                          ? event.localPosition
-                          : null;
-                    },
-                    onPointerUp: (PointerUpEvent event) {
-                      if (_activePointers > 0) _activePointers--;
-                      final down = _downAt;
-                      _downAt = null;
-                      if (down == null || _activePointers > 0) return;
-                      // 移动超过阈值视为拖拽/缩放，不当作翻页点击。
-                      if ((event.localPosition - down).distance > _tapSlop) {
-                        return;
-                      }
-                      _onTap(down.dx, constraints.maxWidth, current, total);
-                    },
-                    onPointerCancel: (PointerCancelEvent event) {
-                      _activePointers = 0;
-                      _downAt = null;
-                    },
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onScaleStart: _onScaleStart,
-                      onScaleUpdate: _onScaleUpdate,
-                      child: Stack(
-                        children: <Widget>[
-                          if (bytes != null)
-                            Positioned(
-                              left: layout.content.left,
-                              top: layout.content.top,
-                              width: layout.content.width,
-                              height: layout.content.height,
-                              child: Image.memory(
-                                bytes,
-                                fit: BoxFit.contain,
-                                gaplessPlayback: true,
-                                filterQuality: FilterQuality.medium,
-                              ),
-                            )
-                          else
-                            Center(
-                              child: imageError == null
-                                  ? const CircularProgressIndicator(
-                                      color: Colors.white70,
-                                    )
-                                  : PageError(
-                                      error: imageError,
-                                      onRetry: () => ref.invalidate(
-                                        readerPageImageProvider((
-                                          bookId: widget.bookId,
-                                          page: current,
-                                        )),
-                                      ),
-                                    ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
+              child: switch (mode) {
+                ReadingMode.verticalScroll => ReaderVerticalView(
+                  bookId: widget.bookId,
+                  pages: pages,
+                  initialPage: page,
+                  palette: palette,
+                  onPageChanged: (int p) => _setPage(p, total, prefetch: false),
+                  onToggleChrome: () =>
+                      setState(() => _chromeVisible = !_chromeVisible),
+                ),
+                _ => ReaderPagedView(
+                  bookId: widget.bookId,
+                  pages: pages,
+                  spread: spread,
+                  rightToLeft: rightToLeft,
+                  palette: palette,
+                  onTurn: (int delta) =>
+                      _turn(delta, total, mode, spreadIndex, spreads),
+                  onToggleChrome: () =>
+                      setState(() => _chromeVisible = !_chromeVisible),
+                ),
+              },
             ),
             if (_chromeVisible)
               ReaderControls(
-                page: current,
                 pagesCount: total,
-                onPrevious: current > 1
-                    ? () => _turn(delta: -1, current: current, total: total)
+                palette: palette,
+                onPrevious: canGoBack
+                    ? () => _turn(-1, total, mode, spreadIndex, spreads)
                     : null,
-                onNext: current < total
-                    ? () => _turn(delta: 1, current: current, total: total)
+                onNext: canGoForward
+                    ? () => _turn(1, total, mode, spreadIndex, spreads)
                     : null,
               ),
           ],

@@ -7,3 +7,4 @@ library;
 export 'src/geometry.dart';
 export 'src/layout.dart';
 export 'src/spreads.dart';
+export 'src/vertical.dart';

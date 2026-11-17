@@ -1,7 +1,17 @@
 import 'package:komga_api/komga_api.dart';
 import 'package:komga_domain/komga_domain.dart';
+import 'package:komga_native/src/providers/settings_provider.dart';
 import 'package:komga_native/src/session/connection_service.dart';
 import 'package:komga_native/src/session/server_store.dart';
+
+/// 墨水屏档位的设置（默认设置是普通设备）。
+///
+/// 阅读器配色与全局主题**都**由 `settings.forceEink` 决定，
+/// 黄金图/组件测试要同时换主题和这个设置，否则两边会不一致（踩过）。
+class EinkSettings extends SettingsController {
+  @override
+  SettingsState build() => const SettingsState(forceEink: true);
+}
 
 /// 可控的假连接服务：按需成功/抛出指定错误。
 class FakeConnectionService implements ConnectionService {
