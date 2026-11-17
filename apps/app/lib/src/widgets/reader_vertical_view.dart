@@ -17,6 +17,8 @@ class ReaderVerticalView extends StatefulWidget {
     required this.palette,
     required this.onPageChanged,
     required this.onToggleChrome,
+    this.jumpToken = 0,
+    this.jumpPage = 1,
     super.key,
   });
 
@@ -32,6 +34,13 @@ class ReaderVerticalView extends StatefulWidget {
   final ValueChanged<int> onPageChanged;
 
   final VoidCallback onToggleChrome;
+
+  /// 外部"跳页"请求：token 变化时滚到 [jumpPage]。
+  ///
+  /// 不能拿 `initialPage` 兼做这个：滚动本身也会改页码，
+  /// 那样会变成"滚动 → 通知 → 再跳回去"的死循环。
+  final int jumpToken;
+  final int jumpPage;
 
   @override
   State<ReaderVerticalView> createState() => _ReaderVerticalViewState();
@@ -77,14 +86,27 @@ class _ReaderVerticalViewState extends State<ReaderVerticalView> {
     final layout = _layout;
     if (_jumped || layout == null || layout.isEmpty) return;
     _jumped = true;
-    final offset = scrollOffsetForPage(layout, widget.initialPage - 1);
-    if (offset <= 0) return;
+    _jumpTo(widget.initialPage);
+  }
+
+  void _jumpTo(int page) {
+    final layout = _layout;
+    if (layout == null || layout.isEmpty) return;
+    final offset = scrollOffsetForPage(layout, page - 1);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_controller.hasClients) return;
       _controller.jumpTo(
         offset.clamp(0.0, _controller.position.maxScrollExtent),
       );
     });
+  }
+
+  @override
+  void didUpdateWidget(ReaderVerticalView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.jumpToken != oldWidget.jumpToken) {
+      _jumpTo(widget.jumpPage);
+    }
   }
 
   @override

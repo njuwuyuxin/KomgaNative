@@ -3,6 +3,17 @@ import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/providers/settings_provider.dart';
 import 'package:komga_native/src/session/connection_service.dart';
 import 'package:komga_native/src/session/server_store.dart';
+import 'package:komga_platform/komga_platform.dart';
+
+/// 记录常亮开关的调用序列，用来断言"进阅读器置真、退出置假"。
+class FakeWakeLock implements WakeLock {
+  final List<bool> calls = <bool>[];
+
+  bool get enabled => calls.isNotEmpty && calls.last;
+
+  @override
+  Future<void> setEnabled(bool value) async => calls.add(value);
+}
 
 /// 墨水屏档位的设置（默认设置是普通设备）。
 ///

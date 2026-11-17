@@ -9,7 +9,8 @@ Komga 的跨平台客户端（iOS / Android / Android 墨水屏），阅读体�
 > **真实书架**（`/api/v1/series` 分页 + 搜索 + 按库筛选 + 封面 + 下拉刷新 + 空/错态）、
 > **系列详情**（`/api/v1/series/{id}` + 书列表 + 点书进阅读器）、
 > **阅读器 v2**（单页 / 双页跨页 / 纵向连续三种模式，按系列方向自动选默认值；
-> 真实页图、点击翻页、双指缩放、从上次位置继续、进度回写 Komga；墨水屏白底黑字）。
+> 真实页图、点击翻页、双指缩放、从上次位置继续、进度回写 Komga；墨水屏白底黑字；
+> 阅读设置面板：模式/亮度/常亮/跳页，偏好持久化）。
 > 已在 **Android 模拟器 + 本机 Komga 实例**上跑通"连接 → 书架 → 系列 → 阅读 → 进度"全链路，
 > 并在**一台公网 NAS（openresty 反代 + 证书已过期）**上验证了真实登录路径。
 > 待完成：阅读设置持久化（亮度/常亮/快速跳页）、进度 outbox 与多设备对账、Drift 离线缓存、i18n 与中文字体。
@@ -23,6 +24,7 @@ Komga 的跨平台客户端（iOS / Android / Android 墨水屏），阅读体�
 | [docs/ci.md](docs/ci.md) | GitHub Actions：概念、免费额度与计费倍率、三条流水线、排障 |
 | [docs/komga-api-verification.md](docs/komga-api-verification.md) | Komga API 实测记录：复现步骤、证据表、发现的缺陷、仍未验证项 |
 | [docs/tls-and-proxy.md](docs/tls-and-proxy.md) | 反代与证书：真实现象（明文 400 / 证书过期）、客户端行为矩阵、复现方式 |
+| [docs/reader.md](docs/reader.md) | 阅读器：三层分工、模式规则、设置与持久化的取舍、常亮通道的实现边界 |
 | [docs/adr/0001-certificate-trust.md](docs/adr/0001-certificate-trust.md) | ADR：为什么用 TOFU + 固定指纹，而不是"忽略证书" |
 | [AGENTS.md](AGENTS.md) | Agent 工作契约：命令、架构不变量、DoD、反模式 |
 
@@ -72,9 +74,9 @@ dart run tool/ci.dart check    # format + analyze + layers + 全部测试
 dart run tool/ci.dart golden   # 重新生成黄金图（仅 Windows，与 CI 一致）
 ```
 
-当前基线：**256 个测试**（纯 Dart 139 / Flutter 117），**21 张黄金图**覆盖
+当前基线：**281 个测试**（纯 Dart 139 / Flutter 142），**23 张黄金图**覆盖
 书架（手机 light / 平板 dark / 1.3 倍字号 / 墨水屏 / 空态 / 错误态）、系列详情（手机 / 平板 / 墨水屏）、
-阅读器（单页 dark+eink、双页 dark+eink、纵向 dark）、墨水屏设置、连接页（light / eink）、
+阅读器（单页 dark+eink、双页 dark+eink、纵向 dark、设置面板 dark+eink）、墨水屏设置、连接页（light / eink）、
 证书面板（手机 / 平板 / 墨水屏）、启动页。
 
 其中 `packages/komga_api` 的 80 个测试里包含**两层真值校验**：
@@ -128,6 +130,20 @@ dart run tool/ci.dart golden   # 重新生成黄金图（仅 Windows，与 CI �
 - **墨水屏**：阅读区改白底黑字（黑底会触发整屏全刷），顶栏/底栏/错误页同一套配色；
 - 页列表失败 → 整页错误 + 重试；单页失败 → 页内提示 + 重试，**页码与翻页仍可用**。
 
+### 阅读设置
+
+顶栏右侧按钮打开面板，四项设置都即时生效：
+
+| 设置 | 说明 |
+|---|---|
+| 阅读模式 | 跟随书 / 单页 / 双页 / 纵向；**持久化**，下次打开新书沿用 |
+| 亮度 | 阅读区盖一层黑遮罩（下限 20%，不会全黑），不吃点击，翻页照常 |
+| 常亮 | 进阅读器置真、退出置假（Android `FLAG_KEEP_SCREEN_ON`，见 [docs/reader.md](docs/reader.md)） |
+| 跳页 | 拖到目标页松手才跳；纵向模式滚到对应偏移 |
+
+偏好存在 secure storage（`komganative.reader.v1`），不是 Drift：几个字段不需要查询能力，
+Drift 留给书架/页图缓存与进度 outbox。坏存档一律回默认值。
+
 ## 连接到你的 Komga（NAS）
 
 1. 地址填 `http://<NAS 局域网 IP>:<端口>`，例如 `http://192.168.1.10:25600`（也支持 `https://` 与反代子路径 `https://host/komga`）；
@@ -145,6 +161,10 @@ dart run tool/ci.dart golden   # 重新生成黄金图（仅 Windows，与 CI �
 排障：连不上先确认手机与 NAS 同一网段、端口没被防火墙挡、`http://` 与端口写全；
 若地址被反代改写成网页，会提示"响应无法识别"；若提示"证书不受信任"，先核对面板里的指纹
 （`sha256sum` 或浏览器里能看到同一张证书），确认是自己服务器再点继续。
+**装的是 release APK 时**，还要确认它带 `INTERNET` 权限（`aapt2 dump permissions app-release.apk`）：
+漏了这条权限，系统会拒绝所有 socket，界面只有"无法连接到 xxx"，而同一台手机的浏览器却能打开——
+debug 包（模拟器 / `flutter run`）自带这条权限，所以这个坑只在真机 release 包上暴露。
+权限声明在 `apps/app/android/app/src/main/AndroidManifest.xml`，由 `test/platform/android_manifest_test.dart` 钉住。
 
 ## 模拟器实测记录（2026-11-17）
 
@@ -161,15 +181,20 @@ dart run tool/ci.dart golden   # 重新生成黄金图（仅 Windows，与 CI �
 | 返回后刷新进度 | ⚠️ 初次实测**不刷新**（仍显示 `0 of 2`），已修复并复测通过（返回后 `2 of 2`、徽标 `2/2`） |
 | 返回书架不跳回顶部 | ⚠️ 第一版修复把列表重置导致跳顶，改为 `refreshInPlace` 后复测通过 |
 | 真实 NAS（openresty 反代，证书 2026-07-19 过期） | ✅ 首次 `http://…:4433` 被反代回 400 → 自动升级 `https` → 弹出证书面板 → `Connect anyway` 后登录成功（见 [docs/tls-and-proxy.md](docs/tls-and-proxy.md)） |
+| 同一台 NAS 续期证书后 | ✅ 无 `-k` 的严格校验通过（`ssl_verify=0`、返回 401 而非握手失败），不再弹面板——指纹固定只在"证书变了"时才拦 |
 | 双页跨页（RTL 系列，3 页真实书） | ✅ 顶栏 `2–3 / 3`；P3 在左、P2 在右（日漫右起） |
 | 双页读完写回 | ✅ 服务端 `"page":3,"completed":true`（最后一屏含末页也标完成） |
 | 纵向连续 + 滚动跟随页码 | ✅ 滚动后 `2 / 3 → 3 / 3`，并按页写回进度 |
 | 墨水屏阅读器 | ✅ 白底黑字（顶栏/底栏/页码同套配色），不再黑底全刷 |
+| 阅读设置：亮度 | ✅ 拖到 20% 后整页变暗；**杀进程重启后仍是 20%**（存档生效） |
+| 阅读设置：常亮 | ✅ 打开后 `dumpsys window` 出现 `fl=KEEP_SCREEN_ON`，关掉即消失 |
 
 ## 已知边界
 
-- **阅读模式不持久化**：关掉阅读器再打开会回到"按系列方向的默认模式"，
-  用户手动选的模式只在本次阅读内有效；等阅读设置面板（亮度/常亮/跳页）一起做持久化；
+- **常亮只在 Android 生效**：iOS 侧通道没实现（`MissingPluginException` 静默降级为"不常亮"），
+  没有 macOS 环境验证，宁可留空也不写没跑过的 `AppDelegate`；
+- **亮度是应用内遮罩**，不改系统亮度（那需要新插件），夜里够用但不是系统级调光；
+- **阅读偏好是全局的**，不按书记忆（系列的条漫/竖向已由元数据兜住，双页是个人习惯）；
 - **进度回写是直接 PATCH**：`sync_engine` 的 outbox/多设备对账要等 Drift 落地后接入（断网时进度会丢）；
 - UI 文案暂为英文：i18n（ARB + 中文字体）之后一次性替换，避免现在把 CJK 字体塞进黄金图。
 - 证书信任是**按叶证书指纹固定**：服务器续期后需要再确认一次（有意为之，不是 bug）；

@@ -3,13 +3,17 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:komga_domain/komga_domain.dart';
+import 'package:komga_native/src/data/reader_prefs.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
+import 'package:komga_native/src/providers/reader_prefs_provider.dart';
 import 'package:komga_native/src/providers/reader_providers.dart';
 import 'package:komga_native/src/providers/settings_provider.dart';
 import 'package:komga_native/src/widgets/reader_chrome.dart';
 import 'package:komga_native/src/widgets/reader_paged_view.dart';
 import 'package:komga_native/src/widgets/reader_palette.dart';
+import 'package:komga_native/src/widgets/reader_settings_sheet.dart';
 import 'package:komga_native/src/widgets/reader_vertical_view.dart';
+import 'package:komga_platform/komga_platform.dart';
 import 'package:komga_reader_engine/komga_reader_engine.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -30,12 +34,10 @@ class ReaderArgs {
 /// 漫画阅读器：单页 / 双页跨页 / 纵向连续。
 ///
 /// 分工：
-/// - 本类只做**编排**——当前页、阅读模式、进度回写、生命周期；
+/// - 本类只做**编排**——当前页、模式解析、进度回写、生命周期；
 /// - 绘制在 `ReaderPagedView` / `ReaderVerticalView`；
+/// - 设置面板在 `ReaderSettingsSheet`（模式/亮度/常亮/跳页，落盘到 `ReaderPrefsStore`）；
 /// - 几何在 `komga_reader_engine`（纯函数，单测覆盖）。
-///
-/// 模式默认值跟随系列元数据：条漫/竖向作品直接进纵向连续，其余先单页；
-/// 用户随时可以在顶栏切换，切完页码不丢。
 class ReaderScreen extends ConsumerStatefulWidget {
   const ReaderScreen({
     required this.bookId,
@@ -69,8 +71,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   bool _chromeVisible = true;
   Timer? _saveTimer;
 
-  /// null = 还没手动选过，跟随系列方向。
-  ReadingMode? _mode;
+  /// 设置面板里的"跳页"：纵向模式靠 token 变化触发滚动跳转。
+  int _jumpToken = 0;
+  int _jumpPage = 1;
 
   @override
   void initState() {
@@ -96,12 +99,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     unawaited(_persist(_resolvePage(total), total));
   }
 
-  ReadingMode _defaultMode(ReadingDirection direction) =>
-      direction.isScroll ? ReadingMode.verticalScroll : ReadingMode.paged;
-
-  /// 条漫/竖向作品默认纵向连续；双页是用户主动选的（元数据表达不了）。
-  ReadingMode _modeFor(ReadingDirection direction) =>
-      _mode ?? _defaultMode(direction);
+  ReadingMode _modeFor(ReaderPrefs prefs) =>
+      prefs.mode.resolve(widget.direction);
 
   int _resolvePage(int total) {
     if (total <= 0) return 1;
@@ -136,7 +135,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   /// 只看页码会漏掉 `completed`，进度条永远差一页。
   bool _isCompleted({required int page, required int total}) {
     if (page >= total) return true;
-    if (_modeFor(widget.direction) != ReadingMode.doublePage) return false;
+    final mode = _modeFor(ref.read(readerPrefsProvider));
+    if (mode != ReadingMode.doublePage) return false;
     final pages = ref.read(readerPagesProvider(widget.bookId)).value;
     if (pages == null || pages.isEmpty) return false;
     final spreads = _spreadsFor(pages, ReadingMode.doublePage);
@@ -174,6 +174,18 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     setState(() => _page = page);
     if (prefetch) _prefetch(page, total);
     _scheduleSave(page, total);
+  }
+
+  /// 设置面板里跳到某页：单页/双页直接换页，纵向模式额外发一次滚动跳转。
+  void _jumpToPage(int page, int total) {
+    final target = page.clamp(1, total);
+    setState(() {
+      _page = target;
+      _jumpPage = target;
+      _jumpToken++;
+    });
+    _prefetch(target, total);
+    _scheduleSave(target, total);
   }
 
   /// 双页模式下翻页的粒度是"一跨页"，单页是"一页"。
@@ -218,11 +230,26 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     return '$page / $total';
   }
 
+  Future<void> _openSettings({
+    required ReaderPalette palette,
+    required int page,
+    required int total,
+  }) {
+    return showReaderSettingsSheet(
+      context,
+      palette: palette,
+      page: page,
+      total: total,
+      onJump: (int target) => _jumpToPage(target, total),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = ReaderPalette.of(
       isEink: ref.watch(settingsProvider).forceEink,
     );
+    final prefs = ref.watch(readerPrefsProvider);
     final bookAsync = ref.watch(readerBookProvider(widget.bookId));
     final book = widget.book ?? bookAsync.value;
     final pagesAsync = ref.watch(readerPagesProvider(widget.bookId));
@@ -252,7 +279,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     }
 
     final total = pages.length;
-    final mode = _modeFor(widget.direction);
+    final mode = _modeFor(prefs);
     final page = _resolvePage(total);
     final spreads = _spreadsFor(pages, mode);
     final spreadIndex = spreads.isEmpty ? -1 : spreadIndexOf(spreads, page - 1);
@@ -272,59 +299,125 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       ReadingMode.verticalScroll => false,
     };
 
-    return Scaffold(
-      backgroundColor: palette.background,
-      body: SafeArea(
-        child: Column(
+    return WakeLockScope(
+      enabled: prefs.keepAwake,
+      child: Scaffold(
+        backgroundColor: palette.background,
+        body: Stack(
           children: <Widget>[
-            if (_chromeVisible)
-              ReaderBar(
-                title: book?.name ?? 'Book',
-                pageLabel: _pageLabel(mode, page, total, spread),
-                palette: palette,
-                mode: mode,
-                onModeChanged: (ReadingMode next) =>
-                    setState(() => _mode = next),
-                onClose: () => context.pop(),
+            SafeArea(
+              child: Column(
+                children: <Widget>[
+                  if (_chromeVisible)
+                    ReaderBar(
+                      title: book?.name ?? 'Book',
+                      pageLabel: _pageLabel(mode, page, total, spread),
+                      palette: palette,
+                      mode: mode,
+                      onOpenSettings: () => _openSettings(
+                        palette: palette,
+                        page: page,
+                        total: total,
+                      ),
+                      onClose: () => context.pop(),
+                    ),
+                  Expanded(
+                    child: switch (mode) {
+                      ReadingMode.verticalScroll => ReaderVerticalView(
+                        bookId: widget.bookId,
+                        pages: pages,
+                        initialPage: page,
+                        jumpToken: _jumpToken,
+                        jumpPage: _jumpPage,
+                        palette: palette,
+                        onPageChanged: (int p) =>
+                            _setPage(p, total, prefetch: false),
+                        onToggleChrome: () =>
+                            setState(() => _chromeVisible = !_chromeVisible),
+                      ),
+                      _ => ReaderPagedView(
+                        bookId: widget.bookId,
+                        pages: pages,
+                        spread: spread,
+                        rightToLeft: rightToLeft,
+                        palette: palette,
+                        onTurn: (int delta) =>
+                            _turn(delta, total, mode, spreadIndex, spreads),
+                        onToggleChrome: () =>
+                            setState(() => _chromeVisible = !_chromeVisible),
+                      ),
+                    },
+                  ),
+                  if (_chromeVisible)
+                    ReaderControls(
+                      pagesCount: total,
+                      palette: palette,
+                      onPrevious: canGoBack
+                          ? () => _turn(-1, total, mode, spreadIndex, spreads)
+                          : null,
+                      onNext: canGoForward
+                          ? () => _turn(1, total, mode, spreadIndex, spreads)
+                          : null,
+                    ),
+                ],
               ),
-            Expanded(
-              child: switch (mode) {
-                ReadingMode.verticalScroll => ReaderVerticalView(
-                  bookId: widget.bookId,
-                  pages: pages,
-                  initialPage: page,
-                  palette: palette,
-                  onPageChanged: (int p) => _setPage(p, total, prefetch: false),
-                  onToggleChrome: () =>
-                      setState(() => _chromeVisible = !_chromeVisible),
-                ),
-                _ => ReaderPagedView(
-                  bookId: widget.bookId,
-                  pages: pages,
-                  spread: spread,
-                  rightToLeft: rightToLeft,
-                  palette: palette,
-                  onTurn: (int delta) =>
-                      _turn(delta, total, mode, spreadIndex, spreads),
-                  onToggleChrome: () =>
-                      setState(() => _chromeVisible = !_chromeVisible),
-                ),
-              },
             ),
-            if (_chromeVisible)
-              ReaderControls(
-                pagesCount: total,
-                palette: palette,
-                onPrevious: canGoBack
-                    ? () => _turn(-1, total, mode, spreadIndex, spreads)
-                    : null,
-                onNext: canGoForward
-                    ? () => _turn(1, total, mode, spreadIndex, spreads)
-                    : null,
+            // 亮度遮罩：盖住整块阅读区（含 chrome），但不吃点击——
+            // 调暗是为了少看光线，不是为了挡住操作。
+            if (prefs.dimOpacity > 0)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: ColoredBox(
+                    key: const Key('reader-dimmer'),
+                    color: Colors.black.withValues(alpha: prefs.dimOpacity),
+                  ),
+                ),
               ),
           ],
         ),
       ),
     );
   }
+}
+
+/// 把"屏幕常亮"和阅读器的生命周期绑在一起：进来置真、退出置假。
+///
+/// 单独成 widget 而不是在 State 里手写，是为了"进入/退出/切换"三个时机
+/// 都由同一个地方负责，测试里替换 [wakeLockProvider] 就能断言。
+class WakeLockScope extends ConsumerStatefulWidget {
+  const WakeLockScope({required this.enabled, required this.child, super.key});
+
+  final bool enabled;
+  final Widget child;
+
+  @override
+  ConsumerState<WakeLockScope> createState() => _WakeLockScopeState();
+}
+
+class _WakeLockScopeState extends ConsumerState<WakeLockScope> {
+  late final WakeLock _wakeLock = ref.read(wakeLockProvider);
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_wakeLock.setEnabled(widget.enabled));
+  }
+
+  @override
+  void didUpdateWidget(WakeLockScope oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.enabled != widget.enabled) {
+      unawaited(_wakeLock.setEnabled(widget.enabled));
+    }
+  }
+
+  @override
+  void dispose() {
+    // 离开阅读器一定放开：否则用户切到书架后屏幕永远不睡。
+    unawaited(_wakeLock.setEnabled(false));
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

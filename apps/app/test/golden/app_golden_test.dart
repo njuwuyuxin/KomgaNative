@@ -5,8 +5,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
+import 'package:komga_native/src/data/reader_prefs.dart';
+import 'package:komga_native/src/data/reader_prefs_store.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
+import 'package:komga_native/src/providers/reader_prefs_provider.dart';
 import 'package:komga_native/src/providers/reader_providers.dart';
 import 'package:komga_native/src/providers/settings_provider.dart';
 import 'package:komga_native/src/screens/connection_screen.dart';
@@ -232,6 +235,9 @@ void main() {
       theme: theme,
       overrides: <Override>[
         readerRepositoryProvider.overrideWithValue(repository),
+        // 设置面板会写偏好：黄金图里必须换成内存实现，否则会打真钥匙串通道。
+        readerPrefsStoreProvider.overrideWithValue(InMemoryReaderPrefsStore()),
+        wakeLockProvider.overrideWithValue(FakeWakeLock()),
         // 阅读器配色跟着 settings.forceEink 走，与 AppTheme 必须成对换；
         // 只换主题的话基线会画成黑底（踩过一次）。
         if (forceEink) settingsProvider.overrideWith(EinkSettings.new),
@@ -242,11 +248,18 @@ void main() {
     await expectGolden(tester, name);
   }
 
-  /// 顶栏 → 阅读模式菜单 → 选中某项。
+  /// 顶栏按钮 → 设置面板 → 选中某项 → 关掉面板。
   Future<void> pickMode(WidgetTester tester, ReadingMode mode) async {
-    await tester.tap(find.byKey(const Key('reader-mode-button')));
+    final choice = switch (mode) {
+      ReadingMode.paged => ReaderModeChoice.single,
+      ReadingMode.doublePage => ReaderModeChoice.double,
+      ReadingMode.verticalScroll => ReaderModeChoice.vertical,
+    };
+    await tester.tap(find.byKey(const Key('reader-settings-button')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(Key('reader-mode-${mode.name}')));
+    await tester.tap(find.byKey(Key('reader-mode-${choice.name}')));
+    await tester.pumpAndSettle();
+    await tester.tapAt(const Offset(4, 4));
     await tester.pumpAndSettle();
   }
 
@@ -308,6 +321,31 @@ void main() {
       theme: AppTheme.dark(),
       precachePages: <int>[1, 2],
       act: (WidgetTester t) => pickMode(t, ReadingMode.verticalScroll),
+    );
+  });
+
+  testWidgets('reader_settings@phone_dark', (WidgetTester tester) async {
+    await pumpReaderGolden(
+      tester,
+      name: 'reader_settings@phone_dark',
+      size: GoldenSizes.phone,
+      theme: AppTheme.dark(),
+      act: (WidgetTester t) async {
+        await t.tap(find.byKey(const Key('reader-settings-button')));
+      },
+    );
+  });
+
+  testWidgets('reader_settings@eink', (WidgetTester tester) async {
+    await pumpReaderGolden(
+      tester,
+      name: 'reader_settings@eink',
+      size: GoldenSizes.eink,
+      theme: AppTheme.eink(),
+      forceEink: true,
+      act: (WidgetTester t) async {
+        await t.tap(find.byKey(const Key('reader-settings-button')));
+      },
     );
   });
 

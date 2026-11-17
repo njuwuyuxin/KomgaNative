@@ -100,7 +100,7 @@ class PageError extends StatelessWidget {
   }
 }
 
-/// 顶部：返回 + 书名 + 页码 + 阅读模式。
+/// 顶部：返回 + 书名 + 页码 + 阅读设置。
 class ReaderBar extends StatelessWidget {
   const ReaderBar({
     required this.title,
@@ -108,7 +108,7 @@ class ReaderBar extends StatelessWidget {
     required this.onClose,
     required this.palette,
     required this.mode,
-    required this.onModeChanged,
+    required this.onOpenSettings,
     super.key,
   });
 
@@ -119,8 +119,10 @@ class ReaderBar extends StatelessWidget {
 
   final VoidCallback onClose;
   final ReaderPalette palette;
+
+  /// 当前生效的模式：图标跟着它变，用户一眼知道自己在什么模式。
   final ReadingMode mode;
-  final ValueChanged<ReadingMode> onModeChanged;
+  final VoidCallback onOpenSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -149,48 +151,25 @@ class ReaderBar extends StatelessWidget {
             ),
           ),
           Text(pageLabel, style: TextStyle(color: palette.muted)),
-          PopupMenuButton<ReadingMode>(
-            key: const Key('reader-mode-button'),
-            tooltip: 'Reading mode',
-            icon: Icon(Icons.tune, color: palette.foreground),
-            onSelected: onModeChanged,
-            itemBuilder: (BuildContext context) =>
-                <PopupMenuEntry<ReadingMode>>[
-                  for (final option in ReadingMode.values)
-                    PopupMenuItem<ReadingMode>(
-                      key: Key('reader-mode-${option.name}'),
-                      value: option,
-                      child: Row(
-                        children: <Widget>[
-                          Icon(_iconFor(option), size: 20),
-                          const SizedBox(width: AppSpacing.sm),
-                          Text(_labelFor(option)),
-                          if (option == mode) ...<Widget>[
-                            const Spacer(),
-                            const Icon(Icons.check, size: 18),
-                          ],
-                        ],
-                      ),
-                    ),
-                ],
+          IconButton(
+            key: const Key('reader-settings-button'),
+            onPressed: onOpenSettings,
+            icon: Icon(iconForMode(mode)),
+            color: palette.foreground,
+            tooltip: 'Reading settings',
           ),
         ],
       ),
     );
   }
-
-  static IconData _iconFor(ReadingMode mode) => switch (mode) {
-    ReadingMode.paged => Icons.crop_portrait,
-    ReadingMode.doublePage => Icons.auto_stories_outlined,
-    ReadingMode.verticalScroll => Icons.view_agenda_outlined,
-  };
-
-  static String _labelFor(ReadingMode mode) => switch (mode) {
-    ReadingMode.paged => 'Single page',
-    ReadingMode.doublePage => 'Double page',
-    ReadingMode.verticalScroll => 'Vertical scroll',
-  };
 }
+
+/// 模式图标：顶栏按钮与设置面板共用，避免两处各写一份。
+IconData iconForMode(ReadingMode mode) => switch (mode) {
+  ReadingMode.paged => Icons.crop_portrait,
+  ReadingMode.doublePage => Icons.auto_stories_outlined,
+  ReadingMode.verticalScroll => Icons.view_agenda_outlined,
+};
 
 /// 底部：上一页 / 页数 / 下一页。
 class ReaderControls extends StatelessWidget {
