@@ -184,6 +184,59 @@ void main() {
     });
   });
 
+  group('阅读进度回写', () {
+    KomgaSession sessionFor(FakeAdapter adapter) => KomgaSession.withApiKey(
+      address: address,
+      apiKey: 'K',
+      dio: dioWith(adapter),
+    );
+
+    test('发 PATCH，页码与完成标记一起发', () async {
+      final adapter = FakeAdapter(
+        (_) async => ResponseBody.fromString('', 204),
+      );
+      await sessionFor(adapter)
+          .updateReadProgress('b1', page: 3, completed: true);
+
+      final request = adapter.requests.single;
+      expect(request.method, 'PATCH');
+      expect(request.uri.path, '/api/v1/books/b1/read-progress');
+      expect(request.data, <String, Object>{'page': 3, 'completed': true});
+    });
+
+    test('只发 completed 时不带 page（服务端支持局部更新）', () async {
+      final adapter = FakeAdapter(
+        (_) async => ResponseBody.fromString('', 204),
+      );
+      await sessionFor(adapter).updateReadProgress('b1', completed: true);
+
+      expect(adapter.requests.single.data, <String, Object>{'completed': true});
+    });
+
+    test('什么都不传就不发请求', () async {
+      final adapter = FakeAdapter(
+        (_) async => ResponseBody.fromString('', 204),
+      );
+      await sessionFor(adapter).updateReadProgress('b1');
+
+      expect(adapter.requests, isEmpty);
+    });
+
+    test('400 折叠成可识别的请求错误', () async {
+      final adapter = FakeAdapter(
+        (_) async => rawResponse(
+          '{"status":400,"message":"Page argument (0) must be within 1 and book page count (3)"}',
+          status: 400,
+        ),
+      );
+
+      expect(
+        sessionFor(adapter).updateReadProgress('b1', page: 0),
+        throwsA(isA<KomgaBadRequestError>()),
+      );
+    });
+  });
+
   group('请求头按资源类型分离', () {
     KomgaSession sessionFor(FakeAdapter adapter) => KomgaSession.withApiKey(
       address: address,

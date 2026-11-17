@@ -66,7 +66,7 @@ ThemeData withTestFont(ThemeData base) => base.copyWith(
 ///
 /// [overrides] 用于把会话/网络等依赖替换成内存实现，避免黄金图被平台通道错误污染。
 /// [settle] 设为 false 适用于含无限动画的页面（如带 spinner 的 splash）。
-/// [precacheCovers] 用于需要真实封面的页面：测试的假时钟不会推进图片解码，
+/// [precacheImages] 用于需要真实封面的页面：测试的假时钟不会推进图片解码，
 /// 必须先在真实事件循环里把字节解成 `ui.Image` 塞进 ImageCache，
 /// 否则截图里只有占位块（实测过，别指望 pumpAndSettle 能等出来）。
 Future<void> pumpGoldenScreen(
@@ -77,7 +77,7 @@ Future<void> pumpGoldenScreen(
   double textScale = 1.0,
   List<Override> overrides = const <Override>[],
   bool settle = true,
-  List<Uint8List> precacheCovers = const <Uint8List>[],
+  List<Uint8List> precacheImages = const <Uint8List>[],
 }) async {
   tester.view.physicalSize = Size(
     size.width * kGoldenDevicePixelRatio,
@@ -86,9 +86,9 @@ Future<void> pumpGoldenScreen(
   tester.view.devicePixelRatio = kGoldenDevicePixelRatio;
   addTearDown(tester.view.reset);
 
-  if (precacheCovers.isNotEmpty) {
+  if (precacheImages.isNotEmpty) {
     await tester.runAsync(() async {
-      for (final bytes in precacheCovers) {
+      for (final bytes in precacheImages) {
         final image = await decodeImageFromList(bytes);
         PaintingBinding.instance.imageCache.putIfAbsent(
           MemoryImage(bytes),

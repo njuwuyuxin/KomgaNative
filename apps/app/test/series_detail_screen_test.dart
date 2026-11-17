@@ -6,11 +6,13 @@ import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
+import 'package:komga_native/src/providers/reader_providers.dart';
 import 'package:komga_native/src/screens/reader_screen.dart';
 import 'package:komga_native/src/screens/series_detail_screen.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_library.dart';
+import 'support/fake_reader.dart';
 
 void main() {
   Future<void> pumpDetail(
@@ -36,9 +38,11 @@ void main() {
           path: '/reader/:bookId',
           builder: (BuildContext context, GoRouterState state) {
             final extra = state.extra;
+            final args = extra is ReaderArgs ? extra : null;
             return ReaderScreen(
               bookId: state.pathParameters['bookId'] ?? '',
-              book: extra is Book ? extra : null,
+              book: args?.book,
+              direction: args?.direction ?? ReadingDirection.leftToRight,
             );
           },
         ),
@@ -49,6 +53,9 @@ void main() {
       ProviderScope(
         overrides: <Override>[
           libraryRepositoryProvider.overrideWithValue(repository),
+          readerRepositoryProvider.overrideWithValue(
+            FakeReaderRepository(pageCount: 21),
+          ),
         ],
         child: MaterialApp.router(
           theme: AppTheme.light(),
@@ -112,6 +119,6 @@ void main() {
 
     expect(find.byType(ReaderScreen), findsOneWidget);
     expect(find.text('Vol. 3'), findsWidgets);
-    expect(find.textContaining('21 pages'), findsWidgets);
+    expect(find.text('1 / 21'), findsWidgets, reason: '阅读器应显示真实页数');
   });
 }

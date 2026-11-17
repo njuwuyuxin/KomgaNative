@@ -1,14 +1,14 @@
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_native/src/data/cover_cache.dart';
+import 'package:komga_native/src/data/byte_cache.dart';
 
 Uint8List bytes(int value) => Uint8List.fromList(<int>[value]);
 
 void main() {
-  group('CoverCache', () {
+  group('ByteLruCache', () {
     test('存进去能取出来，且命中计数增加', () {
-      final cache = CoverCache(capacity: 4)..put('a', bytes(1));
+      final cache = ByteLruCache(capacity: 4)..put('a', bytes(1));
 
       expect(cache.get('a'), bytes(1));
       expect(cache.hits, 1);
@@ -16,13 +16,13 @@ void main() {
     });
 
     test('未命中返回 null 并计数（封面失败不该抛异常）', () {
-      final cache = CoverCache();
+      final cache = ByteLruCache();
       expect(cache.get('nope'), isNull);
       expect(cache.misses, 1);
     });
 
     test('超出容量时淘汰最久未使用的（LRU 而不是 FIFO）', () {
-      final cache = CoverCache(capacity: 2)
+      final cache = ByteLruCache(capacity: 2)
         ..put('a', bytes(1))
         ..put('b', bytes(2));
 
@@ -38,7 +38,7 @@ void main() {
     });
 
     test('同一个 key 重复 put 不会撑大缓存', () {
-      final cache = CoverCache(capacity: 2)
+      final cache = ByteLruCache(capacity: 2)
         ..put('a', bytes(1))
         ..put('a', bytes(2));
 
@@ -47,7 +47,7 @@ void main() {
     });
 
     test('clear 清空', () {
-      final cache = CoverCache()
+      final cache = ByteLruCache()
         ..put('a', bytes(1))
         ..clear();
       expect(cache.length, 0);

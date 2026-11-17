@@ -7,6 +7,7 @@ import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
+import 'package:komga_native/src/screens/reader_screen.dart';
 import 'package:komga_native/src/widgets/shelf_views.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -121,8 +122,10 @@ class _BooksView extends StatelessWidget {
           else
             SliverList.separated(
               itemCount: books.items.length,
-              itemBuilder: (BuildContext context, int index) =>
-                  _BookRow(book: books.items[index]),
+              itemBuilder: (BuildContext context, int index) => _BookRow(
+                book: books.items[index],
+                direction: series?.readingDirection ?? ReadingDirection.unknown,
+              ),
               separatorBuilder: (BuildContext context, int index) =>
                   const Divider(height: 1),
             ),
@@ -243,9 +246,10 @@ class _SeriesHeader extends ConsumerWidget {
 
 /// 一本书：封图 + 标题 + 页数/已读状态，点进去读。
 class _BookRow extends ConsumerWidget {
-  const _BookRow({required this.book});
+  const _BookRow({required this.book, required this.direction});
 
   final Book book;
+  final ReadingDirection direction;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -296,7 +300,10 @@ class _BookRow extends ConsumerWidget {
             ? theme.colorScheme.primary
             : theme.colorScheme.onSurfaceVariant,
       ),
-      onTap: () => context.push('/reader/${book.id}', extra: book),
+      onTap: () => context.push(
+        '/reader/${book.id}',
+        extra: ReaderArgs(book: book, direction: direction),
+      ),
     );
   }
 }

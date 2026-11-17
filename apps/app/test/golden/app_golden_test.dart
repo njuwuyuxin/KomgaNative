@@ -7,6 +7,7 @@ import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
+import 'package:komga_native/src/providers/reader_providers.dart';
 import 'package:komga_native/src/screens/connection_screen.dart';
 import 'package:komga_native/src/screens/library_screen.dart';
 import 'package:komga_native/src/screens/reader_screen.dart';
@@ -17,6 +18,7 @@ import 'package:komga_native/src/session/server_store.dart';
 import 'package:komga_native/src/session/session_controller.dart';
 
 import '../support/fake_library.dart';
+import '../support/fake_reader.dart';
 import '../support/fakes.dart';
 import 'golden_harness.dart';
 
@@ -69,7 +71,7 @@ void main() {
       overrides: <Override>[
         libraryRepositoryProvider.overrideWithValue(repository),
       ],
-      precacheCovers: covers,
+      precacheImages: covers,
     );
     await expectGolden(tester, name);
   }
@@ -160,7 +162,7 @@ void main() {
       overrides: <Override>[
         libraryRepositoryProvider.overrideWithValue(repository),
       ],
-      precacheCovers: covers,
+      precacheImages: covers,
     );
     await expectGolden(tester, name);
   }
@@ -203,14 +205,46 @@ void main() {
     await expectGolden(tester, 'settings@eink');
   });
 
-  testWidgets('reader@phone_dark', (WidgetTester tester) async {
+  Future<void> pumpReaderGolden(
+    WidgetTester tester, {
+    required String name,
+    required Size size,
+    required ThemeData theme,
+  }) async {
+    final repository = FakeReaderRepository();
+    final pageBytes = await repository.warmPage(1);
+
     await pumpGoldenScreen(
       tester,
-      screen: const ReaderScreen(bookId: 'b1'),
+      screen: ReaderScreen(bookId: 'b1', book: demoReaderBook()),
+      size: size,
+      theme: theme,
+      overrides: <Override>[
+        readerRepositoryProvider.overrideWithValue(repository),
+      ],
+      precacheImages: pageBytes == null
+          ? const <Uint8List>[]
+          : <Uint8List>[pageBytes],
+    );
+    await expectGolden(tester, name);
+  }
+
+  testWidgets('reader@phone_dark', (WidgetTester tester) async {
+    await pumpReaderGolden(
+      tester,
+      name: 'reader@phone_dark',
       size: GoldenSizes.phone,
       theme: AppTheme.dark(),
     );
-    await expectGolden(tester, 'reader@phone_dark');
+  });
+
+  testWidgets('reader@eink', (WidgetTester tester) async {
+    await pumpReaderGolden(
+      tester,
+      name: 'reader@eink',
+      size: GoldenSizes.eink,
+      theme: AppTheme.eink(),
+    );
   });
 
   testWidgets('connection@phone_light', (WidgetTester tester) async {

@@ -84,12 +84,14 @@ GoRouter createRouter({
       GoRoute(
         path: '/reader/:bookId',
         builder: (BuildContext context, GoRouterState state) {
-          // 从系列详情点进来时会把已抓到的 Book 一起带过来，省一次请求；
-          // 冷启动/深链没有 extra 时由阅读器自己兜底。
+          // 从系列详情点进来时会带上 Book 与阅读方向，省一次请求；
+          // 冷启动/深链没有 extra 时由阅读器自己取书。
           final extra = state.extra;
+          final args = extra is ReaderArgs ? extra : null;
           return ReaderScreen(
             bookId: state.pathParameters['bookId'] ?? '',
-            book: extra is Book ? extra : null,
+            book: args?.book,
+            direction: args?.direction ?? ReadingDirection.unknown,
           );
         },
       ),

@@ -1,14 +1,14 @@
 import 'dart:typed_data';
 
-/// 封面字节的 LRU 缓存。
+/// 定长 LRU 字节缓存（封面、页图共用）。
 ///
-/// 为什么需要：Riverpod 的 cover provider 会随列表滚动反复重建，
-/// 没有缓存时每滚回来一次就要重新下载一张封面（移动网络下很痛）。
+/// 为什么需要：Riverpod 的 provider 会随列表滚动/翻页反复重建，
+/// 没有缓存时每滚回来一次就要重新下载（移动网络下很痛）。
 ///
-/// 为什么有上限：一本 2 MB 的封面乘以几百个系列会把内存吃穿。
-/// 默认 48 张（按单张 ~40 KB 估约 2 MB 上限），超了就丢最久未用的。
-class CoverCache {
-  CoverCache({this.capacity = 48}) : assert(capacity > 0);
+/// 为什么有上限：一张 2 MB 的页图乘以几百页会把内存吃穿。
+/// 默认容量由调用方决定（封面 48 张；阅读器页图 8 张，因为单张更大）。
+class ByteLruCache {
+  ByteLruCache({this.capacity = 48}) : assert(capacity > 0);
 
   final int capacity;
 

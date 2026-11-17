@@ -202,6 +202,23 @@ class KomgaSession {
     return key;
   }
 
+  /// 更新阅读进度（`PATCH /api/v1/books/{id}/read-progress`）。
+  ///
+  /// 两个字段都是可选的局部更新（实测）：只发 `completed` 时页码保持不变。
+  /// **页码 1 基**；`page=0` 会被服务端 400 拒绝（且 body 为空）。
+  Future<void> updateReadProgress(
+    String bookId, {
+    int? page,
+    bool? completed,
+  }) async {
+    final body = <String, Object>{
+      if (page != null) 'page': page,
+      if (completed != null) 'completed': completed,
+    };
+    if (body.isEmpty) return;
+    await _patchJson(_urls.bookReadProgress(bookId), body);
+  }
+
   void close() => _dio.close(force: true);
 
   Future<Object?> _getJson(String url) async {
@@ -221,6 +238,15 @@ class KomgaSession {
         options: _jsonOptions,
       );
       return response.data;
+    } on DioException catch (e) {
+      throw mapDioException(e);
+    }
+  }
+
+  Future<void> _patchJson(String url, Map<String, Object> body) async {
+    try {
+      // 204 No Content：不要读 data。
+      await _dio.patch<Object?>(url, data: body, options: _jsonOptions);
     } on DioException catch (e) {
       throw mapDioException(e);
     }

@@ -2,7 +2,7 @@ import 'dart:typed_data';
 
 import 'package:komga_api/komga_api.dart';
 import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/data/cover_cache.dart';
+import 'package:komga_native/src/data/byte_cache.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 
 /// 书架/系列详情的数据来源。
@@ -39,12 +39,10 @@ abstract interface class LibraryRepository {
 /// 真实实现：包一层 [KomgaSession]，把 `KomgaError` 翻成 [ShelfFailure]。
 class KomgaLibraryRepository implements LibraryRepository {
   KomgaLibraryRepository(this._session, {int coverCacheCapacity = 48})
-    : _covers = CoverCache(capacity: coverCacheCapacity);
+    : _covers = ByteLruCache(capacity: coverCacheCapacity);
 
   final KomgaSession _session;
-  final CoverCache _covers;
-
-  CoverCache get coverCache => _covers;
+  final ByteLruCache _covers;
 
   @override
   Future<List<Library>> libraries() async {
