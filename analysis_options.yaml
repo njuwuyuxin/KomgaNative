@@ -1,0 +1,35 @@
+# 全仓库统一的分析与 lint 规则。
+# 目标：让 Agent 的常见错误在 `dart analyze` 阶段就暴露，而不是留到运行时。
+analyzer:
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+  exclude:
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+    - "packages/komga_api/lib/generated/**"
+    - "**/.dart_tool/**"
+
+linter:
+  rules:
+    # 类型与可读性
+    - always_declare_return_types
+    - avoid_dynamic_calls
+    - prefer_final_locals
+    - prefer_const_constructors
+    - prefer_const_declarations
+    - prefer_single_quotes
+    - sort_child_properties_last
+    - unawaited_futures
+    - unnecessary_lambdas
+    - use_super_parameters
+    # 安全与可维护性
+    - avoid_print
+    - avoid_empty_else
+    - avoid_relative_lib_imports
+    - cancel_subscriptions
+    - close_sinks
+    - throw_in_finally
+    - unnecessary_statements
+    - prefer_typing_uninitialized_variables

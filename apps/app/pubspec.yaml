@@ -1,0 +1,43 @@
+name: komga_native
+description: KomgaNative — Komga 跨平台客户端（iOS / Android / 墨水屏）。
+publish_to: none
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.14.0
+  flutter: ">=3.50.0"
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_riverpod: ^3.5.0
+  material_ui: ^1.11.1
+  go_router: ^18.1.4
+  komga_api:
+    path: ../../packages/komga_api
+  komga_design_system:
+    path: ../../packages/komga_design_system
+  komga_domain:
+    path: ../../packages/komga_domain
+  komga_platform:
+    path: ../../packages/komga_platform
+  komga_reader_engine:
+    path: ../../packages/komga_reader_engine
+  komga_sync_engine:
+    path: ../../packages/komga_sync_engine
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/fonts/
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto-Regular.ttf
+        - asset: assets/fonts/Roboto-Medium.ttf
+          weight: 500

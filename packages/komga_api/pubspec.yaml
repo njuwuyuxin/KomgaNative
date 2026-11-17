@@ -1,0 +1,16 @@
+name: komga_api
+description: Komga REST 传输层与 URL 构造。DTO 生成在 M1，本包先固化错误模型与传输约定。
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.14.0
+resolution: workspace
+
+dependencies:
+  dio: ^5.11.1
+  komga_domain:
+    path: ../komga_domain
+
+dev_dependencies:
+  test: ^1.25.0

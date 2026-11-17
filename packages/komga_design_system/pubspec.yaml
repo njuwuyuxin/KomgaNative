@@ -1,0 +1,20 @@
+name: komga_design_system
+description: 设计 token、三套主题（light/dark/eink）与基础组件。
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.14.0
+  flutter: ">=3.50.0"
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  material_ui: ^1.11.1
+  komga_domain:
+    path: ../komga_domain
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter

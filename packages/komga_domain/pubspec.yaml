@@ -1,0 +1,11 @@
+name: komga_domain
+description: 纯 Dart 领域模型与值对象。零 Flutter / 网络 / 数据库依赖。
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.14.0
+resolution: workspace
+
+dev_dependencies:
+  test: ^1.25.0

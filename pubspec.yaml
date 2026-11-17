@@ -1,0 +1,15 @@
+name: komga_native_workspace
+publish_to: none
+
+environment:
+  sdk: ^3.14.0
+
+# Dart pub workspace：所有成员共享一份 lockfile，包边界 = Agent 任务边界。
+workspace:
+  - apps/app
+  - packages/komga_domain
+  - packages/komga_reader_engine
+  - packages/komga_sync_engine
+  - packages/komga_api
+  - packages/komga_design_system
+  - packages/komga_platform

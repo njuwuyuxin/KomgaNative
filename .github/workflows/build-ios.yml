@@ -1,0 +1,54 @@
+name: iOS
+
+# macOS runner 按 10 倍计费（私有仓库额度），所以**不在每次 push 时跑**：
+# 手动触发（Actions 页面点 Run workflow）或打 v* 标签时才构建。
+# 当前用 --no-codesign，只验证"能编译"；签名与 TestFlight 上传在 M6 接。
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build iOS (no codesign)
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.50.0
+          channel: stable
+          cache: true
+
+      - name: Pub get (workspace)
+        working-directory: apps/app
+        run: flutter pub get
+
+      - name: Build iOS
+        working-directory: apps/app
+        run: flutter build ios --release --no-codesign
+
+      - name: Package .app
+        # 未签名的 .app 目录无法直接作为 artifact，先打成 zip。
+        run: |
+          cd apps/app/build/ios/iphoneos
+          ditto -c -k --sequesterRsrc --keepParent Runner.app Runner.app.zip
+
+      - name: Upload .app
+        uses: actions/upload-artifact@v7
+        with:
+          name: komga-native-ios-unsigned
+          path: apps/app/build/ios/iphoneos/Runner.app.zip
+          retention-days: 14

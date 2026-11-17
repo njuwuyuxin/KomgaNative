@@ -1,0 +1,17 @@
+* text=auto
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# 二进制：不要做换行转换，也不要 diff
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ttf binary
+*.otf binary
+*.ttc binary
+*.jar binary
+*.zip binary
+*.apk binary
+*.aab binary

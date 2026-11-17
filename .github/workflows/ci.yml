@@ -1,0 +1,52 @@
+name: CI
+
+# 每次 push / PR 都跑：这是"裁判"，本地绿不算绿，CI 绿才算。
+# 为什么跑在 Windows：黄金图基线以 Windows 为唯一平台（见 AGENTS.md），
+# 换平台会让 5 张基线全部失配。
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: Gate (format + analyze + layers + tests + goldens)
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.50.0
+          channel: stable
+          cache: true
+
+      - name: Pub get (workspace)
+        working-directory: apps/app
+        run: flutter pub get
+
+      - name: Gate
+        # 与本地完全同一条命令，避免"CI 能过本地不能"的双轨问题。
+        run: dart run tool/ci.dart check
+
+      - name: Upload golden failures
+        # 黄金图失配时 flutter_test 会把实际渲染图写到 failures/ 目录，
+        # 上传后 Agent 可以直接看图判断差异，而不是猜。
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: golden-failures
+          path: apps/app/test/golden/failures/**
+          if-no-files-found: ignore
+          retention-days: 7

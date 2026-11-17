@@ -1,0 +1,19 @@
+name: komga_platform
+description: 平台能力的最小抽象（设备形态、墨水屏探测）。原生实现只在 M5 补。
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.14.0
+  flutter: ">=3.50.0"
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  komga_domain:
+    path: ../komga_domain
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
