@@ -8,6 +8,7 @@ import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/screens/reader_screen.dart';
+import 'package:komga_native/src/widgets/book_download_button.dart';
 import 'package:komga_native/src/widgets/offline_banner.dart';
 import 'package:komga_native/src/widgets/shelf_views.dart';
 import 'package:material_ui/material_ui.dart';
@@ -308,11 +309,17 @@ class _BookRow extends ConsumerWidget {
           color: theme.colorScheme.onSurfaceVariant,
         ),
       ),
-      trailing: Icon(
-        completed ? Icons.check_circle : Icons.chevron_right,
-        color: completed
-            ? theme.colorScheme.primary
-            : theme.colorScheme.onSurfaceVariant,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          BookDownloadButton(book: book),
+          Icon(
+            completed ? Icons.check_circle : Icons.chevron_right,
+            color: completed
+                ? theme.colorScheme.primary
+                : theme.colorScheme.onSurfaceVariant,
+          ),
+        ],
       ),
       onTap: () async {
         await context.push(

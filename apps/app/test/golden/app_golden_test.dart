@@ -229,10 +229,10 @@ void main() {
       theme: AppTheme.eink(),
       overrides: <Override>[
         ...memorySession(connected: true),
-        // 设置页会读缓存占用：换成内存库，避免 path_provider 平台通道，
+        // 设置页会读缓存/下载占用：换成内存库，避免 path_provider 平台通道，
         // 也让"Nothing cached yet"成为确定值（否则基线随本机缓存漂移）。
-        httpCacheProvider.overrideWithValue(
-          DriftHttpCache(HttpCacheDatabase(NativeDatabase.memory())),
+        httpCacheDatabaseProvider.overrideWithValue(
+          HttpCacheDatabase(NativeDatabase.memory()),
         ),
       ],
     );

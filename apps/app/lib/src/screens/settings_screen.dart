@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_native/src/providers/cache_providers.dart';
+import 'package:komga_native/src/providers/download_providers.dart';
 import 'package:komga_native/src/providers/settings_provider.dart';
 import 'package:komga_native/src/session/session_controller.dart';
 
@@ -16,6 +17,7 @@ class SettingsScreen extends ConsumerWidget {
     final session = ref.watch(sessionProvider);
     final server = session is SessionConnected ? session.server : null;
     final usage = ref.watch(cacheUsageProvider);
+    final downloads = ref.watch(downloadsUsageProvider).value;
     final cacheUsage = usage.value;
     // 不用 AsyncValue.when：Riverpod 3 首次失败是 AsyncLoading + hasError，
     // 按值/错误位判断才不会把"算不出来"显示成永久 loading。
@@ -97,6 +99,15 @@ class SettingsScreen extends ConsumerWidget {
                   : () => _clearCache(context, ref),
               child: const Text('Clear'),
             ),
+          ),
+          ListTile(
+            title: const Text('Downloaded books'),
+            subtitle: Text(
+              downloads == null
+                  ? '—'
+                  : '${downloads.entries} books · ${downloads.humanSize}',
+            ),
+            leading: const Icon(Icons.download_done_outlined),
           ),
           const Divider(),
           const _SectionHeader('About'),

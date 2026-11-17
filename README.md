@@ -80,7 +80,7 @@ dart run tool/ci.dart check    # format + analyze + layers + 全部测试
 dart run tool/ci.dart golden   # 重新生成黄金图（仅 Windows，与 CI 一致）
 ```
 
-当前基线：**342 个测试**（纯 Dart 165 / Flutter 177），**25 张黄金图**覆盖
+当前基线：**351 个测试**（纯 Dart 165 / Flutter 186），**25 张黄金图**覆盖
 书架（手机 light / 平板 dark / 1.3 倍字号 / 墨水屏 / 空态 / 错误态 / **离线态**）、系列详情（手机 / 平板 / 墨水屏）、
 阅读器（单页 dark+eink、双页 dark+eink、纵向 dark、设置面板 dark+eink）、墨水屏设置（含存储占用）、连接页（light / eink）、
 证书面板（手机 / 平板 / 墨水屏）、启动页。
@@ -179,6 +179,8 @@ Drift 留给书架/页图缓存与进度 outbox。坏存档一律回默认值。
   （它很小，却是"书能不能打开"的前提）；
 - 分区：按服务器 `baseUrl`，多服务器不串数据；查询串进缓存键，搜索/分页互不覆盖；
 - 提示：传输层观测到失败就显示「Offline · showing saved content」，任意请求成功（含进度 PATCH）后自动消失；
+- **整本下载**：系列详情每本书右侧 ⬇ 按钮，显示进度、可取消、可删除；下载完断网可整本读，
+  设置页能看到已下载数量与体积；
 - 管理：设置 → Storage 看占用、一键清空（只清缓存，不动进度）。
 
 ## 连接到你的 Komga（NAS）

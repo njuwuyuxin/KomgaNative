@@ -32,6 +32,27 @@ class CachedResponses extends Table {
   Set<Column<Object>> get primaryKey => <Column<Object>>{scope, url};
 }
 
+/// 已下载（整本）的书。
+///
+/// 不靠"缓存里有没有这些页"反推：页图缓存会被字节预算 LRU 淘汰，
+/// 而"用户明确下载过"是个意图，不能被自动淘汰悄悄改写成"没下载"。
+/// 删缓存/删下载都要显式发生，用户才有可预期的手感。
+class DownloadedBooks extends Table {
+  TextColumn get bookId => text()();
+
+  TextColumn get seriesId => text()();
+
+  IntColumn get pageCount => integer()();
+
+  /// 这次下载实际抓到的字节数（设置页/详情页展示用）。
+  IntColumn get bytes => integer()();
+
+  DateTimeColumn get savedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => <Column<Object>>{bookId};
+}
+
 /// 缓存占用统计（设置页展示）。
 class CacheUsage {
   const CacheUsage({required this.bytes, required this.entries});
@@ -50,7 +71,7 @@ class CacheUsage {
   }
 }
 
-@DriftDatabase(tables: <Type>[CachedResponses])
+@DriftDatabase(tables: <Type>[CachedResponses, DownloadedBooks])
 class HttpCacheDatabase extends _$HttpCacheDatabase {
   HttpCacheDatabase(
     super.executor, {
@@ -71,7 +92,19 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
   int? _seqSeed;
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+    onCreate: (Migrator m) async {
+      await m.createAll();
+    },
+    onUpgrade: (Migrator m, int from, int to) async {
+      // v1 → v2：新增"整本下载"记录表。缓存库是可再生的，但已经下载的书
+      // 必须保住记录，否则用户升级后看到"已下载"变回"未下载"。
+      if (from < 2) await m.createTable(downloadedBooks);
+    },
+  );
 
   Future<CachedResponse?> read(String scope, String url) async {
     final row =
@@ -133,6 +166,64 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
       statement.where((t) => t.scope.equals(filter));
     }
     await statement.go();
+  }
+
+  // ---- 整本下载记录 ----
+
+  Future<void> markDownloaded({
+    required String bookId,
+    required String seriesId,
+    required int pageCount,
+    required int bytes,
+  }) async {
+    await into(downloadedBooks).insertOnConflictUpdate(
+      DownloadedBooksCompanion.insert(
+        bookId: bookId,
+        seriesId: seriesId,
+        pageCount: pageCount,
+        bytes: bytes,
+        savedAt: _now(),
+      ),
+    );
+  }
+
+  Future<DownloadedBook?> download(String bookId) {
+    return (select(
+      downloadedBooks,
+    )..where((t) => t.bookId.equals(bookId))).getSingleOrNull();
+  }
+
+  Future<List<DownloadedBook>> downloads() => select(downloadedBooks).get();
+
+  /// 已下载书籍的合计（设置页展示）。
+  Future<CacheUsage> downloadsUsage() async {
+    final byteSum = downloadedBooks.bytes.sum();
+    final count = downloadedBooks.bookId.count();
+    final query = selectOnly(downloadedBooks)
+      ..addColumns(<Expression<Object>>[byteSum, count]);
+    final row = await query.getSingle();
+    return CacheUsage(
+      bytes: row.read(byteSum) ?? 0,
+      entries: row.read(count) ?? 0,
+    );
+  }
+
+  Future<void> removeDownload(String bookId) async {
+    await (delete(downloadedBooks)..where((t) => t.bookId.equals(bookId))).go();
+  }
+
+  /// 删掉一本书已缓存的页图（按 URL 片段）。
+  ///
+  /// 用 `contains` 而不是精确 URL：页图 URL 带 `?zero_based=false`（将来还可能有
+  /// `convert=jpeg`），按"书 + /pages/"匹配才不会漏。返回删除条数。
+  Future<int> deleteCachedPages({
+    required String scope,
+    required String bookId,
+  }) {
+    final fragment = '/books/$bookId/pages/';
+    return (delete(
+      cachedResponses,
+    )..where((t) => t.scope.equals(scope) & t.url.contains(fragment))).go();
   }
 
   /// 按字节预算淘汰最久未用的图片，直到回到预算内。
@@ -230,4 +321,7 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
     final row = await query.getSingle();
     return row.read(maxSeq) ?? 0;
   }
+
+  /// 统一存 UTC：Drift 默认按 Unix 秒存，读回是本地时间，越早归一越少坑。
+  DateTime _now() => DateTime.now().toUtc();
 }
