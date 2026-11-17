@@ -81,5 +81,9 @@ docs/                         选型、环境、spec、ADR
 
 ## 当前阶段
 
-M0（骨架）：可运行的外壳 + 三套主题 + 黄金图闭环 + 纯逻辑包。
-数据层还是示例数据（`apps/app/lib/src/data/sample_data.dart`），M1 接真实 Komga。
+M1 进行中。
+已完成：M0 骨架 + **连接流程**（`lib/src/session/`：密钥串存储、密码换 API Key、路由守卫、错误映射）。
+待完成：真实书架/系列数据、Drift 缓存、缩略图、i18n 与中文字体、TOFU 自签名证书。
+
+接服务器时注意：网络访问只能出现在 `lib/src/data/` 的 Repository 层，screen/widget 里禁止 `dio`。
+新增 API 调用时同步在 `test/support/fakes.dart` 补一个假实现，保持"可离线测试"。

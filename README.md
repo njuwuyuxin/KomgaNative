@@ -2,8 +2,9 @@
 
 Komga 的跨平台客户端（iOS / Android / Android 墨水屏），阅读体验优先。
 
-> 状态：**M0 骨架完成**（可运行的空壳 + 三套主题 + 黄金图闭环 + 纯逻辑包）。
-> 数据层仍是示例数据，M1 接真实 Komga 服务器。
+> 状态：**M1 进行中**。
+> 已完成：M0 骨架（三套主题 + 黄金图闭环）、**服务器连接流程**（密码换 API Key / 直接粘贴 Key / 钥匙串保存 / 路由守卫 / 错误映射）。
+> 待完成：真实书架与系列数据、Drift 缓存、缩略图、i18n 与中文字体。
 
 ## 文档
 
@@ -60,11 +61,19 @@ dart run tool/ci.dart check    # format + analyze + layers + 全部测试
 dart run tool/ci.dart golden   # 重新生成黄金图（仅 Windows，与 CI 一致）
 ```
 
-当前基线：**61 个测试**（纯 Dart 41 / Flutter 20），5 张黄金图覆盖
-手机 light、平板 dark、手机 1.3 倍字号、墨水屏 settings、阅读器。
+当前基线：**91 个测试**（纯 Dart 64 / Flutter 27），8 张黄金图覆盖
+书架（手机 light / 平板 dark / 1.3 倍字号）、墨水屏设置、阅读器、连接页（light / eink）、启动页。
+
+## 连接流程（已可用）
+
+1. 输入服务器地址（支持反代子路径，如 `https://host/komga`）；
+2. **Account 模式**：邮箱 + 密码 → 客户端自动调 `POST /api/v2/users/me/api-keys` 创建一把名为
+   `KomgaNative` 的 Key → 只把 Key 存进 Keychain/Keystore，**不保存密码**；
+3. **API Key 模式**：在 Komga 后台建好 Key 直接粘贴（适合开了双步验证）；
+4. 连接失败按类型给不同建议（401 → 检查凭据；网络错误 → 检查地址/同网段；非 Komga 响应 → 检查反代）。
 
 ## 已知边界
 
-- UI 文案暂为英文：i18n（ARB + 中文字体）在 M1 一起做，避免现在把 CJK 字体塞进黄金图。
-- 未接服务器：登录/书架/阅读器数据都是 `apps/app/lib/src/data/sample_data.dart`。
-- 无 Android 模拟器：用真机或 M1 时补装 system image。
+- 书架数据仍是 `apps/app/lib/src/data/sample_data.dart`（下一步接 `/api/v1/libraries` + `/api/v1/series`）。
+- UI 文案暂为英文：i18n（ARB + 中文字体）与书架一起做，避免现在把 CJK 字体塞进黄金图。
+- 自签名证书 TOFU 流程未做（当前用系统信任链）；M1.2 补"指纹确认"页。

@@ -1,68 +1,103 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:go_router/go_router.dart';
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_native/src/providers/router_provider.dart';
+import 'package:komga_domain/komga_domain.dart';
+import 'package:komga_native/src/app.dart';
+import 'package:komga_native/src/session/connection_service.dart';
+import 'package:komga_native/src/session/server_store.dart';
+import 'package:komga_native/src/session/session_controller.dart';
 
 import 'golden/golden_harness.dart';
+import 'support/fakes.dart';
 
-/// 冒烟测试：真实路由 + 真实 Provider 图，确认外壳能渲染、能跳转。
+/// 端到端冒烟：真实路由 + 真实会话守卫 + 假网络/假钥匙串。
 void main() {
   setUpAll(loadAppFonts);
 
-  testWidgets('启动后落在书架，且底部导航存在', (WidgetTester tester) async {
+  Future<void> pumpApp(
+    WidgetTester tester, {
+    required ServerStore store,
+    ConnectionService? service,
+  }) async {
     tester.view.physicalSize = const Size(390 * 3, 844 * 3);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
 
     await tester.pumpWidget(
       ProviderScope(
-        child: Consumer(
-          builder: (BuildContext context, WidgetRef ref, Widget? child) {
-            final GoRouter router = ref.watch(routerProvider);
-            return MaterialApp.router(
-              theme: withTestFont(AppTheme.light()),
-              routerConfig: router,
-            );
-          },
-        ),
+        overrides: <Override>[
+          serverStoreProvider.overrideWithValue(store),
+          connectionServiceProvider.overrideWithValue(
+            service ?? FakeConnectionService(),
+          ),
+        ],
+        child: const KomgaApp(),
       ),
     );
     await tester.pumpAndSettle();
+  }
 
-    expect(find.text('Library'), findsWidgets);
-    expect(find.byType(NavigationBar), findsOneWidget);
-    expect(find.text('Frieren'), findsOneWidget);
+  testWidgets('未登录 → 直接落在连接页（不闪现书架）', (WidgetTester tester) async {
+    await pumpApp(tester, store: InMemoryServerStore());
+    expect(find.text('Connect to your Komga server'), findsOneWidget);
+    expect(find.text('Library'), findsNothing);
   });
 
-  testWidgets('点击系列进入阅读器，并能翻页', (WidgetTester tester) async {
-    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
-    tester.view.devicePixelRatio = 3;
-    addTearDown(tester.view.reset);
+  testWidgets('已登录 → 冷启动直接进入书架，底部导航可见', (WidgetTester tester) async {
+    await pumpApp(tester, store: InMemoryServerStore(storedServer()));
+    expect(find.text('Library'), findsWidgets);
+    expect(find.text('Frieren'), findsOneWidget);
+    expect(find.byType(NavigationBar), findsOneWidget);
+  });
 
-    await tester.pumpWidget(
-      ProviderScope(
-        child: Consumer(
-          builder: (BuildContext context, WidgetRef ref, Widget? child) {
-            final GoRouter router = ref.watch(routerProvider);
-            return MaterialApp.router(
-              theme: withTestFont(AppTheme.light()),
-              routerConfig: router,
-            );
-          },
-        ),
+  testWidgets('填写账号密码并连接 → 进入书架', (WidgetTester tester) async {
+    final store = InMemoryServerStore();
+    final service = FakeConnectionService();
+    await pumpApp(tester, store: store, service: service);
+
+    await tester.enterText(find.byType(TextField).at(0), 'komga.example.com');
+    await tester.enterText(find.byType(TextField).at(1), 'me@example.com');
+    await tester.enterText(find.byType(TextField).at(2), 'secret');
+    await tester.tap(find.text('Connect'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Frieren'), findsOneWidget);
+    expect(service.passwordCalls, 1);
+    expect((await store.load())!.accountEmail, 'me@example.com');
+  });
+
+  testWidgets('连接失败 → 停留在连接页并显示错误', (WidgetTester tester) async {
+    await pumpApp(
+      tester,
+      store: InMemoryServerStore(),
+      service: FakeConnectionService(
+        onConnect: (ServerAddress address) async => throw authError(),
       ),
     );
+
+    await tester.enterText(
+      find.byType(TextField).at(0),
+      'https://k.example.com',
+    );
+    await tester.enterText(find.byType(TextField).at(1), 'me@example.com');
+    await tester.enterText(find.byType(TextField).at(2), 'bad');
+    await tester.tap(find.text('Connect'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Frieren'));
+    expect(find.text('Connect to your Komga server'), findsOneWidget);
+    expect(find.textContaining('账号或密码不正确'), findsOneWidget);
+    expect(find.text('Library'), findsNothing);
+  });
+
+  testWidgets('切到 API Key 模式只需一个输入框', (WidgetTester tester) async {
+    await pumpApp(tester, store: InMemoryServerStore());
+    await tester.tap(find.text('API key'));
     await tester.pumpAndSettle();
 
-    expect(find.text('1 / 24'), findsOneWidget);
-
-    await tester.tap(find.byTooltip('Next page'));
-    await tester.pumpAndSettle();
-    expect(find.text('2 / 24'), findsOneWidget);
+    expect(find.text('Server address'), findsOneWidget);
+    expect(find.text('API key'), findsWidgets);
+    expect(find.text('Email'), findsNothing);
+    expect(find.text('Password'), findsNothing);
   });
 }

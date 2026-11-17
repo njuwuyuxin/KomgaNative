@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -61,12 +62,17 @@ ThemeData withTestFont(ThemeData base) => base.copyWith(
 );
 
 /// 以指定画布尺寸渲染一个页面。
+///
+/// [overrides] 用于把会话/网络等依赖替换成内存实现，避免黄金图被平台通道错误污染。
+/// [settle] 设为 false 适用于含无限动画的页面（如带 spinner 的 splash）。
 Future<void> pumpGoldenScreen(
   WidgetTester tester, {
   required Widget screen,
   required Size size,
   required ThemeData theme,
   double textScale = 1.0,
+  List<Override> overrides = const <Override>[],
+  bool settle = true,
 }) async {
   tester.view.physicalSize = Size(
     size.width * kGoldenDevicePixelRatio,
@@ -77,6 +83,7 @@ Future<void> pumpGoldenScreen(
 
   await tester.pumpWidget(
     ProviderScope(
+      overrides: overrides,
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
         theme: withTestFont(theme),
@@ -91,7 +98,11 @@ Future<void> pumpGoldenScreen(
       ),
     ),
   );
-  await tester.pumpAndSettle();
+  if (settle) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump(const Duration(milliseconds: 50));
+  }
 }
 
 /// 与基线比对。基线在 `test/golden/goldens/` 下，命名约定：
