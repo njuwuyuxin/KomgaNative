@@ -1,3 +1,5 @@
+import 'package:komga_domain/komga_domain.dart';
+
 /// Komga URL 构造。
 ///
 /// 参数细节已对**真实 Komga 1.30.1 实例**逐条实测，证据与复现步骤见
@@ -26,17 +28,24 @@ class KomgaUrls {
   /// 当前用户（API Key 的归属者）。
   String me() => '$_base/api/v2/users/me';
 
+  /// 系列列表。`sort` / `readStatus` 为空时不写入查询串（用服务端默认）。
+  ///
+  /// 取值已对真实 Komga 1.30.1 验证，见 `docs/series-queries.md`。
   String series({
     int page = 0,
     int size = 20,
     String? libraryId,
     String? search,
+    SeriesSort? sort,
+    SeriesReadStatus? readStatus,
   }) {
     final q = <String, String>{
       'page': '$page',
       'size': '$size',
       if (libraryId != null) 'library_id': libraryId,
       if (search != null && search.isNotEmpty) 'search': search,
+      if (sort != null) 'sort': sortWireValue(sort),
+      if (readStatus != null) 'read_status': readStatusWireValue(readStatus),
     };
     return _withQuery('$_base/api/v1/series', q);
   }
@@ -90,3 +99,21 @@ class KomgaUrls {
     return '$url?$encoded';
   }
 }
+
+/// `SeriesSort` → Komga `sort` 参数值。
+///
+/// 全部对真实 Komga 1.30.1 验证过（`docs/series-queries.md`）：
+/// `metadata.titleSort,{asc,desc}`、`createdDate,desc`、`readProgress.lastModified,desc`。
+String sortWireValue(SeriesSort sort) => switch (sort) {
+  SeriesSort.titleAsc => 'metadata.titleSort,asc',
+  SeriesSort.titleDesc => 'metadata.titleSort,desc',
+  SeriesSort.recentlyAdded => 'createdDate,desc',
+  SeriesSort.recentlyRead => 'readProgress.lastModified,desc',
+};
+
+/// `SeriesReadStatus` → Komga `read_status` 参数值。
+String readStatusWireValue(SeriesReadStatus status) => switch (status) {
+  SeriesReadStatus.unread => 'UNREAD',
+  SeriesReadStatus.inProgress => 'IN_PROGRESS',
+  SeriesReadStatus.read => 'READ',
+};

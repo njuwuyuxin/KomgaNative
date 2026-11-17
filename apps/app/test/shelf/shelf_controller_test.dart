@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 
@@ -47,6 +48,56 @@ void main() {
     expect(state.totalElements, 6);
     expect(state.hasMore, isFalse);
     expect(state.failure, isNull);
+  });
+
+  test('换排序：带上 sort 重新拉第一页', () async {
+    final repository = FakeLibraryRepository(series: demoShelf());
+    final container = containerWith(repository);
+    await settle();
+
+    container.read(shelfProvider.notifier).setSort(SeriesSort.titleDesc);
+    await settle();
+
+    final call = repository.seriesCalls.last;
+    expect(call.sort, SeriesSort.titleDesc);
+    expect(call.page, 0);
+    expect(container.read(shelfProvider).sort, SeriesSort.titleDesc);
+    expect(container.read(shelfProvider).loading, isFalse);
+  });
+
+  test('换阅读状态筛选：带上 readStatus，并保留排序与搜索词', () async {
+    final repository = FakeLibraryRepository(series: demoShelf());
+    final container = containerWith(repository);
+    await settle();
+
+    container.read(shelfProvider.notifier).search('a');
+    await Future<void>.delayed(ShelfController.searchDebounce);
+    await settle();
+    container.read(shelfProvider.notifier).setSort(SeriesSort.titleAsc);
+    await settle();
+    container
+        .read(shelfProvider.notifier)
+        .setReadStatus(SeriesReadStatus.unread);
+    await settle();
+
+    final call = repository.seriesCalls.last;
+    expect(call.readStatus, SeriesReadStatus.unread);
+    expect(call.sort, SeriesSort.titleAsc);
+    expect(call.query, 'a');
+    expect(container.read(shelfProvider).readStatus, SeriesReadStatus.unread);
+  });
+
+  test('恢复默认排序：sort 传 null（用服务端默认）', () async {
+    final repository = FakeLibraryRepository(series: demoShelf());
+    final container = containerWith(repository);
+    await settle();
+
+    container.read(shelfProvider.notifier).setSort(SeriesSort.titleAsc);
+    await settle();
+    container.read(shelfProvider.notifier).setSort(null);
+    await settle();
+
+    expect(repository.seriesCalls.last.sort, isNull);
   });
 
   test('首屏失败：给出可重试的失败类型，不抛裸异常', () async {

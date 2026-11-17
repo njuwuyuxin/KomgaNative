@@ -1,0 +1,175 @@
+{
+    "content":  [
+                    {
+                        "id":  "0S8NJYAVNZ9DE",
+                        "libraryId":  "0S8MSMVB23CZ5",
+                        "name":  "Sunny v01",
+                        "url":  "D:\\DevTools\\_verify\\komga\\library\\Sunny v01",
+                        "created":  "2026-11-17T11:09:36Z",
+                        "lastModified":  "2026-11-17T11:09:36Z",
+                        "fileLastModified":  "2026-11-17T19:09:35Z",
+                        "booksCount":  1,
+                        "booksReadCount":  0,
+                        "booksUnreadCount":  1,
+                        "booksInProgressCount":  0,
+                        "metadata":  {
+                                         "status":  "ONGOING",
+                                         "statusLock":  false,
+                                         "title":  "Sunny v01",
+                                         "titleLock":  false,
+                                         "titleSort":  "Sunny v01",
+                                         "titleSortLock":  false,
+                                         "summary":  "",
+                                         "summaryLock":  false,
+                                         "readingDirection":  "",
+                                         "readingDirectionLock":  false,
+                                         "publisher":  "",
+                                         "publisherLock":  false,
+                                         "ageRating":  null,
+                                         "ageRatingLock":  false,
+                                         "language":  "",
+                                         "languageLock":  false,
+                                         "genres":  [
+
+                                                    ],
+                                         "genresLock":  false,
+                                         "tags":  [
+
+                                                  ],
+                                         "tagsLock":  false,
+                                         "totalBookCount":  null,
+                                         "totalBookCountLock":  false,
+                                         "sharingLabels":  [
+
+                                                           ],
+                                         "sharingLabelsLock":  false,
+                                         "links":  [
+
+                                                   ],
+                                         "linksLock":  false,
+                                         "alternateTitles":  [
+
+                                                             ],
+                                         "alternateTitlesLock":  false,
+                                         "created":  "2026-11-17T11:09:36Z",
+                                         "lastModified":  "2026-11-17T11:09:36Z"
+                                     },
+                        "booksMetadata":  {
+                                              "authors":  [
+
+                                                          ],
+                                              "notableEntities":  [
+
+                                                                  ],
+                                              "tags":  [
+
+                                                       ],
+                                              "releaseDate":  null,
+                                              "summary":  "",
+                                              "summaryNumber":  "",
+                                              "created":  "2026-11-17T11:09:36Z",
+                                              "lastModified":  "2026-11-17T11:09:37Z"
+                                          },
+                        "deleted":  false,
+                        "oneshot":  false
+                    },
+                    {
+                        "id":  "0S8NJYAVNZ9DG",
+                        "libraryId":  "0S8MSMVB23CZ5",
+                        "name":  "Vagabond v01",
+                        "url":  "D:\\DevTools\\_verify\\komga\\library\\Vagabond v01",
+                        "created":  "2026-11-17T11:09:36Z",
+                        "lastModified":  "2026-11-17T11:09:36Z",
+                        "fileLastModified":  "2026-11-17T19:09:35Z",
+                        "booksCount":  1,
+                        "booksReadCount":  0,
+                        "booksUnreadCount":  1,
+                        "booksInProgressCount":  0,
+                        "metadata":  {
+                                         "status":  "ONGOING",
+                                         "statusLock":  false,
+                                         "title":  "Vagabond v01",
+                                         "titleLock":  false,
+                                         "titleSort":  "Vagabond v01",
+                                         "titleSortLock":  false,
+                                         "summary":  "",
+                                         "summaryLock":  false,
+                                         "readingDirection":  "",
+                                         "readingDirectionLock":  false,
+                                         "publisher":  "",
+                                         "publisherLock":  false,
+                                         "ageRating":  null,
+                                         "ageRatingLock":  false,
+                                         "language":  "",
+                                         "languageLock":  false,
+                                         "genres":  [
+
+                                                    ],
+                                         "genresLock":  false,
+                                         "tags":  [
+
+                                                  ],
+                                         "tagsLock":  false,
+                                         "totalBookCount":  null,
+                                         "totalBookCountLock":  false,
+                                         "sharingLabels":  [
+
+                                                           ],
+                                         "sharingLabelsLock":  false,
+                                         "links":  [
+
+                                                   ],
+                                         "linksLock":  false,
+                                         "alternateTitles":  [
+
+                                                             ],
+                                         "alternateTitlesLock":  false,
+                                         "created":  "2026-11-17T11:09:36Z",
+                                         "lastModified":  "2026-11-17T11:09:36Z"
+                                     },
+                        "booksMetadata":  {
+                                              "authors":  [
+
+                                                          ],
+                                              "notableEntities":  [
+
+                                                                  ],
+                                              "tags":  [
+
+                                                       ],
+                                              "releaseDate":  null,
+                                              "summary":  "",
+                                              "summaryNumber":  "",
+                                              "created":  "2026-11-17T11:09:36Z",
+                                              "lastModified":  "2026-11-17T11:09:37Z"
+                                          },
+                        "deleted":  false,
+                        "oneshot":  false
+                    }
+                ],
+    "pageable":  {
+                     "pageNumber":  0,
+                     "pageSize":  20,
+                     "sort":  {
+                                  "empty":  true,
+                                  "sorted":  false,
+                                  "unsorted":  true
+                              },
+                     "offset":  0,
+                     "unpaged":  false,
+                     "paged":  true
+                 },
+    "last":  true,
+    "totalElements":  2,
+    "totalPages":  1,
+    "first":  true,
+    "size":  20,
+    "number":  0,
+    "sort":  {
+                 "empty":  true,
+                 "sorted":  false,
+                 "unsorted":  true
+             },
+    "numberOfElements":  2,
+    "empty":  false
+}

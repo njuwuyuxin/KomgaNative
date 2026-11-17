@@ -13,12 +13,14 @@ import 'package:komga_native/src/data/shelf_failure.dart';
 abstract interface class LibraryRepository {
   Future<List<Library>> libraries();
 
-  /// 系列分页。`query` 为空表示不搜索。
+  /// 系列分页。`query` 为空表示不搜索；`sort` / `readStatus` 为空用服务端默认。
   Future<PageResult<Series>> series({
     String? libraryId,
     String? query,
     int page = 0,
     int size = 30,
+    SeriesSort? sort,
+    SeriesReadStatus? readStatus,
   });
 
   /// 单个系列；已被删除时返回 null。
@@ -70,6 +72,8 @@ class KomgaLibraryRepository implements LibraryRepository {
     String? query,
     int page = 0,
     int size = 30,
+    SeriesSort? sort,
+    SeriesReadStatus? readStatus,
   }) async {
     try {
       return await _session.fetchSeries(
@@ -77,6 +81,8 @@ class KomgaLibraryRepository implements LibraryRepository {
         search: query,
         page: page,
         size: size,
+        sort: sort,
+        readStatus: readStatus,
       );
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);

@@ -48,9 +48,26 @@ class FakeLibraryRepository implements LibraryRepository {
   final String coverDirectory;
   final List<String> coverNames;
 
-  /// 记录每次 `series()` 的入参，用来断言分页/搜索/筛选真的传下去了。
-  final List<({String? libraryId, String? query, int page})> seriesCalls =
-      <({String? libraryId, String? query, int page})>[];
+  /// 记录每次 `series()` 的入参，用来断言分页/搜索/筛选/排序真的传下去了。
+  final List<
+    ({
+      String? libraryId,
+      String? query,
+      int page,
+      SeriesSort? sort,
+      SeriesReadStatus? readStatus,
+    })
+  >
+  seriesCalls =
+      <
+        ({
+          String? libraryId,
+          String? query,
+          int page,
+          SeriesSort? sort,
+          SeriesReadStatus? readStatus,
+        })
+      >[];
 
   int librariesCalls = 0;
   int coverCalls = 0;
@@ -78,8 +95,16 @@ class FakeLibraryRepository implements LibraryRepository {
     String? query,
     int page = 0,
     int size = 30,
+    SeriesSort? sort,
+    SeriesReadStatus? readStatus,
   }) async {
-    seriesCalls.add((libraryId: libraryId, query: query, page: page));
+    seriesCalls.add((
+      libraryId: libraryId,
+      query: query,
+      page: page,
+      sort: sort,
+      readStatus: readStatus,
+    ));
 
     final pending = gate;
     if (pending != null) await pending.future;
@@ -87,7 +112,7 @@ class FakeLibraryRepository implements LibraryRepository {
     final failure = seriesFailure;
     if (failure != null) throw failure;
 
-    final filtered = seriesData
+    var filtered = seriesData
         .where((Series s) => libraryId == null || s.libraryId == libraryId)
         .where(
           (Series s) =>
@@ -95,7 +120,19 @@ class FakeLibraryRepository implements LibraryRepository {
               query.isEmpty ||
               s.title.toLowerCase().contains(query.toLowerCase()),
         )
+        .where((Series s) => _matchesReadStatus(s, readStatus))
         .toList(growable: false);
+
+    // 排序只实现标题：其余取值在假仓库里没有真实时间线，断言"参数传下去了"即可。
+    if (sort == SeriesSort.titleAsc || sort == SeriesSort.titleDesc) {
+      final ascending = sort == SeriesSort.titleAsc;
+      filtered = <Series>[...filtered]
+        ..sort(
+          (Series a, Series b) => ascending
+              ? a.title.toLowerCase().compareTo(b.title.toLowerCase())
+              : b.title.toLowerCase().compareTo(a.title.toLowerCase()),
+        );
+    }
 
     final start = page * size;
     final items = start >= filtered.length
@@ -191,6 +228,17 @@ class FakeLibraryRepository implements LibraryRepository {
     final index = (int.tryParse(digits) ?? 1) - 1;
     final name = coverNames[index % coverNames.length];
     return _coverBytesFor(name);
+  }
+
+  static bool _matchesReadStatus(Series series, SeriesReadStatus? status) {
+    if (status == null) return true;
+    final read = series.booksReadCount;
+    final total = series.booksCount;
+    return switch (status) {
+      SeriesReadStatus.unread => read == 0,
+      SeriesReadStatus.read => total > 0 && read >= total,
+      SeriesReadStatus.inProgress => read > 0 && read < total,
+    };
   }
 
   Uint8List? _coverBytesFor(String name) {

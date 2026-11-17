@@ -57,6 +57,7 @@ void main() {
     ShelfFailure? failure,
     bool offline = false,
     List<Book>? ondeck,
+    Future<void> Function(WidgetTester tester)? act,
   }) async {
     final data = series ?? demoShelf();
     // 正常书架给两本"继续阅读"；空态/错误态不给（那一行本来就不该出现）。
@@ -99,6 +100,7 @@ void main() {
         httpCacheProvider.overrideWithValue(cache),
       ],
       precacheImages: covers,
+      act: act,
     );
     await expectGolden(tester, name);
   }
@@ -147,6 +149,19 @@ void main() {
       size: GoldenSizes.phone,
       theme: AppTheme.light(),
       offline: true,
+    );
+  });
+
+  testWidgets('library_sort_menu@phone_light', (WidgetTester tester) async {
+    await pumpShelfGolden(
+      tester,
+      name: 'library_sort_menu@phone_light',
+      size: GoldenSizes.phone,
+      theme: AppTheme.light(),
+      act: (WidgetTester t) async {
+        await t.tap(find.byKey(const Key('shelf-sort-menu')));
+        await t.pumpAndSettle();
+      },
     );
   });
 

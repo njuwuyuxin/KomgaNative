@@ -143,6 +143,18 @@ void main() {
       expect(page.totalElements, 0);
       expect(page.items, isEmpty);
     });
+
+    test('read_status=UNREAD 的真实响应可解析，且确实全是未读', () async {
+      final session = _sessionWith(
+        _replay(fixture('series-read-status-unread.json')),
+      );
+      final page = await session.fetchSeries(
+        readStatus: SeriesReadStatus.unread,
+      );
+
+      expect(page.items, isNotEmpty);
+      expect(page.items.every((Series s) => s.booksReadCount == 0), isTrue);
+    });
   });
 
   group('错误体的多种形态（全部来自真实抓包）', () {

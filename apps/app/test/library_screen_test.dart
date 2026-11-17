@@ -43,6 +43,36 @@ void main() {
     }
   }
 
+  testWidgets('排序菜单：选 Title Z-A 后把 sort 传下去并重排', (WidgetTester tester) async {
+    final repository = FakeLibraryRepository(series: demoShelf());
+    await pumpShelf(tester, repository);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('shelf-sort-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Title Z-A'));
+    await tester.pumpAndSettle();
+
+    expect(repository.seriesCalls.last.sort, SeriesSort.titleDesc);
+    // Z→A 时第一个系列是 Vagabond。
+    expect(find.text('Vagabond'), findsOneWidget);
+  });
+
+  testWidgets('筛选菜单：选 Read 后只显示读完的系列', (WidgetTester tester) async {
+    final repository = FakeLibraryRepository(series: demoShelf());
+    await pumpShelf(tester, repository);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('shelf-filter-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Read'));
+    await tester.pumpAndSettle();
+
+    expect(repository.seriesCalls.last.readStatus, SeriesReadStatus.read);
+    expect(find.text('Vagabond'), findsOneWidget);
+    expect(find.text('Blame!'), findsNothing);
+  });
+
   testWidgets('加载中先出骨架屏，不闪白屏', (WidgetTester tester) async {
     final gate = Completer<void>();
     final repository = FakeLibraryRepository(series: demoShelf())..gate = gate;

@@ -25,6 +25,7 @@ Komga 的跨平台客户端（iOS / Android / Android 墨水屏），阅读体�
 | [docs/environment-setup.md](docs/environment-setup.md) | 环境搭建与双机切换：免管理员安装、验收标准、踩坑表 |
 | [docs/ci.md](docs/ci.md) | GitHub Actions：概念、免费额度与计费倍率、三条流水线、排障 |
 | [docs/komga-api-verification.md](docs/komga-api-verification.md) | Komga API 实测记录：复现步骤、证据表、发现的缺陷、仍未验证项 |
+| [docs/series-queries.md](docs/series-queries.md) | 书架排序与阅读状态筛选的参数验证（真实响应顺序） |
 | [docs/tls-and-proxy.md](docs/tls-and-proxy.md) | 反代与证书：真实现象（明文 400 / 证书过期）、客户端行为矩阵、复现方式 |
 | [docs/reader.md](docs/reader.md) | 阅读器：三层分工、模式规则、设置与持久化的取舍、常亮通道的实现边界 |
 | [docs/adr/0001-certificate-trust.md](docs/adr/0001-certificate-trust.md) | ADR：为什么用 TOFU + 固定指纹，而不是"忽略证书" |
@@ -80,12 +81,12 @@ dart run tool/ci.dart check    # format + analyze + layers + 全部测试
 dart run tool/ci.dart golden   # 重新生成黄金图（仅 Windows，与 CI 一致）
 ```
 
-当前基线：**359 个测试**（纯 Dart 165 / Flutter 194），**26 张黄金图**覆盖
+当前基线：**369 个测试**（纯 Dart 169 / Flutter 200），**27 张黄金图**覆盖
 书架（手机 light / 平板 dark / 1.3 倍字号 / 墨水屏 / 空态 / 错误态 / **离线态**）、系列详情（手机 / 平板 / 墨水屏）、
 阅读器（单页 dark+eink、双页 dark+eink、纵向 dark、设置面板 dark+eink）、墨水屏设置（含存储占用）、连接页（light / eink）、
 证书面板（手机 / 平板 / 墨水屏）、启动页。
 
-其中 `packages/komga_api` 的 91 个测试里包含**两层真值校验**：
+其中 `packages/komga_api` 的 95 个测试里包含**两层真值校验**：
 `contract_test.dart` 拿官方 OpenAPI 校验客户端会构造的每个 URL；`fixtures_test.dart` 用真实服务器响应驱动解析层。
 反代与证书的异常形态同样用**真实抓包**（`test/fixtures/proxy-400-plain-http.html`）和真实异常类型驱动（`errors_test.dart`）；
 离线缓存的回退决策由 11 个用例覆盖（命中/未命中/404/401/5xx/缓存自身故障）。
@@ -104,6 +105,8 @@ dart run tool/ci.dart golden   # 重新生成黄金图（仅 Windows，与 CI �
 数据流：`LibraryScreen`（只画状态）← `ShelfController`（分页/搜索/筛选/竞态）← `LibraryRepository`（唯一碰网络的地方）← `KomgaSession`。
 
 - **继续阅读**：书架顶部一行 ondeck（读过没读完的书），读完会自动消失；点击带着系列阅读方向直接进阅读器；
+- **排序与筛选**：标题 A-Z/Z-A、最近添加、最近阅读；阅读状态（未读/在读/已读）。
+  取值只列已对真实 Komga 1.30.1 验证过的（见 [docs/series-queries.md](docs/series-queries.md)）；
 - 分页 + 滚到底自动预取（距底 600px，太晚会有"卡一下"的体感）；
 - 搜索 350ms 防抖；按库筛选；下拉刷新（空态/错误态也能拉）；
 - 封面走 `/series/{id}/thumbnail`，字节进 48 张的 LRU 缓存，失败只显示占位图**不影响整页**；

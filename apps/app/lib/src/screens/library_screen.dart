@@ -10,6 +10,7 @@ import 'package:komga_native/src/screens/reader_screen.dart';
 import 'package:komga_native/src/session/session_controller.dart';
 import 'package:komga_native/src/widgets/continue_reading_row.dart';
 import 'package:komga_native/src/widgets/offline_banner.dart';
+import 'package:komga_native/src/widgets/shelf_query_buttons.dart';
 import 'package:komga_native/src/widgets/shelf_views.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -52,7 +53,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     );
     // 回来时进度变了：让"继续阅读"重新按 ondeck 排序（读完的书会消失）。
     ref.invalidate(ondeckProvider);
-    ref.read(shelfProvider.notifier).refreshInPlace();
+    unawaited(ref.read(shelfProvider.notifier).refreshInPlace());
   }
 
   @override
@@ -64,6 +65,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       appBar: AppBar(
         title: const Text('Library'),
         actions: <Widget>[
+          const ShelfSortButton(),
+          const ShelfFilterButton(),
           IconButton(
             onPressed: _toggleSearch,
             icon: Icon(_searching ? Icons.close : Icons.search),

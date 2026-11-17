@@ -87,6 +87,8 @@ class ShelfState {
     this.hasMore = false,
     this.query = '',
     this.libraryId,
+    this.sort,
+    this.readStatus,
     this.loading = true,
     this.loadingMore = false,
     this.failure,
@@ -103,6 +105,12 @@ class ShelfState {
   final bool hasMore;
   final String query;
   final String? libraryId;
+
+  /// 排序；null = 用服务端默认顺序。
+  final SeriesSort? sort;
+
+  /// 阅读状态筛选；null = 不筛选。
+  final SeriesReadStatus? readStatus;
 
   /// 首屏（或换库/换搜索词后的重新加载）进行中。
   final bool loading;
@@ -125,6 +133,8 @@ class ShelfState {
     bool? hasMore,
     String? query,
     Object? libraryId = _unset,
+    Object? sort = _unset,
+    Object? readStatus = _unset,
     bool? loading,
     bool? loadingMore,
     ShelfFailure? failure,
@@ -140,6 +150,10 @@ class ShelfState {
     libraryId: identical(libraryId, _unset)
         ? this.libraryId
         : libraryId as String?,
+    sort: identical(sort, _unset) ? this.sort : sort as SeriesSort?,
+    readStatus: identical(readStatus, _unset)
+        ? this.readStatus
+        : readStatus as SeriesReadStatus?,
     loading: loading ?? this.loading,
     loadingMore: loadingMore ?? this.loadingMore,
     failure: clearFailure ? null : (failure ?? this.failure),
@@ -219,6 +233,33 @@ class ShelfController extends Notifier<ShelfState> {
     _debounce = Timer(searchDebounce, () => unawaited(_load(reset: true)));
   }
 
+  /// 换排序：立刻重新拉第一页（排序结果顺序变了，追加已无意义）。
+  void setSort(SeriesSort? sort) {
+    if (state.sort == sort) return;
+    _reloadWith(state.copyWith(sort: sort));
+  }
+
+  /// 换阅读状态筛选。
+  void setReadStatus(SeriesReadStatus? status) {
+    if (state.readStatus == status) return;
+    _reloadWith(state.copyWith(readStatus: status));
+  }
+
+  /// 换查询条件后重新开始：清空列表、回到第一页，但保留新条件本身。
+  void _reloadWith(ShelfState next) {
+    _debounce?.cancel();
+    state = next.copyWith(
+      series: const <Series>[],
+      page: 0,
+      totalElements: 0,
+      hasMore: false,
+      loading: true,
+      clearFailure: true,
+      clearLoadMoreFailure: true,
+    );
+    unawaited(_load(reset: true));
+  }
+
   Future<void> _load({required bool reset, bool keepItems = false}) async {
     final generation = ++_generation;
     final targetPage = reset ? 0 : state.page + 1;
@@ -237,6 +278,8 @@ class ShelfController extends Notifier<ShelfState> {
         libraryId: state.libraryId,
         query: state.query,
         page: targetPage,
+        sort: state.sort,
+        readStatus: state.readStatus,
       );
       if (generation != _generation) return;
 

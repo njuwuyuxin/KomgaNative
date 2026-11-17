@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:komga_api/komga_api.dart';
+import 'package:komga_domain/komga_domain.dart';
 import 'package:test/test.dart';
 
 import 'support/fixtures.dart';
@@ -39,6 +40,15 @@ List<_Call> _calls() {
     _Call('get', urls.me()),
     _Call('get', urls.series()),
     _Call('get', urls.series(libraryId: 'L1', search: 'abc')),
+    _Call(
+      'get',
+      urls.series(
+        sort: SeriesSort.titleAsc,
+        readStatus: SeriesReadStatus.unread,
+      ),
+    ),
+    _Call('get', urls.series(sort: SeriesSort.recentlyRead)),
+    _Call('get', urls.series(readStatus: SeriesReadStatus.inProgress)),
     _Call('get', urls.seriesBooks('S1')),
     _Call('get', urls.seriesById('S1')),
     _Call('get', urls.book('B1')),

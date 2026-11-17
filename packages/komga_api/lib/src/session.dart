@@ -140,12 +140,14 @@ class KomgaSession {
     return accountFromJson(data);
   }
 
-  /// 系列列表（分页）。`libraryId` / `search` 为空时不写入查询串。
+  /// 系列列表（分页）。`libraryId` / `search` / `sort` / `readStatus` 为空时不写入查询串。
   Future<PageResult<Series>> fetchSeries({
     int page = 0,
     int size = 20,
     String? libraryId,
     String? search,
+    SeriesSort? sort,
+    SeriesReadStatus? readStatus,
   }) async {
     final data = _requireMap(
       await _getJson(
@@ -154,6 +156,8 @@ class KomgaSession {
           size: size,
           libraryId: libraryId,
           search: search,
+          sort: sort,
+          readStatus: readStatus,
         ),
       ),
       '系列列表',
