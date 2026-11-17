@@ -40,20 +40,23 @@
 | `windows-latest` | **2×** | 我们跑黄金图的门禁 |
 | `macos-latest` | **10×** | 一次 10 分钟 iOS 构建 = 100 分钟额度 |
 
-本仓库单次运行的账（私有仓库）：
+本仓库单次运行的账：
 
 | 流水线 | 机器 | 实际耗时 | 折算额度 | 频率 |
 |---|---|---|---|---|
-| CI 门禁 | Windows | ~6 min | **~12 min** | 每次 push / PR |
-| Android APK | Ubuntu | ~8 min | **~8 min** | 仅 main + 手动 |
-| iOS 构建 | macOS | ~12 min | **~120 min** | **仅手动 / tag** |
+| CI 门禁 | Windows | ~6 min | ~12 min（私有） | 每次 push / PR |
+| Android APK | Ubuntu | ~8 min | ~8 min（私有） | main + 手动 |
+| iOS 构建 | macOS | ~12 min | **~120 min（私有）** | push / PR / tag / 手动 |
+
+> **本仓库当前是 public → 上表全部免费**，所以三条流水线都跟 push/PR 跑，额度不用管。
+> 如果哪天转成私有，需要立刻把 `build-ios.yml` 的 `pull_request` 触发删掉（macOS 10× 计费，一次 PR 跑掉 120 分钟额度）。
 
 结论：
 - **仓库公开 → 全免费，随便跑。**
-- **仓库私有 → 每月约 100 次门禁没问题；iOS 构建每月别超过 ~15 次**（这也是它被设计成手动触发的原因）。
+- **仓库私有 → 每月约 100 次门禁没问题；iOS 构建每月别超过 ~15 次**，所以私有化时 iOS 必须退回"仅手动/tag"。
 - 计费从 job 开始执行算，排队时间不算；但不足 1 分钟按 1 分钟计，所以别把一个任务拆成 20 个 30 秒的 job。
 
-> 建议：项目跑顺后公开仓库（Komga 客户端这类工具开源收益很大），CI 成本立刻归零。
+> 建议：保持 public 仓库（Komga 客户端这类工具开源收益很大），CI 成本持续为 0。
 
 ---
 
@@ -63,11 +66,12 @@
 |---|---|---|---|
 | `ci.yml` | push to main、PR、手动 | `windows-latest` | `dart run tool/ci.dart check`：格式 + 分析 + 分层规则 + 61 个测试 + 5 张黄金图 |
 | `build-android.yml` | push to main（代码路径变化）、手动 | `ubuntu-latest` | `flutter build apk --release` → 上传 APK artifact |
-| `build-ios.yml` | **手动**、`v*` tag | `macos-latest` | `flutter build ios --release --no-codesign` → 上传 `.app.zip` |
+| `build-ios.yml` | push / PR / `v*` tag / 手动 | `macos-latest` | `flutter build ios --release --no-codesign` → 上传 `.app.zip` |
 
 **为什么门禁放在 Windows**：黄金图基线以 Windows 为唯一平台（`AGENTS.md` 的约定）。在 Linux/macOS 上跑会因字体光栅化差异导致 5 张基线全部失配，而且修不好——只能换基线平台。
 
-**为什么 iOS 不跟 push**：10× 计费 + 现在还没有签名，每次跑只是"验证能编译"。等 M6 接 TestFlight 时再改成 tag 触发 + secrets 签名。
+**为什么 iOS 现在也跟 push**：仓库是 public，macOS runner 免费。三条流水线都跑，PR 能同时看到"Android 能编、iOS 能编"。
+**如果转私有**：删掉 `build-ios.yml` 的 `pull_request` 与 `push` 触发，只留 `workflow_dispatch` 和 tag。
 
 ---
 

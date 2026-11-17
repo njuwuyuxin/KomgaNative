@@ -75,7 +75,7 @@ docs/                         选型、环境、spec、ADR
 
 - `ci.yml`（Windows）：每次 push/PR 跑全量门禁，**本地绿不算绿，CI 绿才算**；
 - `build-android.yml`（Ubuntu）：main 分支 / 手动，产出 release APK；
-- `build-ios.yml`（macOS）：**仅手动或 `v*` tag**，因为 macOS runner 按 10× 计费。
+- `build-ios.yml`（macOS）：push / PR / tag / 手动，编译验证（public 仓库 macOS 免费；转私有需去掉 push/PR 触发）。
 
 改 workflow 后请同步更新 `docs/ci.md` 的流水线表。
 

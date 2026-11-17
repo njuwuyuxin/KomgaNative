@@ -20,7 +20,7 @@ Komga 的跨平台客户端（iOS / Android / Android 墨水屏），阅读体�
 |---|---|---|---|
 | `ci.yml` | push / PR / 手动 | windows | 全量门禁（含黄金图） |
 | `build-android.yml` | main / 手动 | ubuntu | release APK 产物 |
-| `build-ios.yml` | 手动 / `v*` tag | macos | `--no-codesign` 编译验证（10× 计费，故不跟 push） |
+| `build-ios.yml` | push / PR / tag / 手动 | macos | `--no-codesign` 编译验证（public 仓库 macOS 免费） |
 
 ## 快速开始
 
