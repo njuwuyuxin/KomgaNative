@@ -47,6 +47,9 @@ class KomgaUrls {
         'size': '$size',
       });
 
+  /// 单个系列（`GET /api/v1/series/{seriesId}`）。
+  String seriesById(String seriesId) => '$_base/api/v1/series/$seriesId';
+
   String book(String bookId) => '$_base/api/v1/books/$bookId';
 
   String bookPages(String bookId) => '$_base/api/v1/books/$bookId/pages';

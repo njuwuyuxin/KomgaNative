@@ -10,6 +10,7 @@ import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/screens/connection_screen.dart';
 import 'package:komga_native/src/screens/library_screen.dart';
 import 'package:komga_native/src/screens/reader_screen.dart';
+import 'package:komga_native/src/screens/series_detail_screen.dart';
 import 'package:komga_native/src/screens/settings_screen.dart';
 import 'package:komga_native/src/screens/splash_screen.dart';
 import 'package:komga_native/src/session/server_store.dart';
@@ -127,6 +128,67 @@ void main() {
       size: GoldenSizes.eink,
       theme: AppTheme.eink(),
       failure: const NetworkFailure(),
+    );
+  });
+
+  Future<void> pumpSeriesGolden(
+    WidgetTester tester, {
+    required String name,
+    required Size size,
+    required ThemeData theme,
+    bool empty = false,
+  }) async {
+    final repository = FakeLibraryRepository(
+      series: demoShelf(),
+      libraries: demoLibraries(),
+    );
+    if (empty) repository.bookCount = 0;
+
+    final covers = <Uint8List>[];
+    final seriesCover = await repository.seriesCover('s1');
+    if (seriesCover != null) covers.add(seriesCover);
+    for (var i = 1; i <= repository.bookCount; i++) {
+      final bytes = await repository.bookCover('s1-b$i');
+      if (bytes != null) covers.add(bytes);
+    }
+
+    await pumpGoldenScreen(
+      tester,
+      screen: const SeriesDetailScreen(seriesId: 's1'),
+      size: size,
+      theme: theme,
+      overrides: <Override>[
+        libraryRepositoryProvider.overrideWithValue(repository),
+      ],
+      precacheCovers: covers,
+    );
+    await expectGolden(tester, name);
+  }
+
+  testWidgets('series@phone_light', (WidgetTester tester) async {
+    await pumpSeriesGolden(
+      tester,
+      name: 'series@phone_light',
+      size: GoldenSizes.phone,
+      theme: AppTheme.light(),
+    );
+  });
+
+  testWidgets('series@tablet_dark', (WidgetTester tester) async {
+    await pumpSeriesGolden(
+      tester,
+      name: 'series@tablet_dark',
+      size: GoldenSizes.tablet,
+      theme: AppTheme.dark(),
+    );
+  });
+
+  testWidgets('series@eink', (WidgetTester tester) async {
+    await pumpSeriesGolden(
+      tester,
+      name: 'series@eink',
+      size: GoldenSizes.eink,
+      theme: AppTheme.eink(),
     );
   });
 

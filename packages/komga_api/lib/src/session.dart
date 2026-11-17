@@ -121,6 +121,19 @@ class KomgaSession {
     return pageResultFromJson(data, bookFromJson);
   }
 
+  /// 单个系列。系列已被删除时返回 `null`（调用方据此提示，而不是报错）。
+  Future<Series?> fetchSeriesById(String seriesId) async {
+    try {
+      final data = _requireMap(
+        await _getJson(_urls.seriesById(seriesId)),
+        '系列信息',
+      );
+      return seriesFromJson(data);
+    } on KomgaNotFoundError {
+      return null;
+    }
+  }
+
   Future<Book> fetchBook(String bookId) async {
     final data = _requireMap(await _getJson(_urls.book(bookId)), '书籍信息');
     return bookFromJson(data);

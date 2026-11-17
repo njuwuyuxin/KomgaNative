@@ -106,4 +106,17 @@ void main() {
     expect(find.text('Email'), findsNothing);
     expect(find.text('Password'), findsNothing);
   });
+
+  testWidgets('从书架点进系列详情，再点进阅读器', (WidgetTester tester) async {
+    await pumpApp(tester, store: InMemoryServerStore(storedServer()));
+
+    await tester.tap(find.text('Frieren'));
+    await tester.pumpAndSettle();
+    expect(find.text('5 of 12 read'), findsOneWidget);
+    expect(find.textContaining('Vol. 1'), findsOneWidget);
+
+    await tester.tap(find.textContaining('Vol. 1'));
+    await tester.pumpAndSettle();
+    expect(find.text('1 / 19'), findsOneWidget, reason: '阅读器应显示这本书的真实页数');
+  });
 }

@@ -1,8 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
+import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/screens/connection_screen.dart';
 import 'package:komga_native/src/screens/library_screen.dart';
 import 'package:komga_native/src/screens/reader_screen.dart';
+import 'package:komga_native/src/screens/series_detail_screen.dart';
 import 'package:komga_native/src/screens/settings_screen.dart';
 import 'package:komga_native/src/screens/splash_screen.dart';
 import 'package:komga_native/src/session/session_controller.dart';
@@ -73,9 +75,23 @@ GoRouter createRouter({
         ],
       ),
       GoRoute(
-        path: '/reader/:bookId',
+        path: '/series/:seriesId',
         builder: (BuildContext context, GoRouterState state) =>
-            ReaderScreen(bookId: state.pathParameters['bookId'] ?? ''),
+            SeriesDetailScreen(
+              seriesId: state.pathParameters['seriesId'] ?? '',
+            ),
+      ),
+      GoRoute(
+        path: '/reader/:bookId',
+        builder: (BuildContext context, GoRouterState state) {
+          // 从系列详情点进来时会把已抓到的 Book 一起带过来，省一次请求；
+          // 冷启动/深链没有 extra 时由阅读器自己兜底。
+          final extra = state.extra;
+          return ReaderScreen(
+            bookId: state.pathParameters['bookId'] ?? '',
+            book: extra is Book ? extra : null,
+          );
+        },
       ),
     ],
   );

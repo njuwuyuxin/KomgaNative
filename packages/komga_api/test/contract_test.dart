@@ -40,6 +40,7 @@ List<_Call> _calls() {
     _Call('get', urls.series()),
     _Call('get', urls.series(libraryId: 'L1', search: 'abc')),
     _Call('get', urls.seriesBooks('S1')),
+    _Call('get', urls.seriesById('S1')),
     _Call('get', urls.book('B1')),
     _Call('get', urls.bookPages('B1')),
     _Call('get', urls.pageImage('B1', 1)),

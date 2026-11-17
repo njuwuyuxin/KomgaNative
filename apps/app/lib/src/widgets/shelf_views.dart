@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
@@ -54,11 +55,16 @@ class ShelfGrid extends StatelessWidget {
               padding: const EdgeInsets.all(AppSpacing.md),
               sliver: SliverGrid(
                 gridDelegate: shelfGridDelegate(),
-                delegate: SliverChildBuilderDelegate(
-                  (BuildContext context, int index) =>
-                      SeriesShelfTile(series: state.series[index]),
-                  childCount: state.series.length,
-                ),
+                delegate: SliverChildBuilderDelegate((
+                  BuildContext context,
+                  int index,
+                ) {
+                  final series = state.series[index];
+                  return SeriesShelfTile(
+                    series: series,
+                    onTap: () => context.push('/series/${series.id}'),
+                  );
+                }, childCount: state.series.length),
               ),
             ),
             SliverToBoxAdapter(

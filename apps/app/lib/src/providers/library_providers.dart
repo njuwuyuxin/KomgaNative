@@ -38,6 +38,33 @@ final seriesCoverProvider = FutureProvider.family<Uint8List?, String>((
   return ref.watch(libraryRepositoryProvider).seriesCover(seriesId);
 });
 
+/// 单个系列（详情页头部用；系列被删时返回 null）。
+final seriesDetailProvider = FutureProvider.family<Series?, String>((
+  Ref ref,
+  String seriesId,
+) {
+  return ref.watch(libraryRepositoryProvider).seriesById(seriesId);
+});
+
+/// 系列下的书。
+///
+/// 一次要 100 本：绝大多数系列到不了，省掉一整套分页状态机；
+/// 真超过 100 本时 UI 会明说"只显示了前 N 本"，不装作全部都在。
+final seriesBooksProvider = FutureProvider.family<PageResult<Book>, String>((
+  Ref ref,
+  String seriesId,
+) {
+  return ref.watch(libraryRepositoryProvider).books(seriesId);
+});
+
+/// 单本书的封面。
+final bookCoverProvider = FutureProvider.family<Uint8List?, String>((
+  Ref ref,
+  String bookId,
+) {
+  return ref.watch(libraryRepositoryProvider).bookCover(bookId);
+});
+
 /// 书架一屏的状态。
 ///
 /// 刻意不用 `AsyncValue`：书架同时存在"有数据 + 正在追加下一页 + 追加失败"

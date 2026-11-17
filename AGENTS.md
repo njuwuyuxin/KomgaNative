@@ -95,8 +95,9 @@ M1 进行中。
 已完成：M0 骨架 + **连接流程**（`lib/src/session/`）+ **API 契约与真实响应验证**（`docs/komga-api-verification.md`）
 + `komga_api` 的目录读取（系列/书/页/缩略图字节）+ **真实书架**
 （`lib/src/data/library_repository.dart`、`lib/src/providers/library_providers.dart`、`lib/src/screens/library_screen.dart`：
-分页、350ms 搜索防抖、按库筛选、下拉刷新、封面 LRU、空/错态、请求竞态）。
-待完成：系列详情与书列表、阅读器真实书页与进度同步、Drift 离线缓存、i18n 与中文字体、TOFU 自签名证书。
+分页、350ms 搜索防抖、按库筛选、下拉刷新、封面 LRU、空/错态、请求竞态）
++ **系列详情**（`lib/src/screens/series_detail_screen.dart`：头部 + 书列表 + 点书进阅读器）。
+待完成：阅读器真实书页与进度同步、Drift 离线缓存、i18n 与中文字体、TOFU 自签名证书。
 
 接服务器时注意：网络访问只能出现在 `lib/src/data/` 的 Repository 层，screen/widget 里禁止 `dio`。
 新增 API 调用时同步在 `test/support/fakes.dart` 补一个假实现，保持"可离线测试"；
@@ -106,4 +107,7 @@ M1 进行中。
 - UI 只认 `ShelfFailure`（`lib/src/data/shelf_failure.dart`），不认 `KomgaError`；
 - 封面失败必须返回 `null`，绝不让装饰性资源打断整页；
 - 失败时**不清空**已有内容（刷新失败只在底部提示）；
-- 新的列表/分页逻辑一律走 `ShelfController` 的 generation 竞态保护，不要在页面里自己发请求。
+- 新的列表/分页逻辑一律走 `ShelfController` 的 generation 竞态保护，不要在页面里自己发请求；
+- **不要用 `switch (asyncValue) { AsyncError() => … }` 做错误分支**：Riverpod 3 首次加载失败给的是
+  `AsyncLoading` + `hasError`（`test/providers/async_value_behavior_test.dart` 钉住了这个行为），
+  一律按 `hasError` / `value` 判断。

@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:komga_design_system/komga_design_system.dart';
+import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/sample_data.dart';
 import 'package:komga_reader_engine/komga_reader_engine.dart';
 
@@ -8,9 +9,12 @@ import 'package:komga_reader_engine/komga_reader_engine.dart';
 /// M0 的作用不是"能看漫画"，而是把**布局计算链路**接进真实 Widget：
 /// 页面尺寸 → [computePagedLayout] → 绘制矩形。M2 会把中间换成真实的页图管线。
 class ReaderScreen extends StatefulWidget {
-  const ReaderScreen({required this.bookId, super.key});
+  const ReaderScreen({required this.bookId, this.book, super.key});
 
   final String bookId;
+
+  /// 从系列详情带过来的书；深链时为空，退回占位数据。
+  final Book? book;
 
   @override
   State<ReaderScreen> createState() => _ReaderScreenState();
@@ -24,7 +28,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final book = sampleBook(widget.bookId);
+    final book = widget.book ?? sampleBook(widget.bookId);
     final pagesCount = book?.pagesCount ?? 1;
 
     return Scaffold(

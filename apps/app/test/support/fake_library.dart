@@ -17,6 +17,8 @@ class FakeLibraryRepository implements LibraryRepository {
     List<Series>? series,
     this.seriesFailure,
     this.librariesFailure,
+    this.booksFailure,
+    this.detailFailure,
     this.coverDirectory = 'test/fixtures/covers',
     this.coverNames = const <String>['c1', 'c2', 'c3', 'c4', 'c5', 'c6'],
   }) : librariesData = libraries ?? const <Library>[],
@@ -32,6 +34,11 @@ class FakeLibraryRepository implements LibraryRepository {
   /// 非 final：测试里可以先失败、再改成功来验证"重试"。
   ShelfFailure? seriesFailure;
   ShelfFailure? librariesFailure;
+  ShelfFailure? booksFailure;
+  ShelfFailure? detailFailure;
+
+  /// 每个系列生成多少本书。
+  int bookCount = 6;
 
   final String coverDirectory;
   final List<String> coverNames;
@@ -42,6 +49,9 @@ class FakeLibraryRepository implements LibraryRepository {
 
   int librariesCalls = 0;
   int coverCalls = 0;
+  int seriesByIdCalls = 0;
+  int booksCalls = 0;
+  int bookCoverCalls = 0;
 
   /// 设成非 null 后，`series()` 会等它完成——用来稳定观察 loading 态。
   Completer<void>? gate;
@@ -99,6 +109,74 @@ class FakeLibraryRepository implements LibraryRepository {
   Future<Uint8List?> seriesCover(String seriesId) async {
     coverCalls++;
     final name = _coverBySeries[seriesId] ?? coverNames.first;
+    return _coverBytesFor(name);
+  }
+
+  @override
+  Future<Series?> seriesById(String seriesId) async {
+    seriesByIdCalls++;
+    final failure = detailFailure;
+    if (failure != null) throw failure;
+    for (final series in seriesData) {
+      if (series.id == seriesId) return series;
+    }
+    return null;
+  }
+
+  @override
+  Future<PageResult<Book>> books(
+    String seriesId, {
+    int page = 0,
+    int size = 100,
+  }) async {
+    booksCalls++;
+    final failure = booksFailure;
+    if (failure != null) throw failure;
+
+    final items = <Book>[
+      for (var i = 1; i <= bookCount; i++)
+        Book(
+          id: '$seriesId-b$i',
+          seriesId: seriesId,
+          name: 'Vol. $i',
+          number: '$i',
+          pagesCount: 18 + i,
+          sizeBytes: 1024 * 512 * i,
+          readProgress: i == 1
+              ? ReadProgress(
+                  page: 5,
+                  completed: false,
+                  lastModified: DateTime.utc(2026, 1, 1),
+                )
+              : (i == 2
+                    ? ReadProgress(
+                        page: 19,
+                        completed: true,
+                        lastModified: DateTime.utc(2026, 1, 2),
+                      )
+                    : null),
+        ),
+    ];
+
+    return PageResult<Book>(
+      items: items,
+      totalElements: items.length,
+      page: page,
+      size: size,
+    );
+  }
+
+  @override
+  Future<Uint8List?> bookCover(String bookId) async {
+    bookCoverCalls++;
+    // 按 id 结尾的数字选图，保证同一本书每次都是同一张（黄金图才稳定）。
+    final digits = RegExp(r'(\d+)$').firstMatch(bookId)?.group(1) ?? '1';
+    final index = (int.tryParse(digits) ?? 1) - 1;
+    final name = coverNames[index % coverNames.length];
+    return _coverBytesFor(name);
+  }
+
+  Uint8List? _coverBytesFor(String name) {
     final cached = _coverBytes[name];
     if (cached != null) return cached;
 
