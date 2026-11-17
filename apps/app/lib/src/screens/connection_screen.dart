@@ -63,14 +63,17 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
     final hint = disconnected?.hint;
     final certificate = disconnected?.certificate;
 
-    // HTTP + 非本机时提前警告，避免用户把密码明文发到公网。
+    // HTTP + 公网时提前警告，避免用户把凭据明文发出去。
+    // 注意措辞：端口只开 HTTPS 时我们会自动换协议，但第一次尝试确实带凭据，
+    // 所以警告不能写成"可能会"。
     String? insecureWarning;
     try {
       final address = ServerAddress.parse(_url.text);
       if (address.isInsecureRemote) {
         insecureWarning =
             'This address is outside your local network and uses plain HTTP. '
-            'Your credentials would be sent unencrypted.';
+            'If the port only accepts HTTPS the app switches automatically; '
+            'otherwise your credentials would be sent unencrypted.';
       }
     } on FormatException {
       insecureWarning = null;
