@@ -245,6 +245,7 @@ void main() {
     required Size size,
     required ThemeData theme,
     List<int> precachePages = const <int>[1],
+    bool settleAfterActWithRealTime = false,
     Future<void> Function(WidgetTester tester)? act,
     bool forceEink = false,
   }) async {
@@ -270,6 +271,7 @@ void main() {
         if (forceEink) settingsProvider.overrideWith(EinkSettings.new),
       ],
       precacheImages: pageBytes,
+      settleAfterActWithRealTime: settleAfterActWithRealTime,
       act: act,
     );
     await expectGolden(tester, name);
@@ -348,6 +350,23 @@ void main() {
       theme: AppTheme.dark(),
       precachePages: <int>[1, 2],
       act: (WidgetTester t) => pickMode(t, ReadingMode.verticalScroll),
+    );
+  });
+
+  testWidgets('reader_pages@phone_dark', (WidgetTester tester) async {
+    await pumpReaderGolden(
+      tester,
+      name: 'reader_pages@phone_dark',
+      size: GoldenSizes.phone,
+      theme: AppTheme.dark(),
+      precachePages: <int>[1, 2, 3],
+      // 缩略图用 cacheWidth 解码，属于真实异步解码：假时钟推不动，必须放一段
+      // 真实时间再截屏（否则缩略图全是黑块）。
+      settleAfterActWithRealTime: true,
+      act: (WidgetTester t) async {
+        await t.tap(find.byKey(const Key('reader-pages-button')));
+        await t.pumpAndSettle();
+      },
     );
   });
 

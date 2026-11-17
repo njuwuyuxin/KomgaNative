@@ -10,6 +10,7 @@ import 'package:komga_native/src/providers/progress_providers.dart';
 import 'package:komga_native/src/providers/reader_prefs_provider.dart';
 import 'package:komga_native/src/providers/reader_providers.dart';
 import 'package:komga_native/src/providers/settings_provider.dart';
+import 'package:komga_native/src/widgets/page_navigator_sheet.dart';
 import 'package:komga_native/src/widgets/reader_chrome.dart';
 import 'package:komga_native/src/widgets/reader_paged_view.dart';
 import 'package:komga_native/src/widgets/reader_palette.dart';
@@ -179,6 +180,24 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     _scheduleSave(page, total);
   }
 
+  /// 缩略图跳页：选中后走和设置面板跳页同一条路径（纵向模式也要滚动过去）。
+  void _openPages({
+    required ReaderPalette palette,
+    required int page,
+    required int total,
+  }) {
+    unawaited(
+      showPageNavigator(
+        context,
+        bookId: widget.bookId,
+        total: total,
+        currentPage: page,
+        palette: palette,
+        onJump: (int target) => _jumpToPage(target, total),
+      ),
+    );
+  }
+
   /// 设置面板里跳到某页：单页/双页直接换页，纵向模式额外发一次滚动跳转。
   void _jumpToPage(int page, int total) {
     final target = page.clamp(1, total);
@@ -327,6 +346,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                                 palette: palette,
                                 mode: mode,
                                 offline: offline,
+                                onOpenPages: () => _openPages(
+                                  palette: palette,
+                                  page: page,
+                                  total: total,
+                                ),
                                 onOpenSettings: () => _openSettings(
                                   palette: palette,
                                   page: page,

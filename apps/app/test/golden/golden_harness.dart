@@ -80,6 +80,10 @@ Future<void> pumpGoldenScreen(
   List<Override> overrides = const <Override>[],
   bool settle = true,
   List<Uint8List> precacheImages = const <Uint8List>[],
+
+  /// act 结束后再放一小段**真实时间**给异步解码（`Image.memory(cacheWidth:)` 的
+  /// ResizeImage 走真实解码，测试的假时钟推不动它，会截到黑块）。
+  bool settleAfterActWithRealTime = false,
   Future<void> Function(WidgetTester tester)? act,
 }) async {
   tester.view.physicalSize = Size(
@@ -129,6 +133,12 @@ Future<void> pumpGoldenScreen(
   if (act != null) {
     await act(tester);
     await tester.pumpAndSettle();
+    if (settleAfterActWithRealTime) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 300)),
+      );
+      await tester.pumpAndSettle();
+    }
   }
 }
 
