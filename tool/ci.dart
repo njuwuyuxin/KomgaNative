@@ -38,6 +38,7 @@ Future<void> main(List<String> args) async {
     'analyze' => await analyze(),
     'test' => await test(),
     'golden' => await golden(),
+    'install' => await installApp(deviceId: args.length > 1 ? args[1] : null),
     'contract' => await contract(),
     'help' || '-h' || '--help' => await help(),
     _ => await help(unknown: command),
@@ -56,6 +57,7 @@ KomgaNative CI
   analyze   只跑静态分析
   test      只跑测试（纯 Dart 包用 dart test，Flutter 包用 flutter test）
   golden    重新生成黄金图基线（仅 Windows，与 CI 一致）
+  install [device]  构建 release APK 并装到已启动的模拟器/真机（提交后必跑）
   contract  契约测试（M1）
 ''');
   return unknown == null ? 0 : 64;
@@ -231,6 +233,23 @@ Future<int> contract() async {
   stdout.writeln('  2. POST /api/v1/claim 初始化管理员');
   stdout.writeln('  3. 录制夹具到 test/fixtures/，再用真实响应跑分页/进度/页图用例');
   return 0;
+}
+
+/// 构建 release 包并装到已连接的设备（一般是模拟器）。
+///
+/// 规则写在 AGENTS.md「提交后：装到模拟器」：每次代码提交后都要跑一次，
+/// 用真包确认能启动。用 `flutter install` 而不是手写 adb 的原因：
+/// adb 的路径由 Flutter 自己管理，换机器/换 shell 不用额外配 PATH；
+/// `--release` 会先构建再安装，与 CI 的 `flutter build apk --release` 同一条链路。
+///
+/// 不传 [deviceId] 时交给 Flutter 选（只有一台设备时最省事）；多设备用
+/// `dart run tool/ci.dart install emulator-5554`。
+Future<int> installApp({String? deviceId}) async {
+  final args = <String>['install', '--release'];
+  if (deviceId != null && deviceId.isNotEmpty) {
+    args.addAll(<String>['-d', deviceId]);
+  }
+  return runProc('flutter', args, workingDirectory: 'apps/app');
 }
 
 // ---------------------------------------------------------------- layer rules

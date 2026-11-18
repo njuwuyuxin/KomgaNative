@@ -54,6 +54,22 @@ docs/                         选型、环境、spec、ADR
 - [ ] 涉及 API 的变更：新端点先加进 `KomgaUrls`（contract_test 会自动覆盖），解析层用 `test/fixtures/` 里的**真实响应**驱动
 - [ ] `dart run tool/ci.dart check` 全绿
 - [ ] 相关 `docs/` 段落已更新
+- [ ] 代码提交后已装到模拟器：`dart run tool/ci.dart install`（见下节）
+
+## 提交后：装到模拟器（强制）
+
+每次**代码提交后**都要把 release 包装到正在运行的模拟器上，确认不是"测试绿、启动崩"：
+
+```bash
+dart run tool/emulator.dart                    # 没启动先启动（见 docs/environment-setup.md §11）
+dart run tool/ci.dart install                  # 构建 release APK 并安装
+dart run tool/ci.dart install emulator-5554    # 多设备时显式指定
+```
+
+- 装的是 **release**（debug 签名），与 CI 的 `flutter build apk --release` 同一条构建链路；
+- 装完打开 KomgaNative，至少确认能启动、书架能出内容；
+- 纯文档提交可以跳过，但要在最终回复里说明"本次未跑设备"；
+- 命令实现在 `tool/ci.dart` 的 `installApp`：不要自己拼 `adb install`（adb 的路径由 Flutter 管理）。
 
 ## API 真值规则（重要）
 
