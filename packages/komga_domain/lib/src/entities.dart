@@ -166,6 +166,10 @@ class Series {
     this.booksReadCount = 0,
     this.readingDirection = ReadingDirection.unknown,
     this.summary,
+    this.authors = const <String>[],
+    this.publisher,
+    this.releaseDate,
+    this.tags = const <String>[],
   });
 
   final String id;
@@ -174,7 +178,21 @@ class Series {
   final int booksCount;
   final int booksReadCount;
   final ReadingDirection readingDirection;
+
+  /// 简介（系列元数据；系列没写时退回书籍聚合的简介）。
   final String? summary;
+
+  /// 作者名（来自书籍元数据的聚合，UI-P2-4）。可能是空的——很多库不填。
+  final List<String> authors;
+
+  /// 出版社（系列元数据优先，其次书籍聚合）。
+  final String? publisher;
+
+  /// 出版日期（书籍聚合里的 `releaseDate`，只有日期没有时间）。
+  final DateTime? releaseDate;
+
+  /// 标签（书籍聚合；不含流派 genres，那是另一个字段）。
+  final List<String> tags;
 
   double get progress {
     if (booksCount <= 0) return 0;

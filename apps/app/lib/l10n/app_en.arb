@@ -284,5 +284,14 @@
   "coverMedium": "Medium",
   "coverLarge": "Large",
   "sortBooksCount": "Most books",
-  "sortReleaseDate": "Release date"
+  "sortReleaseDate": "Release date",
+  "startReading": "Start reading",
+  "continueReadingNumber": "Continue · #{number}",
+  "@continueReadingNumber": {
+    "placeholders": {
+      "number": {"type": "String"}
+    }
+  },
+  "showMore": "Show more",
+  "showLess": "Show less"
 }

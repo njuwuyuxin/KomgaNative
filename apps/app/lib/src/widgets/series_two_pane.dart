@@ -10,7 +10,7 @@ import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/widgets/book_download_button.dart';
 import 'package:komga_native/src/widgets/context_menu.dart';
 import 'package:komga_native/src/widgets/cover_image.dart';
-import 'package:komga_native/src/widgets/series_shelf_tile.dart';
+import 'package:komga_native/src/widgets/series_header.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 打开一本书（带上系列阅读方向），由 `SeriesDetailScreen` 负责路由与刷新。
@@ -45,7 +45,17 @@ class SeriesSinglePane extends StatelessWidget {
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: <Widget>[
           SliverToBoxAdapter(
-            child: SeriesHeader(series: series, seriesId: seriesId),
+            child: SeriesHeader(
+              series: series,
+              seriesId: seriesId,
+              books: books.items,
+              onOpenBook: (Book book) => unawaited(
+                onOpenBook(
+                  book,
+                  series?.readingDirection ?? ReadingDirection.unknown,
+                ),
+              ),
+            ),
           ),
           ...seriesBookSlivers(
             context,
@@ -89,7 +99,17 @@ class SeriesTwoPane extends StatelessWidget {
           Expanded(
             flex: 2,
             child: SingleChildScrollView(
-              child: SeriesHeader(series: series, seriesId: seriesId),
+              child: SeriesHeader(
+                series: series,
+                seriesId: seriesId,
+                books: books.items,
+                onOpenBook: (Book book) => unawaited(
+                  onOpenBook(
+                    book,
+                    series?.readingDirection ?? ReadingDirection.unknown,
+                  ),
+                ),
+              ),
             ),
           ),
           const VerticalDivider(width: AppSizes.hairline),
@@ -159,115 +179,6 @@ List<Widget> seriesBookSlivers(
         ),
       ),
   ];
-}
-
-/// 头部：封面 + 标题 + 已读进度。
-class SeriesHeader extends ConsumerWidget {
-  const SeriesHeader({required this.series, required this.seriesId, super.key});
-
-  final Series? series;
-  final String seriesId;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    final cover = ref.watch(seriesCoverProvider(seriesId));
-    final bytes = switch (cover) {
-      AsyncData<Uint8List?>(:final value) => value,
-      _ => null,
-    };
-    final read = series?.booksReadCount ?? 0;
-    final total = series?.booksCount ?? 0;
-    // Hero 的另一半：tag 必须和书架卡片上那个一模一样（UI-P2-2）。
-    // 墨水屏不飞：灰阶屏上的共享元素只会变成一层拖影。
-    final coverBox = SizedBox(
-      width: AppSpacing.xxl * 2,
-      height: AppSpacing.xxl * 3,
-      child: bytes == null
-          ? DecoratedBox(
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
-              ),
-            )
-          : CoverImage(bytes: bytes),
-    );
-    final coverShape = AppShapes.of(context, AppShapes.panel);
-    final coverWidget = DecoratedBox(
-      decoration: ShapeDecoration(
-        shape: coverShape,
-        shadows: AppShadows.of(context, AppShadows.cover),
-      ),
-      child: ClipPath(
-        clipper: ShapeBorderClipper(shape: coverShape),
-        child: coverBox,
-      ),
-    );
-
-    return Padding(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          if (AppTheme.isEink(theme))
-            coverWidget
-          else
-            Hero(tag: seriesHeroTag(seriesId), child: coverWidget),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  series?.title ?? l10n.seriesFallbackTitle,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleMedium,
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  l10n.readOfTotal(read, total),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(AppRadii.sm),
-                  child: LinearProgressIndicator(
-                    value: series?.progress ?? 0,
-                    minHeight: AppSpacing.xs,
-                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                  ),
-                ),
-                if (series != null &&
-                    series!.readingDirection != ReadingDirection.unknown) ...[
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    _directionLabel(l10n, series!.readingDirection),
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  static String _directionLabel(
-    AppLocalizations l10n,
-    ReadingDirection direction,
-  ) => switch (direction) {
-    ReadingDirection.rightToLeft => l10n.readsRightToLeft,
-    ReadingDirection.leftToRight => l10n.readsLeftToRight,
-    ReadingDirection.vertical => l10n.readsVertical,
-    ReadingDirection.webtoon => l10n.readsWebtoon,
-    ReadingDirection.unknown => '',
-  };
 }
 
 /// 一本书：封图 + 标题 + 页数/已读状态，点进去读。

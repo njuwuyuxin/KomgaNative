@@ -73,6 +73,60 @@ void main() {
       expect(series.booksCount, 1);
       expect(series.booksReadCount, 0);
       expect(series.progress, 0);
+      // 真实响应里这本书的作者/标签/出版日期都是空，解析层要给出空集合而不是 null 崩溃。
+      expect(series.authors, isEmpty);
+      expect(series.tags, isEmpty);
+      expect(series.releaseDate, isNull);
+    });
+
+    test('系列元数据：作者 / 出版社 / 出版日期 / 标签（UI-P2-4）', () {
+      // 这两项在真实 fixture 里是空的（那个测试库没填元数据），所以这里用构造的
+      // 响应验证**字段映射**：结构照 OpenAPI 的 SeriesDto + BookMetadataAggregationDto。
+      final series = seriesFromJson(<Object?, Object?>{
+        'id': 'S1',
+        'libraryId': 'L1',
+        'name': 'folder-name',
+        'booksCount': 3,
+        'booksReadCount': 1,
+        'metadata': <Object?, Object?>{
+          'title': 'Frieren',
+          'publisher': 'Shogakukan',
+          'summary': '系列简介',
+          'readingDirection': 'RIGHT_TO_LEFT',
+        },
+        'booksMetadata': <Object?, Object?>{
+          'summary': '来自书籍的简介',
+          'releaseDate': '2019-04-15',
+          'authors': <Object?>[
+            <Object?, Object?>{'name': 'Kanehito Yamada', 'role': 'WRITER'},
+            <Object?, Object?>{'name': 'Tsukasa Abe', 'role': 'PENCILLER'},
+            <Object?, Object?>{'name': 'Kanehito Yamada', 'role': 'WRITER'},
+            <Object?, Object?>{'role': 'WRITER'},
+          ],
+          'tags': <Object?>['fantasy', 42, 'adventure'],
+        },
+      });
+
+      expect(series.title, 'Frieren');
+      expect(series.summary, '系列简介', reason: '系列自己的简介优先于书籍聚合的');
+      expect(series.publisher, 'Shogakukan');
+      expect(series.authors, <String>['Kanehito Yamada', 'Tsukasa Abe']);
+      expect(series.tags, <String>['fantasy', 'adventure']);
+      expect(series.releaseDate, DateTime(2019, 4, 15));
+      expect(series.readingDirection, ReadingDirection.rightToLeft);
+    });
+
+    test('系列没有自己的简介时退回书籍聚合的简介', () {
+      final series = seriesFromJson(<Object?, Object?>{
+        'id': 'S1',
+        'libraryId': 'L1',
+        'name': 'Frieren',
+        'metadata': <Object?, Object?>{'title': 'Frieren'},
+        'booksMetadata': <Object?, Object?>{'summary': '来自书籍的简介'},
+      });
+      expect(series.summary, '来自书籍的简介');
+      expect(series.publisher, isNull);
+      expect(series.authors, isEmpty);
     });
 
     test('系列下的书：pagesCount / mediaProfile / number（服务器给的是 int）', () async {

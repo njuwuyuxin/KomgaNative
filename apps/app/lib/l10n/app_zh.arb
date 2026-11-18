@@ -185,5 +185,14 @@
   "coverMedium": "中",
   "coverLarge": "大",
   "sortBooksCount": "书籍数量",
-  "sortReleaseDate": "发行日期"
+  "sortReleaseDate": "发行日期",
+  "startReading": "开始阅读",
+  "continueReadingNumber": "继续阅读 第 {number} 本",
+  "@continueReadingNumber": {
+    "placeholders": {
+      "number": {"type": "String"}
+    }
+  },
+  "showMore": "展开",
+  "showLess": "收起"
 }

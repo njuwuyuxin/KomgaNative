@@ -57,7 +57,11 @@ Account accountFromJson(Map<Object?, Object?> json) {
 
 Series seriesFromJson(Map<Object?, Object?> json) {
   final metadata = asMap(json['metadata']);
+  // 书籍聚合（`booksMetadata`）：作者、出版日期、标签这些"系列自己没有"的字段
+  // 在 Komga 里是从书聚合出来的（字段清单见 OpenAPI 的 BookMetadataAggregationDto）。
+  final aggregate = asMap(json['booksMetadata']);
   final title = _str(metadata?['title']);
+  final summary = _strOrNull(metadata?['summary']);
   return Series(
     id: _str(json['id']),
     libraryId: _str(json['libraryId']),
@@ -68,8 +72,29 @@ Series seriesFromJson(Map<Object?, Object?> json) {
     readingDirection: ReadingDirection.parse(
       _strOrNull(metadata?['readingDirection']),
     ),
-    summary: _strOrNull(metadata?['summary']),
+    summary: summary ?? _strOrNull(aggregate?['summary']),
+    authors: _authorNames(aggregate?['authors']),
+    publisher: _strOrNull(metadata?['publisher']),
+    releaseDate: parseServerDate(aggregate?['releaseDate']),
+    tags: _stringList(aggregate?['tags']),
   );
+}
+
+/// `authors` 是 `[{name, role}]` 数组（AuthorDto）；只取名字，空名字丢掉。
+List<String> _authorNames(Object? raw) {
+  if (raw is! List<Object?>) return const <String>[];
+  final names = <String>[];
+  for (final entry in raw) {
+    final name = _str(asMap(entry)?['name']).trim();
+    if (name.isNotEmpty && !names.contains(name)) names.add(name);
+  }
+  return List<String>.unmodifiable(names);
+}
+
+/// 字符串数组（标签）。非字符串项直接跳过，不让一条脏数据毁掉整个系列。
+List<String> _stringList(Object? raw) {
+  if (raw is! List<Object?>) return const <String>[];
+  return List<String>.unmodifiable(raw.whereType<String>());
 }
 
 Book bookFromJson(Map<Object?, Object?> json) {

@@ -295,6 +295,19 @@ Panels 的高级感主要来自三点，和控件本身关系不大：
   Komga 就无法验证。理由与补测方法写在 `docs/series-queries.md`。
 - 平板双指捏合调封面大小没做：会和网格滚动/下拉刷新抢手势，收益不如菜单直接选。
 
+**进度（2026-11-18）：P2-4 系列详情页重做。**
+
+| 落地 |
+|---|
+| 领域层 `Series` 新增 `authors` / `publisher` / `releaseDate` / `tags`；`seriesFromJson` 从 `metadata.publisher` 与 `booksMetadata`（作者数组、`releaseDate`、标签、简介）解析，空值给空集合；`komga_api` 导出 `parsers.dart`，fixture 测试覆盖"真实响应里这几项是空的也不崩"与"构造样本的字段映射" |
+| 头部抽成 `widgets/series_header.dart`（`series_two_pane.dart` 380 → 292 行）：模糊放大的封面当背景（`ImageFiltered` 而不是 `BackdropFilter`——模糊的是封面自己，便宜且不违反分层规则）、渐变遮罩、封面 + 标题 + 已读进度 + 作者/出版社/年份 + 标签胶囊 + 可展开简介 |
+| 主按钮 `series-main-action`：`data/book_selection.dart` 的 `nextBookToRead` 决定"下一本该读的"（优先在读 → 否则第一本未读 → 全读完则不显示按钮），文案是"继续阅读 第 N 本"或"开始阅读"；纯逻辑有单测 |
+| 墨水屏：不做模糊背景，纸色 + 墨色下边框 |
+
+**P2-4 还差一项**：书列表**分页**（当前仍是一次 100 本 + 超出时提示）。要做需要把
+`seriesBooksProvider` 从 `FutureProvider` 换成带 `loadMore` 的 Notifier，并同步改
+`series_detail_screen` / `series_two_pane` 的入参与几个测试，单独一轮做更稳。
+
 ---
 
 ## P3：长尾功能

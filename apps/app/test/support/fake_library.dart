@@ -55,6 +55,11 @@ class FakeLibraryRepository implements LibraryRepository {
   /// 每个系列生成多少本书。
   int bookCount = 6;
 
+  /// 书列表里要不要带阅读进度（第 1 本在读、第 2 本已读完）。
+  ///
+  /// 关掉就是"一本都没读过"的系列，用来测详情页的主按钮文案（UI-P2-4）。
+  bool bookProgress = true;
+
   final String coverDirectory;
   final List<String> coverNames;
 
@@ -224,19 +229,21 @@ class FakeLibraryRepository implements LibraryRepository {
           number: '$i',
           pagesCount: 18 + i,
           sizeBytes: 1024 * 512 * i,
-          readProgress: i == 1
-              ? ReadProgress(
-                  page: 5,
-                  completed: false,
-                  lastModified: DateTime.utc(2026, 1, 1),
-                )
-              : (i == 2
+          readProgress: !bookProgress
+              ? null
+              : (i == 1
                     ? ReadProgress(
-                        page: 19,
-                        completed: true,
-                        lastModified: DateTime.utc(2026, 1, 2),
+                        page: 5,
+                        completed: false,
+                        lastModified: DateTime.utc(2026, 1, 1),
                       )
-                    : null),
+                    : (i == 2
+                          ? ReadProgress(
+                              page: 19,
+                              completed: true,
+                              lastModified: DateTime.utc(2026, 1, 2),
+                            )
+                          : null)),
         ),
     ];
 
