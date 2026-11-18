@@ -99,17 +99,26 @@
 已由门禁覆盖：
 
 - `packages/komga_platform/test/hardware_keys_test.dart`：`up/down` 映射、未知参数忽略、
-  无原生实现时静默空流；
+  无原生实现时静默空流，以及**通道参数形状**（`setActive` 必须发 `{"active": bool}`）；
 - `apps/app/test/reader_screen_test.dart`：单页按键翻页、双页按屏翻页、纵向模式忽略；
 - `apps/app/test/series_detail_screen_test.dart`：宽屏两栏 / 手机单栏的几何断言；
 - `apps/app/test/a11y_test.dart`：语义与 48 点击区；
 - 黄金图：`series@tablet_dark`（重生成）、`series@tablet_two_pane`（新增）。
 
+已在模拟器上验证（Android release，2026-11-18）：
+
+- `adb shell input keyevent 25` / `24` 在阅读器里分别是下一页 / 上一页（页码 21→22→21），
+  并且**系统音量面板不再弹出**（之前会弹，见下）；
+- 这里修过一个只在设备上暴露的 bug：`setActive` 以前把**裸 bool** 当通道参数发，
+  原生侧 `call.argument<Boolean>("active")` 拿到非 Map 抛 `ClassCastException`
+  （logcat: `MethodChannel#komganative/device: java.lang.ClassCastException`），
+  调用失败又被 Dart 侧的 `on PlatformException` 吞掉 → `volumeKeysEnabled` 恒为 false，
+  音量键只调系统音量、不翻页。单测用 `FakeHardwareKeys`，只验证了 Dart 侧事件流，
+  所以"功能编译通过、测试全绿、真机上不工作"。现在的契约测试补上了这一层。
+- 仍未验证：真实墨水屏设备（Boox / Kindle）上的按键手感与刷新表现。
+
 未验证：
 
-- **没有在真机上按音量键验证**"翻页 + 不调系统音量"：Dart 侧只验证了假事件流；
-  Kotlin 侧已通过本地 `flutter build apk --debug`（Gradle `assembleDebug`，约 23s），
-  但编译通过不等于行为正确；
 - iOS 的屏幕常亮仍未实现（见 `docs/reader.md`）：没有 macOS 环境，不写没跑过的
   `AppDelegate` 代码；iOS 音量键也没有实现；
 - 没有用 TalkBack / VoiceOver 做人工走查；语义测试只到语义树，不等于真实读屏体验。

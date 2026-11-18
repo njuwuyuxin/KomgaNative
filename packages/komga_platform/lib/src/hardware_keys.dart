@@ -77,7 +77,12 @@ class ChannelHardwareKeys implements HardwareKeys {
   @override
   Future<void> setActive(bool active) async {
     try {
-      await _channel.invokeMethod<void>('volumeKeysEnabled', active);
+      // 必须是 `{"active": bool}`：原生侧用 `call.argument<Boolean>("active")` 取，
+      // 传裸 bool 会抛 ClassCastException → 通道报错 → 这里的 catch 吞掉，
+      // 表现就是"音量键翻页静默失效，按下去只调系统音量"（真机上踩过）。
+      await _channel.invokeMethod<void>('volumeKeysEnabled', <String, Object?>{
+        'active': active,
+      });
     } on MissingPluginException {
       // 平台没实现：什么都不会发生，音量键由系统处理。
     } on PlatformException {

@@ -39,6 +39,29 @@ void main() {
     keys.dispose();
   });
 
+  test('setActive 发给原生的是 {"active": bool}，不是裸布尔', () async {
+    final calls = <MethodCall>[];
+    messenger.setMockMethodCallHandler(channel, (MethodCall call) async {
+      calls.add(call);
+      return null;
+    });
+
+    final keys = ChannelHardwareKeys(channel: channel);
+    await keys.setActive(true);
+    await keys.setActive(false);
+    keys.dispose();
+
+    final payloads = calls
+        .where((MethodCall call) => call.method == 'volumeKeysEnabled')
+        .toList();
+    expect(payloads, hasLength(2));
+    // 原生侧是 `call.argument<Boolean>("active")`：传裸 bool 会抛
+    // ClassCastException，通道报错后被这里 catch 吞掉，表现就是
+    // "音量键翻页静默失效、按下去只调系统音量"（模拟器上踩过）。
+    expect(payloads.first.arguments, <String, Object?>{'active': true});
+    expect(payloads.last.arguments, <String, Object?>{'active': false});
+  });
+
   test('没有原生实现时安静降级为空流', () async {
     messenger.setMockMethodCallHandler(channel, null);
     final keys = ChannelHardwareKeys(channel: channel);
