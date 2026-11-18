@@ -39,6 +39,10 @@ class FakeReaderRepository implements ReaderRepository {
 
   int pageImageCalls = 0;
 
+  /// 每次 `pageImage` 被请求的页码（1 基，按调用顺序）。
+  /// 预加载测试用它断言"翻过去之前就已经取过"，而不是只看总数。
+  final List<int> pageRequests = <int>[];
+
   final Map<String, Uint8List> _bytes = <String, Uint8List>{};
 
   @override
@@ -71,6 +75,7 @@ class FakeReaderRepository implements ReaderRepository {
   @override
   Future<Uint8List> pageImage(String bookId, int page) async {
     pageImageCalls++;
+    pageRequests.add(page);
     final failure = imageFailure;
     if (failure != null) throw failure;
 

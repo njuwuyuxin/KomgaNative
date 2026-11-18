@@ -378,6 +378,65 @@ void main() {
     });
   });
 
+  group('页图预加载', () {
+    testWidgets('打开第一页就把下一屏取好了（不是翻页时才现取）', (WidgetTester tester) async {
+      final repository = FakeReaderRepository(pageCount: 5);
+      await pumpReader(tester, repository: repository, book: demoReaderBook());
+
+      // 屏幕上只有第 1 页，但 2、3 已经取过；否则第一次翻页要等网络，
+      // 那段空档就是用户看到的"闪一下黑"。
+      expect(repository.pageRequests, containsAll(<int>[2, 3]));
+      expect(
+        repository.pageRequests,
+        isNot(contains(5)),
+        reason: '只预热前后一屏，不该把整本都拖下来',
+      );
+    });
+
+    testWidgets('翻页后预取跟着走：新位置的前后一屏都取', (WidgetTester tester) async {
+      final repository = FakeReaderRepository(pageCount: 5);
+      await pumpReader(tester, repository: repository, book: demoReaderBook());
+
+      await tapRight(tester);
+      expect(find.text('2 / 5'), findsOneWidget);
+      // 第 2 页的下一屏是 3、4，上一屏是 1。
+      expect(repository.pageRequests, containsAll(<int>[3, 4]));
+    });
+
+    testWidgets('双页模式按"屏"预取：下一屏的第二页也不能漏', (WidgetTester tester) async {
+      final repository = FakeReaderRepository(pageCount: 6);
+      await pumpReader(tester, repository: repository, book: demoReaderBook());
+      await pickMode(tester, ReaderModeChoice.double);
+
+      // 第 1 屏只有封面，翻到第 2 屏（2–3）。
+      await tapRight(tester);
+      expect(find.text('2–3 / 6'), findsOneWidget);
+      // 下一屏是 4–5。只按 `page + 1` 算的话第 5 页永远轮不到预热，
+      // 结果就是"翻一屏有一页是空的"（每两屏闪一次）。
+      expect(repository.pageRequests, containsAll(<int>[4, 5]));
+    });
+
+    testWidgets('紧接着的那一屏会被解码进 ImageCache（翻页首帧就有像素）', (
+      WidgetTester tester,
+    ) async {
+      final repository = FakeReaderRepository();
+      await pumpReader(tester, repository: repository, book: demoReaderBook());
+
+      final next = await repository.warmPage(2);
+      // 测试的假时钟推不动真实解码，必须放一段真实时间。
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 300)),
+      );
+
+      expect(next, isNotNull);
+      expect(
+        PaintingBinding.instance.imageCache.containsKey(MemoryImage(next!)),
+        isTrue,
+        reason: '只抓字节不预解码的话，翻过去第一帧是空白（黑屏）',
+      );
+    });
+  });
+
   group('墨水屏', () {
     testWidgets('阅读区改白底黑字（黑底会触发整屏全刷）', (WidgetTester tester) async {
       await pumpReader(tester, book: demoReaderBook(), forceEink: true);

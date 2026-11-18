@@ -45,12 +45,16 @@ final readerPagesProvider = FutureProvider.family<List<PageInfo>, String>((
 /// 一页的图片字节。family 参数用 record，值相等即同一个 provider。
 typedef PageRequest = ({String bookId, int page});
 
+/// 单页字节。**故意是 autoDispose**：Riverpod 3 默认不回收，页图一张几百 KB
+/// 到 2 MB，读一本 200 页的书就等于把整本留在内存里（还会一直涨）。
+/// 只有屏幕上正在看的那一屏需要持有字节；翻走的页交给仓库的 LRU（8 张）
+/// 和 `ImageCache`（解码后的位图）兜着，翻回来仍然是秒开。
 final readerPageImageProvider = FutureProvider.family<Uint8List, PageRequest>((
   Ref ref,
   PageRequest req,
 ) {
   return ref.watch(readerRepositoryProvider).pageImage(req.bookId, req.page);
-});
+}, isAutoDispose: true);
 
 /// 查"下一本"的键：书 id + 所属系列。
 typedef NextBookQuery = ({String seriesId, String bookId});

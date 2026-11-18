@@ -73,8 +73,20 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   /// 翻页后多久回写进度：连续翻页时只写最后停下的那一页。
   static const Duration _saveDelay = Duration(milliseconds: 600);
 
-  /// 预取前后几页，翻页时不用等网络（纵向模式由 ListView 自己预取）。
-  static const List<int> _prefetchOffsets = <int>[1, -1, 2];
+  /// 预取时最多同时飞几张页图。
+  ///
+  /// 一起发太多会把"真正要显示的那一页"挤到队尾，弱网下反而更慢。
+  /// 计划本身是"越近越靠前"，超出上限的那些下一轮翻页会重新排。
+  static const int _preloadConcurrency = 3;
+
+  /// 正在预取的页（1 基），用来限流和去重。
+  final Set<int> _preloading = <int>{};
+
+  /// 已经排过预取的锚点：`第几页:模式`。模式变了分屏就变了，必须重排。
+  String? _preloadAnchor;
+
+  /// 已经排进下一帧、还没执行的预取。
+  bool _preloadScheduled = false;
 
   /// 1 基当前页；0 表示"还没翻过页"，此时用服务端进度恢复位置。
   int _page = 0;
@@ -193,28 +205,93 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     });
   }
 
-  Future<void> _warm(int page) async {
+  /// 排一次"当前页附近"的预取。
+  ///
+  /// 不在 `build` 里直接发请求：build 只该读状态；而且晚一帧再发也保证
+  /// 当前页自己的请求先出去——弱网下出场顺序就是优先级。
+  void _schedulePreload(int page, ReadingMode mode) {
+    final anchor = '$page:${mode.name}';
+    if (_preloadAnchor == anchor) return;
+    _preloadAnchor = anchor;
+    if (_preloadScheduled) return;
+    _preloadScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _preloadScheduled = false;
+      if (mounted) _preloadAround();
+    });
+  }
+
+  /// 预取当前页前后各一屏。
+  ///
+  /// 双页模式下"一屏"是两页，所以计划按分屏算（`preloadPlan`），
+  /// 而不是 `page ± 1`——那样会一直漏掉每屏的第二页。
+  void _preloadAround() {
+    final pages = ref.read(readerPagesProvider(widget.bookId)).value;
+    if (pages == null || pages.isEmpty) return;
+    final mode = _modeFor(ref.read(readerPrefsProvider));
+    // 纵向模式由 `ListView.cacheExtent` 自己预取，这里再叠一层只会重复请求。
+    if (mode == ReadingMode.verticalScroll) return;
+
+    final total = pages.length;
+    final page = _resolvePage(total);
+    final groups = mode == ReadingMode.doublePage
+        ? _spreadsFor(pages, mode)
+        : const <List<int>>[];
+
+    // 字节：前后各一屏都抓。翻回去、连翻两页都不用等网络。
+    final bytesPlan = preloadPlan(
+      pageIndex: page - 1,
+      pageCount: total,
+      spreads: groups,
+    );
+    // 位图：一张 1500×2200 的页解出来约 13 MB，ImageCache 装不下几屏，
+    // 所以只提前解"紧接着的那一屏"——那一屏才是必须首帧就有图的。
+    final decodePlan = preloadPlan(
+      pageIndex: page - 1,
+      pageCount: total,
+      spreads: groups,
+      ahead: 1,
+      behind: 0,
+    ).toSet();
+    for (final index in bytesPlan) {
+      unawaited(_preload(index + 1, decode: decodePlan.contains(index)));
+    }
+  }
+
+  /// 预取一页：抓字节暖仓库 LRU；[decode] 为真时顺手把位图解码进 ImageCache。
+  ///
+  /// 只暖字节是不够的——`Image` 要等解码完才有像素，那段空档就是用户看到的
+  /// "翻页时闪一下黑"。解码过之后翻过去的第一帧就有图。
+  ///
+  /// 失败静默：真翻到那一页时会重新请求，走正常的错误/重试路径。
+  Future<void> _preload(int page, {required bool decode}) async {
+    if (_preloading.length >= _preloadConcurrency || !_preloading.add(page)) {
+      return;
+    }
     try {
-      await ref.read(
-        readerPageImageProvider((bookId: widget.bookId, page: page)).future,
+      final bytes = await ref
+          .read(readerRepositoryProvider)
+          .pageImage(widget.bookId, page);
+      if (!decode || !mounted) return;
+      unawaited(
+        precacheImage(
+          MemoryImage(bytes),
+          context,
+          onError: (Object error, StackTrace? stackTrace) {},
+        ),
       );
     } on ShelfFailure {
-      // 预取失败无所谓：真的翻到那一页时会重新请求并显示错误/重试。
+      // 预取失败不影响阅读。
+    } finally {
+      _preloading.remove(page);
     }
   }
 
-  void _prefetch(int current, int total) {
-    for (final offset in _prefetchOffsets) {
-      final target = current + offset;
-      if (target < 1 || target > total) continue;
-      unawaited(_warm(target));
-    }
-  }
-
-  void _setPage(int page, int total, {bool prefetch = true}) {
+  void _setPage(int page, int total) {
     if (page == _page) return;
     setState(() => _page = page);
-    if (prefetch) _prefetch(page, total);
+    // 预取不在各个入口各写一遍：`build` 里的 `_schedulePreload` 会看到
+    // 页码/模式变化并重排，翻页、跳页、切模式走的是同一条路。
     _scheduleSave(page, total);
   }
 
@@ -260,7 +337,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       _jumpPage = target;
       _jumpToken++;
     });
-    _prefetch(target, total);
     _scheduleSave(target, total);
   }
 
@@ -380,6 +456,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     final total = pages.length;
     final mode = _modeFor(prefs);
     final page = _resolvePage(total);
+    // 打开、翻页、跳页、切模式都会经过这里：页码/模式变了就在下一帧重排预取。
+    _schedulePreload(page, mode);
     final spreads = _spreadsFor(pages, mode);
     final spreadIndex = spreads.isEmpty ? -1 : spreadIndexOf(spreads, page - 1);
     final spread = spreads.isEmpty
@@ -456,8 +534,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                         jumpToken: _jumpToken,
                         jumpPage: _jumpPage,
                         palette: palette,
-                        onPageChanged: (int p) =>
-                            _setPage(p, total, prefetch: false),
+                        onPageChanged: (int p) => _setPage(p, total),
                         onToggleChrome: () =>
                             setState(() => _chromeVisible = !_chromeVisible),
                       ),

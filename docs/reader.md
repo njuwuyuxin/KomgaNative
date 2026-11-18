@@ -49,14 +49,43 @@
 坏存档必须回默认值（`ReaderPrefs.fromJson` 逐字段判类型 + 夹取），
 亮度下限 0.2：存档里出现 0 也不能变成黑屏。
 
-## 缩略图跳页与预取
+## 页图加载与预取（翻页不闪黑）
+
+页图有三层，翻页走的是前两层，第三层只在**离线**时兜底：
+
+| 层 | 内容 | 生命周期 |
+| --- | --- | --- |
+| `readerPageImageProvider` | 当前屏的原始字节（`AsyncValue`） | autoDispose：翻走即释放 |
+| `KomgaReaderRepository._pages`（`ByteLruCache`） | 最近 8 页的原始字节 | 会话内，LRU |
+| `PaintingBinding.imageCache` | 解码后的位图（`MemoryImage`） | Flutter 引擎管，默认 100 MB |
+| `DriftHttpCache` | 磁盘上的响应体 | 只在请求**失败**时读（`KomgaSession._cachedBytes`） |
+
+第三层是"断网还能翻回去看"，不是读穿缓存：**在线时 LRU 未命中的页仍会请求网络**。
+
+预取（`apps/app/lib/src/screens/reader_screen.dart` + `komga_reader_engine/src/preload.dart`）：
+
+- 计划按**屏**算（`preloadPlan`），不是 `page ± 1`。双页模式一屏两页，按页码加减会
+  一直漏掉每屏的第二页，表现是"翻一屏闪一次、翻一页不闪"——很难查，所以钉了单测；
+- 往前 2 屏、往后 1 屏抓字节；紧接着的那一屏额外 `precacheImage` 预解码；
+- 触点在 `build` 里（`_schedulePreload`），只在 **页码或模式变化**时排一次，下一帧执行：
+  保证当前页自己的请求先出去（弱网下顺序就是优先级），也避免每帧重复排；
+- 并发上限 3 张，超出的丢掉（下一轮翻页会重排），不排队；
+- **为什么光抓字节不够**：`Image.memory` 在解码完成前那一帧没有像素，看到的就是
+  Scaffold 的黑底——这就是"闪一下黑"。预解码后翻过去首帧就有图；
+  只预解码一屏是因为一张 1500×2200 的页解出来约 13 MB，预解码再多反而把 ImageCache 挤爆；
+- 纵向模式不在这里预取：`ListView.cacheExtent` 自己会建下面两屏，再叠一层是重复请求；
+- 预取失败静默——真翻到那页时会重新请求并显示正常的错误/重试。
+
+验证方式：`packages/komga_reader_engine/test/preload_test.dart` 钉计划；
+`apps/app/test/reader_screen_test.dart` 的「页图预加载」组断言"翻过去之前请求过哪几页"
+（`FakeReaderRepository.pageRequests`），并用 `runAsync` 放真实时间断言下一屏已进 `ImageCache`。
+
+## 缩略图跳页
 
 - 顶栏的网格按钮打开缩略图面板（`widgets/page_navigator_sheet.dart`），当前页描白边；
 - Komga **没有页级缩略图接口**（`/books/{id}/thumbnail` 是整本封面），所以缩略图就是页图本身：
   网格懒构建 + `cacheWidth: 240` 解码降采样，只有滚到的页才会下载；
 - 点一张 = 走和设置面板跳页同一条路径（纵向模式也会滚过去）；
-- 预取：翻页后对 `+1 / -1 / +2` 三页调一次仓库的 `pageImage`，只暖内存 LRU（8 张），
-  失败静默——真翻到那页时仍会重新请求并显示错误；
 - 黄金图 `reader_pages@phone_dark`：缩略图是**真实异步解码**，基线要在 `act` 之后
   放一小段真实时间（`settleAfterActWithRealTime`），否则截到的是黑块（踩过）。
 
@@ -97,4 +126,6 @@
 
 - 亮度是**应用内遮罩**，不改系统亮度（系统亮度需要新插件；遮罩已能满足"夜里不刺眼"）；
 - 偏好是全局的，不按书记忆；
-- 纵向模式不叠加缩放（交给滚动）。
+- 纵向模式不叠加缩放（交给滚动）；
+- 分页模式只预取前后各一屏，**不预下载整本**（离线整本阅读靠"下载"功能，不靠预取）；
+- 在线时页图只要不在 8 张 LRU 里就要重新请求网络（磁盘缓存是离线兜底，不是读穿缓存）。
