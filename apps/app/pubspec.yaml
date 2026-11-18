@@ -46,7 +46,7 @@ flutter:
   assets:
     - assets/fonts/
   shaders:
-    # 翻页卷曲：纸面绕斜折线卷成圆柱。见 docs/reader.md「翻页动画」。
+    # 翻页卷曲：圆柱卷页模型，逆映射逐像素合成。见 docs/reader.md「翻页动画」。
     - shaders/page_curl.frag
   fonts:
     - family: Roboto

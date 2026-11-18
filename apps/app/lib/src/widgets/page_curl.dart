@@ -6,7 +6,7 @@ import 'package:material_ui/material_ui.dart';
 /// 翻页动画的绘制层。
 ///
 /// 三种效果，从"最真"到"最省"：
-/// - [PageTurnEffect.curl]：片元着色器把纸面卷起来（需要快照，见 `ReaderPagedView`）；
+/// - [PageTurnEffect.curl]：片元着色器把纸面沿圆柱卷起来（需要页面位图，见 [CurlSheets]）；
 /// - [PageTurnEffect.slide]：整张纸平移出去（双页模式、着色器不可用时用）；
 /// - [PageTurnEffect.none]：不做动画（墨水屏），直接换页。
 enum PageTurnEffect { curl, slide, none }
@@ -58,12 +58,15 @@ class PageCurlProgram {
   }
 }
 
-/// 把一帧纸面快照按 [geometry] 画出来。整块画布交给着色器，纸面矩形由 `uRect` 指定。
+/// 把一帧纸面位图按 [frame]（圆柱卷页几何）画出来。
+///
+/// 整块画布交给着色器：卷起的纸、翻过去的背面、投在下层的影子都可能落在
+/// 纸面矩形之外，所以不能只画 [sheetRect]。
 class PageCurlPainter extends CustomPainter {
   const PageCurlPainter({
     required this.sheet,
     required this.sheetRect,
-    required this.geometry,
+    required this.frame,
   });
 
   final ui.Image sheet;
@@ -71,7 +74,8 @@ class PageCurlPainter extends CustomPainter {
   /// 纸面（页面内容）在画布上的矩形。
   final Rect sheetRect;
 
-  final CurlGeometry geometry;
+  /// 纸面坐标系下的几何（原点是 [sheetRect] 的左上角）。
+  final CurlFrame frame;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -87,16 +91,11 @@ class PageCurlPainter extends CustomPainter {
         ..setFloat(3, sheetRect.top)
         ..setFloat(4, sheetRect.width)
         ..setFloat(5, sheetRect.height)
-        ..setFloat(6, geometry.foldX + sheetRect.left)
-        ..setFloat(7, geometry.foldY + sheetRect.top)
-        ..setFloat(8, geometry.normalX)
-        ..setFloat(9, geometry.normalY)
-        ..setFloat(10, geometry.radius)
-        ..setFloat(11, geometry.progress)
-        ..setFloat(12, geometry.cornerX + sheetRect.left)
-        ..setFloat(13, geometry.cornerY + sheetRect.top)
-        ..setFloat(14, geometry.coneLength)
-        ..setFloat(15, geometry.bend)
+        ..setFloat(6, frame.axisX + sheetRect.left)
+        ..setFloat(7, frame.axisY + sheetRect.top)
+        ..setFloat(8, frame.dirX)
+        ..setFloat(9, frame.dirY)
+        ..setFloat(10, frame.radius)
         ..setImageSampler(0, sheet);
 
       canvas.drawRect(
@@ -113,9 +112,97 @@ class PageCurlPainter extends CustomPainter {
   @override
   bool shouldRepaint(PageCurlPainter oldDelegate) =>
       oldDelegate.sheet != sheet ||
-      oldDelegate.geometry.progress != geometry.progress ||
-      oldDelegate.geometry.radius != geometry.radius ||
-      oldDelegate.geometry.coneLength != geometry.coneLength ||
       oldDelegate.sheetRect != sheetRect ||
-      oldDelegate.geometry.mirrored != geometry.mirrored;
+      oldDelegate.frame.axisX != frame.axisX ||
+      oldDelegate.frame.axisY != frame.axisY ||
+      oldDelegate.frame.dirX != frame.dirX ||
+      oldDelegate.frame.dirY != frame.dirY ||
+      oldDelegate.frame.radius != frame.radius;
+}
+
+/// 卷页要用的两张位图：当前页（往前翻时卷走它）和上一页（往回翻时把它卷回来）。
+///
+/// 页图字节本来就在仓库 LRU 里，这里只负责解码与释放。
+/// 换掉的位图可能还被上一帧的 raster 线程引用着，立刻 `dispose()` 有时会
+/// 闪一帧空白，所以统一等下一帧结束再释放。
+class CurlSheets {
+  ui.Image? _current;
+  ui.Image? _previous;
+  int? _currentPage;
+  int? _previousPage;
+  final List<ui.Image> _retired = <ui.Image>[];
+
+  /// [page] 是当前页（0 基）的位图；不匹配时返回 null。
+  ui.Image? currentFor(int page) => _currentPage == page ? _current : null;
+
+  /// [page] 是上一页（0 基）的位图；不匹配时返回 null。
+  ui.Image? previousFor(int page) => _previousPage == page ? _previous : null;
+
+  /// 当前要的两页（null 表示不需要），已有的直接复用（往前翻一页后，
+  /// 原来的"当前页"正好变成新的"上一页"，不必重新解码）。
+  Future<void> ensure({
+    required int? current,
+    required int? previous,
+    required Future<ui.Image?> Function(int page) decode,
+    required bool Function() stillWanted,
+  }) async {
+    final pool = <int, ui.Image>{
+      if (_currentPage != null && _current != null) _currentPage!: _current!,
+      if (_previousPage != null && _previous != null)
+        _previousPage!: _previous!,
+    };
+    final keep = <int>{?current, ?previous};
+    for (final entry in pool.entries) {
+      if (!keep.contains(entry.key)) _retire(entry.value);
+    }
+    _current = current == null ? null : pool[current];
+    _currentPage = _current == null ? null : current;
+    _previous = previous == null ? null : pool[previous];
+    _previousPage = _previous == null ? null : previous;
+
+    if (current != null && _current == null) {
+      final image = await decode(current);
+      if (image != null && !_adopt(image, stillWanted)) return;
+      if (image != null) {
+        _retire(_current);
+        _current = image;
+        _currentPage = current;
+      }
+    }
+    if (previous != null && _previous == null) {
+      final image = await decode(previous);
+      if (image != null && _adopt(image, stillWanted)) {
+        _retire(_previous);
+        _previous = image;
+        _previousPage = previous;
+      }
+    }
+  }
+
+  bool _adopt(ui.Image image, bool Function() stillWanted) {
+    if (stillWanted()) return true;
+    image.dispose();
+    return false;
+  }
+
+  void _retire(ui.Image? image) {
+    if (image == null) return;
+    _retired.add(image);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _flushRetired());
+  }
+
+  void _flushRetired() {
+    for (final image in _retired) {
+      image.dispose();
+    }
+    _retired.clear();
+  }
+
+  void dispose() {
+    _current?.dispose();
+    _previous?.dispose();
+    _current = null;
+    _previous = null;
+    _flushRetired();
+  }
 }

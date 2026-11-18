@@ -1,150 +1,340 @@
+import 'dart:math' as math;
+
 import 'package:komga_reader_engine/komga_reader_engine.dart';
 import 'package:test/test.dart';
 
-/// 翻页卷曲的几何：起手必须从角上掀、收尾必须贴书脊立直、进度到 1 时整页翻走。
+/// 圆柱卷页的几何与手指运动。
+///
+/// 核心不变量：被捏住的角绕圆柱卷过半圈后，正好落在手指下面。
 void main() {
   const width = 1000.0;
   const height = 1500.0;
+  const exitX = 1000.0;
 
-  group('curlGeometry', () {
-    test('进度 0：折线穿过左下角，倾角最大', () {
-      final g = curlGeometry(progress: 0, width: width, height: height);
-      expect(g.foldX, 0);
-      expect(g.foldY, height);
-      expect(g.tilt, closeTo(kCurlTilt, 1e-9));
-      expect(g.startsAtCorner, isTrue, reason: '起手是"捏住左下角"，不是整条边一起抬');
-    });
+  /// 把纸面点 q 按卷页模型映射到屏幕（只处理"翻过去平压"那一段）。
+  ({double x, double y}) flippedScreen(CurlFrame f, double qx, double qy) {
+    final s = f.signedDistance(qx, qy);
+    final r = f.radius;
+    // 弧长 s >= πR：屏幕上 d = πR − s，沿 u 方向的位移是 (d − s)。
+    final shift = (math.pi * r - s) - s;
+    return (x: qx + f.dirX * shift, y: qy + f.dirY * shift);
+  }
 
-    test('进度 1：折线越过书脊一个半径（整张纸从右边退出去）', () {
-      final g = curlGeometry(progress: 1, width: width, height: height);
-      expect(g.tilt, closeTo(0, 1e-9), reason: '贴书脊时折线是竖直的');
-      // 只走到页宽的话，收尾会剩一根竖直白条凭空消失——所以多走一个半径。
-      expect(g.foldX, greaterThan(width));
-      expect(
-        g.foldX - g.radius,
-        greaterThanOrEqualTo(width - 1e-6),
-        reason: '卷筒必须完全滑出纸面，不能停在右边缘',
-      );
-    });
-
-    test('卷筒半径从被捏住的角往外变粗（起手是一个尖页脚）', () {
-      final g = curlGeometry(progress: 0.2, width: width, height: height);
-      expect(g.cornerX, 0, reason: 'RTL：捏的是左下角');
-      expect(g.cornerY, height);
-      expect(g.coneLength, greaterThan(0));
-
-      final mirrored = curlGeometry(
-        progress: 0.2,
+  group('solveCurl', () {
+    test('手指在角上：完全平铺，整张纸都还在原位', () {
+      final f = solveCurl(
+        fingerX: 0,
+        fingerY: height,
         width: width,
         height: height,
-        mirrored: true,
       );
-      expect(mirrored.cornerX, width, reason: 'LTR：捏的是右下角');
+      expect(f.radius, 0);
+      expect(f.isFlatAt(0, height), isTrue);
+      expect(f.isFlatAt(width, 0), isTrue);
     });
 
-    test('倾角随进度单调减小（越翻越立直）', () {
-      var previous = double.infinity;
-      for (var i = 0; i <= 20; i++) {
-        final g = curlGeometry(progress: i / 20, width: width, height: height);
-        expect(g.tilt, lessThanOrEqualTo(previous + 1e-9));
-        previous = g.tilt;
-      }
-    });
-
-    test('折线位置单调右移，并且不是线性推进（慢—快—慢）', () {
-      var previous = -1.0;
-      final positions = <double>[];
-      for (var i = 0; i <= 20; i++) {
-        final g = curlGeometry(progress: i / 20, width: width, height: height);
-        expect(g.foldX, greaterThan(previous));
-        previous = g.foldX;
-        positions.add(g.foldX);
-      }
-      final firstQuarter = positions[5] - positions[0];
-      final middleQuarter = positions[10] - positions[5];
-      final lastQuarter = positions[20] - positions[15];
-      // 起手和收尾都比中段慢：这就是"掀角"和"贴上书脊"的手感。
-      expect(firstQuarter, lessThan(middleQuarter));
-      expect(lastQuarter, lessThan(middleQuarter));
-    });
-
-    test('起手是从左下角掀起：左下角先翻，左上角还是平的', () {
-      // 回归测试：法线 y 分量写反时被掀起的是"左上"那半边，
-      // 真机上看起来像"从左上角翻页"，而且 p 刚离开 0 就几乎整页翻掉（跳变）。
-      //
-      // 只检查前 30%：再往后折线已经扫过左半边，左上角本来就该翻走了。
-      for (var step = 1; step <= 3; step++) {
-        final g = curlGeometry(
-          progress: step / 10,
+    test('卷过半圈后，角正好落在手指下面（几何闭式解）', () {
+      for (final finger in <(double, double)>[
+        (300, height),
+        (500, height - 400),
+        (1600, height - 200),
+        (40, height - 10),
+      ]) {
+        final f = solveCurl(
+          fingerX: finger.$1,
+          fingerY: finger.$2,
           width: width,
           height: height,
         );
-        double s(double x, double y) =>
-            (x - g.foldX) * g.normalX + (y - g.foldY) * g.normalY;
-        expect(s(2, height - 2), lessThan(0), reason: '左下角应该先被掀起');
-        expect(s(2, height * 0.4), greaterThan(0), reason: '左上方还没翻走');
+        final landed = flippedScreen(f, 0, height);
+        expect(landed.x, closeTo(f.fingerX, 1e-6), reason: '$finger');
+        expect(landed.y, closeTo(f.fingerY, 1e-6), reason: '$finger');
       }
     });
 
-    test('起手进度很小时只掀起一个角，不会直接跳到半页', () {
-      final g = curlGeometry(progress: 0.02, width: width, height: height);
-      // 折线仍在最左边 3% 以内；法线方向错了的话它会瞬间扫到中间。
-      expect(g.foldX, lessThan(width * 0.03));
+    test('起手只掀起左下角：左上角、右下角都还平铺', () {
+      final f = solveCurl(
+        fingerX: 120,
+        fingerY: height - 60,
+        width: width,
+        height: height,
+      );
+      expect(f.isFlatAt(0, height), isFalse, reason: '被捏住的角已经卷起');
+      expect(f.isFlatAt(0, 0), isTrue);
+      expect(f.isFlatAt(width, height), isTrue);
+      expect(f.isFlatAt(width, 0), isTrue);
     });
 
-    test('中途：还没翻走的那一侧仍然是 s > 0', () {
-      final g = curlGeometry(progress: 0.5, width: width, height: height);
-      // 页面右侧（靠书脊）还没翻走。
-      final right =
-          (width - 5 - g.foldX) * g.normalX +
-          (height / 2 - g.foldY) * g.normalY;
-      expect(right, greaterThan(0));
-      // 左侧已经被掀起来了。
-      final left =
-          (5 - g.foldX) * g.normalX + (height / 2 - g.foldY) * g.normalY;
-      expect(left, lessThan(0));
+    test('半径随拖开距离连续增长：起手趋于 0，之后饱和在最大值', () {
+      expect(curlRadiusFor(0, 85), 0);
+      expect(curlRadiusFor(1, 85), lessThan(1));
+      var previous = 0.0;
+      for (var reach = 0.0; reach <= 2000; reach += 10) {
+        final r = curlRadiusFor(reach, 85);
+        expect(r, greaterThanOrEqualTo(previous - 1e-9));
+        expect(r, lessThanOrEqualTo(85 + 1e-9));
+        previous = r;
+      }
+      expect(curlRadiusFor(2000, 85), closeTo(85, 1e-9));
     });
 
-    test('镜像（LTR）：起手从右下角掀，收尾贴左边书脊', () {
-      final start = curlGeometry(
+    test('往上拖：折线变斜（u 有向下的分量，左下角先卷）', () {
+      final level = solveCurl(
+        fingerX: 400,
+        fingerY: height,
+        width: width,
+        height: height,
+      );
+      expect(level.dirX, closeTo(-1, 1e-9));
+      expect(level.dirY, closeTo(0, 1e-9), reason: '水平拖：折线竖直');
+
+      final raised = solveCurl(
+        fingerX: 400,
+        fingerY: height - 300,
+        width: width,
+        height: height,
+      );
+      expect(raised.dirX, lessThan(0));
+      expect(raised.dirY, greaterThan(0), reason: '往上拖：u 指向左下角');
+    });
+
+    test('手指低于底边：按底边处理，不会把上半页卷起来', () {
+      final f = solveCurl(
+        fingerX: 300,
+        fingerY: height + 500,
+        width: width,
+        height: height,
+      );
+      expect(f.fingerY, height);
+      expect(f.dirY, closeTo(0, 1e-9));
+    });
+
+    test('倾角有上限：几乎竖直往上拖也不会卷起整条左边', () {
+      final f = solveCurl(
+        fingerX: 1,
+        fingerY: height - 800,
+        width: width,
+        height: height,
+      );
+      final tilt = math.atan2(f.dirY, -f.dirX);
+      expect(tilt, lessThanOrEqualTo(kCurlMaxTilt + 1e-9));
+    });
+
+    test('镜像（书脊在左）：从右下角掀起，几何左右对称', () {
+      final standard = solveCurl(
+        fingerX: 350,
+        fingerY: height - 200,
+        width: width,
+        height: height,
+      );
+      final mirrored = solveCurl(
+        fingerX: 350,
+        fingerY: height - 200,
+        width: width,
+        height: height,
+        mirrored: true,
+      );
+      expect(mirrored.cornerX, width);
+      expect(mirrored.axisX, closeTo(width - standard.axisX, 1e-9));
+      expect(mirrored.axisY, closeTo(standard.axisY, 1e-9));
+      expect(mirrored.dirX, closeTo(-standard.dirX, 1e-9));
+      expect(mirrored.dirY, closeTo(standard.dirY, 1e-9));
+      expect(mirrored.radius, standard.radius);
+      expect(mirrored.isFlatAt(width, height), isFalse);
+      expect(mirrored.isFlatAt(0, height), isTrue);
+    });
+
+    test('窄页、零尺寸：不出 NaN', () {
+      final f = solveCurl(fingerX: 5, fingerY: 5, width: 0, height: 10);
+      expect(f.axisX.isNaN, isFalse);
+      expect(f.radius.isNaN, isFalse);
+    });
+  });
+
+  group('curlFrameAt（自动翻页路径）', () {
+    test('进度 0：完全平铺', () {
+      final f = curlFrameAt(
         progress: 0,
         width: width,
         height: height,
-        mirrored: true,
+        exitX: exitX,
       );
-      expect(start.foldX, closeTo(width, 1e-9));
-      expect(start.startsAtCorner, isTrue);
-      expect(start.normalX, lessThan(0), reason: 'LTR 时"没翻走"的一侧在右边');
+      expect(f.radius, 0);
+      expect(f.isFlatAt(0, height), isTrue);
+    });
 
-      final end = curlGeometry(
+    test('进度 1：整张纸连同卷筒都滑出了屏幕另一侧', () {
+      final f = curlFrameAt(
         progress: 1,
         width: width,
         height: height,
-        mirrored: true,
+        exitX: exitX,
       );
-      expect(end.foldX, lessThan(0), reason: '镜像时从左边退出去');
-      expect(end.tilt, closeTo(0, 1e-9));
-      expect(end.foldX + end.radius, lessThanOrEqualTo(1e-6));
+      for (final c in <(double, double)>[
+        (0, 0),
+        (width, 0),
+        (0, height),
+        (width, height),
+      ]) {
+        expect(f.isFlatAt(c.$1, c.$2), isFalse, reason: '角 $c 不该还平铺');
+      }
+      // 圆柱在屏幕上占 d ∈ [0, R]，最靠近书脊的一侧是轴线左边 R 处。
+      expect(f.axisX - f.radius, greaterThanOrEqualTo(exitX));
     });
 
-    test('卷筒随翻动变粗：起手只是一个翘起的页脚', () {
-      final start = curlGeometry(progress: 0, width: width, height: height);
-      final mid = curlGeometry(progress: 0.65, width: width, height: height);
-      final end = curlGeometry(progress: 1, width: width, height: height);
-
-      expect(start.radius, lessThan(mid.radius), reason: '起手不该就卷成一根筒');
-      expect(
-        start.radius,
-        lessThan(width * kCurlRadiusRatio * 0.3),
-        reason: '起手半径应该是最大值的零头',
+    test('页面窄于屏幕时，卷筒要滑出屏幕而不是只滑出纸面', () {
+      final f = curlFrameAt(
+        progress: 1,
+        width: width,
+        height: height,
+        exitX: 1600,
       );
-      expect(mid.radius, closeTo(width * kCurlRadiusRatio, 1e-6));
-      expect(end.radius, closeTo(mid.radius, 1e-9), reason: '长到最大之后保持');
+      expect(f.axisX - f.radius, greaterThanOrEqualTo(1600));
     });
 
-    test('窄页也不会出现 0 半径', () {
-      final g = curlGeometry(progress: 0.5, width: 2, height: 3);
-      expect(g.radius, greaterThan(0));
+    test('中途往上拱：折线是斜的（参考效果那种斜卷）', () {
+      final f = curlFrameAt(
+        progress: 0.4,
+        width: width,
+        height: height,
+        exitX: exitX,
+      );
+      expect(f.dirY, greaterThan(0.2));
+    });
+
+    test('轴线随进度单调向书脊推进（不倒退、不跳变）', () {
+      var previous = -double.infinity;
+      var previousRadius = 0.0;
+      for (var i = 0; i <= 100; i++) {
+        final f = curlFrameAt(
+          progress: i / 100,
+          width: width,
+          height: height,
+          exitX: exitX,
+        );
+        // 用底边上轴线的位置衡量推进：(x − A)·u = 0 且 y = height。
+        final bottomX = f.axisX - (height - f.axisY) * f.dirY / f.dirX;
+        expect(bottomX, greaterThanOrEqualTo(previous - 1e-6), reason: '$i');
+        if (i > 0) {
+          expect(bottomX - previous, lessThan(width * 0.1), reason: '跳变 @$i');
+        }
+        expect(
+          (f.radius - previousRadius).abs(),
+          lessThan(width * 0.02),
+          reason: '半径跳变 @$i',
+        );
+        previous = bottomX;
+        previousRadius = f.radius;
+      }
+    });
+  });
+
+  group('CurlMotion', () {
+    const forward = CurlMotion(
+      forward: true,
+      width: width,
+      height: height,
+      exitX: exitX,
+    );
+    const backward = CurlMotion(
+      forward: false,
+      width: width,
+      height: height,
+      exitX: exitX,
+    );
+
+    test('往回翻是往前翻的倒放：任意进度下手指位置互为镜像时刻', () {
+      for (var i = 0; i <= 10; i++) {
+        final t = i / 10;
+        final a = forward.fingerAt(t);
+        final b = backward.fingerAt(1 - t);
+        expect(b.x, closeTo(a.x, 1e-9));
+        expect(b.y, closeTo(a.y, 1e-9));
+      }
+    });
+
+    test('往回翻起点：纸完全在屏幕外；终点：完全平铺', () {
+      final start = backward.frame(backward.fingerAt(0), mirrored: false);
+      expect(start.isFlatAt(width, 0), isFalse);
+      final end = backward.frame(backward.fingerAt(1), mirrored: false);
+      expect(end.radius, 0);
+      expect(end.isFlatAt(0, height), isTrue);
+    });
+
+    test('往前拖：角跟着手指走，往上拖就是往上', () {
+      final f = forward.dragFinger(along: 300, dy: -120);
+      expect(f.x, 300);
+      expect(f.y, height - 120);
+      expect(forward.dragFinger(along: -50, dy: 0).x, 0, reason: '反向拖不卷');
+    });
+
+    test('往回拖：从路径终点往回退，拖得越多盖得越多', () {
+      final none = backward.dragFinger(along: 0, dy: 0);
+      expect(none.x, closeTo(backward.travel, 1e-9));
+      final some = backward.dragFinger(along: 400, dy: 0);
+      expect(some.x, closeTo(backward.travel - 400, 1e-9));
+      expect(backward.turnOf(some), greaterThan(backward.turnOf(none)));
+    });
+
+    test('turnOf 与 fingerAt 互逆（横向分量）', () {
+      for (var i = 0; i <= 10; i++) {
+        final t = i / 10;
+        expect(forward.turnOf(forward.fingerAt(t)), closeTo(t, 1e-9));
+        expect(backward.turnOf(backward.fingerAt(t)), closeTo(t, 1e-9));
+      }
+    });
+
+    test('补完：t = 0 停在松手处，t = 1 到达目标，中途不跳', () {
+      const from = (x: 700.0, y: height - 350.0);
+      final fromTurn = forward.turnOf(from);
+      final start = forward.settleFinger(
+        from: from,
+        fromTurn: fromTurn,
+        toTurn: 1,
+        t: 0,
+      );
+      expect(start.x, closeTo(from.x, 1e-9));
+      expect(start.y, closeTo(from.y, 1e-9));
+      final end = forward.settleFinger(
+        from: from,
+        fromTurn: fromTurn,
+        toTurn: 1,
+        t: 1,
+      );
+      final target = forward.fingerAt(1);
+      expect(end.x, closeTo(target.x, 1e-9));
+      expect(end.y, closeTo(target.y, 1e-9));
+
+      var prev = start;
+      for (var i = 1; i <= 50; i++) {
+        final p = forward.settleFinger(
+          from: from,
+          fromTurn: fromTurn,
+          toTurn: 1,
+          t: i / 50,
+        );
+        final step = math.sqrt(
+          math.pow(p.x - prev.x, 2) + math.pow(p.y - prev.y, 2),
+        );
+        expect(step, lessThan(forward.travel * 0.06), reason: '跳变 @$i');
+        prev = p;
+      }
+    });
+
+    test('点击翻页（起点在路径上）：补完完全沿拱形路径走', () {
+      final from = forward.fingerAt(0);
+      for (var i = 0; i <= 10; i++) {
+        final t = i / 10;
+        final p = forward.settleFinger(
+          from: from,
+          fromTurn: 0,
+          toTurn: 1,
+          t: t,
+        );
+        final onPath = forward.fingerAt(t);
+        expect(p.x, closeTo(onPath.x, 1e-9));
+        expect(p.y, closeTo(onPath.y, 1e-9));
+      }
     });
   });
 

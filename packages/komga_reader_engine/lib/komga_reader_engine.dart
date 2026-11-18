@@ -4,6 +4,7 @@
 /// 不引入 Flutter 引擎。Widget 层负责把 [RectD] 转成 `Rect`。
 library;
 
+export 'src/curl_motion.dart';
 export 'src/geometry.dart';
 export 'src/layout.dart';
 export 'src/page_turn.dart';

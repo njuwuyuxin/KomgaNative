@@ -1,162 +1,134 @@
 #version 460 core
 #include <flutter/runtime_effect.glsl>
 
-// 翻页折页 —— **连续曲面**版本。
+// 翻页卷曲 —— 圆柱模型（几何见 packages/komga_reader_engine/lib/src/page_turn.dart）。
 //
-// 把纸看成一条一维剖面绕折线扫出来的曲面（折线法线方向记 `s`）：
+// 纸沿一根半径 R 的圆柱卷过去。设 u 为从轴线指向"被卷起一侧"的单位向量，
+// 屏幕点 p 到轴线的有符号距离 d = (p − A)·u。纸上一点到轴线的弧长记 s：
 //
-//   s >= 0                     平铺在页面上（高度 0）
-//   -R .. 0                    以折线为切点、半径 R 卷起来的一段圆弧（0..bend）
-//   s <  -R sin(bend)          圆弧末端的切线延伸出去的"飞起的那半张纸"
+//   s <= 0          平铺在原位，屏幕上 d = s
+//   0 < s < πR      绕在圆柱上，θ = s/R，屏幕上 d = R·sinθ
+//   s >= πR         翻过去平压在上面（背面朝上），屏幕上 d = πR − s（< 0）
 //
-// 每个像素把所有可能盖住它的那几层都算出来（平面 / 圆弧正面 / 圆弧背面 /
-// 切线延伸），取**高度最大**的一层来画。这样：
-// - 曲面本身连续，不会出现"两截纸 + 一道缝"；
-// - 明暗和镜面高光直接由曲面法线算，卷筒上自然有一道亮边；
-// - 飞起的那半张纸是切线延伸，天然和卷筒连在一起，末端还有投影。
+// 每个像素反推它可能对应的纸面点 q（逆映射），从下往上合成：
+//   平铺正面 → 圆柱正面 → 圆柱背面 → 翻过去的背面
+// 同一套参数化推出所有层，纸面天然连续，不会有缝。
 //
 // 只有一个出口：带 sampler 的 main 里多个 return 在 Windows 上可能编不过
 // （flutter issue 190809）。
 
-uniform vec2 uSize;      // 画布尺寸（逻辑像素）
-uniform vec4 uRect;      // 纸面矩形：x, y, w, h（画布坐标）
-uniform vec2 uFold;      // 折线经过的点（卷起的切点）
-uniform vec2 uNormal;    // 折线法线，指向"还没翻走"的一侧（书脊方向）
-uniform float uRadius;   // 卷曲半径（像素）
-uniform float uProgress; // 0..1，收尾时淡出
-uniform vec2 uCorner;    // 被捏住的角（页脚从这里翘起）
-uniform float uConeLen;  // 半径从角长到满值所需的距离
-uniform float uBend;     // 弯曲角（弧度）
+uniform vec2 uSize;     // 画布尺寸（逻辑像素）
+uniform vec4 uRect;     // 纸面矩形：x, y, w, h（画布坐标）
+uniform vec2 uAxis;     // 圆柱轴线经过的点（画布坐标）
+uniform vec2 uDir;      // u：单位向量，从轴线指向被卷起的一侧
+uniform float uRadius;  // 圆柱半径（px），可以为 0（折痕）
 uniform sampler2D uSheet;
 
 out vec4 fragColor;
 
-const vec3 kPaper = vec3(0.972, 0.966, 0.950);
-// 光从上方偏左打下来，高光跟着曲面法线走。
-const vec3 kLight = vec3(-0.42, 0.0, 0.91);
+const float kPi = 3.14159265;
+const vec3 kPaper = vec3(0.975, 0.970, 0.955);
 
-float rectEdgeDistance(vec2 p) {
-    return min(min(p.x - uRect.x, uRect.x + uRect.z - p.x),
-               min(p.y - uRect.y, uRect.y + uRect.w - p.y));
+// 纸背透出来的墨迹浓度：真实纸张会隐约透印，完全纯白反而像塑料片。
+const float kShowThrough = 0.07;
+
+// q 到纸面矩形边缘的有符号距离（内部为正）。
+float edgeDistance(vec2 q) {
+    return min(min(q.x - uRect.x, uRect.x + uRect.z - q.x),
+               min(q.y - uRect.y, uRect.y + uRect.w - q.y));
 }
 
-vec3 sheetAt(vec2 p) {
-    vec2 uv = (p - uRect.xy) / uRect.zw;
-    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
-        return kPaper;
-    }
+// 1px 抗锯齿的覆盖率。
+float coverage(vec2 q) {
+    return clamp(edgeDistance(q) + 0.5, 0.0, 1.0);
+}
+
+vec3 sheetAt(vec2 q) {
+    vec2 uv = clamp((q - uRect.xy) / uRect.zw, 0.0, 1.0);
     return texture(uSheet, uv).rgb;
 }
 
-// 曲面法线（剖面内）：φ = 0 时朝屏幕外，φ 增大转到侧面。
-// 返回 (亮度, 高光)。
-vec2 shadeAt(float phi, float distToCorner) {
-    vec3 n = vec3(sin(phi), 0.0, cos(phi));
-    float diff = clamp(dot(n, kLight), 0.0, 1.0);
-    vec3 h = normalize(kLight + vec3(0.0, 0.0, 1.0));
-    float spec = pow(clamp(dot(n, h), 0.0, 1.0), 42.0);
-    // 越靠角越软一点，避免页脚处出现一条生硬亮线。
-    spec *= mix(0.5, 1.0, clamp(distToCorner / 80.0, 0.0, 1.0));
-    return vec2(mix(0.72, 1.05, diff), spec * 0.55);
+// 纸背：白纸 + 很淡的透印（镜像的墨迹本来就在同一个 q 上）。
+vec3 backAt(vec2 q) {
+    return mix(kPaper, sheetAt(q), kShowThrough);
+}
+
+// 预乘 alpha 的 "over" 合成。
+vec4 over(vec4 dst, vec3 rgb, float a) {
+    return vec4(rgb * a, a) + dst * (1.0 - a);
 }
 
 void main() {
     vec2 p = FlutterFragCoord().xy;
+    vec2 u = uDir;
+    float r = max(uRadius, 0.0);
+    float d = dot(p - uAxis, u);
 
-    float s = dot(p - uFold, uNormal);
-    vec2 tangent = vec2(-uNormal.y, uNormal.x);
-    float along = dot(p - uFold, tangent);
+    // 光源在 (u, z) 平面里略偏向被卷起的一侧：卷筒背面靠上处出现一道高光，
+    // 正面越接近侧立越暗——这就是卷筒的立体感。
+    vec3 light = normalize(vec3(0.42, 0.0, 0.91));
+    vec3 halfVec = normalize(light + vec3(0.0, 0.0, 1.0));
 
-    // 半径沿折线变化：角上细、远处粗，起手才是一个尖页脚。
-    float cornerDist = distance(p, uCorner);
-    float cone = smoothstep(0.0, max(1.0, uConeLen), cornerDist);
-    float r = max(2.0, uRadius * mix(0.45, 1.0, cone));
+    vec4 color = vec4(0.0);
 
-    float bend = clamp(uBend, 0.0, 1.62);
-    float tailFade = 1.0 - smoothstep(0.86, 1.0, uProgress);
+    // ---- 1. 平铺在原位的正面（d <= 0）----
+    // 其余位置是露出来的下一页，这里只往上叠一层投影。
+    float flatCov = coverage(p) * (1.0 - smoothstep(-0.5, 0.5, d));
+    vec3 flatRgb = sheetAt(p);
 
-    bool outside = p.x < uRect.x || p.x > uRect.x + uRect.z ||
-                   p.y < uRect.y || p.y > uRect.y + uRect.w;
+    // 卷筒顶端（θ = π/2）对应的纸面点：判断这条线上到底有没有纸在卷。
+    vec2 qTop = p + u * (r * kPi * 0.5 - d);
+    float rollHere = clamp(edgeDistance(qTop) / 6.0 + 0.5, 0.0, 1.0);
 
-    // 最高的一层：z 越大越靠上。
-    float bestZ = -1.0;
-    vec3 bestRgb = vec3(0.0);
-    bool bestHit = false;
+    // 贴着轴线的接触阴影：卷起的纸挡住了一部分环境光。
+    float contact = exp(min(d, 0.0) / (0.6 * r + 2.0));
+    flatRgb *= 1.0 - 0.16 * contact * rollHere;
 
-    if (!outside) {
-        // ---- 1. 平铺页面（z = 0）----
-        if (s >= 0.0) {
-            bestZ = 0.0;
-            bestRgb = sheetAt(p);
-            bestHit = true;
-        }
+    // 翻过去的那半张纸投在平铺纸面上的影子：离它的边越近越实。
+    vec2 qFlip = p + u * (kPi * r - 2.0 * d);
+    float outside = max(-edgeDistance(qFlip), 0.0);
+    float flipShadow = 1.0 - smoothstep(0.0, 4.0 + 1.6 * r, outside);
+    float flipLift = clamp(r / 6.0, 0.25, 1.0);
+    flatRgb *= 1.0 - 0.26 * flipShadow * flipLift * step(d, 0.0);
 
-        // ---- 2. 圆弧：屏幕 s ∈ [-r, 0] 是圆弧的正面；弯曲角超过 90° 后，
-        //         同一处屏幕位置还会落到圆弧的背面（更高，盖住正面）。----
-        if (s <= 0.0 && s >= -r) {
-            float phiFront = asin(clamp(-s / r, 0.0, 1.0));
-            float zFront = r * (1.0 - cos(phiFront));
-            if (zFront > bestZ) {
-                vec2 shade = shadeAt(phiFront, cornerDist);
-                vec3 ink = sheetAt(uFold - uNormal * (r * phiFront));
-                vec3 rgb = mix(ink, kPaper, smoothstep(0.05, 0.55, phiFront));
-                rgb = rgb * shade.x + vec3(shade.y);
-                bestZ = zFront;
-                bestRgb = rgb;
-                bestHit = true;
-            }
+    color = over(color, flatRgb, flatCov);
 
-            // 圆弧背面：φ 从 π - asin(-s/r) 处绕回来，高度更高。
-            float phiBack = 3.14159265 - asin(clamp(-s / r, 0.0, 1.0));
-            if (phiBack <= bend) {
-                float zBack = r * (1.0 - cos(phiBack));
-                if (zBack > bestZ) {
-                    vec2 shade = shadeAt(phiBack, cornerDist);
-                    vec3 ink = sheetAt(uFold - uNormal * (r * phiBack));
-                    // 背面：白纸为主，只留很淡的透印。
-                    vec3 rgb = mix(mix(kPaper, ink, 0.04), kPaper, 0.6);
-                    rgb = rgb * shade.x + vec3(shade.y * 0.7);
-                    bestZ = zBack;
-                    bestRgb = rgb;
-                    bestHit = true;
-                }
-            }
-        }
+    // 露出来的下一页上，卷筒投下的影子（只输出半透明黑，叠在下层 widget 上）。
+    float beyond = max(d - r, 0.0);
+    float revealShadow = 0.38 * exp(-beyond / (3.0 + 0.9 * r)) * rollHere;
+    revealShadow *= step(0.0, d) * (1.0 - flatCov);
+    color = over(color, vec3(0.0), revealShadow * (1.0 - color.a));
 
-        // ---- 3. 切线延伸：从圆弧末端沿切线飞出去的那半张纸 ----
-        if (abs(cos(bend)) > 0.02) {
-            float d = r * bend + (-s - r * sin(bend)) / cos(bend);
-            // d >= r*bend 才在圆弧之外；再从折点往回量不能超出纸面。
-            if (d >= r * bend && (uFold - uNormal * d).x >= uRect.x - 1.0 &&
-                (uFold - uNormal * d).x <= uRect.x + uRect.z + 1.0) {
-                float zTail = r * (1.0 - cos(bend)) + (d - r * bend) * sin(bend);
-                if (zTail > bestZ) {
-                    vec2 shade = shadeAt(bend, cornerDist);
-                    vec3 ink = sheetAt(uFold - uNormal * d);
-                    vec3 rgb;
-                    if (cos(bend) >= 0.0) {
-                        // 还没折过 90°：看到的是正面。
-                        rgb = mix(ink, kPaper, smoothstep(0.2, 0.9, bend));
-                    } else {
-                        rgb = mix(mix(kPaper, ink, 0.04), kPaper, 0.6);
-                    }
-                    rgb = rgb * shade.x + vec3(shade.y * 0.8);
-                    bestZ = zTail;
-                    bestRgb = rgb;
-                    bestHit = true;
-                }
-            }
-        }
+    // ---- 2./3. 圆柱：同一个 d 对应正面（θ < π/2）和背面（θ > π/2）两层 ----
+    if (r > 0.01 && d >= 0.0 && d <= r) {
+        float base = asin(clamp(d / r, 0.0, 1.0));
+        // 圆柱轮廓处的抗锯齿：d → r 时两层都收成一条线。
+        float rim = clamp((r - d) + 0.5, 0.0, 1.0);
+
+        float thetaF = base;
+        vec2 qF = p + u * (r * thetaF - d);
+        vec3 nF = vec3(-sin(thetaF), 0.0, cos(thetaF));
+        float diffF = clamp(dot(nF, light), 0.0, 1.0);
+        vec3 rgbF = sheetAt(qF) * mix(0.55, 1.04, diffF);
+        color = over(color, rgbF, coverage(qF) * rim);
+
+        float thetaB = kPi - base;
+        vec2 qB = p + u * (r * thetaB - d);
+        vec3 nB = vec3(sin(thetaB), 0.0, -cos(thetaB));
+        float diffB = clamp(dot(nB, light), 0.0, 1.0);
+        float specB = pow(clamp(dot(nB, halfVec), 0.0, 1.0), 24.0);
+        vec3 rgbB = backAt(qB) * mix(0.62, 1.0, diffB) + vec3(0.22 * specB);
+        color = over(color, rgbB, coverage(qB) * rim);
     }
 
-    // ---- 投影：纸面（z = 0）被上空那半张纸压出的影子 ----
-    vec3 rgb = bestRgb;
-    if (bestHit && bestZ > 0.0 && bestZ < 14.0 * r) {
-        // 高度越低、影子越实；离折线越远越淡。
-        float soft = 1.0 - smoothstep(0.0, 9.0 * r, bestZ);
-        float lateral = 1.0 - smoothstep(0.0, 60.0 * r, abs(along));
-        rgb *= 1.0 - 0.30 * soft * lateral * tailFade;
+    // ---- 4. 翻过去平压在上面的背面（d < 0，最高的一层）----
+    if (d < 0.5) {
+        float cov = coverage(qFlip) * (1.0 - smoothstep(-0.5, 0.5, d));
+        // 靠近卷筒处稍亮（接着卷筒背面的高光），往外略暗，避免一整片死白。
+        float fade = exp(d / (2.0 * r + 24.0));
+        vec3 rgb = backAt(qFlip) * mix(0.90, 0.99, fade);
+        color = over(color, rgb, cov);
     }
 
-    fragColor = vec4(rgb * (bestHit ? 1.0 : 0.0), bestHit ? 1.0 : 0.0);
+    fragColor = color;
 }
