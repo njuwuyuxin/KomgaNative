@@ -56,11 +56,23 @@
 | 层 | 内容 | 生命周期 |
 | --- | --- | --- |
 | `readerPageImageProvider` | 当前屏的原始字节（`AsyncValue`） | autoDispose：翻走即释放 |
-| `KomgaReaderRepository._pages`（`ByteLruCache`） | 最近 8 页的原始字节 | 会话内，LRU |
+| `KomgaReaderRepository._pages`（`ByteLruCache`） | 最近 16 页的原始字节 | 会话内，LRU |
 | `PaintingBinding.imageCache` | 解码后的位图（`MemoryImage`） | Flutter 引擎管，默认 100 MB |
 | `DriftHttpCache` | 磁盘上的响应体 | 只在请求**失败**时读（`KomgaSession._cachedBytes`） |
 
 第三层是"断网还能翻回去看"，不是读穿缓存：**在线时 LRU 未命中的页仍会请求网络**。
+
+**第一帧的字节不许等异步**：`ReaderPage` 先用 `ReaderRepository.cachedPageImage`
+同步问一句"这页现在在不在内存里"，在就直接画（翻回去、预取过的页都是这条路径）。
+
+为什么必须同步：provider 是 autoDispose 的，每换一页都会先给一次 `AsyncLoading`，
+只等它的话第一帧就是"黑底 + 转圈"——用户看到的就是"翻页闪一下"。
+这一条是踩过的坑：先把 provider 改成 autoDispose（为了不把整本留在内存里），
+结果**连翻回去都开始闪**，因为旧的 provider 不会 dispose、恰好白拿了"首帧就有数据"；
+补上同步查询后才两边都对，并钉了「翻页首帧」两条测试（只 `pump()` 一帧断言）。
+
+再冷的页（LRU 里没有）也不会黑屏：`ReaderPage` 会先继续画**上一帧**，
+等新页解码完再换掉。`PageError` 的优先级高于"上一帧"，失败照常显示错误与重试。
 
 预取（`apps/app/lib/src/screens/reader_screen.dart` + `komga_reader_engine/src/preload.dart`）：
 
@@ -78,7 +90,9 @@
 
 验证方式：`packages/komga_reader_engine/test/preload_test.dart` 钉计划；
 `apps/app/test/reader_screen_test.dart` 的「页图预加载」组断言"翻过去之前请求过哪几页"
-（`FakeReaderRepository.pageRequests`），并用 `runAsync` 放真实时间断言下一屏已进 `ImageCache`。
+（`FakeReaderRepository.pageRequests`），并用 `runAsync` 放真实时间断言下一屏已进 `ImageCache`；
+「翻页首帧」组只 `pump()` 一帧，断言第一帧里没有 `CircularProgressIndicator`、
+`reader-image-*` 已经在了（`pumpAndSettle` 会把这种问题吞掉，别用它验闪烁）。
 
 ## 缩略图跳页
 
@@ -128,7 +142,8 @@
 - 偏好是全局的，不按书记忆；
 - 纵向模式不叠加缩放（交给滚动）；
 - 分页模式只预取前后各一屏，**不预下载整本**（离线整本阅读靠"下载"功能，不靠预取）；
-- 在线时页图只要不在 8 张 LRU 里就要重新请求网络（磁盘缓存是离线兜底，不是读穿缓存）；
+- 在线时页图只要不在 16 张 LRU 里就要重新请求网络（磁盘缓存是离线兜底，不是读穿缓存）；
+  这种"很远的回翻"不会黑屏（会先画上一帧），但会明显停一下。
 - 预解码依赖默认 100 MB 的 `ImageCache`：普通扫描页（约 1000×1400 ≈ 5.6 MB）装得下十几张，
   但超大页（解出来 > 30 MB）会把预解码的那张挤出去，翻页仍可能闪一次——真遇到了再按需
   放宽预算或降采样，别一上来就动全局参数。

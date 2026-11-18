@@ -437,6 +437,37 @@ void main() {
     });
   });
 
+  group('翻页首帧（不能先闪一帧 loading）', () {
+    testWidgets('翻到已预取的下一页：第一帧就有图', (WidgetTester tester) async {
+      await pumpReader(
+        tester,
+        repository: FakeReaderRepository(pageCount: 5),
+        book: demoReaderBook(),
+      );
+
+      await tapRightOneFrame(tester);
+
+      // `pumpAndSettle` 会把中间那一帧 loading 吞掉，所以这里只推进一帧：
+      // 用户看到的就是这一帧（黑底 + 转圈 = "闪一下"）。
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.byKey(const Key('reader-image-1')), findsOneWidget);
+    });
+
+    testWidgets('翻回已经读过的页：第一帧就有图', (WidgetTester tester) async {
+      await pumpReader(
+        tester,
+        repository: FakeReaderRepository(pageCount: 5),
+        book: demoReaderBook(),
+      );
+      await tapRight(tester);
+
+      await tapLeftOneFrame(tester);
+
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.byKey(const Key('reader-image-0')), findsOneWidget);
+    });
+  });
+
   group('墨水屏', () {
     testWidgets('阅读区改白底黑字（黑底会触发整屏全刷）', (WidgetTester tester) async {
       await pumpReader(tester, book: demoReaderBook(), forceEink: true);

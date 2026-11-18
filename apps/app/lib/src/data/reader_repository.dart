@@ -23,6 +23,13 @@ abstract interface class ReaderRepository {
   /// 第 [page] 页的图片字节（1 基）。
   Future<Uint8List> pageImage(String bookId, int page);
 
+  /// 第 [page] 页的字节**此刻**在不在内存里（1 基）；不在返回 null。
+  ///
+  /// 这是给"绘制第一帧"用的同步查询：翻回去、连翻时字节早就在 LRU 里，
+  /// 直接画就行。只走 `pageImage` 的话要多等一个异步回合，
+  /// 那一帧的 loading 就是用户看到的"闪一下"。
+  Uint8List? cachedPageImage(String bookId, int page);
+
   /// 只负责**把进度发给服务端**。落盘与重试在 `ProgressSyncService`，
   /// 这里不再"直连 PATCH 一发了之"（断网就会丢）。
   Future<void> uploadProgress(
@@ -33,13 +40,21 @@ abstract interface class ReaderRepository {
 }
 
 class KomgaReaderRepository implements ReaderRepository {
-  KomgaReaderRepository(this._session, this._sync, {int pageCacheCapacity = 8})
-    : _pages = ByteLruCache(capacity: pageCacheCapacity);
+  /// 页图缓存张数，默认 16。
+  ///
+  /// 单张几百 KB 到 2 MB，16 张约 10–30 MB——比"把整本留在内存里"便宜得多，
+  /// 又足够覆盖"翻过去再翻回来"。再多就该靠磁盘缓存（离线）而不是内存了。
+  static const int defaultPageCacheCapacity = 16;
+
+  KomgaReaderRepository(
+    this._session,
+    this._sync, {
+    int pageCacheCapacity = defaultPageCacheCapacity,
+  }) : _pages = ByteLruCache(capacity: pageCacheCapacity);
 
   final KomgaSession _session;
   final ProgressSyncService _sync;
 
-  /// 页图单张通常几百 KB 到 2 MB，缓存 8 张足够覆盖"前后翻页"而不会吃爆内存。
   final ByteLruCache _pages;
 
   @override
@@ -77,6 +92,10 @@ class KomgaReaderRepository implements ReaderRepository {
       throw shelfFailureOf(error);
     }
   }
+
+  @override
+  Uint8List? cachedPageImage(String bookId, int page) =>
+      _pages.peek('$bookId#$page');
 
   @override
   Future<void> uploadProgress(

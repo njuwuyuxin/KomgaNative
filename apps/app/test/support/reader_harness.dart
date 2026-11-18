@@ -109,6 +109,21 @@ Future<void> tapLeft(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+/// 点一下只推进**一帧**：看得见"翻页后的第一帧"到底是什么。
+///
+/// `pumpAndSettle` 会把中间的 loading 帧全部吞掉，正好掩盖"闪一下"这类问题。
+Future<void> tapRightOneFrame(WidgetTester tester) async {
+  final rect = tester.getRect(find.byKey(const Key('reader-tap-layer')));
+  await tester.tapAt(Offset(rect.right - rect.width * 0.05, rect.center.dy));
+  await tester.pump();
+}
+
+Future<void> tapLeftOneFrame(WidgetTester tester) async {
+  final rect = tester.getRect(find.byKey(const Key('reader-tap-layer')));
+  await tester.tapAt(Offset(rect.left + rect.width * 0.05, rect.center.dy));
+  await tester.pump();
+}
+
 /// 打开设置面板。
 Future<void> openSettings(WidgetTester tester) async {
   await tester.tap(find.byKey(const Key('reader-settings-button')));

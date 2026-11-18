@@ -34,6 +34,12 @@ class ByteLruCache {
     return bytes;
   }
 
+  /// 只看一眼，不动顺序、不计命中。
+  ///
+  /// 给"绘制前先问一句：这页现在在不在内存里"用（`ReaderPage` 首帧）。
+  /// 用 [get] 的话每帧重绘都会改写 LRU 顺序，把真正该淘汰的页留在里面。
+  Uint8List? peek(String key) => _entries[key];
+
   void put(String key, Uint8List bytes) {
     _entries.remove(key);
     _entries[key] = bytes;
