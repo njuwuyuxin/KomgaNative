@@ -1,23 +1,23 @@
 #version 460 core
 #include <flutter/runtime_effect.glsl>
 
-// 翻页卷页（折页模型）。
+// 翻页折页（精确镜像模型）。
 //
-// 沿折线法线把屏幕分成五段（`s` = 像素到折线的有符号距离，正方向是"还没翻走"的一侧）：
+// 把像素 `p` 关于折线做镜像得到 `pm = p - 2*s*n`（`s` = 到折线的有符号距离，
+// 正方向是"还没翻走"的一侧）。折回来的那半张纸就是**被掀起来的区域的镜像**：
 //
-//   s < -r           已经掀空：露出下层页面（透明）
-//   -r ≤ s < 0       卷筒：纸绕折线卷成的圆柱（白色纸背、带明暗）
-//   0 ≤ s < flapEnd  折回来的那一半纸：盖在页面上，看到的是白色纸背
-//   flapEnd 附近     纸背的自由边：薄薄一条暗边 + 投在页面上的影子
-//   s ≥ flapEnd      还没翻走的平铺页面
+//   s < -r           掀空了：露出下层页面（透明）
+//   |s| < r          卷筒：折线附近的圆柱（白色纸背 + 明暗）
+//   s >= r 且 pm 在纸面内   折回来的那半张纸：白色纸背，边界就是镜像后的页边
+//   s >= r 且 pm 在纸面外   还没翻走的平铺页面（+ 折页边投下的影子）
 //
-// 关键点：
-// - 折回来的那半（flap）**必须画出来**。只画一根卷筒的话，看起来像"一个细柱在滚"，
-//   而不是"整页纸被翻起来盖住"——参考图里最显眼的就是那一大片白色纸背。
-// - 卷筒半径从"被捏住的角"往外逐渐变粗，所以起手是一个尖的页脚。
-// - 全部只画在纸面矩形内，收尾时整页从右侧退出去。
-// - **只有一个出口**：带 sampler 的 main 里多个 return 在 Windows 上可能编不过
-//   （flutter issue 190809），这里统一算完再写 fragColor。
+// 关键：折页的形状**由镜像决定**，不是"离折线多远"的等距带。
+// 等距带会画出一条贯穿页面的带子，起手也永远没有三角形；镜像出来才是
+// "掀起来的那一角"（小进度时是三角形，中段是随页边裁出的四边形）。
+//
+// 全部只画在纸面矩形内；收尾时整页连同纸背从右侧退出去。
+// 只有一个出口：带 sampler 的 main 里多个 return 在 Windows 上可能编不过
+// （flutter issue 190809）。
 
 uniform vec2 uSize;      // 画布尺寸（逻辑像素）
 uniform vec4 uRect;      // 纸面矩形：x, y, w, h（画布坐标）
@@ -32,7 +32,7 @@ uniform sampler2D uSheet;
 out vec4 fragColor;
 
 const vec3 kPaper = vec3(0.965, 0.958, 0.940);
-const vec3 kPaperShadow = vec3(0.80, 0.79, 0.77);
+const vec3 kPaperShadow = vec3(0.78, 0.77, 0.75);
 
 vec3 sheetAt(vec2 p) {
     vec2 uv = (p - uRect.xy) / uRect.zw;
@@ -42,62 +42,73 @@ vec3 sheetAt(vec2 p) {
     return texture(uSheet, uv).rgb;
 }
 
+// >0：在纸面内，离最近边的距离；<0：在纸面外。
+float rectEdgeDistance(vec2 p) {
+    return min(min(p.x - uRect.x, uRect.x + uRect.z - p.x),
+               min(p.y - uRect.y, uRect.y + uRect.w - p.y));
+}
+
 void main() {
     vec2 p = FlutterFragCoord().xy;
 
-    // 纸只会出现在自己的矩形里。
-    bool outside = p.x < uRect.x || p.x > uRect.x + uRect.z ||
-                   p.y < uRect.y || p.y > uRect.y + uRect.w;
+    vec2 d = p - uFold;
+    float s = dot(d, uNormal);
+
+    // 镜像点：折回来的纸在这里取材料（它就是被掀起来区域翻过去的样子）。
+    vec2 pm = p - 2.0 * s * uNormal;
+    float mirrorEdge = rectEdgeDistance(pm);
 
     // 局部卷筒半径：角上很细（页脚），离角越远越粗。
     float cornerDist = distance(p, uCorner);
     float cone = smoothstep(0.0, max(1.0, uConeLen), cornerDist);
-    float r = max(1.0, uRadius * mix(0.18, 1.0, cone));
+    float r = max(1.0, uRadius * mix(0.16, 1.0, cone));
 
-    float s = dot(p - uFold, uNormal);
+    // 已经掀起来的长度，只用来做明暗归一化。
+    float peel = clamp(-dot(uCorner - uFold, uNormal), 1.0, uRect.z * 2.5);
+    float tailFade = 1.0 - smoothstep(0.80, 1.0, uProgress);
 
-    // 已经掀起来的长度 = 折点到被捏住的角的距离；折回来的那半从折线量同样远。
-    // 角上折回来的少一些（`cone`），自由边就成了一条曲线，而不是笔直的一刀。
-    float peel = clamp(-dot(uCorner - uFold, uNormal), 0.0, uRect.z * 2.5);
-    float flapEnd = peel * mix(0.62, 1.0, cone);
-
-    float tailFade = 1.0 - smoothstep(0.82, 1.0, uProgress);
+    bool outside = p.x < uRect.x || p.x > uRect.x + uRect.z ||
+                   p.y < uRect.y || p.y > uRect.y + uRect.w;
 
     vec3 rgb = vec3(0.0);
     float alpha = 0.0;
 
-    if (!outside && s > -r) {
-        if (s < 0.0) {
-            // 卷筒：弧长回采样，白色纸背为主，保留圆柱明暗。
-            float t = -s / r;
-            float m = r * asin(clamp(t, 0.0, 1.0));
+    if (!outside) {
+        if (s < -r) {
+            // 掀空了：透明，露出下层页面。
+        } else if (abs(s) < r) {
+            // 卷筒：折线两侧各 r 范围内是卷起来的那一段，按弧长回采样。
+            float t = abs(s) / r;
+            float m = r * asin(clamp(t, 0.0, 1.0)) * 0.85;
             vec3 ink = sheetAt(uFold - uNormal * m);
-            float back = smoothstep(0.10, 0.75, t);
+            float back = smoothstep(0.12, 0.80, t);
             rgb = mix(ink, kPaper, back);
-            float curve = sqrt(max(0.0, 1.0 - t * t));
-            rgb *= mix(0.60, 1.03, curve);
+            rgb *= mix(0.60, 1.03, sqrt(max(0.0, 1.0 - t * t)));
             alpha = 1.0;
-        } else if (s < flapEnd) {
-            // 折回来的那半：白色纸背（带一点点透印），越靠自由边越亮。
-            vec3 ink = sheetAt(uFold - uNormal * s);
-            float lift = s / max(flapEnd, 1.0);
-            vec3 paper =
-                mix(kPaper * 0.94, kPaper, smoothstep(0.0, 0.75, lift));
-            rgb = mix(paper, ink, 0.10);
+        } else if (s > 0.0 && mirrorEdge >= 0.0) {
+            // 折回来的那半张纸：形状由镜像页边决定 → 起手就是三角形。
+            vec3 ink = sheetAt(pm);
+            float lift = clamp(s / peel, 0.0, 1.0);
+            vec3 paper = mix(kPaper * 0.95, kPaper, smoothstep(0.0, 0.85, lift));
+            // 只有很淡的一层透印（4%）：纸背是白纸，不是半透明描图纸。
+            rgb = mix(paper, ink, 0.04);
 
             // 自由边：薄薄一条暗边（纸的厚度）。
-            float edge = smoothstep(flapEnd - 5.0, flapEnd, s);
-            rgb = mix(rgb, kPaperShadow, edge * 0.85);
+            float edge = 1.0 - smoothstep(0.0, 6.0, mirrorEdge);
+            rgb = mix(rgb, kPaperShadow, edge * 0.80);
 
             // 折线附近压一点暗，做出"纸是从这儿折起来的"。
-            float crease = 1.0 - smoothstep(0.0, r * 0.9, s);
-            rgb *= mix(1.0, 0.86, crease * tailFade);
+            float crease = 1.0 - smoothstep(0.0, r * 1.1, s);
+            rgb *= mix(1.0, 0.87, crease * tailFade);
             alpha = 1.0;
         } else {
-            // 平铺页面 + 折页边投下的影子。
+            // 平铺页面；折页自由边的外侧投一道影子。
             vec3 ink = sheetAt(p);
-            float shadow =
-                (1.0 - smoothstep(0.0, r * 1.6, s - flapEnd)) * 0.35 * tailFade;
+            float shadow = 0.0;
+            if (s > 0.0 && mirrorEdge < 0.0) {
+                shadow = (1.0 - smoothstep(0.0, r * 1.6, -mirrorEdge)) *
+                         0.35 * tailFade;
+            }
             rgb = ink * (1.0 - shadow);
             alpha = 1.0;
         }
