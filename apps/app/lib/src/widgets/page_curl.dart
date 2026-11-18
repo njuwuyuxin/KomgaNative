@@ -96,6 +96,7 @@ class PageCurlPainter extends CustomPainter {
         ..setFloat(12, geometry.cornerX + sheetRect.left)
         ..setFloat(13, geometry.cornerY + sheetRect.top)
         ..setFloat(14, geometry.coneLength)
+        ..setFloat(15, geometry.bend)
         ..setImageSampler(0, sheet);
 
       canvas.drawRect(

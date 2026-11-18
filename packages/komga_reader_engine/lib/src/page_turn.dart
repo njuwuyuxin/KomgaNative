@@ -31,6 +31,13 @@ const double kCurlRadiusGrowAt = 0.65;
 /// 看起来才像"捏住书页角掀起来"，而不是一开始就有根等粗的圆柱。
 const double kCurlConeRatio = 0.30;
 
+/// 折页弯曲角的上限（弧度）。90° 出头：翻到最后纸面接近竖立，
+/// 再由折线滑出纸面收尾，不会剩下一条"平摊的白纸"停在页面上。
+const double kCurlBendMax = 1.68;
+
+/// 折页的弯曲角：起手 0，越翻越卷，到结尾接近竖立。
+double curlBendAt(double progress) => progress.clamp(0.0, 1.0) * kCurlBendMax;
+
 /// 折线倾角随进度的衰减指数：>1 表示前段一直斜、临近书脊才迅速立直。
 const double kCurlTiltDecay = 1.8;
 
@@ -71,6 +78,7 @@ class CurlGeometry {
     required this.progress,
     required this.mirrored,
     required this.coneLength,
+    required this.bend,
   });
 
   /// 折线经过的一个点。
@@ -122,6 +130,12 @@ class CurlGeometry {
 
   /// 卷筒半径从角长到满值所需的距离。
   final double coneLength;
+
+  /// 折页的弯曲角（弧度）：0 = 完全平摊，π/2 ≈ 纸面竖立。
+  ///
+  /// 着色器用它把纸面看成"平面 → 半径 R 的圆弧（转 `bend`）→ 切线延伸"的
+  /// 单一曲面，明暗/高光都从曲面法线推出来，不再分段拼接。
+  final double bend;
 }
 
 /// 计算某一帧的折线几何。
@@ -152,6 +166,7 @@ CurlGeometry curlGeometry({
     progress: p,
     mirrored: mirrored,
     coneLength: width * kCurlConeRatio,
+    bend: curlBendAt(p),
   );
 }
 
