@@ -58,6 +58,12 @@ jobs:
         working-directory: apps/app
         run: flutter pub get
 
+      - name: Generate code (drift + l10n)
+        # 生成物（*.g.dart / app_localizations*.dart）不入库，CI 是全新 clone：
+        # 少了它们 AOT 编译会以 "The getter 'cachedResponses' isn't defined" 失败。
+        # 与门禁共用同一条命令，避免本地/CI 双轨。
+        run: dart run tool/ci.dart codegen
+
       - name: Build APK
         working-directory: apps/app
         run: flutter build apk --release

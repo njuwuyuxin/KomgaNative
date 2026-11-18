@@ -65,13 +65,26 @@
 | 文件 | 触发 | 机器 | 做什么 |
 |---|---|---|---|
 | `ci.yml` | push to main、PR、手动 | `windows-latest` | `dart run tool/ci.dart check`：格式 + 分析 + 分层规则 + 全部测试 + 黄金图比对 |
-| `build-android.yml` | push to main（代码路径变化）、手动 | `ubuntu-latest` | `flutter build apk --release` → 上传 APK artifact |
-| `build-ios.yml` | push / PR / `v*` tag / 手动 | `macos-latest` | `flutter build ios --release --no-codesign` → 上传 `.app.zip` |
+| `build-android.yml` | push to main（代码路径变化）、手动 | `ubuntu-latest` | `flutter pub get` → `dart run tool/ci.dart codegen` → `flutter build apk --release` → 上传 APK artifact |
+| `build-ios.yml` | push / PR / `v*` tag / 手动 | `macos-latest` | `flutter pub get` → `dart run tool/ci.dart codegen` → `flutter build ios --release --no-codesign` → 上传 `.app.zip` |
 
 **为什么门禁放在 Windows**：黄金图基线以 Windows 为唯一平台（`AGENTS.md` 的约定）。在 Linux/macOS 上跑会因字体光栅化差异导致 5 张基线全部失配，而且修不好——只能换基线平台。
 
 **为什么 iOS 现在也跟 push**：仓库是 public，macOS runner 免费。三条流水线都跑，PR 能同时看到"Android 能编、iOS 能编"。
 **如果转私有**：删掉 `build-ios.yml` 的 `pull_request` 与 `push` 触发，只留 `workflow_dispatch` 和 tag。
+
+**为什么两条构建流水线在 `flutter build` 前都要跑 `codegen`**：`*.g.dart`（drift）与
+`app_localizations*.dart` 都在 `.gitignore` 里，而 CI 是全新 clone。`flutter pub get` 只会顺带生成 l10n
+（`flutter.generate: true`），**不会**跑 `build_runner`。跳过这一步，`flutter build` 会在 AOT 编译阶段直接失败：
+
+```
+Error: Target of URI hasn't been generated: '.../progress_database.g.dart'
+Error: The getter 'cachedResponses' isn't defined for the type 'HttpCacheDatabase'
+```
+
+门禁（`tool/ci.dart check`）内部会先 codegen，所以 Windows 门禁一直绿，两条构建流水线却从引入 drift 的
+提交起一直红——这是 v1 收尾时补的坑。本地验证"全新 clone 能不能编"不要用工作区（生成物还在），用
+`git worktree add --detach ..\ci-sim HEAD` 后只跑 `flutter pub get` + `flutter build`。
 
 ### 3.1 产物（artifact）怎么拿
 
@@ -160,6 +173,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tool\bootstrap.ps1 -CheckOnl
 |---|---|---|
 | `golden` 失配，diff 百分比很小 | 字体/平台/Flutter 版本不一致 | 确认 runner 是 windows-latest 且 Flutter 版本 = `.fvmrc`；必要时本地 `dart run tool/ci.dart golden` 重生成 |
 | `flutter pub get` 超时 | runner 访问 pub.dev 抖动 | 重跑；持续失败再考虑镜像（但要写进 AGENTS.md，否则本地/CI 不一致） |
+| `Build APK` / `Build iOS` 报 `isn't defined`、`Target of URI hasn't been generated` | 全新 clone 没有 drift 生成物 | 确认该 workflow 在 build 前有 `dart run tool/ci.dart codegen`；本地用干净 worktree 复现 |
+| iOS job 报 `not acquired by Runner of type hosted` | GitHub macOS 容量不足，不是代码问题 | 直接 Re-run failed jobs |
 | Gradle 下载超时 | 依赖没命中缓存 | 首次必慢；检查 `actions/cache` 的 key 是否因 `pubspec.lock` 变化频繁失效 |
 | `Permission denied` / 工作流不出现 | 仓库 Actions 被禁用 | Settings → Actions → General → 允许 |
 | macOS job 排队很久 | macOS runner 紧张 | 正常现象，别在 PR 上跑 iOS |
