@@ -122,6 +122,19 @@
       "total": {"type": "int"}
     }
   },
+  "currentPage": "Page {page}",
+  "@currentPage": {
+    "placeholders": {
+      "page": {"type": "int"}
+    }
+  },
+  "currentSpread": "Pages {from}–{to}",
+  "@currentSpread": {
+    "placeholders": {
+      "from": {"type": "int"},
+      "to": {"type": "int"}
+    }
+  },
   "continueReadingProgress": "p. {page} / {total}",
   "@continueReadingProgress": {
     "placeholders": {

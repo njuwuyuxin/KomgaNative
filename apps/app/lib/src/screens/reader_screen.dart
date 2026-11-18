@@ -312,6 +312,22 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     return l10n.readerPageOf(page, total);
   }
 
+  /// 底栏的页码：只报"当前在第几页"。
+  ///
+  /// 以前这里显示总页数（`{count} pages`），翻页时永远不变，看起来像页码坏了；
+  /// 总数已经在顶栏的 `3 / 12` 里，底栏再说一遍只会让人误以为页码没跟上。
+  String _positionLabel(
+    AppLocalizations l10n,
+    ReadingMode mode,
+    int page,
+    List<int> spread,
+  ) {
+    if (mode == ReadingMode.doublePage && spread.length > 1) {
+      return l10n.currentSpread(spread.first + 1, spread.last + 1);
+    }
+    return l10n.currentPage(page);
+  }
+
   Future<void> _openSettings({
     required ReaderPalette palette,
     required int page,
@@ -469,8 +485,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                     ),
                   if (_chromeVisible)
                     ReaderControls(
-                      pagesCount: total,
+                      pageLabel: _positionLabel(l10n, mode, page, spread),
                       palette: palette,
+                      // 点击区与底部箭头共用这一个判断：RTL 时左侧（点/箭头）
+                      // 都是"下一页"。后续加"阅读方向"设置时只改这里的来源。
+                      leftTurnsNext: rightToLeft,
                       onPrevious: canGoBack
                           ? () => _turn(-1, total, mode, spreadIndex, spreads)
                           : null,

@@ -56,6 +56,29 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
   /// 拖动中的页码（松手才跳，避免拖动时每帧都改阅读位置）。
   double? _dragging;
 
+  /// 松手后停住的页码。
+  ///
+  /// 不能在松手时直接丢掉局部状态：`widget.page` 是**打开面板那一刻**的快照，
+  /// `onJump` 只会改阅读器、不会重建这个面板。回到 `widget.page` 会让滑条
+  /// "弹回原位"，看起来像拖动失败（其实页面已经跳过去了）。
+  late int _page;
+
+  @override
+  void initState() {
+    super.initState();
+    _page = widget.page.clamp(1, widget.total < 1 ? 1 : widget.total);
+  }
+
+  void _onSlideEnd(double value) {
+    final target = value.round().clamp(1, widget.total);
+    // 先落本地页码再通知外部：两者顺序反了会有一帧仍显示旧值。
+    setState(() {
+      _dragging = null;
+      _page = target;
+    });
+    widget.onJump(target);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -159,7 +182,7 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
                     const Spacer(),
                     Text(
                       l10n.readerPageOf(
-                        _dragging?.round() ?? widget.page,
+                        _dragging?.round() ?? _page,
                         widget.total,
                       ),
                       style: textStyle.bodySmall?.copyWith(
@@ -170,7 +193,7 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
                 ),
                 Slider(
                   key: const Key('reader-jump-slider'),
-                  value: (_dragging ?? widget.page.toDouble()).clamp(
+                  value: (_dragging ?? _page.toDouble()).clamp(
                     1,
                     widget.total.toDouble(),
                   ),
@@ -181,10 +204,7 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
                   inactiveColor: palette.outline,
                   onChanged: (double value) =>
                       setState(() => _dragging = value),
-                  onChangeEnd: (double value) {
-                    setState(() => _dragging = null);
-                    widget.onJump(value.round());
-                  },
+                  onChangeEnd: _onSlideEnd,
                 ),
               ],
             ],

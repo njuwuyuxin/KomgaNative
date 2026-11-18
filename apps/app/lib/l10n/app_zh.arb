@@ -72,6 +72,8 @@
   "goToPage": "跳转到页",
   "readerPageOf": "{page} / {total}",
   "readerSpreadOf": "{from}–{to} / {total}",
+  "currentPage": "第 {page} 页",
+  "currentSpread": "第 {from}–{to} 页",
   "continueReadingProgress": "第 {page} / {total} 页",
   "readerModeAuto": "跟随书籍",
   "readerModeAutoHint": "条漫自动纵向滚动，其余逐页打开",

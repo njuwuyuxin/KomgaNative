@@ -194,6 +194,22 @@ void main() {
       expect(find.text('3 / 3'), findsOneWidget);
     });
 
+    testWidgets('松手后滑条停在目标页，不会弹回打开时的页码', (WidgetTester tester) async {
+      await pumpReader(tester, book: demoReaderBook());
+      await openSettings(tester);
+
+      final slider = find.byKey(const Key('reader-jump-slider'));
+      expect(tester.widget<Slider>(slider).value, 1.0);
+
+      await tester.drag(slider, const Offset(500, 0));
+      await tester.pumpAndSettle();
+
+      // 页面已经跳了，滑条也得停在末页：以前 widget.page 是打开时的快照，
+      // 松手后 value 回到 1，看起来像拖动失败。
+      expect(tester.widget<Slider>(slider).value, 3.0);
+      expect(find.text('3 / 3'), findsWidgets, reason: '面板标签与顶栏都应是第 3 页');
+    });
+
     testWidgets('只有一页时不显示跳页滑块', (WidgetTester tester) async {
       await pumpReader(
         tester,

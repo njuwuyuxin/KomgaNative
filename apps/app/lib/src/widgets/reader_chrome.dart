@@ -269,49 +269,88 @@ class ReaderFinishedBar extends StatelessWidget {
   }
 }
 
-/// 底部：上一页 / 页数 / 下一页。
+/// 底部：上一屏 / 当前页码 / 下一屏。
+///
+/// 左右箭头的**位置**跟着阅读方向走（RTL 漫画的"下一页"在左侧），与画面点击区
+/// 共用同一个判断 [leftTurnsNext]，所以不会出现"点左边是前进、箭头左边却是后退"。
 class ReaderControls extends StatelessWidget {
   const ReaderControls({
-    required this.pagesCount,
+    required this.pageLabel,
     required this.palette,
+    required this.leftTurnsNext,
     this.onPrevious,
     this.onNext,
     super.key,
   });
 
-  final int pagesCount;
+  /// 当前页码（不是总页数）：单页 `Page 3`，双页 `Pages 3–4`。
+  final String pageLabel;
+
   final ReaderPalette palette;
+
+  /// 左侧按钮是不是"下一页"。
+  final bool leftTurnsNext;
+
   final VoidCallback? onPrevious;
   final VoidCallback? onNext;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+
+    Widget button({
+      required Key key,
+      required IconData icon,
+      required String tooltip,
+      required VoidCallback? onPressed,
+    }) {
+      return IconButton(
+        key: key,
+        onPressed: onPressed,
+        icon: Icon(icon),
+        color: palette.foreground,
+        disabledColor: palette.outline,
+        tooltip: tooltip,
+      );
+    }
+
+    // 图标永远指向"这一侧"（左箭头朝左、右箭头朝右），语义（上一页/下一页）
+    // 由 [leftTurnsNext] 决定，两者不会再各说各话。
+    final leftButton = leftTurnsNext
+        ? button(
+            key: const Key('reader-next-button'),
+            icon: Icons.chevron_left,
+            tooltip: l10n.nextPage,
+            onPressed: onNext,
+          )
+        : button(
+            key: const Key('reader-previous-button'),
+            icon: Icons.chevron_left,
+            tooltip: l10n.previousPage,
+            onPressed: onPrevious,
+          );
+    final rightButton = leftTurnsNext
+        ? button(
+            key: const Key('reader-previous-button'),
+            icon: Icons.chevron_right,
+            tooltip: l10n.previousPage,
+            onPressed: onPrevious,
+          )
+        : button(
+            key: const Key('reader-next-button'),
+            icon: Icons.chevron_right,
+            tooltip: l10n.nextPage,
+            onPressed: onNext,
+          );
+
     return Padding(
       padding: const EdgeInsets.all(AppSpacing.sm),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: <Widget>[
-          IconButton(
-            key: const Key('reader-previous-button'),
-            onPressed: onPrevious,
-            icon: const Icon(Icons.chevron_left),
-            color: palette.foreground,
-            disabledColor: palette.outline,
-            tooltip: l10n.previousPage,
-          ),
-          Text(
-            l10n.bookPages(pagesCount),
-            style: TextStyle(color: palette.muted),
-          ),
-          IconButton(
-            key: const Key('reader-next-button'),
-            onPressed: onNext,
-            icon: const Icon(Icons.chevron_right),
-            color: palette.foreground,
-            disabledColor: palette.outline,
-            tooltip: l10n.nextPage,
-          ),
+          leftButton,
+          Text(pageLabel, style: TextStyle(color: palette.muted)),
+          rightButton,
         ],
       ),
     );

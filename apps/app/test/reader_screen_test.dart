@@ -312,6 +312,72 @@ void main() {
     });
   });
 
+  group('底栏页码与翻页箭头', () {
+    testWidgets('底栏显示当前页码，翻页后跟着变（不是总页数）', (WidgetTester tester) async {
+      await pumpReader(tester, book: demoReaderBook());
+
+      expect(find.text('Page 1'), findsOneWidget);
+      expect(find.text('3 pages'), findsNothing, reason: '底栏不该再显示总页数');
+
+      await tapRight(tester);
+      expect(find.text('Page 2'), findsOneWidget);
+      expect(find.text('Page 1'), findsNothing);
+    });
+
+    testWidgets('双页模式底栏显示当前跨页', (WidgetTester tester) async {
+      await pumpReader(tester, book: demoReaderBook());
+      await pickMode(tester, ReaderModeChoice.double);
+
+      await tapRight(tester);
+      expect(find.text('Pages 2–3'), findsOneWidget);
+    });
+
+    testWidgets('LTR：左侧是上一页，右侧是下一页（与点击区一致）', (WidgetTester tester) async {
+      await pumpReader(tester, book: demoReaderBook());
+
+      final previous = tester.getCenter(
+        find.byKey(const Key('reader-previous-button')),
+      );
+      final next = tester.getCenter(
+        find.byKey(const Key('reader-next-button')),
+      );
+      expect(previous.dx, lessThan(next.dx));
+
+      await tester.tap(find.byKey(const Key('reader-next-button')));
+      await tester.pumpAndSettle();
+      expect(find.text('2 / 3'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('reader-previous-button')));
+      await tester.pumpAndSettle();
+      expect(find.text('1 / 3'), findsOneWidget);
+    });
+
+    testWidgets('RTL：左侧按钮变成下一页（和左侧点击区同一个方向）', (WidgetTester tester) async {
+      await pumpReader(
+        tester,
+        book: demoReaderBook(),
+        direction: ReadingDirection.rightToLeft,
+      );
+
+      final previous = tester.getCenter(
+        find.byKey(const Key('reader-previous-button')),
+      );
+      final next = tester.getCenter(
+        find.byKey(const Key('reader-next-button')),
+      );
+      expect(next.dx, lessThan(previous.dx), reason: '日漫下一页在左');
+
+      // 点左侧的"下一页"按钮 → 前进；再点右侧的"上一页"按钮 → 回来。
+      await tester.tap(find.byKey(const Key('reader-next-button')));
+      await tester.pumpAndSettle();
+      expect(find.text('2 / 3'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('reader-previous-button')));
+      await tester.pumpAndSettle();
+      expect(find.text('1 / 3'), findsOneWidget);
+    });
+  });
+
   group('墨水屏', () {
     testWidgets('阅读区改白底黑字（黑底会触发整屏全刷）', (WidgetTester tester) async {
       await pumpReader(tester, book: demoReaderBook(), forceEink: true);

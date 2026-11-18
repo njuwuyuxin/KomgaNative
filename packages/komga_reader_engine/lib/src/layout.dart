@@ -114,3 +114,38 @@ PagedLayout computePagedLayout({
     content: RectD(left, top, contentWidth, contentHeight),
   );
 }
+
+/// 以双指焦点为中心缩放后，内容的新左上角（视口坐标）。
+///
+/// 交互规则：缩放时**焦点下的那一块画面必须停在原地**。手势层把返回值当作
+/// 下一次 [computePagedLayout] 的 `panX` / `panY`，就不会出现"不管手指在哪，
+/// 画面都从左上角开始放大"。
+///
+/// - [contentLeft] / [contentTop]：缩放前内容的左上角（上一帧布局的
+///   `content.left/top`，已经含平移与居中）；
+/// - [scale] / [nextScale]：缩放前后的有效比例（不是 zoomFactor）；
+/// - [focalX] / [focalY]：手势开始时的焦点；
+/// - [focalDeltaX] / [focalDeltaY]：焦点相对手势起点的位移（单指拖动时就是平移）。
+///
+/// 推导：焦点处的内容坐标 `c = (focal - content) / scale`；缩放后要保持
+/// `content' + c * nextScale = focal`，于是 `content' = focal - (focal - content) * ratio`。
+({double left, double top}) zoomAboutFocal({
+  required double contentLeft,
+  required double contentTop,
+  required double scale,
+  required double nextScale,
+  required double focalX,
+  required double focalY,
+  double focalDeltaX = 0,
+  double focalDeltaY = 0,
+}) {
+  if (scale <= 0 || nextScale <= 0) {
+    // 尺寸未知/视口为 0 的退化情况：只保留拖动位移，不让缩放把内容甩飞。
+    return (left: contentLeft + focalDeltaX, top: contentTop + focalDeltaY);
+  }
+  final ratio = nextScale / scale;
+  return (
+    left: focalX - (focalX - contentLeft) * ratio + focalDeltaX,
+    top: focalY - (focalY - contentTop) * ratio + focalDeltaY,
+  );
+}

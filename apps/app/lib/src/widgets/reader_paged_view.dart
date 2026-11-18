@@ -57,7 +57,14 @@ class _ReaderPagedViewState extends State<ReaderPagedView> {
   Offset _pan = Offset.zero;
   Offset _startFocal = Offset.zero;
   double _startZoom = 1;
-  Offset _startPan = Offset.zero;
+
+  // 手势回调里拿不到 LayoutBuilder 的 constraints，所以 build 时缓存一份：
+  // 缩放要以焦点为基准，需要"缩放前的有效比例 + 内容左上角"。
+  int _pageWidth = kFallbackPageWidth;
+  int _pageHeight = kFallbackPageHeight;
+  SizeD _viewport = const SizeD(0, 0);
+  double _startScale = 1;
+  Offset _startContent = Offset.zero;
 
   /// 点击判定用自己的指针记账：`onTapUp` 与 `onScaleStart/Update` 在同一个
   /// gesture arena 里会互相抢，实测 tap 会被 scale 吃掉，翻页完全不响应。
@@ -84,18 +91,52 @@ class _ReaderPagedViewState extends State<ReaderPagedView> {
 
   void _onScaleStart(ScaleStartDetails details) {
     _startZoom = _zoom;
-    _startPan = _pan;
     _startFocal = details.localFocalPoint;
+    final layout = computePagedLayout(
+      pageWidth: _pageWidth,
+      pageHeight: _pageHeight,
+      viewport: _viewport,
+      zoomFactor: _zoom,
+      panX: _pan.dx,
+      panY: _pan.dy,
+    );
+    _startScale = layout.scale;
+    _startContent = Offset(layout.content.left, layout.content.top);
   }
 
   void _onScaleUpdate(ScaleUpdateDetails details) {
     final nextZoom = (_startZoom * details.scale).clamp(1.0, 4.0);
+    if (nextZoom <= 1.0) {
+      setState(() {
+        _zoom = nextZoom;
+        // 缩回适配尺寸时内容居中，旧平移没有意义。
+        _pan = Offset.zero;
+      });
+      return;
+    }
+
+    // 先用引擎算出"缩放后的有效比例"，再以两指中点为基准反推新的内容左上角。
+    // 直接用 zoomFactor 当比例会忽略夹紧（fit 很小时 max 可能小于 fit*4）。
+    final nextScale = computePagedLayout(
+      pageWidth: _pageWidth,
+      pageHeight: _pageHeight,
+      viewport: _viewport,
+      zoomFactor: nextZoom,
+    ).scale;
+    final origin = zoomAboutFocal(
+      contentLeft: _startContent.dx,
+      contentTop: _startContent.dy,
+      scale: _startScale,
+      nextScale: nextScale,
+      focalX: _startFocal.dx,
+      focalY: _startFocal.dy,
+      // 焦点本身也可以移动：单指拖动时比例不变，等价于平移。
+      focalDeltaX: details.localFocalPoint.dx - _startFocal.dx,
+      focalDeltaY: details.localFocalPoint.dy - _startFocal.dy,
+    );
     setState(() {
       _zoom = nextZoom;
-      // 缩放后单指拖动就是平移；缩回 1 时自动归位。
-      _pan = nextZoom <= 1.0
-          ? Offset.zero
-          : _startPan + (details.localFocalPoint - _startFocal);
+      _pan = Offset(origin.left, origin.top);
     });
   }
 
@@ -127,12 +168,18 @@ class _ReaderPagedViewState extends State<ReaderPagedView> {
       if (h > maxHeight) maxHeight = h;
     }
 
+    // 手势回调要用：页面像素尺寸（跨页合计）在 build 时确定。
+    _pageWidth = totalWidth;
+    _pageHeight = maxHeight;
+
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
+        final viewport = SizeD(constraints.maxWidth, constraints.maxHeight);
+        _viewport = viewport;
         final layout = computePagedLayout(
           pageWidth: totalWidth,
           pageHeight: maxHeight,
-          viewport: SizeD(constraints.maxWidth, constraints.maxHeight),
+          viewport: viewport,
           zoomFactor: _zoom,
           panX: _pan.dx,
           panY: _pan.dy,

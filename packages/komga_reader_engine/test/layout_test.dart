@@ -70,6 +70,69 @@ void main() {
     });
   });
 
+  group('zoomAboutFocal', () {
+    test('焦点下的内容保持不动（以双指中点为基准，而不是左上角）', () {
+      // 适配后内容左上角在 (0, 129.5)，以 (195, 422) 为焦点放大一倍。
+      final origin = zoomAboutFocal(
+        contentLeft: 0,
+        contentTop: 129.5,
+        scale: 0.39,
+        nextScale: 0.78,
+        focalX: 195,
+        focalY: 422,
+      );
+      expect(origin.left, closeTo(-195, 1e-9));
+      expect(origin.top, closeTo(422 - (422 - 129.5) * 2, 1e-9));
+
+      // 焦点处的内容坐标缩放前后必须落在同一个屏幕位置。
+      const focalContent = 500.0; // (195 - 0) / 0.39
+      expect(origin.left + focalContent * 0.78, closeTo(195, 1e-9));
+    });
+
+    test('单指拖动（比例不变）只平移焦点位移', () {
+      final origin = zoomAboutFocal(
+        contentLeft: -100,
+        contentTop: -200,
+        scale: 0.78,
+        nextScale: 0.78,
+        focalX: 150,
+        focalY: 400,
+        focalDeltaX: 24,
+        focalDeltaY: -36,
+      );
+      expect(origin.left, closeTo(-76, 1e-9));
+      expect(origin.top, closeTo(-236, 1e-9));
+    });
+
+    test('缩小同样以焦点为基准（内容往焦点收）', () {
+      final origin = zoomAboutFocal(
+        contentLeft: -300,
+        contentTop: -400,
+        scale: 1.56,
+        nextScale: 0.78,
+        focalX: 195,
+        focalY: 422,
+      );
+      expect(origin.left, closeTo(195 - (195 + 300) * 0.5, 1e-9));
+      expect(origin.top, closeTo(422 - (422 + 400) * 0.5, 1e-9));
+    });
+
+    test('非法比例退化为只保留位移，不产生 NaN', () {
+      final origin = zoomAboutFocal(
+        contentLeft: 10,
+        contentTop: 20,
+        scale: 0,
+        nextScale: 0,
+        focalX: 100,
+        focalY: 100,
+        focalDeltaX: 5,
+        focalDeltaY: 6,
+      );
+      expect(origin.left, 15);
+      expect(origin.top, 26);
+    });
+  });
+
   group('computePagedLayout', () {
     test('未放大时整页居中', () {
       final layout = computePagedLayout(
