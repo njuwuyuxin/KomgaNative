@@ -282,6 +282,19 @@ Panels 的高级感主要来自三点，和控件本身关系不大：
 
 基线变更原因：封面形状/阴影/角标/进度条位置、大标题（书架/设置）、骨架微光。
 
+**进度（2026-11-18）：第 5 批进行中。**
+
+| 编号 | 落地 |
+|---|---|
+| P2-5 | 长按上下文菜单（`showContextMenu`，锚在被按的控件旁）；系列：标记全部已读/全部未读/查看详情；书行：标记已读/标记未读；补上**单本书标记已读**（`LibraryRepository.setBookRead` 走已有的 `PATCH`/`DELETE /books/{id}/read-progress`，并同步本地 outbox）；新增 `bookReadProvider`；书行包 `PressableScale` |
+| P2-7 | 网格/列表切换 + 封面小/中/大三档（`ShelfView` / `ShelfCoverSize`，档位只影响"一格最宽多少"，仍然不判断平板）；`ShelfViewButton` 用 `CheckedPopupMenuItem` 标当前项；**不重新请求**，只换 sliver 类型；列表行 `SeriesShelfRow` 与网格卡片共用 Hero 与长按菜单；`komga_api` 补"排序 wire 值符合 `property,asc\|desc`"的契约测试 |
+
+**P2-7 的偏差**：
+- 排序**没有**新增"按书籍数量 / 按发行日期"：OpenAPI 不给可排序属性清单，且排序属性
+  不等于 DTO 字段名（已验证的 `createdDate` 对应 DTO 的 `created`），没有运行中的
+  Komga 就无法验证。理由与补测方法写在 `docs/series-queries.md`。
+- 平板双指捏合调封面大小没做：会和网格滚动/下拉刷新抢手势，收益不如菜单直接选。
+
 ---
 
 ## P3：长尾功能

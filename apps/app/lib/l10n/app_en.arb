@@ -275,5 +275,14 @@
   "bookMarkRead": "Mark read",
   "bookMarkUnread": "Mark unread",
   "readFromStart": "Read from the start",
-  "viewDetails": "View details"
+  "viewDetails": "View details",
+  "shelfViewTooltip": "Layout",
+  "viewGrid": "Grid",
+  "viewList": "List",
+  "coverSize": "Cover size",
+  "coverSmall": "Small",
+  "coverMedium": "Medium",
+  "coverLarge": "Large",
+  "sortBooksCount": "Most books",
+  "sortReleaseDate": "Release date"
 }

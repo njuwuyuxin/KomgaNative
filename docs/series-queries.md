@@ -33,6 +33,22 @@ $hk = @{ 'X-API-Key' = $key }
 - `sort` 是**数组**参数（OpenAPI 里 `type: array`），单个 `property,asc` 写法服务端接受；
 - 上述四个取值都返回 200，且顺序符合语义（标题排序正反序对称，最近阅读与最近添加各成一套顺序）。
 
+### 为什么排序项没有继续加（UI-P2-7 的取舍）
+
+计划里还想补"按书籍数量 / 按发行日期"。没有加，原因有二：
+
+1. OpenAPI 只规定 `sort` 的**格式**是 `property(,asc|desc)`，**没有列出可排序属性清单**，
+   没法从规格反推合法属性名；
+2. 排序属性是查询/实体层的名字，**不等于 DTO 字段名**——已验证的 `createdDate` 在
+   `SeriesDto` 里对应的字段叫 `created`。所以"字段在 DTO 里存在"不能证明它能排序。
+
+`booksCount` / `booksMetadata.releaseDate` 看起来能排，但没有运行中的 Komga 可以验证：
+写错了用户点下去要么 400、要么顺序诡异。按"API 真值规则"（`AGENTS.md`）不猜。
+有服务器时按上面的表格补两行实测，再往 `SeriesSort` 里加即可。
+
+契约测试目前钉的是**格式**（`komga_api/test/contract_test.dart`：每个排序都能解析成
+`属性[,asc|desc]`、方向只有 asc/desc）；属性名的正确性靠这张实测表。
+
 ## 阅读状态：`read_status=UNREAD|READ|IN_PROGRESS`
 
 | 请求 | `totalElements` | 返回系列 |

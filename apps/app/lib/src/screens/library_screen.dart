@@ -6,6 +6,7 @@ import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
+import 'package:komga_native/src/data/shelf_view_options.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/screens/reader_screen.dart';
 import 'package:komga_native/src/session/session_controller.dart';
@@ -98,6 +99,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 actions: <Widget>[
                   const ShelfSortButton(),
                   const ShelfFilterButton(),
+                  const ShelfViewButton(),
                   IconButton(
                     onPressed: _toggleSearch,
                     icon: Icon(_searching ? Icons.close : Icons.search),
@@ -220,26 +222,40 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       ];
     }
     return <Widget>[
-      SliverPadding(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-        sliver: SliverGrid(
-          gridDelegate: shelfGridDelegate(),
+      // 网格 / 列表（UI-P2-7）：两种视图共用同一个 `state.series`，
+      // 切换只是换 sliver 的类型，不重新请求。
+      if (state.view == ShelfView.grid)
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          sliver: SliverGrid(
+            gridDelegate: shelfGridDelegate(state.coverSize),
+            delegate: SliverChildBuilderDelegate((
+              BuildContext context,
+              int index,
+            ) {
+              final series = state.series[index];
+              return SeriesShelfTile(
+                series: series,
+                onTap: () => unawaited(_openSeries(series)),
+              );
+            }, childCount: state.series.length),
+          ),
+        )
+      else
+        SliverList(
           delegate: SliverChildBuilderDelegate((
             BuildContext context,
             int index,
           ) {
             final series = state.series[index];
-            return SeriesShelfTile(
+            return SeriesShelfRow(
+              key: Key('series-${series.id}'),
               series: series,
-              onTap: () async {
-                await context.push('/series/${series.id}');
-                // 系列页里可能读完了书：原地刷新进度，别把列表清空跳回顶部。
-                await ref.read(shelfProvider.notifier).refreshInPlace();
-              },
+              coverSize: state.coverSize,
+              onTap: () => unawaited(_openSeries(series)),
             );
           }, childCount: state.series.length),
         ),
-      ),
       SliverToBoxAdapter(
         child: ShelfPagingFooter(
           state: state,
@@ -247,5 +263,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         ),
       ),
     ];
+  }
+
+  /// 进系列页；回来时原地刷新进度（别把列表清空跳回顶部）。
+  Future<void> _openSeries(Series series) async {
+    await context.push('/series/${series.id}');
+    await ref.read(shelfProvider.notifier).refreshInPlace();
   }
 }

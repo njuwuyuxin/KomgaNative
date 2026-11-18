@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
+import 'package:komga_native/src/data/shelf_view_options.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/widgets/series_shelf_tile.dart';
 import 'package:material_ui/material_ui.dart';
@@ -13,13 +14,15 @@ import 'package:material_ui/material_ui.dart';
 ///
 /// 好处：手机 2 列、平板 5 列、墨水屏 4 列都是同一条规则算出来的，
 /// 页面里不需要再判断"是不是平板"，窗口拉伸时密度也自然跟着变。
-SliverGridDelegate shelfGridDelegate() =>
-    const SliverGridDelegateWithMaxCrossAxisExtent(
-      maxCrossAxisExtent: 190,
-      crossAxisSpacing: AppSpacing.md,
-      mainAxisSpacing: AppSpacing.md,
-      childAspectRatio: 0.6,
-    );
+/// [size] 由用户选的封面档位决定（UI-P2-7）。
+SliverGridDelegate shelfGridDelegate([
+  ShelfCoverSize size = ShelfCoverSize.medium,
+]) => SliverGridDelegateWithMaxCrossAxisExtent(
+  maxCrossAxisExtent: size.maxExtent,
+  crossAxisSpacing: AppSpacing.md,
+  mainAxisSpacing: AppSpacing.md,
+  childAspectRatio: 0.6,
+);
 
 /// 书架网格 + 下拉刷新 + 滚到底自动预取。
 class ShelfGrid extends ConsumerWidget {

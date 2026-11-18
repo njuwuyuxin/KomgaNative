@@ -130,5 +130,28 @@ void main() {
         );
       });
     }
+
+    /// 排序的 wire 值（UI-P2-7 的契约面）。
+    ///
+    /// OpenAPI 只规定 `sort` 的**格式**是 `property(,asc|desc)`，没有列出可排序
+    /// 属性清单；而且排序属性是**查询/实体层**的名字，不是 DTO 字段名
+    /// （实测过的 `createdDate` 就对应 DTO 里的 `created`），所以没法用
+    /// `SeriesDto` 反查。这里只钉格式：每个排序都能解析成 `属性[,方向]`，
+    /// 方向只有 asc / desc。属性名本身要靠 `docs/series-queries.md` 的实测清单。
+    test('排序 wire 值符合 property,asc|desc 格式', () {
+      expect(SeriesSort.values, isNotEmpty);
+      for (final sort in SeriesSort.values) {
+        final wire = sortWireValue(sort);
+        final parts = wire.split(',');
+        expect(parts.length, lessThanOrEqualTo(2), reason: '$wire 格式不对');
+        expect(parts.first, isNotEmpty, reason: '$wire 没有属性名');
+        expect(parts.first.contains(' '), isFalse, reason: '$wire 的属性名里不该有空格');
+        expect(
+          parts.last,
+          anyOf('asc', 'desc'),
+          reason: '$wire 的方向只能是 asc / desc',
+        );
+      }
+    });
   });
 }

@@ -176,5 +176,14 @@
   "bookMarkRead": "标记已读",
   "bookMarkUnread": "标记未读",
   "readFromStart": "从头阅读",
-  "viewDetails": "查看详情"
+  "viewDetails": "查看详情",
+  "shelfViewTooltip": "视图",
+  "viewGrid": "网格",
+  "viewList": "列表",
+  "coverSize": "封面大小",
+  "coverSmall": "小",
+  "coverMedium": "中",
+  "coverLarge": "大",
+  "sortBooksCount": "书籍数量",
+  "sortReleaseDate": "发行日期"
 }

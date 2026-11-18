@@ -6,6 +6,7 @@ import 'package:komga_api/komga_api.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/library_repository.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
+import 'package:komga_native/src/data/shelf_view_options.dart';
 import 'package:komga_native/src/providers/cache_providers.dart';
 import 'package:komga_native/src/providers/progress_providers.dart';
 import 'package:komga_native/src/session/session_controller.dart';
@@ -89,6 +90,8 @@ class ShelfState {
     this.libraryId,
     this.sort,
     this.readStatus,
+    this.view = ShelfView.grid,
+    this.coverSize = ShelfCoverSize.medium,
     this.loading = true,
     this.loadingMore = false,
     this.failure,
@@ -111,6 +114,12 @@ class ShelfState {
 
   /// 阅读状态筛选；null = 不筛选。
   final SeriesReadStatus? readStatus;
+
+  /// 网格还是列表（UI-P2-7）。
+  final ShelfView view;
+
+  /// 网格封面档位（UI-P2-7）。
+  final ShelfCoverSize coverSize;
 
   /// 首屏（或换库/换搜索词后的重新加载）进行中。
   final bool loading;
@@ -135,6 +144,8 @@ class ShelfState {
     Object? libraryId = _unset,
     Object? sort = _unset,
     Object? readStatus = _unset,
+    ShelfView? view,
+    ShelfCoverSize? coverSize,
     bool? loading,
     bool? loadingMore,
     ShelfFailure? failure,
@@ -154,6 +165,8 @@ class ShelfState {
     readStatus: identical(readStatus, _unset)
         ? this.readStatus
         : readStatus as SeriesReadStatus?,
+    view: view ?? this.view,
+    coverSize: coverSize ?? this.coverSize,
     loading: loading ?? this.loading,
     loadingMore: loadingMore ?? this.loadingMore,
     failure: clearFailure ? null : (failure ?? this.failure),
@@ -243,6 +256,17 @@ class ShelfController extends Notifier<ShelfState> {
   void setReadStatus(SeriesReadStatus? status) {
     if (state.readStatus == status) return;
     _reloadWith(state.copyWith(readStatus: status));
+  }
+
+  /// 换呈现方式 / 封面档位（UI-P2-7）：**不重新发请求**，只改视图状态。
+  void setView(ShelfView view) {
+    if (state.view == view) return;
+    state = state.copyWith(view: view);
+  }
+
+  void setCoverSize(ShelfCoverSize size) {
+    if (state.coverSize == size) return;
+    state = state.copyWith(coverSize: size);
   }
 
   /// 换查询条件后重新开始：清空列表、回到第一页，但保留新条件本身。
