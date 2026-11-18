@@ -5,7 +5,8 @@
 | 层 | 位置 | 职责 |
 |---|---|---|
 | 几何（纯 Dart） | `packages/komga_reader_engine` | 单页适配缩放、双页分组与视觉顺序、纵向偏移与页码映射 |
-| 编排（Flutter） | `apps/app/lib/src/screens/reader_screen.dart` | 当前页、模式解析、进度回写、生命周期、亮度遮罩、常亮 |
+| 编排（Flutter） | `apps/app/lib/src/screens/reader_screen.dart` | 当前页、模式解析、翻页/跳页、生命周期 |
+| 编排拆件（Flutter） | `widgets/reader_layout.dart`（这一屏的派生状态：分屏、能否翻页、是否读完、页码文案）、`reader_preloader.dart`（预取调度）、`reader_progress_writer.dart`（进度防抖回写）、`reader_pages_gate.dart`（加载/失败/空书）、`reader_top_bar.dart`（顶栏接线）、`reader_frame.dart`（骨架 + chrome 显隐 + 亮度遮罩）、`volume_key_scope.dart`、`wake_lock_scope.dart` | 从 `reader_screen.dart` 拆出（UI-P0-1，行为零变化）；chrome 动画以后只改 `reader_frame.dart` |
 | 绘制（Flutter） | `apps/app/lib/src/widgets/reader_{paged,vertical}_view.dart`、`reader_chrome.dart`、`reader_settings_sheet.dart` | 一屏画哪几页、顶栏底栏、设置面板 |
 
 ## 三种模式
@@ -77,7 +78,7 @@
 页码变了、图没变，用户第一反应是"卡住了/是 bug"。所以宁可露出明确的"还没加载好"。
 预取做深就是为了让这条路径尽量不出现（见下）。
 
-预取（`apps/app/lib/src/screens/reader_screen.dart` + `komga_reader_engine/src/preload.dart`）：
+预取（`apps/app/lib/src/widgets/reader_preloader.dart` + `komga_reader_engine/src/preload.dart`）：
 
 - 计划按**屏**算（`preloadPlan`），不是 `page ± 1`。双页模式一屏两页，按页码加减会
   一直漏掉每屏的第二页，表现是"翻一屏闪一次、翻一页不闪"——很难查，所以钉了单测；
@@ -86,7 +87,7 @@
   按 1 页/秒的阅读速度算，4 屏就是 4 秒以上的缓冲——阅读快的人不会翻两下就撞上转圈；
 - 触点在 `build` 里（`_schedulePreload`），只在 **页码或模式变化**时排一次，下一帧执行：
   保证当前页自己的请求先出去（弱网下顺序就是优先级），也避免每帧重复排；
-- 并发上限 4 张，其余**排队**（`_pumpPreload`：前一张回来就补下一张）。
+- 并发上限 4 张，其余**排队**（`ReaderPreloader._pump`：前一张回来就补下一张）。
   早先是"超上限直接丢"，阅读快时计划尾部永远轮不到——排队才对；
 - **为什么光抓字节不够**：`Image.memory` 在解码完成前那一帧没有像素，看到的就是
   Scaffold 的黑底——这就是"闪一下黑"。预解码后翻过去首帧就有图；

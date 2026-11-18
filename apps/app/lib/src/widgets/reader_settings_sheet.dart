@@ -106,12 +106,14 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
             children: <Widget>[
               Center(
                 child: Container(
-                  width: 36,
-                  height: 4,
+                  width: AppSizes.grabber.width,
+                  height: AppSizes.grabber.height,
                   margin: const EdgeInsets.only(bottom: AppSpacing.md),
                   decoration: BoxDecoration(
                     color: palette.outline,
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(
+                      AppSizes.grabber.height / 2,
+                    ),
                   ),
                 ),
               ),
@@ -134,7 +136,11 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
               _Label(l10n.brightness, palette: palette),
               Row(
                 children: <Widget>[
-                  Icon(Icons.brightness_low, color: palette.muted, size: 20),
+                  Icon(
+                    Icons.brightness_low,
+                    color: palette.muted,
+                    size: AppSizes.iconMd,
+                  ),
                   Expanded(
                     child: Slider(
                       key: const Key('reader-brightness-slider'),
@@ -147,7 +153,7 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
                     ),
                   ),
                   SizedBox(
-                    width: 44,
+                    width: AppSizes.valueColumn,
                     child: Text(
                       l10n.brightnessPercent((prefs.brightness * 100).round()),
                       textAlign: TextAlign.end,
@@ -266,7 +272,7 @@ class _ModeRow extends StatelessWidget {
               selected
                   ? Icons.radio_button_checked
                   : Icons.radio_button_unchecked,
-              size: 20,
+              size: AppSizes.iconMd,
               color: selected ? palette.foreground : palette.muted,
             ),
             const SizedBox(width: AppSpacing.sm),

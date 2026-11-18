@@ -289,6 +289,20 @@ Future<int> layerCheck() async {
     ], reason: 'UI 不得直接访问 API 层'),
   );
 
+  // 材质与触感反馈必须经设计系统（FrostedSurface / AppHaptics），
+  // 否则墨水屏退化和"触感反馈"开关会被绕开。
+  for (final dir in <String>[
+    'apps/app/lib/src/screens',
+    'apps/app/lib/src/widgets',
+  ]) {
+    violations.addAll(
+      _scanCode(dir, <String>[
+        'BackdropFilter(',
+        'HapticFeedback.',
+      ], reason: '用 FrostedSurface / AppHaptics，保证墨水屏退化与设置开关生效'),
+    );
+  }
+
   if (violations.isEmpty) {
     stdout.writeln('分层规则通过');
     return 0;
@@ -316,6 +330,31 @@ List<String> _scanImports(
       for (final f in forbidden) {
         if (line.contains(f)) {
           violations.add('${entity.path}:${i + 1} 禁止 import $f（$reason）');
+        }
+      }
+    }
+  }
+  return violations;
+}
+
+/// 扫描源码里（非注释行）出现的禁用写法。
+List<String> _scanCode(
+  String dir,
+  List<String> forbidden, {
+  required String reason,
+}) {
+  final directory = Directory(dir);
+  if (!directory.existsSync()) return <String>[];
+  final violations = <String>[];
+  for (final entity in directory.listSync(recursive: true)) {
+    if (entity is! File || !entity.path.endsWith('.dart')) continue;
+    final lines = entity.readAsLinesSync();
+    for (var i = 0; i < lines.length; i++) {
+      final line = lines[i].trimLeft();
+      if (line.startsWith('//')) continue;
+      for (final f in forbidden) {
+        if (line.contains(f)) {
+          violations.add('${entity.path}:${i + 1} 禁止直接使用 $f（$reason）');
         }
       }
     }

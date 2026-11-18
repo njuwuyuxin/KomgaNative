@@ -40,7 +40,7 @@ class ContinueReadingRow extends ConsumerWidget {
           child: Text(l10n.continueReading, style: theme.textTheme.titleSmall),
         ),
         SizedBox(
-          height: 196,
+          height: AppSizes.shelfRowHeight,
           child: ListView.separated(
             key: const Key('continue-reading'),
             scrollDirection: Axis.horizontal,
@@ -92,15 +92,15 @@ class _ContinueCard extends ConsumerWidget {
         child: InkWell(
           onTap: () => onOpen(book, direction),
           child: SizedBox(
-            width: 96,
+            width: AppSizes.shelfCover.width,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 ClipRRect(
                   borderRadius: BorderRadius.circular(AppRadii.sm),
                   child: SizedBox(
-                    width: 96,
-                    height: 136,
+                    width: AppSizes.shelfCover.width,
+                    height: AppSizes.shelfCover.height,
                     child: cover == null
                         ? ColoredBox(
                             color: theme.colorScheme.surfaceContainerHighest,

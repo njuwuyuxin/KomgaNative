@@ -470,6 +470,19 @@ void main() {
     await expectGolden(tester, 'connection@phone_light');
   });
 
+  // 中文基线：验证测试字体子集生效（汉字不是占位方块）。
+  testWidgets('connection@phone_light_zh', (WidgetTester tester) async {
+    await pumpGoldenScreen(
+      tester,
+      screen: const ConnectionScreen(),
+      size: GoldenSizes.phone,
+      theme: AppTheme.light(),
+      locale: const Locale('zh'),
+      overrides: memorySession(),
+    );
+    await expectGolden(tester, 'connection@phone_light_zh');
+  });
+
   testWidgets('connection@eink', (WidgetTester tester) async {
     await pumpGoldenScreen(
       tester,

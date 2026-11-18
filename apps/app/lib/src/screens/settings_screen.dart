@@ -69,6 +69,13 @@ class SettingsScreen extends ConsumerWidget {
             title: Text(l10n.einkMode),
             subtitle: Text(l10n.einkModeHint),
           ),
+          SwitchListTile(
+            key: const Key('settings-haptics'),
+            value: settings.haptics,
+            onChanged: controller.setHaptics,
+            title: Text(l10n.haptics),
+            subtitle: Text(l10n.hapticsHint),
+          ),
           ListTile(
             key: const Key('settings-language'),
             title: Text(l10n.language),

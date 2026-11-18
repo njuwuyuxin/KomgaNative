@@ -18,8 +18,8 @@ class SplashScreen extends StatelessWidget {
             Text('KomgaNative', style: theme.textTheme.headlineSmall),
             const SizedBox(height: AppSpacing.lg),
             const SizedBox(
-              width: 20,
-              height: 20,
+              width: AppSizes.iconMd,
+              height: AppSizes.iconMd,
               child: CircularProgressIndicator(strokeWidth: 2),
             ),
           ],

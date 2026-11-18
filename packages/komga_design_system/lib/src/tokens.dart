@@ -2,6 +2,8 @@ import 'package:material_ui/material_ui.dart';
 
 /// 间距标尺。页面只允许使用这些值。
 abstract final class AppSpacing {
+  /// 细线 / 角标内边距。
+  static const double xxs = 2;
   static const double xs = 4;
   static const double sm = 8;
   static const double md = 16;
@@ -15,23 +17,57 @@ abstract final class AppSpacing {
   );
 }
 
-/// 圆角标尺。墨水屏主题会把它们压成 0（见 [AppTheme.eink]）。
+/// 圆角标尺（数值）。墨水屏主题会把它们压成 0（见 [AppTheme.eink]）。
+///
+/// 页面里优先用 [AppShapes]（连续曲率、会按主题退化）；只有必须给
+/// `BorderRadius` 的老接口才直接用这里的数值。
 abstract final class AppRadii {
+  /// 封面：小圆角，像实体书的切边，而不是"卡片"。
+  static const double xs = 6;
   static const double sm = 8;
   static const double md = 12;
   static const double lg = 20;
+
+  /// 底部面板顶角。
+  static const double xl = 28;
 }
 
-/// 动效时长。
-abstract final class AppDurations {
-  static const Duration fast = Duration(milliseconds: 120);
-  static const Duration normal = Duration(milliseconds: 220);
+/// 图标与小尺寸控件标尺。
+abstract final class AppSizes {
+  /// 分隔线。
+  static const double hairline = 1;
 
-  /// 墨水屏一律零时长，否则会拖影。
-  static const Duration none = Duration.zero;
+  /// 行内小图标（离线标记等）、按钮内的小转圈。
+  static const double iconXs = 16;
 
-  static Duration resolve({required bool eink, Duration fallback = normal}) =>
-      eink ? none : fallback;
+  /// 状态图标（书末条的勾）。
+  static const double iconSm = 18;
+
+  /// 列表行尾图标、设置面板图标。
+  static const double iconMd = 20;
+
+  static const double iconLg = 24;
+
+  /// 进度条粗细。
+  static const double progressBar = 3;
+
+  /// 最小触控尺寸（与 Material / HIG 一致）。
+  static const double minTouch = 48;
+
+  /// 底部面板顶部的拖动条。
+  static const Size grabber = Size(36, 4);
+
+  /// 横向货架（继续阅读）里的封面。
+  static const Size shelfCover = Size(96, 136);
+
+  /// 横向货架整行高度：封面 + 两行文字。
+  static const double shelfRowHeight = 196;
+
+  /// 表单里"标签：值"的标签列宽（证书面板）。
+  static const double labelColumn = 92;
+
+  /// 设置面板里滑条两端数值的宽度。
+  static const double valueColumn = 44;
 }
 
 /// 布局断点，与 `komga_platform` 的形态判断保持同一套数值。

@@ -1,0 +1,318 @@
+# UI 精致化与功能对齐开发计划（对标 Panels）
+
+> 写于 2026-11-18。来源：对 Panels（iOS 漫画阅读器）官方指南、官网、博客与社区的调研，
+> 加上对本仓库代码的逐项盘点。目标是把现在"能用但朴素"的标准 Material 3 界面，
+> 做成接近 iOS 原生质感的阅读体验。
+>
+> 范围约束：只做和 **Komga 场景**相关的部分。本地导入、网盘、商店、Panels 账号同步不在范围内。
+> 每个需求都必须给出**墨水屏退化方案**。墨水屏不是"关掉动画的深色主题"，见 `docs/a11y-and-input.md`。
+
+## 0. 结论先行
+
+Panels 的高级感主要来自三点，和控件本身关系不大：
+
+1. **克制**："The library is the surface, the reader is the product"。
+   界面元素少，封面就是主视觉，阅读时几乎看不到 UI。
+2. **连续性**：所有状态变化都有过渡，包括 chrome 淡入淡出、封面放大进详情、页面和背景色融合。
+   我们目前的状态变化**全部是瞬切**。
+3. **阅读器里的贴心细节**：底部缩略图滑条、动态背景色、读完后的下一本卡片、阅读预设。
+
+所以排序原则是：**先补设计系统地基（P0），再做"每次打开都会看到"的阅读器体验（P1），
+然后是书架和详情页（P2），最后是长尾功能（P3）**。
+
+## 1. 现状基线（2026-11-18 盘点）
+
+| 维度 | 现状 |
+|---|---|
+| 动效 | 只有卷页动画用了曲线（`reader_page_turn.dart`）。Hero、`AnimatedSwitcher`、Fade、Slide 一律为 0。`AppDurations` 在 app 里**没有任何引用** |
+| 材质 | `BackdropFilter`、`BoxShadow`、自定义形状都为 0。普通圆角，没有阴影 token |
+| 反馈 | 没有 `HapticFeedback`，没有按压缩放 |
+| 字体排印 | 用 M3 默认值，没有字体排印 token；只打包了 Roboto，没有中文字体 |
+| 组件 | 设计系统只有 `SeriesTile` 和 `StatusView` 两个组件 |
+| 阅读器 chrome | `if (_chromeVisible)` 直接显隐，不切换系统沉浸模式 |
+| 阅读器功能 | 有单页、双页、纵向、卷页、双指缩放、网格跳页、亮度遮罩、常亮、读完后的下一本条、音量键 |
+| 缺少的阅读器功能 | 适配方式切换（引擎里有 `FitMode`，UI 没接）、手动阅读方向、双击缩放、背景色、预设 |
+| 书架 | 只有网格视图，5 种排序 + 4 种筛选，有继续阅读行，没有收藏集和阅读列表 |
+| 系列详情 | 不展示简介、作者、标签（`Series.summary` 已解析但没用上），单本书不能标记已读，书列表上限 100 本 |
+| 文件体积 | `reader_screen.dart` **660 行**，已超过 350 行上限；`reader_chrome.dart` 341 行、`series_two_pane.dart` 324 行，接近上限 |
+
+我们已有而 Panels 在 Komga 下**做不到**的能力，改造时**不能被削弱**：
+
+- 流式阅读时自动接下一本（Panels 走 OPDS，流式阅读不支持）；
+- Komga ondeck；
+- 墨水屏主题；
+- 音量键翻页；
+- 自签名证书指纹固定；
+- Android 端。
+
+## 2. 优先级定义
+
+| 级别 | 含义 | 目标批次 |
+|---|---|---|
+| **P0** | 地基。不做的话后面每个需求都会各写各的魔法数字和动画 | 第 1 批 |
+| **P1** | 阅读器体验。每次打开都会看到，收益最大 | 第 2–3 批 |
+| **P2** | 书架和详情页的质感，以及信息补全 | 第 4–5 批 |
+| **P3** | 长尾功能，排期视需求而定 | 待定 |
+| **不做** | 成本远大于收益，或与 Komga 场景无关 | — |
+
+每个需求的编号格式是 `UI-<级别>-<序号>`，提交信息和 PR 标题里引用这个编号。
+
+---
+
+## P0：设计系统地基
+
+### UI-P0-1 拆分 `reader_screen.dart`（前置重构）
+- **原因**：文件 660 行，超过 AGENTS.md 规定的 350 行上限。P1 的所有改动都会落在这里，必须先拆。
+- **做法**：
+  - 把预取编排（`_schedulePreload`、`_pumpPreload`）抽成 controller；
+  - 把进度回写和生命周期抽成 mixin 或 controller；
+  - 把亮度遮罩、常亮这类"装饰层"抽成独立 widget。
+  - **行为零变化。**
+- **验收**：所有阅读器测试和黄金图**不变**；单文件 ≤ 350 行。
+
+### UI-P0-2 动效 token：时长、曲线、弹簧
+- **新增**：
+  - `AppMotion`：`quick`（约 150ms）、`standard`（约 300ms）、`emphasized`（约 450ms）三档时长；
+  - 曲线：`standard` 用 easeOutCubic 系，`emphasized` 是带轻微回弹的曲线；
+  - 两组 `SpringDescription`：`snappy`（界面元素）和 `gentle`（页面级）。
+  - 现有 `AppDurations` 并入 `AppMotion`，或者让 `AppMotion` 引用它。二者只能保留一个出口。
+- **墨水屏**：`AppMotion.resolve(eink: true)` 返回零时长和 `Curves.linear`；
+  弹簧退化成瞬时到位。系统"减少动态效果"（`MediaQuery.disableAnimations`）也走同一条路径。
+- **验收**：token 单测覆盖 eink、`disableAnimations` 和普通三种情况；
+  app 里新增的动画只允许读 `AppMotion`（可以在 `ci.dart layers` 里加一条 grep 规则，禁止 `Duration(milliseconds:` 出现在 `screens/` 和 `widgets/`）。
+
+### UI-P0-3 材质 token：毛玻璃与阴影
+- **新增**：
+  - `AppMaterials`：`chrome`（阅读器顶栏和底栏，强模糊加半透明底色）、`bar`（导航栏）、`sheet`（底部面板）三种材质；
+  - `AppShadows`：`cover`（大半径、低透明度、向下偏移的柔和投影）、`card`、`floating` 三档；
+  - 组件 `FrostedSurface`：封装 `ClipRect`、`BackdropFilter` 和底色。
+- **墨水屏**：不模糊，改成不透明的纸色底加 1px 墨色描边，阴影为空。
+- **性能**：`BackdropFilter` 只用在 chrome 和面板上，不能放进网格的单元格里。
+  需要在 Android 低端模拟器上确认滚动和翻页不掉帧。
+- **验收**：`FrostedSurface` 三个主题各一张黄金图。
+
+### UI-P0-4 形状 token：连续圆角
+- **新增**：`AppShapes`。封面用小圆角（约 6），卡片和面板用中、大圆角，统一采用 Flutter 自带的
+  `ContinuousRectangleBorder`（squircle 近似）。**不引入第三方包**，
+  如果自带的效果不够，另写 ADR 再讨论。
+- **同时**：清理盘点中发现的魔法数字（96×136、196、圆角 2、图标 20），全部改成 token。
+- **墨水屏**：零圆角，保持现状。
+
+### UI-P0-5 字体排印 token 与中文字体
+- **新增**：`AppTypography`。层级包括大标题、标题、正文、说明、等宽数字（页码用 tabular figures，翻页时宽度不跳）。
+- **中文字体**：这是路线图阶段 G 遗留的边界。引入一套可再分发的中文字体子集，
+  先写 ADR 评审体积和许可。字体到位后补中文黄金图。
+- **验收**：`settings@eink` 中的"中文"不再显示为方块。
+
+### UI-P0-6 交互反馈原语
+- **新增**：
+  - 组件 `PressableScale`：按下缩小到约 0.97，松开时用 `snappy` 弹簧回弹；
+  - 薄封装 `AppHaptics`：`selection`、`light`、`success` 三种，统一开关。
+- **墨水屏**：不缩放；触感反馈保留，因为不影响屏幕刷新。
+- **设置项**：设置页新增"触感反馈"开关，默认开启。
+
+**P0 出口**：`ci.dart check` 全绿；设计系统新组件有单测和黄金图；`docs/` 中补一节设计 token 说明。
+
+**进度（2026-11-18）：第 1 批完成。**
+
+| 编号 | 落地 |
+|---|---|
+| P0-1 | `reader_screen.dart` 740 → 349 行，拆出 `reader_layout` / `reader_preloader` / `reader_progress_writer` / `reader_pages_gate` / `reader_top_bar` / `reader_frame` / `volume_key_scope` / `wake_lock_scope`、`screens/reader_args.dart`；原有阅读器测试与黄金图零变化，新增 `test/reader_layout_test.dart`（布局派生状态 + 进度防抖） |
+| P0-2 | `AppMotion`（时长 / 曲线 / 弹簧 + `of`/`resolve` 统一退化），删除无人引用的 `AppDurations` |
+| P0-3 | `AppMaterial`（chrome / bar / sheet）、`AppShadows`、`FrostedSurface`；`ci.dart layers` 禁止页面直接写 `BackdropFilter(` |
+| P0-4 | `AppShapes`（`ContinuousRectangleBorder`，不引第三方包）、`AppSizes`；盘点出的 22 处魔法数字全部换成 token |
+| P0-5 | `AppTypography`（含等宽数字页码）；中文字体按 ADR 0004：App 走系统字体，黄金图用 OFL 的 Noto Sans SC 子集，新增 `connection@phone_light_zh` |
+| P0-6 | `PressableScale`、`AppHaptics`；设置页"触感反馈"开关（持久化，默认开启）；`ci.dart layers` 禁止页面直接写 `HapticFeedback.` |
+
+说明见 [docs/design-system.md](design-system.md)。新 token 尚未用到具体页面上——那是第 2 批（P1）起的工作，
+所以除了新增的 `design_tokens@*`、`connection@phone_light_zh` 与设置页（多了一行开关）外，页面基线不变。
+
+---
+
+## P1：阅读器体验
+
+### UI-P1-1 Chrome 动画与沉浸模式 ★最高收益
+- 顶栏和底栏改用 `FrostedSurface(chrome)`；显隐用淡入加 4–8px 位移，时长取 `AppMotion.standard`。
+- chrome 隐藏时进入 `SystemUiMode.immersiveSticky`，显示时恢复系统栏，两者同步。
+  退出阅读器时必须恢复原来的系统 UI 模式。
+- 布局不能随系统栏显隐跳动：阅读区固定按全屏布局。
+- **墨水屏**：瞬切，不透明纸色底加描边。
+- **验收**：widget 测试断言显隐后的系统 UI 调用顺序，以及退出时恢复；黄金图更新 `reader@*`（基线变更原因：chrome 换成毛玻璃材质）。
+
+### UI-P1-2 底部横向缩略图滑条
+- 点开 chrome 后，底栏上方出现横向滚动的页面缩略图。当前页高亮并自动居中，点击跳页。
+  双页模式按屏分组显示。
+- 拖动时有 `selection` 触感反馈，每经过一页触发一次。
+- 现有网格面板（`page_navigator_sheet.dart`）**保留**，作为"查看全部"的入口。
+- 复用现有的 `cacheWidth` 降采样路径，只加载可见范围内的页。
+- **墨水屏**：保留滑条，但滚动时不做惯性动画；也可以改成分页按钮式滚动，二选一，实现时再定。
+- **验收**：可见范围懒加载测试（断言只请求了可见页）；RTL 时滑条方向镜像；黄金图。
+
+### UI-P1-3 适配方式选择
+- 设置面板加"适应屏幕 / 填满屏幕 / 适应宽度 / 自动"四个选项，接上引擎里已有的 `FitMode`。
+  "填满"时溢出的方向允许平移。
+- **验收**：引擎层补边界单测（宽页、超长页、0 尺寸）；偏好持久化与坏存档回退。
+
+### UI-P1-4 手动阅读方向
+- 设置项"跟随系列 / 从左到右 / 从右到左"。只需要替换 `ReaderControls.leftTurnsNext` 的数据来源，
+  `docs/reader.md` 里已经预留了这一点。
+- 卷页的捏角方向、点击区、底栏箭头、缩略图滑条方向都要跟着变。
+- **验收**：RTL/LTR × 三种来源的组合测试。
+
+### UI-P1-5 动态背景色
+- 背景选项：黑色 / 白色 / 动态。"动态"模式提取当前页**边缘区域**的主色作为背景，翻页时颜色交叉渐变过渡。
+- **提色算法**放在 `komga_reader_engine`，输入是降采样后的 RGBA 字节，保持纯 Dart、零依赖。
+  页面解码之后在 isolate 里计算，结果按页缓存。
+- 第一版只做单色；"沉浸式"的多色渐变放到 P3。
+- 双页模式取两页边缘色的平均或主导色。
+- **墨水屏**：不提供"动态"选项，固定白底。
+- **验收**：算法单测（纯色、黑边扫描、白边扫描、透明像素、1×1 图片）；黄金图用合成页面验证。
+
+### UI-P1-6 双击缩放
+- 双击把双击点放大到 2.5 倍，再次双击还原。动画用 `gentle` 弹簧，以双击点为中心，
+  复用 `zoomAboutFocal`。
+- 必须和"点击中间切换 chrome"区分开，单击要等双击判定超时才生效。
+  为了不让单击变慢，只在**中间区域**识别双击，左右翻页区保持立即响应。
+- **验收**：手势冲突测试，覆盖单击、双击、双击后拖动、缩放态下的翻页。
+
+### UI-P1-7 读完后的"下一本"卡片
+- 把现有的 `Finished` 条换成卡片：显示下一本的封面、书名和"第 N 本"，
+  按钮是"继续阅读"（主按钮）和"返回系列"。卡片带入场动画。
+- 读完最后一屏后**继续往后翻**也可以直接进入下一本（Panels 的行为）。
+- 保留现有约束：拿不到下一本时只显示"已读完"，不报错；继续使用 `pushReplacement`。
+- **验收**：现有书末测试不回归，新增"末页再翻进下一本"测试；黄金图。
+
+**P1 出口**：`docs/reader.md` 同步更新（设置表、手势、chrome 部分）；装到模拟器上实际走查一遍阅读器。
+
+---
+
+## P2：书架与详情页
+
+### UI-P2-1 封面质感
+- `SeriesTile` 加上 `AppShapes.cover` 圆角和 `AppShadows.cover` 投影；未读角标改成小圆点或胶囊；
+  进度条变细，并贴在封面内侧底部。
+- 封面加载完成时淡入，不再从色块直接跳到图片。
+- 网格单元格外包 `PressableScale`。
+- **验收**：书架全套黄金图更新（基线变更原因：封面质感）。
+
+### UI-P2-2 Hero 过渡
+- 书架封面到系列详情头部封面，继续阅读卡片到阅读器首页。
+- tag 用 `series-<id>` / `book-<id>`。注意同一页面上不能有重复的 tag：继续阅读行和网格里可能是同一个系列。
+- **墨水屏**：关闭 Hero，转场为零。
+- **验收**：widget 测试断言 tag 唯一性；在模拟器上走查一遍。
+
+### UI-P2-3 iOS 式页面转场与大标题
+- 非墨水屏主题的 `pageTransitionsTheme` 在两个平台上都改用 Cupertino 式侧滑，支持边缘右滑返回。
+- 书架和设置页改成可折叠的大标题（`SliverAppBar.large` 或自定义 sliver），滚动时标题收缩，顶栏换成毛玻璃材质。
+- **注意**：Android 预测性返回手势与此有冲突，需要先确认行为再定方案。
+
+### UI-P2-4 系列详情页重做
+- 头部用模糊放大的封面做背景（`AppMaterials`），叠上封面、标题、作者、出版社、年份、标签，以及简介（可展开）。
+- 新增的元数据字段先抓真实响应存入 fixture，再改解析层（遵守 API 真值规则）。
+- 主按钮"继续阅读第 N 本"或"开始阅读"放在显眼位置。
+- 书列表改成带封面的卡片行，支持分页加载（解除 100 本上限）。
+- `series_two_pane.dart` 已有 324 行，先拆再改。
+- **墨水屏**：不做模糊背景，用纯纸色背景加描边。
+- **验收**：手机浅色、平板深色、墨水屏三张黄金图，平板两栏单独一张。
+
+### UI-P2-5 长按上下文菜单
+- 长按系列或书时，带缩放效果弹出菜单。系列菜单：标记已读/未读、下载全部、查看详情；
+  书的菜单：标记已读/未读、下载/删除、从头阅读。
+- 这个需求顺带补上缺失的**单本书标记已读**功能。需要新端点时先加进 `KomgaUrls` 并补契约测试。
+- 墨水屏用普通弹出菜单，不做缩放效果。
+
+### UI-P2-6 Reading Now 首页
+- 底部导航从"书架 / 设置"扩展为"**正在读** / 书架 / 设置"。
+- "正在读"页的内容：
+  - 大号继续阅读卡片（来自 ondeck）；
+  - 最近添加的书；
+  - 按库分组的横向货架。
+- 原来书架里的继续阅读行在书架页移除，或者保留一个精简版，实现时再定。
+
+### UI-P2-7 书架视图选项
+- 网格/列表切换，封面大小分小、中、大三档；平板上支持双指捏合调整大小。
+- 排序补充 Komga 支持的字段，例如按书籍数量、按发行日期。新排序参数要对照 OpenAPI 补契约测试。
+
+### UI-P2-8 骨架屏与状态过渡
+- 首屏的纯色骨架改成带微光（shimmer）的骨架；加载、内容、错误三态之间用 `AnimatedSwitcher` 交叉淡入。
+- **墨水屏**：不做 shimmer，用静态骨架。
+
+**P2 出口**：书架、系列详情、新首页三套黄金图完整；在模拟器上能看到书架内容；
+`docs/series-queries.md` 同步更新排序部分。
+
+---
+
+## P3：长尾功能
+
+| 编号 | 需求 | 备注 |
+|---|---|---|
+| UI-P3-1 | 阅读预设：命名保存一组配置，阅读中一键切换 | 依赖 P1-3、P1-4、P1-5 |
+| UI-P3-2 | 按系列记住阅读设置 | 存储方案可能需要 Drift，要写 ADR |
+| UI-P3-3 | 横屏时自动单/双页 | 方向判断只能经过 `WindowSizeClass` |
+| UI-P3-4 | 锁定缩放：翻页后保持缩放比例 | 依赖 P1-6 |
+| UI-P3-5 | 手动修正双页分组（从某一页开始重新配对） | 在引擎的 `spreads.dart` 里加一个偏移参数 |
+| UI-P3-6 | 缩略图长按：分享或保存此页 | 可能需要新插件，要写 ADR |
+| UI-P3-7 | 沉浸式动态背景（多色渐变） | 依赖 P1-5 |
+| UI-P3-8 | Komga 收藏集（Collections）和阅读列表（Read Lists） | 需要新端点和 fixture |
+| UI-P3-9 | 跨库全局搜索（系列和书） | 需要新端点 |
+| UI-P3-10 | 图像滤镜：先做去白边 | 纯算法，放在引擎里 |
+| UI-P3-11 | 键盘快捷键、蓝牙翻页器 | 复用 `HardwareKeys` 抽象 |
+| UI-P3-12 | 隐身模式（本次阅读不回写进度） | 要明确与 outbox 的交互语义 |
+| UI-P3-13 | 下载管理页、后台下载队列 | |
+| UI-P3-14 | 墨水屏自动探测接入（`device_profile.dart` 里已有实现，app 没有调用） | |
+
+## 不做
+
+| 需求 | 理由 |
+|---|---|
+| 逐格阅读（Panels View） | 需要机器学习模型，Panels 打磨多年仍然标着"实验性" |
+| Live Text、主体抠图、实时翻译 | 依赖平台机器学习，且只有 iOS 有 |
+| 内容锁（Face ID） | 和自建服务器的使用场景关系弱 |
+| 本地导入、网盘、内置商店 | 不在 Komga 客户端的定位内 |
+| 可替换 App 图标、付费主题 | 收益低 |
+
+## 3. 批次与依赖
+
+```text
+第1批  P0-1 拆分 ─┬─ P0-2 动效 ─┬─ P0-6 反馈
+                  ├─ P0-3 材质 ─┤
+                  ├─ P0-4 形状 ─┘
+                  └─ P0-5 字体（ADR，可并行）
+第2批  P1-1 chrome ── P1-2 缩略图滑条 ── P1-7 下一本卡片
+第3批  P1-3 适配 / P1-4 方向 / P1-6 双击（相互独立）  P1-5 动态背景（引擎先行）
+第4批  P2-1 封面 ── P2-2 Hero ── P2-3 转场与大标题 ── P2-8 骨架
+第5批  P2-4 详情页（需 fixture） ── P2-5 长按菜单（需端点） ── P2-6 首页 ── P2-7 视图选项
+之后   P3 按需求挑选
+```
+
+每批的出口与路线图（`docs/roadmap.md`）一致：
+- `ci.dart check` 全绿；
+- 单独提交并推送；
+- 运行 `dart run tool/ci.dart install` 装到模拟器上走查。
+
+## 4. 每个需求的统一检查单
+
+- [ ] 数值全部来自 token，没有新的魔法数字；
+- [ ] 墨水屏退化路径已实现并有黄金图；系统"减少动态效果"开启时同样退化；
+- [ ] RTL 下行为正确（凡是涉及方向的需求）；
+- [ ] 新 UI 补齐手机浅色、平板深色、墨水屏三张黄金图，并已用 `read_image` 自查；
+- [ ] 改动的基线都能说明"为什么这次渲染变了"；
+- [ ] 动效类需求在 Android 模拟器上实际看过，而不只是测试通过；
+- [ ] 动画测试不用 `pumpAndSettle` 掩盖首帧问题；
+- [ ] 文件不超过 350 行，类不超过 300 行；
+- [ ] 相关 `docs/` 段落已更新。
+
+## 5. 参考来源
+
+- Panels 功能与付费分级：<https://guides.panels.app/premium/what-is-panels-premium>
+- 阅读器配置、预设、动态背景：<https://guides.panels.app/read-content/reader-configurations>
+- 缩略图滑条与双页分组：<https://guides.panels.app/read-content/double-page-grouping>
+- 继续阅读（OPDS 流式阅读不支持）：<https://guides.panels.app/read-content/continue-reading>
+- 阅读会话与 Reading Now：<https://guides.panels.app/read-content/reading-sessions>
+- 键盘快捷键（排序与视图选项的完整列表）：<https://guides.panels.app/remotes-and-controllers/keyboard-shortcuts>
+- Panels 的 Komga 支持说明：<https://www.panels.app/komga-ios-app>
+- Panels 4 预告（新 UI 与转场）：<https://www.panels.app/blog/iphoneduo>
+
+> 说明：Panels 的视觉细节（毛玻璃 chrome、封面阴影、长按菜单等）出自对该 App 的使用印象，
+> 官方文档里没有对应的截图级描述。开始做 P1 和 P2 之前，建议先在 iPhone 或 iPad 上对照实机截图，
+> 存进 `docs/assets/panels-ref/` 作为验收参照。

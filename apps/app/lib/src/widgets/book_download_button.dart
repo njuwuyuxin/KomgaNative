@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/providers/download_providers.dart';
@@ -29,8 +30,8 @@ class BookDownloadButton extends ConsumerWidget {
         tooltip: l10n.cancelDownload,
         onPressed: () => controller.cancel(book.id),
         icon: SizedBox(
-          width: 20,
-          height: 20,
+          width: AppSizes.iconMd,
+          height: AppSizes.iconMd,
           child: CircularProgressIndicator(
             value: progress.fraction,
             strokeWidth: 2,

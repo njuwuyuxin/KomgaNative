@@ -170,7 +170,7 @@ class ReaderBar extends StatelessWidget {
               message: l10n.offlineSavedPages,
               child: Icon(
                 Icons.cloud_off_outlined,
-                size: 16,
+                size: AppSizes.iconXs,
                 color: palette.muted,
               ),
             ),
@@ -240,7 +240,11 @@ class ReaderFinishedBar extends StatelessWidget {
       child: Row(
         key: const Key('reader-finished'),
         children: <Widget>[
-          Icon(Icons.check_circle_outline, size: 18, color: palette.foreground),
+          Icon(
+            Icons.check_circle_outline,
+            size: AppSizes.iconSm,
+            color: palette.foreground,
+          ),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(

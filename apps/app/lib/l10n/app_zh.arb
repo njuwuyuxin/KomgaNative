@@ -126,6 +126,8 @@
   "themeDark": "深色",
   "einkMode": "墨水屏模式",
   "einkModeHint": "关闭动画、阴影和颜色；最大化对比度",
+  "haptics": "触感反馈",
+  "hapticsHint": "拖动翻页、按下封面时轻微振动",
   "language": "语言",
   "languageSystem": "跟随系统",
   "languageEnglish": "English",

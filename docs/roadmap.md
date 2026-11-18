@@ -140,3 +140,8 @@
 - 应用图标与启动图、版本号来源、隐私清单（`PrivacyInfo.xcprivacy`）、
   README/文档收尾、发布检查单（APK/IPA 构建、签名说明）。
 - 验收：全量门禁 + Android release 构建通过；最终汇总"已实现功能"清单。
+
+## 下一阶段：UI 精致化（对标 Panels）
+
+需求清单、优先级（P0 设计系统地基 → P1 阅读器 → P2 书架/详情 → P3 长尾）与批次依赖见
+[docs/ui-polish-plan.md](ui-polish-plan.md)。

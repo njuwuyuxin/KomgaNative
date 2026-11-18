@@ -47,6 +47,12 @@ Future<void> loadAppFonts() async {
     'assets/fonts/Roboto-Medium.ttf',
   ]);
 
+  // 中文：Noto Sans SC 子集（只含 app_zh.arb 与测试里出现的字，OFL，见 ADR 0004）。
+  // 仅测试使用，不打进 App——真机走系统中文字体。
+  await load('NotoSansSC', <String>[
+    'test/fonts/NotoSansSC-Regular-subset.ttf',
+  ]);
+
   final flutterRoot = Platform.environment['FLUTTER_ROOT'];
   if (flutterRoot != null) {
     await load('MaterialIcons', <String>[
@@ -56,13 +62,21 @@ Future<void> loadAppFonts() async {
 }
 
 /// 给主题套上测试字体（仅测试用，不污染设计系统）。
+///
+/// 中文字形回退到 NotoSansSC 子集：没有回退时汉字是占位方块。
 ThemeData withTestFont(ThemeData base) => base.copyWith(
   textTheme: base.textTheme.apply(
     fontFamily: 'Roboto',
+    fontFamilyFallback: _testFallback,
     bodyColor: base.textTheme.bodyMedium?.color,
   ),
-  primaryTextTheme: base.primaryTextTheme.apply(fontFamily: 'Roboto'),
+  primaryTextTheme: base.primaryTextTheme.apply(
+    fontFamily: 'Roboto',
+    fontFamilyFallback: _testFallback,
+  ),
 );
+
+const List<String> _testFallback = <String>['NotoSansSC'];
 
 /// 以指定画布尺寸渲染一个页面。
 ///
@@ -79,6 +93,9 @@ Future<void> pumpGoldenScreen(
   required Size size,
   required ThemeData theme,
   double textScale = 1.0,
+
+  /// 界面语言；中文基线传 Locale('zh')。
+  Locale locale = const Locale('en'),
   List<Override> overrides = const <Override>[],
   bool settle = true,
   List<Uint8List> precacheImages = const <Uint8List>[],
@@ -114,7 +131,7 @@ Future<void> pumpGoldenScreen(
       overrides: overrides,
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
-        locale: const Locale('en'),
+        locale: locale,
         localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         theme: withTestFont(theme),

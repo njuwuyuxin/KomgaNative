@@ -39,6 +39,7 @@ class SettingsState {
     this.themeMode = ThemeMode.system,
     this.forceEink = false,
     this.language = AppLanguage.system,
+    this.haptics = true,
   });
 
   final ThemeMode themeMode;
@@ -48,20 +49,26 @@ class SettingsState {
 
   final AppLanguage language;
 
+  /// 触感反馈（默认开启）。墨水屏也保留：它不影响屏幕刷新。
+  final bool haptics;
+
   SettingsState copyWith({
     ThemeMode? themeMode,
     bool? forceEink,
     AppLanguage? language,
+    bool? haptics,
   }) => SettingsState(
     themeMode: themeMode ?? this.themeMode,
     forceEink: forceEink ?? this.forceEink,
     language: language ?? this.language,
+    haptics: haptics ?? this.haptics,
   );
 }
 
 class SettingsController extends Notifier<SettingsState> {
   /// 恢复是异步的：如果用户已经手动选过语言，不能被旧存档覆盖回去。
   bool _languageTouched = false;
+  bool _hapticsTouched = false;
 
   @override
   SettingsState build() {
@@ -74,8 +81,11 @@ class SettingsController extends Notifier<SettingsState> {
   Future<void> _restore() async {
     try {
       final saved = await _store.loadLanguage();
-      if (_languageTouched) return;
-      state = state.copyWith(language: appLanguageFromCode(saved));
+      final haptics = await _store.loadHaptics();
+      state = state.copyWith(
+        language: _languageTouched ? null : appLanguageFromCode(saved),
+        haptics: _hapticsTouched ? null : haptics,
+      );
     } on Object {
       // 设置存储读失败就用默认值：不能让钥匙串问题挡住启动。
     }
@@ -90,6 +100,13 @@ class SettingsController extends Notifier<SettingsState> {
     _languageTouched = true;
     state = state.copyWith(language: language);
     unawaited(_store.saveLanguage(language.code));
+  }
+
+  void setHaptics(bool enabled) {
+    if (enabled == state.haptics) return;
+    _hapticsTouched = true;
+    state = state.copyWith(haptics: enabled);
+    unawaited(_store.saveHaptics(enabled));
   }
 }
 

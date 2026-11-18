@@ -35,7 +35,11 @@ class OfflineBanner extends ConsumerWidget {
             ),
             child: Row(
               children: <Widget>[
-                Icon(Icons.cloud_off_outlined, size: 16, color: foreground),
+                Icon(
+                  Icons.cloud_off_outlined,
+                  size: AppSizes.iconXs,
+                  color: foreground,
+                ),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Text(

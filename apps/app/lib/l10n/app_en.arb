@@ -208,6 +208,8 @@
   "themeDark": "Dark",
   "einkMode": "E-ink mode",
   "einkModeHint": "Disable animation, shadows and color; maximize contrast",
+  "haptics": "Haptic feedback",
+  "hapticsHint": "Light vibration when scrubbing pages and pressing covers",
   "language": "Language",
   "languageSystem": "System",
   "languageEnglish": "English",

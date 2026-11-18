@@ -165,12 +165,12 @@ class _PageThumbnail extends ConsumerWidget {
                   child: image.hasError
                       ? Icon(
                           Icons.broken_image_outlined,
-                          size: 20,
+                          size: AppSizes.iconMd,
                           color: palette.muted,
                         )
                       : SizedBox(
-                          width: 16,
-                          height: 16,
+                          width: AppSizes.iconXs,
+                          height: AppSizes.iconXs,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
                             color: palette.muted,
@@ -182,7 +182,7 @@ class _PageThumbnail extends ConsumerWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.xs,
-                    vertical: 2,
+                    vertical: AppSpacing.xxs,
                   ),
                   color: palette.background.withValues(alpha: 0.7),
                   child: Text(

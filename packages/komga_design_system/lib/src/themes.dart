@@ -1,3 +1,4 @@
+import 'package:komga_design_system/src/tokens.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 主题工厂：light / dark / eink。
@@ -11,6 +12,15 @@ abstract final class AppTheme {
   static const Color einkInk = Color(0xFF000000);
   static const Color einkPaper = Color(0xFFFFFFFF);
   static const Color einkMuted = Color(0xFF3A3A3A);
+
+  /// 这套主题是不是墨水屏主题。
+  ///
+  /// 判据是"无水波纹 + 纸色底 + 墨色前景"：墨水屏主题独有的组合。
+  /// 动效 / 材质 / 形状 token 都靠它退化，页面里不需要自己再读设置。
+  static bool isEink(ThemeData theme) =>
+      theme.splashFactory == NoSplash.splashFactory &&
+      theme.colorScheme.surface == einkPaper &&
+      theme.colorScheme.onSurface == einkInk;
 
   static ThemeData light() => _base(
     ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.light),
@@ -99,7 +109,9 @@ abstract final class AppTheme {
       cardTheme: CardThemeData(
         elevation: 0,
         clipBehavior: Clip.antiAlias,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.md),
+        ),
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: scheme.surface,

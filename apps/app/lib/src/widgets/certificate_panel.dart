@@ -140,7 +140,7 @@ class _Row extends StatelessWidget {
         children: <Widget>[
           SizedBox(
             // 固定标签列宽，值才能对齐；大字缩放时标签自己换行，不压住值。
-            width: 92,
+            width: AppSizes.labelColumn,
             child: Text(
               label,
               style: theme.textTheme.bodySmall?.copyWith(

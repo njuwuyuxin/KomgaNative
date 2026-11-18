@@ -48,7 +48,7 @@ docs/                         选型、环境、spec、ADR
 2. `apps/app/lib/src/screens/**` 与 `widgets/**` **不得** import `package:komga_api`，只能经 Repository。
 3. Widget 里不做网络 I/O，不 `await` 请求；只读 provider 状态 + 派发 intent。
 4. 错误统一用 `KomgaError`（`packages/komga_api/lib/src/errors.dart`）或领域内的密封类型，UI 只 `switch`，不允许裸 `catch`。
-5. 设计数值只能来自 `design_system` 的 token（`AppSpacing` / `AppRadii` / `AppDurations`），禁止魔法数字。
+5. 设计数值只能来自 `design_system` 的 token（`AppSpacing` / `AppRadii` / `AppSizes` / `AppMotion` / `AppMaterial` / `AppShadows` / `AppShapes` / `AppTypography`），禁止魔法数字；毛玻璃与触感反馈只能经 `FrostedSurface` / `AppHaptics`（`ci.dart layers` 会拦）。说明见 `docs/design-system.md`。
 6. 断点判断只在 `WindowSizeClass`（一次性），页面内部不要自己判断"是不是平板"。
 
 ## 完成定义（DoD）

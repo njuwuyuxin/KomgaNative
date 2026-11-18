@@ -88,7 +88,7 @@ class SeriesTwoPane extends StatelessWidget {
               child: SeriesHeader(series: series, seriesId: seriesId),
             ),
           ),
-          const VerticalDivider(width: 1),
+          const VerticalDivider(width: AppSizes.hairline),
           Expanded(
             flex: 3,
             child: CustomScrollView(
@@ -139,7 +139,7 @@ List<Widget> seriesBookSlivers(
           onOpen: () => onOpenBook(books.items[index], direction),
         ),
         separatorBuilder: (BuildContext context, int index) =>
-            const Divider(height: 1),
+            const Divider(height: AppSizes.hairline),
       ),
     if (truncated)
       SliverToBoxAdapter(

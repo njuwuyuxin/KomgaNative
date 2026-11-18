@@ -206,8 +206,8 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
                     onPressed: submitting ? null : _submit,
                     child: submitting
                         ? const SizedBox(
-                            width: 18,
-                            height: 18,
+                            width: AppSizes.iconSm,
+                            height: AppSizes.iconSm,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : Text(l10n.connect),
@@ -253,7 +253,7 @@ class _Banner extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Icon(icon, size: 20, color: foreground),
+          Icon(icon, size: AppSizes.iconMd, color: foreground),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(

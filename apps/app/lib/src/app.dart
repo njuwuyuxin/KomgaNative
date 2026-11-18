@@ -22,6 +22,8 @@ class KomgaApp extends ConsumerWidget {
     final settings = ref.watch(settingsProvider);
     final router = ref.watch(routerProvider);
     final einkTheme = AppTheme.eink();
+    // 触感反馈的总开关只在这里同步一次，页面统一走 AppHaptics。
+    AppHaptics.enabled = settings.haptics;
 
     return ProgressSyncScope(
       child: MaterialApp.router(

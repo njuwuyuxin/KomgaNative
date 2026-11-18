@@ -65,6 +65,9 @@ void main() {
     expect(find.byKey(Key('server-${first.id}')), findsOneWidget);
     expect(find.byKey(Key('server-${second.id}')), findsOneWidget);
 
+    // 设置页外观区变长（触感反馈开关），服务器列表可能在首屏之外：先滚到可见。
+    await tester.ensureVisible(find.byKey(Key('server-${second.id}')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(Key('server-${second.id}')));
     await tester.pumpAndSettle();
 
@@ -80,6 +83,8 @@ void main() {
       store: InMemoryServerStore.withAll(<StoredServer>[first], active: first),
     );
 
+    await tester.ensureVisible(find.byKey(const Key('server-add')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('server-add')));
     await tester.pumpAndSettle();
 
@@ -98,6 +103,8 @@ void main() {
       ], active: first),
     );
 
+    await tester.ensureVisible(find.byKey(Key('server-remove-${first.id}')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(Key('server-remove-${first.id}')));
     await tester.pumpAndSettle();
     expect(find.text('Remove server?'), findsOneWidget);
