@@ -194,5 +194,10 @@
     }
   },
   "showMore": "展开",
-  "showLess": "收起"
+  "showLess": "收起",
+  "readingNow": "正在读",
+  "readingNowEmpty": "还没有在读的书",
+  "readingNowEmptyHint": "从书架打开一本，它会出现在这里",
+  "recentlyAdded": "最近添加",
+  "pickUpWhereYouLeftOff": "继续上次读到的位置"
 }

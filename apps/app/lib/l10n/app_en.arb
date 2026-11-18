@@ -293,5 +293,10 @@
     }
   },
   "showMore": "Show more",
-  "showLess": "Show less"
+  "showLess": "Show less",
+  "readingNow": "Reading now",
+  "readingNowEmpty": "Nothing in progress",
+  "readingNowEmptyHint": "Start a book from your library and it will show up here",
+  "recentlyAdded": "Recently added",
+  "pickUpWhereYouLeftOff": "Pick up where you left off"
 }

@@ -8,9 +8,7 @@ import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/data/shelf_view_options.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
-import 'package:komga_native/src/screens/reader_screen.dart';
 import 'package:komga_native/src/session/session_controller.dart';
-import 'package:komga_native/src/widgets/continue_reading_row.dart';
 import 'package:komga_native/src/widgets/offline_banner.dart';
 import 'package:komga_native/src/widgets/phase_fade.dart';
 import 'package:komga_native/src/widgets/shelf_query_buttons.dart';
@@ -54,20 +52,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     }
   }
 
-  Future<void> _openFromContinueRow(
-    Book book,
-    ReadingDirection direction,
-  ) async {
-    await context.push(
-      '/reader/${book.id}',
-      extra: ReaderArgs(book: book, direction: direction),
-    );
-    // 回来时进度变了：让"继续阅读"重新按 ondeck 排序（读完的书会消失）。
-    ref.invalidate(ondeckProvider);
-    unawaited(ref.read(shelfProvider.notifier).refreshInPlace());
-  }
-
   Future<void> _refresh() {
+    // "正在读"页也读 ondeck：刷新书架时顺手让它重新取（两页共享同一份数据）。
     ref.invalidate(ondeckProvider);
     return ref.read(shelfProvider.notifier).refresh();
   }
@@ -111,12 +97,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
               // 断网时提示"看的是缓存"，并给一次重新联网的机会。
               SliverToBoxAdapter(
                 child: OfflineBanner(onRetry: () => unawaited(_refresh())),
-              ),
-              SliverToBoxAdapter(
-                child: ContinueReadingRow(
-                  onOpen: (Book book, ReadingDirection direction) =>
-                      unawaited(_openFromContinueRow(book, direction)),
-                ),
               ),
               if (_searching)
                 SliverToBoxAdapter(

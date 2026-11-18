@@ -20,6 +20,11 @@ class AdaptiveShell extends StatelessWidget {
     final destinations =
         <({IconData icon, IconData selectedIcon, String label})>[
           (
+            icon: Icons.auto_stories_outlined,
+            selectedIcon: Icons.auto_stories,
+            label: l10n.readingNow,
+          ),
+          (
             icon: Icons.grid_view_outlined,
             selectedIcon: Icons.grid_view,
             label: l10n.libraryTitle,

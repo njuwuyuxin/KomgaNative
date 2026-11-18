@@ -4,6 +4,7 @@ import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/screens/connection_screen.dart';
 import 'package:komga_native/src/screens/library_screen.dart';
 import 'package:komga_native/src/screens/reader_screen.dart';
+import 'package:komga_native/src/screens/reading_now_screen.dart';
 import 'package:komga_native/src/screens/series_detail_screen.dart';
 import 'package:komga_native/src/screens/settings_screen.dart';
 import 'package:komga_native/src/screens/splash_screen.dart';
@@ -32,8 +33,8 @@ GoRouter createRouter({
       if (current is SessionDisconnected) {
         return location == '/connect' ? null : '/connect';
       }
-      // 已连接：不要再停留在启动/连接页。
-      if (location == '/splash' || location == '/connect') return '/library';
+      // 已连接：不要再停留在启动/连接页；首页是"正在读"（UI-P2-6）。
+      if (location == '/splash' || location == '/connect') return '/reading';
       return null;
     },
     routes: <RouteBase>[
@@ -54,6 +55,16 @@ GoRouter createRouter({
           StatefulNavigationShell shell,
         ) => AdaptiveShell(shell: shell),
         branches: <StatefulShellBranch>[
+          // "正在读"是首页（UI-P2-6）：打开 App 先看到"上次看到哪"。
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: '/reading',
+                builder: (BuildContext context, GoRouterState state) =>
+                    const ReadingNowScreen(),
+              ),
+            ],
+          ),
           StatefulShellBranch(
             routes: <RouteBase>[
               GoRoute(

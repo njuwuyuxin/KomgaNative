@@ -22,6 +22,7 @@ import 'package:komga_native/src/providers/settings_provider.dart';
 import 'package:komga_native/src/screens/connection_screen.dart';
 import 'package:komga_native/src/screens/library_screen.dart';
 import 'package:komga_native/src/screens/reader_screen.dart';
+import 'package:komga_native/src/screens/reading_now_screen.dart';
 import 'package:komga_native/src/screens/series_detail_screen.dart';
 import 'package:komga_native/src/screens/settings_screen.dart';
 import 'package:komga_native/src/screens/splash_screen.dart';
@@ -255,6 +256,69 @@ void main() {
     await pumpSeriesGolden(
       tester,
       name: 'series@eink',
+      size: GoldenSizes.eink,
+      theme: AppTheme.eink(),
+    );
+  });
+
+  /// "正在读"首页（UI-P2-6）：继续阅读卡片 + 最近添加 + 按库分组三条货架。
+  Future<void> pumpReadingNowGolden(
+    WidgetTester tester, {
+    required String name,
+    required Size size,
+    required ThemeData theme,
+  }) async {
+    final repository = FakeLibraryRepository(
+      series: demoShelf(),
+      libraries: demoLibraries(),
+      ondeck: demoOndeck(),
+    );
+    // 封面预热：与页面里同一份 bytes 实例，ImageCache 才能命中。
+    final covers = <Uint8List>[];
+    for (final book in demoOndeck()) {
+      final bytes = await repository.bookCover(book.id);
+      if (bytes != null) covers.add(bytes);
+    }
+    for (final series in demoShelf()) {
+      final bytes = await repository.seriesCover(series.id);
+      if (bytes != null) covers.add(bytes);
+    }
+    await pumpGoldenScreen(
+      tester,
+      screen: const ReadingNowScreen(),
+      size: size,
+      theme: theme,
+      overrides: <Override>[
+        libraryRepositoryProvider.overrideWithValue(repository),
+      ],
+      precacheImages: covers,
+      realTimeSettle: true,
+    );
+    await expectGolden(tester, name);
+  }
+
+  testWidgets('reading_now@phone_light', (WidgetTester tester) async {
+    await pumpReadingNowGolden(
+      tester,
+      name: 'reading_now@phone_light',
+      size: GoldenSizes.phone,
+      theme: AppTheme.light(),
+    );
+  });
+
+  testWidgets('reading_now@tablet_dark', (WidgetTester tester) async {
+    await pumpReadingNowGolden(
+      tester,
+      name: 'reading_now@tablet_dark',
+      size: GoldenSizes.tablet,
+      theme: AppTheme.dark(),
+    );
+  });
+
+  testWidgets('reading_now@eink', (WidgetTester tester) async {
+    await pumpReadingNowGolden(
+      tester,
+      name: 'reading_now@eink',
       size: GoldenSizes.eink,
       theme: AppTheme.eink(),
     );

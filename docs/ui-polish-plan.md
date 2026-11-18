@@ -308,6 +308,16 @@ Panels 的高级感主要来自三点，和控件本身关系不大：
 `seriesBooksProvider` 从 `FutureProvider` 换成带 `loadMore` 的 Notifier，并同步改
 `series_detail_screen` / `series_two_pane` 的入参与几个测试，单独一轮做更稳。
 
+**进度（2026-11-18）：P2-6「正在读」首页。**
+
+| 落地 |
+|---|
+| 新增 `screens/reading_now_screen.dart`：大号继续阅读卡片（ondeck 第一本 + 进度 + 主按钮）、"最近添加"横向货架（`series(sort: recentlyAdded)`）、按库分组的横向货架（`series(libraryId:)`）；空态给一句说明而不是空壳；ondeck / 列表失败都只是"这一块不显示"，不把整页变成错误页 |
+| 新增 `recentSeriesProvider` / `libraryShelfProvider`：只用**已验证过**的 `GET /api/v1/series`（理由见 `docs/series-queries.md`："/api/v1/books 按添加时间列"没有 fixture） |
+| 底部导航从"书架 / 设置"变成"**正在读** / 书架 / 设置"，连接成功后的落地页也改成 `/reading`；平板侧边栏同样三项 |
+| 书架页移除原来的"继续阅读"横排（`continue_reading_row.dart` 与其测试删除）——同一件事只在一个地方做；继续阅读卡保留了"按系列查阅读方向"的行为（日漫从首页进去仍是 RTL） |
+| 新页面按约定补齐三张黄金图：`reading_now@phone_light` / `@tablet_dark` / `@eink`；`a11y_test` 的"继续阅读卡片"用例改到新页面（语义标签与 48 点按区不放宽） |
+
 ---
 
 ## P3：长尾功能

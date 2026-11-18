@@ -10,6 +10,7 @@ import 'package:komga_native/src/data/download/download_service.dart';
 import 'package:komga_native/src/providers/download_providers.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/screens/library_screen.dart';
+import 'package:komga_native/src/screens/reading_now_screen.dart';
 import 'package:komga_native/src/screens/series_detail_screen.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -90,13 +91,14 @@ void main() {
   testWidgets('继续阅读卡片：标签是"书名 + 进度"，点击区够大', (WidgetTester tester) async {
     final handle = tester.ensureSemantics();
 
-    await pumpApp(tester, const LibraryScreen(), <Override>[
+    // 「继续阅读」从书架搬到了"正在读"首页（UI-P2-6）。
+    await pumpApp(tester, const ReadingNowScreen(), <Override>[
       libraryRepositoryProvider.overrideWithValue(
         FakeLibraryRepository(series: demoShelf(), ondeck: demoOndeck()),
       ),
     ]);
 
-    final finder = find.byKey(const Key('continue-s1-b1'));
+    final finder = find.byKey(const Key('reading-now-continue'));
     final node = tester.getSemantics(finder);
     expect(node.label, 'Vol. 1, p. 5 / 12');
     expect(node.flagsCollection.isButton, isTrue);

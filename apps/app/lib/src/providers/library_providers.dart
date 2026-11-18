@@ -71,6 +71,29 @@ final bookCoverProvider = FutureProvider.family<Uint8List?, String>((
   return ref.watch(libraryRepositoryProvider).bookCover(bookId);
 });
 
+/// 最近添加的系列（"正在读"首页的第二块，UI-P2-6）。
+///
+/// 为什么用系列不用书：`GET /api/v1/series?sort=createdDate,desc` 是**已验证过**的
+/// （`docs/series-queries.md`），而"按添加时间列书"的 `/api/v1/books` 没有验证过，
+/// 也没有 fixture。先用验证过的端点做，等有服务器再补"最近添加的书"。
+final recentSeriesProvider = FutureProvider<List<Series>>((Ref ref) async {
+  final page = await ref
+      .watch(libraryRepositoryProvider)
+      .series(sort: SeriesSort.recentlyAdded, size: 20);
+  return page.items;
+});
+
+/// 某个库里的系列（"正在读"首页按库分组的横向货架）。
+final libraryShelfProvider = FutureProvider.family<List<Series>, String>((
+  Ref ref,
+  String libraryId,
+) async {
+  final page = await ref
+      .watch(libraryRepositoryProvider)
+      .series(libraryId: libraryId, size: 15);
+  return page.items;
+});
+
 /// 继续阅读（在读过、还没读完的书）。空列表/失败都只是"不显示这一行"。
 final ondeckProvider = FutureProvider<PageResult<Book>>((Ref ref) {
   return ref.watch(libraryRepositoryProvider).ondeck();
