@@ -125,6 +125,24 @@ class ReaderPagedViewState extends ConsumerState<ReaderPagedView>
   ui.Image? _sheet;
   Rect _sheetRect = Rect.zero;
 
+  /// 已经不再使用、但可能还被上一帧的 raster 线程引用着的贴图。
+  ///
+  /// 立刻 `dispose()` 有时会闪一帧空白；统一等下一帧结束再释放。
+  final List<ui.Image> _retired = <ui.Image>[];
+
+  void _retire(ui.Image? image) {
+    if (image == null) return;
+    _retired.add(image);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _flushRetired());
+  }
+
+  void _flushRetired() {
+    for (final image in _retired) {
+      image.dispose();
+    }
+    _retired.clear();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -141,6 +159,7 @@ class ReaderPagedViewState extends ConsumerState<ReaderPagedView>
   void dispose() {
     _turnController.dispose();
     _sheet?.dispose();
+    _flushRetired();
     super.dispose();
   }
 
@@ -239,13 +258,13 @@ class ReaderPagedViewState extends ConsumerState<ReaderPagedView>
     }
     final old = _sheet;
     _sheet = frame.image;
-    old?.dispose();
+    _retire(old);
   }
 
   void _dropSheet() {
     final old = _sheet;
     _sheet = null;
-    old?.dispose();
+    _retire(old);
   }
 
   @override
@@ -345,7 +364,8 @@ class ReaderPagedViewState extends ConsumerState<ReaderPagedView>
         duration: Duration(
           milliseconds: (duration.inMilliseconds / remaining).round(),
         ),
-        curve: Curves.easeOut,
+        // easeOutCubic：尾巴更长、更软，翻页结束时不会"戛然而止"。
+        curve: Curves.easeOutCubic,
       ),
     );
   }

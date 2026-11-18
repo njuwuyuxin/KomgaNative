@@ -13,19 +13,38 @@ import 'dart:math' as math;
 /// 起手时折线相对竖直方向的倾角（弧度）：≈31°，看起来是"捏住左下角掀起来"。
 const double kCurlTilt = 0.55;
 
-/// 圆柱半径 / 页宽。
-const double kCurlRadiusRatio = 0.085;
+/// 圆柱半径 / 页宽（卷到中段时的最大值）。
+const double kCurlRadiusRatio = 0.10;
+
+/// 起手时的卷筒半径 = 最大半径 × 这个比例。
+///
+/// 物理上起手只是"翘起一个页脚"，不是一开始就卷成一个管子；
+/// 卷筒随翻动逐渐变粗，翻到 [kCurlRadiusGrowAt] 附近才长到最大。
+const double kCurlRadiusStart = 0.22;
+
+/// 卷筒长到最大半径时的进度。
+const double kCurlRadiusGrowAt = 0.65;
 
 /// 折线倾角随进度的衰减指数：>1 表示前段一直斜、临近书脊才迅速立直。
 const double kCurlTiltDecay = 1.8;
+
+double _smoothstep(double x) {
+  final t = x.clamp(0.0, 1.0);
+  return t * t * (3 - 2 * t);
+}
 
 /// 折线位置随进度的推进曲线。
 ///
 /// 用 smoothstep（慢—快—慢）：起手像"先掀起一个角"，中段扫过页面，
 /// 贴到书脊前收住。纯线性会显得呆板（而且收尾会"啪"一下撞上去）。
-double curlPositionEase(double progress) {
+double curlPositionEase(double progress) => _smoothstep(progress);
+
+/// 卷筒半径随进度的变化：起手很细（页脚），中段变粗，之后保持。
+double curlRadiusAt(double progress, double width) {
   final p = progress.clamp(0.0, 1.0);
-  return p * p * (3 - 2 * p);
+  final grow = _smoothstep(p / kCurlRadiusGrowAt);
+  final factor = kCurlRadiusStart + (1 - kCurlRadiusStart) * grow;
+  return math.max(1.0, width * kCurlRadiusRatio * factor);
 }
 
 /// 折线倾角（弧度，恒为非负；方向由 [CurlGeometry.mirrored] 决定）。
@@ -107,7 +126,7 @@ CurlGeometry curlGeometry({
     foldX: mirrored ? width - along : along,
     foldY: height,
     tilt: tilt,
-    radius: math.max(1.0, width * radiusRatio),
+    radius: curlRadiusAt(p, width) * (radiusRatio / kCurlRadiusRatio),
     width: width,
     height: height,
     progress: p,

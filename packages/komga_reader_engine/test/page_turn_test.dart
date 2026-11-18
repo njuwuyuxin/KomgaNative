@@ -105,6 +105,21 @@ void main() {
       expect(end.tilt, closeTo(0, 1e-9));
     });
 
+    test('卷筒随翻动变粗：起手只是一个翘起的页脚', () {
+      final start = curlGeometry(progress: 0, width: width, height: height);
+      final mid = curlGeometry(progress: 0.65, width: width, height: height);
+      final end = curlGeometry(progress: 1, width: width, height: height);
+
+      expect(start.radius, lessThan(mid.radius), reason: '起手不该就卷成一根筒');
+      expect(
+        start.radius,
+        lessThan(width * kCurlRadiusRatio * 0.3),
+        reason: '起手半径应该是最大值的零头',
+      );
+      expect(mid.radius, closeTo(width * kCurlRadiusRatio, 1e-6));
+      expect(end.radius, closeTo(mid.radius, 1e-9), reason: '长到最大之后保持');
+    });
+
     test('窄页也不会出现 0 半径', () {
       final g = curlGeometry(progress: 0.5, width: 2, height: 3);
       expect(g.radius, greaterThan(0));
