@@ -57,7 +57,7 @@ KomgaNative CI
   analyze   只跑静态分析
   test      只跑测试（纯 Dart 包用 dart test，Flutter 包用 flutter test）
   golden    重新生成黄金图基线（仅 Windows，与 CI 一致）
-  install [device]  构建 release APK 并装到已启动的模拟器/真机（提交后必跑）
+  install [device]  构建 release、装到模拟器并启动（保留应用数据；提交后必跑）
   contract  契约测试（M1）
 ''');
   return unknown == null ? 0 : 64;
@@ -235,17 +235,19 @@ Future<int> contract() async {
   return 0;
 }
 
-/// 构建 release 包并装到已连接的设备（一般是模拟器）。
+/// 构建 release 包、装到已连接的设备并启动。
 ///
 /// 规则写在 AGENTS.md「提交后：装到模拟器」：每次代码提交后都要跑一次，
-/// 用真包确认能启动。用 `flutter install` 而不是手写 adb 的原因：
-/// adb 的路径由 Flutter 自己管理，换机器/换 shell 不用额外配 PATH；
-/// `--release` 会先构建再安装，与 CI 的 `flutter build apk --release` 同一条链路。
+/// 用真包确认能启动。
+///
+/// 为什么用 `flutter run --release --no-resident` 而不是 `flutter install`：
+/// 后者会**先卸载再安装**，每次提交都把登录态、缓存、阅读进度清空；
+/// `--no-resident` 装完启动就退出，不挂着一个日志进程。
 ///
 /// 不传 [deviceId] 时交给 Flutter 选（只有一台设备时最省事）；多设备用
 /// `dart run tool/ci.dart install emulator-5554`。
 Future<int> installApp({String? deviceId}) async {
-  final args = <String>['install', '--release'];
+  final args = <String>['run', '--release', '--no-resident'];
   if (deviceId != null && deviceId.isNotEmpty) {
     args.addAll(<String>['-d', deviceId]);
   }

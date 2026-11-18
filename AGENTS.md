@@ -62,12 +62,13 @@ docs/                         选型、环境、spec、ADR
 
 ```bash
 dart run tool/emulator.dart                    # 没启动先启动（见 docs/environment-setup.md §11）
-dart run tool/ci.dart install                  # 构建 release APK 并安装
+dart run tool/ci.dart install                  # 构建 release、安装并启动
 dart run tool/ci.dart install emulator-5554    # 多设备时显式指定
 ```
 
-- 装的是 **release**（debug 签名），与 CI 的 `flutter build apk --release` 同一条构建链路；
-- 装完打开 KomgaNative，至少确认能启动、书架能出内容；
+- 装的是 **release**（debug 签名）；命令用 `flutter run --release --no-resident`，
+  **保留应用数据**（`flutter install` 会先卸载，每次提交都清掉登录态/缓存，别用）；
+- 命令会自动启动 App，至少确认能启动、书架能出内容；
 - 纯文档提交可以跳过，但要在最终回复里说明"本次未跑设备"；
 - 命令实现在 `tool/ci.dart` 的 `installApp`：不要自己拼 `adb install`（adb 的路径由 Flutter 管理）。
 
