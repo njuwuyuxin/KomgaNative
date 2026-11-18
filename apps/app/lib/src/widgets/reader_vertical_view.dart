@@ -1,5 +1,5 @@
 import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/widgets/reader_paged_view.dart';
+import 'package:komga_native/src/widgets/reader_page.dart';
 import 'package:komga_native/src/widgets/reader_palette.dart';
 import 'package:komga_reader_engine/komga_reader_engine.dart';
 import 'package:material_ui/material_ui.dart';

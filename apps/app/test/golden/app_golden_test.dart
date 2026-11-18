@@ -8,11 +8,14 @@ import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/cache/drift_http_cache.dart';
 import 'package:komga_native/src/data/cache/http_cache_database.dart';
+import 'package:komga_native/src/data/progress/progress_store.dart';
+import 'package:komga_native/src/data/progress/progress_sync_service.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
 import 'package:komga_native/src/data/reader_prefs_store.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/cache_providers.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
+import 'package:komga_native/src/providers/progress_providers.dart';
 import 'package:komga_native/src/providers/reader_prefs_provider.dart';
 import 'package:komga_native/src/providers/reader_providers.dart';
 import 'package:komga_native/src/providers/settings_provider.dart';
@@ -27,6 +30,7 @@ import 'package:komga_native/src/session/server_store.dart';
 import 'package:komga_native/src/session/session_controller.dart';
 import 'package:komga_native/src/widgets/certificate_panel.dart';
 import 'package:komga_reader_engine/komga_reader_engine.dart';
+import 'package:komga_sync_engine/komga_sync_engine.dart';
 
 import '../support/fake_library.dart';
 import '../support/fake_reader.dart';
@@ -290,6 +294,14 @@ void main() {
         readerRepositoryProvider.overrideWithValue(repository),
         // 设置面板会写偏好：黄金图里必须换成内存实现，否则会打真钥匙串通道。
         readerPrefsStoreProvider.overrideWithValue(InMemoryReaderPrefsStore()),
+        // 翻页动画会跨过 600ms 的进度防抖，真实现会去开 sqlite（path_provider
+        // 在测试里没有通道）。换成内存 store，基线不依赖本机文件系统。
+        progressSyncProvider.overrideWithValue(
+          ProgressSyncService(
+            store: InMemoryProgressStore(),
+            upload: (ProgressTarget target) async {},
+          ),
+        ),
         wakeLockProvider.overrideWithValue(FakeWakeLock()),
         // 阅读器配色跟着 settings.forceEink 走，与 AppTheme 必须成对换；
         // 只换主题的话基线会画成黑底（踩过一次）。

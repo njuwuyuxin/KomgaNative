@@ -1,16 +1,41 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:async';
+import 'dart:ui' as ui;
+
+import 'package:flutter/rendering.dart';
 import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/providers/reader_providers.dart';
-import 'package:komga_native/src/widgets/reader_chrome.dart';
+import 'package:komga_native/src/widgets/page_curl.dart';
+import 'package:komga_native/src/widgets/reader_page.dart';
 import 'package:komga_native/src/widgets/reader_palette.dart';
 import 'package:komga_reader_engine/komga_reader_engine.dart';
 import 'package:material_ui/material_ui.dart';
+
+/// 一次翻页所处的阶段。
+enum _TurnPhase { idle, dragging, settling }
+
+/// 一屏（1–2 页）的绘制矩形与页序。
+class _SpreadFrame {
+  const _SpreadFrame({
+    required this.order,
+    required this.sizes,
+    required this.layout,
+    required this.content,
+  });
+
+  final List<int> order;
+  final Map<int, int> sizes;
+  final PagedLayout layout;
+  final Rect content;
+}
 
 /// 单页 / 双页的绘制层。
 ///
 /// 一个"跨页"就是屏幕上要同时显示的那 1–2 页；单页模式只是长度为 1 的特例，
 /// 所以缩放、平移、点击区、图片加载都在这里共用一套，不用写两遍。
 /// 翻页/进度/模式切换由 `ReaderScreen` 管——这里只负责"把当前的跨页画好"。
+///
+/// 翻页动画也在这里：横向拖动时把当前屏截成一张快照（`toImage`），
+/// 上层用着色器把快照卷起来（`page_curl.dart`），下层露出相邻那一屏。
+/// 快照只在空闲时拍，所以开始拖的那一刻就有图可用。
 class ReaderPagedView extends StatefulWidget {
   const ReaderPagedView({
     required this.bookId,
@@ -20,6 +45,9 @@ class ReaderPagedView extends StatefulWidget {
     required this.palette,
     required this.onTurn,
     required this.onToggleChrome,
+    this.nextSpread,
+    this.previousSpread,
+    this.style = const PageTurnStyle(),
     super.key,
   });
 
@@ -39,17 +67,23 @@ class ReaderPagedView extends StatefulWidget {
 
   final VoidCallback onToggleChrome;
 
+  /// 相邻的跨页：拖动时先画在下面，翻过去才真正换页。
+  final List<int>? nextSpread;
+  final List<int>? previousSpread;
+
+  final PageTurnStyle style;
+
   @override
-  State<ReaderPagedView> createState() => _ReaderPagedViewState();
+  ReaderPagedViewState createState() => ReaderPagedViewState();
 }
 
-/// 服务端没返回尺寸时的兜底页面尺寸（比例接近实体漫画单页）。
-const int kFallbackPageWidth = 1000;
-const int kFallbackPageHeight = 1500;
-
-class _ReaderPagedViewState extends State<ReaderPagedView> {
+class ReaderPagedViewState extends State<ReaderPagedView>
+    with SingleTickerProviderStateMixin {
   /// 指针移动超过这个距离就不算点击（拖拽/缩放）。
   static const double _tapSlop = 12;
+
+  /// 超过这个横向位移才开始跟手翻页（太小会误吃点击）。
+  static const double _dragStartSlop = 14;
 
   double _zoom = 1;
   Offset _pan = Offset.zero;
@@ -69,6 +103,140 @@ class _ReaderPagedViewState extends State<ReaderPagedView> {
   int _activePointers = 0;
   Offset? _downAt;
 
+  // ---- 翻页动画 ----
+  final GlobalKey _sheetKey = GlobalKey();
+  late final AnimationController _turnController;
+  _TurnPhase _phase = _TurnPhase.idle;
+  bool _forward = true;
+  bool _mirrored = false;
+  double _progress = 0;
+  bool _commit = false;
+  bool _gestureZoom = false;
+  bool _dragCandidate = false;
+  Offset _dragOrigin = Offset.zero;
+  ui.Image? _sheet;
+  Rect _sheetRect = Rect.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _turnController = AnimationController(
+      vsync: this,
+      duration: widget.style.duration,
+    )..addListener(_onTurnTick);
+    _turnController.addStatusListener(_onTurnStatus);
+    unawaited(PageCurlProgram.ensureLoaded());
+    _scheduleCapture();
+  }
+
+  @override
+  void dispose() {
+    _turnController.dispose();
+    _sheet?.dispose();
+    super.dispose();
+  }
+
+  /// 由外部（底栏箭头 / 音量键）触发的翻页：和点击走同一套动画。
+  ///
+  /// 没有快照/不允许动画时直接翻页——宁可瞬切，也不要假装有动画。
+  void turn(int delta) {
+    if (_phase != _TurnPhase.idle) return;
+    final neighbour = delta > 0 ? widget.nextSpread : widget.previousSpread;
+    if (neighbour == null || !_canAnimate) {
+      widget.onTurn(delta);
+      return;
+    }
+    _forward = delta > 0;
+    _mirrored = _mirrorFor(_forward);
+    _commit = true;
+    _progress = 0;
+    _phase = _TurnPhase.settling;
+    setState(() {});
+    unawaited(
+      _turnController.animateTo(
+        1,
+        duration: widget.style.duration,
+        curve: Curves.easeOut,
+      ),
+    );
+  }
+
+  void _onTurnTick() {
+    if (!mounted) return;
+    setState(() => _progress = _turnController.value);
+  }
+
+  void _onTurnStatus(AnimationStatus status) {
+    if (status != AnimationStatus.completed &&
+        status != AnimationStatus.dismissed) {
+      return;
+    }
+    if (_phase != _TurnPhase.settling) return;
+    final commit = _commit;
+    _phase = _TurnPhase.idle;
+    _commit = false;
+    _progress = 0;
+    // 必须归零：否则下一次 `animateTo(1)` 因为"目标等于当前值"直接完成、
+    // 状态没变化也就不会回调 status listener，翻页会卡死在 settling。
+    _turnController.reset();
+    setState(() {});
+    if (commit) widget.onTurn(_forward ? 1 : -1);
+    _scheduleCapture();
+  }
+
+  bool get _canAnimate =>
+      widget.style.animates &&
+      _phase == _TurnPhase.idle &&
+      _sheet != null &&
+      _zoom <= 1.0 &&
+      _viewport.width > 0;
+
+  /// 书脊在右边（RTL）时"往前翻"从左边掀起；镜像方向用于往后翻。
+  bool _mirrorFor(bool forward) =>
+      forward ? !widget.rightToLeft : widget.rightToLeft;
+
+  PageTurnEffect get _effect {
+    if (widget.style.effect != PageTurnEffect.curl) return widget.style.effect;
+    // 往后翻需要"上一屏的快照"，我们只有当前屏的；退化成平移。
+    if (!_forward || PageCurlProgram.program == null)
+      return PageTurnEffect.slide;
+    return PageTurnEffect.curl;
+  }
+
+  /// 空闲时把当前屏截成一张图，供下一次翻页动画使用。
+  void _scheduleCapture() {
+    if (widget.style.effect == PageTurnEffect.none) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _phase != _TurnPhase.idle) return;
+      unawaited(_captureSheet());
+    });
+  }
+
+  Future<void> _captureSheet() async {
+    final boundary = _sheetKey.currentContext?.findRenderObject();
+    if (boundary is! RenderRepaintBoundary) return;
+    final pixelRatio = MediaQuery.devicePixelRatioOf(context);
+    final ui.Image image;
+    try {
+      image = await boundary.toImage(pixelRatio: pixelRatio);
+    } on Object {
+      return;
+    }
+    if (!mounted || _phase != _TurnPhase.idle) {
+      image.dispose();
+      return;
+    }
+    final old = _sheet;
+    _sheet = image;
+    old?.dispose();
+  }
+
+  void _dropSheet() {
+    final old = _sheet;
+    _sheet = null;
+    old?.dispose();
+  }
+
   @override
   void didUpdateWidget(ReaderPagedView oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -76,6 +244,8 @@ class _ReaderPagedViewState extends State<ReaderPagedView> {
     if (!_sameSpread(oldWidget.spread, widget.spread)) {
       _zoom = 1;
       _pan = Offset.zero;
+      _dropSheet();
+      _scheduleCapture();
     }
   }
 
@@ -86,6 +256,8 @@ class _ReaderPagedViewState extends State<ReaderPagedView> {
     }
     return true;
   }
+
+  // ---- 手势 ----
 
   void _onScaleStart(ScaleStartDetails details) {
     _startZoom = _zoom;
@@ -100,9 +272,88 @@ class _ReaderPagedViewState extends State<ReaderPagedView> {
     );
     _startScale = layout.scale;
     _startContent = Offset(layout.content.left, layout.content.top);
+    _gestureZoom = details.pointerCount > 1;
+    _dragOrigin = details.localFocalPoint;
+    _dragCandidate = _canAnimate;
   }
 
   void _onScaleUpdate(ScaleUpdateDetails details) {
+    if (details.pointerCount > 1) {
+      _gestureZoom = true;
+      _dragCandidate = false;
+      if (_phase == _TurnPhase.dragging) _cancelDrag();
+      _applyZoom(details);
+      return;
+    }
+    if (_phase == _TurnPhase.dragging) {
+      _updateDrag(details.localFocalPoint);
+      return;
+    }
+    if (_dragCandidate && !_gestureZoom) {
+      final delta = details.localFocalPoint - _dragOrigin;
+      if (delta.dx.abs() > _dragStartSlop &&
+          delta.dx.abs() > delta.dy.abs() * 1.4) {
+        _startDrag(delta.dx);
+        return;
+      }
+      if (delta.dy.abs() > _dragStartSlop) _dragCandidate = false;
+    }
+    if (_zoom > 1.0) _applyZoom(details);
+  }
+
+  void _onScaleEnd(ScaleEndDetails details) {
+    _dragCandidate = false;
+    _gestureZoom = false;
+    if (_phase != _TurnPhase.dragging) return;
+    final sign = _forward
+        ? (widget.rightToLeft ? 1 : -1)
+        : (widget.rightToLeft ? -1 : 1);
+    final decision = settlePageTurn(
+      progress: _progress,
+      velocityX: details.velocity.pixelsPerSecond.dx,
+      base: widget.style.duration,
+      forwardSign: sign,
+    );
+    _commit = decision.commit;
+    _phase = _TurnPhase.settling;
+    unawaited(
+      _turnController.animateTo(
+        decision.commit ? 1 : 0,
+        duration: decision.duration,
+        curve: Curves.easeOut,
+      ),
+    );
+  }
+
+  void _startDrag(double dx) {
+    final forwardSign = widget.rightToLeft ? 1 : -1;
+    final forward = dx * forwardSign > 0;
+    final neighbour = forward ? widget.nextSpread : widget.previousSpread;
+    if (neighbour == null) {
+      _dragCandidate = false;
+      return;
+    }
+    _forward = forward;
+    _mirrored = _mirrorFor(forward);
+    _progress = 0;
+    _phase = _TurnPhase.dragging;
+    setState(() {});
+  }
+
+  void _updateDrag(Offset position) {
+    final distance = (position.dx - _dragOrigin.dx).abs();
+    final width = _viewport.width <= 0 ? 1.0 : _viewport.width;
+    setState(() => _progress = (distance / width).clamp(0.0, 1.0));
+  }
+
+  void _cancelDrag() {
+    _phase = _TurnPhase.idle;
+    _progress = 0;
+    _commit = false;
+    setState(() {});
+  }
+
+  void _applyZoom(ScaleUpdateDetails details) {
     final nextZoom = (_startZoom * details.scale).clamp(1.0, 4.0);
     if (nextZoom <= 1.0) {
       setState(() {
@@ -112,7 +363,6 @@ class _ReaderPagedViewState extends State<ReaderPagedView> {
       });
       return;
     }
-
     // 先用引擎算出"缩放后的有效比例"，再以两指中点为基准反推新的内容左上角。
     // 直接用 zoomFactor 当比例会忽略夹紧（fit 很小时 max 可能小于 fit*4）。
     final nextScale = computePagedLayout(
@@ -128,7 +378,6 @@ class _ReaderPagedViewState extends State<ReaderPagedView> {
       nextScale: nextScale,
       focalX: _startFocal.dx,
       focalY: _startFocal.dy,
-      // 焦点本身也可以移动：单指拖动时比例不变，等价于平移。
       focalDeltaX: details.localFocalPoint.dx - _startFocal.dx,
       focalDeltaY: details.localFocalPoint.dy - _startFocal.dy,
     );
@@ -139,49 +388,128 @@ class _ReaderPagedViewState extends State<ReaderPagedView> {
   }
 
   void _onTap(double dx, double width) {
+    if (_phase != _TurnPhase.idle) return;
     final fraction = width <= 0 ? 0.5 : dx / width;
     if (fraction < 0.33) {
       // 左侧三分之一：LTR 往回翻，RTL 往前翻（日漫）。
-      widget.onTurn(widget.rightToLeft ? 1 : -1);
+      turn(widget.rightToLeft ? 1 : -1);
     } else if (fraction > 0.67) {
-      widget.onTurn(widget.rightToLeft ? -1 : 1);
+      turn(widget.rightToLeft ? -1 : 1);
     } else {
       widget.onToggleChrome();
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    // 视觉顺序：RTL 时后一页在左，所以渲染顺序要反过来。
-    final order = visualOrder(widget.spread, rightToLeft: widget.rightToLeft);
+  // ---- 布局 ----
+
+  _SpreadFrame _frameFor(
+    List<int> spread,
+    SizeD viewport, {
+    bool applyZoom = true,
+  }) {
+    final order = visualOrder(spread, rightToLeft: widget.rightToLeft);
     final sizes = <int, int>{};
-    for (final index in order) {
-      final info = widget.pages[index];
-      sizes[index] = info.width ?? kFallbackPageWidth;
-    }
-    final totalWidth = sizes.values.fold<int>(0, (sum, w) => sum + w);
+    var totalWidth = 0;
     var maxHeight = kFallbackPageHeight;
     for (final index in order) {
-      final h = widget.pages[index].height ?? kFallbackPageHeight;
+      final info = widget.pages[index];
+      final w = info.width ?? kFallbackPageWidth;
+      sizes[index] = w;
+      totalWidth += w;
+      final h = info.height ?? kFallbackPageHeight;
       if (h > maxHeight) maxHeight = h;
     }
+    if (applyZoom) {
+      _pageWidth = totalWidth;
+      _pageHeight = maxHeight;
+    }
+    final layout = computePagedLayout(
+      pageWidth: totalWidth,
+      pageHeight: maxHeight,
+      viewport: viewport,
+      zoomFactor: applyZoom ? _zoom : 1,
+      panX: applyZoom ? _pan.dx : 0,
+      panY: applyZoom ? _pan.dy : 0,
+    );
+    return _SpreadFrame(
+      order: order,
+      sizes: sizes,
+      layout: layout,
+      content: Rect.fromLTWH(
+        layout.content.left,
+        layout.content.top,
+        layout.content.width,
+        layout.content.height,
+      ),
+    );
+  }
 
-    // 手势回调要用：页面像素尺寸（跨页合计）在 build 时确定。
-    _pageWidth = totalWidth;
-    _pageHeight = maxHeight;
+  Widget _spreadRow(_SpreadFrame frame) => Row(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: <Widget>[
+      for (final index in frame.order)
+        Expanded(
+          flex: frame.sizes[index]!,
+          child: ReaderPage(
+            bookId: widget.bookId,
+            pageIndex: index,
+            palette: widget.palette,
+          ),
+        ),
+    ],
+  );
+
+  Positioned _positioned(_SpreadFrame frame, Widget child) => Positioned(
+    left: frame.content.left,
+    top: frame.content.top,
+    width: frame.content.width,
+    height: frame.content.height,
+    child: child,
+  );
+
+  Widget _curlLayer() {
+    final sheet = _sheet;
+    if (sheet == null) return const SizedBox.shrink();
+    final effect = _effect;
+    return CustomPaint(
+      size: Size.infinite,
+      painter: effect == PageTurnEffect.curl
+          ? PageCurlPainter(
+              sheet: sheet,
+              sheetRect: _sheetRect,
+              geometry: curlGeometry(
+                progress: _progress,
+                width: _sheetRect.width,
+                height: _sheetRect.height,
+                mirrored: _mirrored,
+              ),
+            )
+          : PageSlidePainter(
+              sheet: sheet,
+              sheetRect: _sheetRect,
+              progress: _progress,
+              mirrored: _mirrored,
+            ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final turning = _phase != _TurnPhase.idle && _sheet != null;
+    final neighbour = turning
+        ? (_forward ? widget.nextSpread : widget.previousSpread)
+        : null;
 
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
         final viewport = SizeD(constraints.maxWidth, constraints.maxHeight);
         _viewport = viewport;
-        final layout = computePagedLayout(
-          pageWidth: totalWidth,
-          pageHeight: maxHeight,
-          viewport: viewport,
-          zoomFactor: _zoom,
-          panX: _pan.dx,
-          panY: _pan.dy,
-        );
+        final frame = _frameFor(widget.spread, viewport);
+        _sheetRect = frame.content;
+        final neighbourFrame = neighbour == null
+            ? null
+            : _frameFor(neighbour, viewport, applyZoom: false);
+
         return Listener(
           key: const Key('reader-tap-layer'),
           onPointerDown: (PointerDownEvent event) {
@@ -205,95 +533,23 @@ class _ReaderPagedViewState extends State<ReaderPagedView> {
             behavior: HitTestBehavior.opaque,
             onScaleStart: _onScaleStart,
             onScaleUpdate: _onScaleUpdate,
+            onScaleEnd: _onScaleEnd,
             child: Stack(
               children: <Widget>[
-                if (layout.content.width > 0 && layout.content.height > 0)
-                  Positioned(
-                    left: layout.content.left,
-                    top: layout.content.top,
-                    width: layout.content.width,
-                    height: layout.content.height,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: <Widget>[
-                        for (final index in order)
-                          Expanded(
-                            flex: sizes[index]!,
-                            child: ReaderPage(
-                              bookId: widget.bookId,
-                              pageIndex: index,
-                              palette: widget.palette,
-                            ),
-                          ),
-                      ],
-                    ),
+                if (neighbourFrame != null)
+                  _positioned(neighbourFrame, _spreadRow(neighbourFrame)),
+                if (!turning)
+                  _positioned(
+                    frame,
+                    RepaintBoundary(key: _sheetKey, child: _spreadRow(frame)),
                   ),
+                if (turning)
+                  Positioned.fill(child: IgnorePointer(child: _curlLayer())),
               ],
             ),
           ),
         );
       },
     );
-  }
-}
-
-/// 单页图片（含加载中/失败/重试）。
-///
-/// 翻页时**第一帧**必须已经有像素，否则用户看到的就是"闪一下黑"。
-/// 两条路径按优先级：
-/// 1. provider 已经有值（同屏内的重绘）；
-/// 2. 仓库同步缓存里有这页的字节（翻回去 / 预取过）——直接画，不进 loading。
-///
-/// 缓存里没有的页就**老老实实转圈**：这是"还没加载好"，不是内容本身。
-/// 曾经试过"先继续画上一页"，反馈是"页码变了图没变，像 bug"——所以不要
-/// 拿旧画面顶替，黑底 + 转圈反而是更准确的表达。
-class ReaderPage extends ConsumerWidget {
-  const ReaderPage({
-    required this.bookId,
-    required this.pageIndex,
-    required this.palette,
-    super.key,
-  });
-
-  final String bookId;
-
-  /// 0 基页索引。
-  final int pageIndex;
-
-  final ReaderPalette palette;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final page = pageIndex + 1;
-    final request = (bookId: bookId, page: page);
-    final async = ref.watch(readerPageImageProvider(request));
-
-    // 同步问一句"这页的字节现在在不在内存里"：在就直接画第一帧。
-    // 只等 provider 的话，autoDispose 的 provider 每换一页都会先给一次
-    // AsyncLoading，那一帧就是用户看到的闪烁。
-    final bytes =
-        async.value ??
-        ref.watch(readerRepositoryProvider).cachedPageImage(bookId, page);
-    final error = async.error;
-
-    if (bytes != null) {
-      return Image.memory(
-        bytes,
-        key: Key('reader-image-$pageIndex'),
-        fit: BoxFit.contain,
-        gaplessPlayback: true,
-        filterQuality: FilterQuality.medium,
-      );
-    }
-    if (error != null) {
-      return Center(
-        child: PageError(
-          error: error,
-          palette: palette,
-          onRetry: () => ref.invalidate(readerPageImageProvider(request)),
-        ),
-      );
-    }
-    return Center(child: CircularProgressIndicator(color: palette.muted));
   }
 }

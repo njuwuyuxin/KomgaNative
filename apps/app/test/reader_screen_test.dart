@@ -478,7 +478,9 @@ void main() {
       repository.pageGates[2] = gate;
 
       await pumpReader(tester, repository: repository, book: demoReaderBook());
+      // 点击会先播翻页动画（约 400ms），动画结束才真正换页。
       await tapRightOneFrame(tester);
+      await tester.pump(const Duration(milliseconds: 500));
 
       // 页码已经变了，图没有 → 必须明确显示"在加载"，不能继续画第 1 页：
       // 否则用户看到的是"页码变了、图没变"，会以为是 bug（真被这么反馈过）。

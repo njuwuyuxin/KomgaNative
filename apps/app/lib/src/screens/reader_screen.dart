@@ -11,6 +11,7 @@ import 'package:komga_native/src/providers/progress_providers.dart';
 import 'package:komga_native/src/providers/reader_prefs_provider.dart';
 import 'package:komga_native/src/providers/reader_providers.dart';
 import 'package:komga_native/src/providers/settings_provider.dart';
+import 'package:komga_native/src/widgets/page_curl.dart';
 import 'package:komga_native/src/widgets/page_navigator_sheet.dart';
 import 'package:komga_native/src/widgets/reader_chrome.dart';
 import 'package:komga_native/src/widgets/reader_paged_view.dart';
@@ -117,6 +118,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   int _jumpToken = 0;
   int _jumpPage = 1;
 
+  /// 单页/双页绘制层：翻页动画由它负责，外部翻页也要经过它。
+  final GlobalKey<ReaderPagedViewState> _pagedKey =
+      GlobalKey<ReaderPagedViewState>();
+
   /// 音量键翻页：订阅在 initState，取消在 dispose。
   StreamSubscription<PageTurnKey>? _volumeKeys;
 
@@ -151,13 +156,18 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     if (!mounted) return;
     final pages = ref.read(readerPagesProvider(widget.bookId)).value;
     if (pages == null || pages.isEmpty) return;
-    final total = pages.length;
     final mode = _modeFor(ref.read(readerPrefsProvider));
     if (mode == ReadingMode.verticalScroll) return;
-    final spreads = _spreadsFor(pages, mode);
-    final page = _resolvePage(total);
-    final spreadIndex = spreads.isEmpty ? -1 : spreadIndexOf(spreads, page - 1);
-    _turn(key == PageTurnKey.next ? 1 : -1, total, mode, spreadIndex, spreads);
+    _requestTurn(key == PageTurnKey.next ? 1 : -1, mode);
+  }
+
+  /// 外部翻页（底栏箭头 / 音量键）统一入口。
+  ///
+  /// 单页/双页交给绘制层播动画，动画结束后它再回调 `onTurn` 真正换页；
+  /// 绘制层还没建好时（页数据未到）什么也不做。
+  void _requestTurn(int delta, ReadingMode mode) {
+    if (mode == ReadingMode.verticalScroll) return;
+    _pagedKey.currentState?.turn(delta);
   }
 
   /// 切后台/锁屏时立刻落一次进度：只靠防抖会丢掉"看完就退出"的那一页。
@@ -197,8 +207,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
             completed: _isCompleted(page: page, total: total),
           );
       _lastSaved = page;
-    } on ShelfFailure {
-      // 连本地库都写不进去才会走到这里（磁盘满/库损坏）；阅读不因此中断。
+    } on Object {
+      // 本地库打不开（磁盘满/库损坏/测试环境没有 path_provider 通道）也
+      // 不能把阅读打断：这一页只是没落盘，下一次翻页会再试。
+      // 只吞不报是因为进度回写是后台行为，用户此刻只想看书。
     }
   }
 
@@ -398,6 +410,42 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     _setPage((current + delta).clamp(1, total), total);
   }
 
+  /// 相邻那一屏的页索引；到书头/书尾返回 null。
+  ///
+  /// 翻页动画需要它：拖动时先把相邻那一屏画在下面，翻过去才真正换页。
+  List<int>? _neighbourSpread(
+    int delta,
+    ReadingMode mode,
+    List<List<int>> spreads,
+    int spreadIndex,
+    int page,
+    int total,
+  ) {
+    if (mode == ReadingMode.doublePage && spreads.isNotEmpty) {
+      final index = spreadIndex + delta;
+      if (index < 0 || index >= spreads.length) return null;
+      return spreads[index];
+    }
+    final target = page + delta;
+    if (target < 1 || target > total) return null;
+    return <int>[target - 1];
+  }
+
+  /// 翻页动效：墨水屏和"系统关闭动画"直接不做动画；双页回退成平移。
+  PageTurnStyle _turnStyle(ReadingMode mode) {
+    if (ref.watch(settingsProvider).forceEink) {
+      return const PageTurnStyle(effect: PageTurnEffect.none);
+    }
+    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
+      return const PageTurnStyle(effect: PageTurnEffect.none);
+    }
+    return PageTurnStyle(
+      effect: mode == ReadingMode.doublePage
+          ? PageTurnEffect.slide
+          : PageTurnEffect.curl,
+    );
+  }
+
   List<List<int>> _spreadsFor(List<PageInfo> pages, ReadingMode mode) {
     if (mode != ReadingMode.doublePage) {
       return const <List<int>>[];
@@ -514,6 +562,22 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         spreadIndex >= 0 && spreadIndex < spreads.length - 1,
       ReadingMode.verticalScroll => false,
     };
+    final nextSpread = _neighbourSpread(
+      1,
+      mode,
+      spreads,
+      spreadIndex,
+      page,
+      total,
+    );
+    final previousSpread = _neighbourSpread(
+      -1,
+      mode,
+      spreads,
+      spreadIndex,
+      page,
+      total,
+    );
 
     final completed = _isCompleted(page: page, total: total);
     // 只在完成态查"下一本"：没读完时多一次列表请求纯属浪费。
@@ -578,11 +642,15 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                             setState(() => _chromeVisible = !_chromeVisible),
                       ),
                       _ => ReaderPagedView(
+                        key: _pagedKey,
                         bookId: widget.bookId,
                         pages: pages,
                         spread: spread,
                         rightToLeft: rightToLeft,
                         palette: palette,
+                        nextSpread: nextSpread,
+                        previousSpread: previousSpread,
+                        style: _turnStyle(mode),
                         onTurn: (int delta) =>
                             _turn(delta, total, mode, spreadIndex, spreads),
                         onToggleChrome: () =>
@@ -607,11 +675,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                       // 都是"下一页"。后续加"阅读方向"设置时只改这里的来源。
                       leftTurnsNext: rightToLeft,
                       onPrevious: canGoBack
-                          ? () => _turn(-1, total, mode, spreadIndex, spreads)
+                          ? () => _requestTurn(-1, mode)
                           : null,
-                      onNext: canGoForward
-                          ? () => _turn(1, total, mode, spreadIndex, spreads)
-                          : null,
+                      onNext: canGoForward ? () => _requestTurn(1, mode) : null,
                     ),
                 ],
               ),
