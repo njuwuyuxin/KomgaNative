@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -26,6 +27,8 @@ class FakeReaderRepository implements ReaderRepository {
   ShelfFailure? imageFailure;
   ShelfFailure? saveFailure;
 
+  /// 页图文件名**循环复用**：页数超过 `pageNames.length` 时第 4 页与第 1 页是同一张图。
+  /// 断言"字节缓存里有没有"时要记住这一点（页面别开太多，否则 p2 会被 p5 顺手填上）。
   final String pageDirectory;
   final List<String> pageNames;
 
@@ -42,6 +45,10 @@ class FakeReaderRepository implements ReaderRepository {
   /// 每次 `pageImage` 被请求的页码（1 基，按调用顺序）。
   /// 预加载测试用它断言"翻过去之前就已经取过"，而不是只看总数。
   final List<int> pageRequests = <int>[];
+
+  /// 给某几页装一道闸：`pageImage` 会停在这里，直到测试手动放行。
+  /// 用来造"这一页还没加载好"的状态（冷页 loading 态）。
+  final Map<int, Completer<void>> pageGates = <int, Completer<void>>{};
 
   final Map<String, Uint8List> _bytes = <String, Uint8List>{};
 
@@ -76,6 +83,8 @@ class FakeReaderRepository implements ReaderRepository {
   Future<Uint8List> pageImage(String bookId, int page) async {
     pageImageCalls++;
     pageRequests.add(page);
+    final gate = pageGates[page];
+    if (gate != null) await gate.future;
     final failure = imageFailure;
     if (failure != null) throw failure;
 

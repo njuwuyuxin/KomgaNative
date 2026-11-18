@@ -73,14 +73,33 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   /// 翻页后多久回写进度：连续翻页时只写最后停下的那一页。
   static const Duration _saveDelay = Duration(milliseconds: 600);
 
+  /// 往前预取几屏（双页模式一屏两页）。
+  ///
+  /// 4 屏 ≈ 单页 4 页 / 双页 8 页：一页看 1 秒的人也有 4 秒以上缓冲，
+  /// 不会翻两下就撞上"还没加载好"的转圈。再多就开始抢当前页的带宽了。
+  static const int _preloadAheadScreens = 4;
+
+  /// 往后预取几屏：回翻也常见，但优先级低于往前。
+  static const int _preloadBehindScreens = 2;
+
+  /// 预解码几屏。
+  ///
+  /// 解码结果占的是 `ImageCache` 的 100 MB 预算（一张 1500×2200 约 13 MB），
+  /// 所以比"抓字节"浅一档：只保证最近要看的这几屏翻过去首帧就有像素。
+  static const int _decodeAheadScreens = 2;
+
   /// 预取时最多同时飞几张页图。
   ///
-  /// 一起发太多会把"真正要显示的那一页"挤到队尾，弱网下反而更慢。
-  /// 计划本身是"越近越靠前"，超出上限的那些下一轮翻页会重新排。
-  static const int _preloadConcurrency = 3;
+  /// 一起发太多会把"真正要显示的那一页"挤到队尾，弱网下反而更慢；
+  /// 排队的其余页会在前面的回来之后接着发（`_pumpPreload`），不会丢。
+  static const int _preloadConcurrency = 4;
 
   /// 正在预取的页（1 基），用来限流和去重。
   final Set<int> _preloading = <int>{};
+
+  /// 还没轮到发的预取任务，按优先级（越近越前）。
+  final List<({int page, bool decode})> _preloadQueue =
+      <({int page, bool decode})>[];
 
   /// 已经排过预取的锚点：`第几页:模式`。模式变了分屏就变了，必须重排。
   String? _preloadAnchor;
@@ -221,7 +240,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     });
   }
 
-  /// 预取当前页前后各一屏。
+  /// 预取当前页前后几屏。
   ///
   /// 双页模式下"一屏"是两页，所以计划按分屏算（`preloadPlan`），
   /// 而不是 `page ± 1`——那样会一直漏掉每屏的第二页。
@@ -238,23 +257,44 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         ? _spreadsFor(pages, mode)
         : const <List<int>>[];
 
-    // 字节：前后各一屏都抓。翻回去、连翻两页都不用等网络。
+    // 字节：往前 4 屏、往后 2 屏。阅读快的人也不会翻两下就撞上转圈。
     final bytesPlan = preloadPlan(
       pageIndex: page - 1,
       pageCount: total,
       spreads: groups,
+      ahead: _preloadAheadScreens,
+      behind: _preloadBehindScreens,
     );
-    // 位图：一张 1500×2200 的页解出来约 13 MB，ImageCache 装不下几屏，
-    // 所以只提前解"紧接着的那一屏"——那一屏才是必须首帧就有图的。
+    // 位图：解码占的是 ImageCache 的预算，比抓字节浅一档。
     final decodePlan = preloadPlan(
       pageIndex: page - 1,
       pageCount: total,
       spreads: groups,
-      ahead: 1,
+      ahead: _decodeAheadScreens,
       behind: 0,
     ).toSet();
-    for (final index in bytesPlan) {
-      unawaited(_preload(index + 1, decode: decodePlan.contains(index)));
+
+    // 整份计划重新排队：还没发的旧计划作废（分屏/位置可能已经变了），
+    // 已经在飞的不受影响。
+    _preloadQueue
+      ..clear()
+      ..addAll(<({int page, bool decode})>[
+        for (final index in bytesPlan)
+          (page: index + 1, decode: decodePlan.contains(index)),
+      ]);
+    _pumpPreload();
+  }
+
+  /// 按并发上限从队列里发预取。
+  ///
+  /// 之前是"超上限的直接丢"，结果是阅读快时计划尾部永远轮不到；
+  /// 改成排队后，前一个回来就补下一个，最多慢一点但不会漏。
+  void _pumpPreload() {
+    while (_preloading.length < _preloadConcurrency &&
+        _preloadQueue.isNotEmpty) {
+      final next = _preloadQueue.removeAt(0);
+      if (_preloading.contains(next.page)) continue;
+      unawaited(_preload(next.page, decode: next.decode));
     }
   }
 
@@ -265,9 +305,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   ///
   /// 失败静默：真翻到那一页时会重新请求，走正常的错误/重试路径。
   Future<void> _preload(int page, {required bool decode}) async {
-    if (_preloading.length >= _preloadConcurrency || !_preloading.add(page)) {
-      return;
-    }
+    if (!_preloading.add(page)) return;
     try {
       final bytes = await ref
           .read(readerRepositoryProvider)
@@ -284,6 +322,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       // 预取失败不影响阅读。
     } finally {
       _preloading.remove(page);
+      if (mounted) _pumpPreload();
     }
   }
 

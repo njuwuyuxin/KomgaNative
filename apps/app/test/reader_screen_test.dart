@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
@@ -379,28 +381,28 @@ void main() {
   });
 
   group('页图预加载', () {
-    testWidgets('打开第一页就把下一屏取好了（不是翻页时才现取）', (WidgetTester tester) async {
-      final repository = FakeReaderRepository(pageCount: 5);
+    testWidgets('打开第一页就把后面几屏取好了（不是翻页时才现取）', (WidgetTester tester) async {
+      final repository = FakeReaderRepository(pageCount: 30);
       await pumpReader(tester, repository: repository, book: demoReaderBook());
 
-      // 屏幕上只有第 1 页，但 2、3 已经取过；否则第一次翻页要等网络，
-      // 那段空档就是用户看到的"闪一下黑"。
-      expect(repository.pageRequests, containsAll(<int>[2, 3]));
+      // 屏幕上只有第 1 页，但后面 4 屏（2–5）已经在取；否则翻两下就要等网络，
+      // 那段空档就是用户看到的"加载中"。
+      expect(repository.pageRequests, containsAll(<int>[2, 3, 4, 5]));
       expect(
         repository.pageRequests,
-        isNot(contains(5)),
-        reason: '只预热前后一屏，不该把整本都拖下来',
+        isNot(contains(20)),
+        reason: '只预热前面几屏，不该把整本都拖下来',
       );
     });
 
-    testWidgets('翻页后预取跟着走：新位置的前后一屏都取', (WidgetTester tester) async {
-      final repository = FakeReaderRepository(pageCount: 5);
+    testWidgets('翻页后预取跟着走：新位置往前 4 屏、往后 2 屏', (WidgetTester tester) async {
+      final repository = FakeReaderRepository(pageCount: 30);
       await pumpReader(tester, repository: repository, book: demoReaderBook());
 
       await tapRight(tester);
-      expect(find.text('2 / 5'), findsOneWidget);
-      // 第 2 页的下一屏是 3、4，上一屏是 1。
-      expect(repository.pageRequests, containsAll(<int>[3, 4]));
+      expect(find.text('2 / 30'), findsOneWidget);
+      // 第 2 页：往前 4 屏（3–6）、往后 2 屏（1）都该被重新排上。
+      expect(repository.pageRequests, containsAll(<int>[1, 3, 4, 5, 6]));
     });
 
     testWidgets('双页模式按"屏"预取：下一屏的第二页也不能漏', (WidgetTester tester) async {
@@ -416,7 +418,7 @@ void main() {
       expect(repository.pageRequests, containsAll(<int>[4, 5]));
     });
 
-    testWidgets('紧接着的那一屏会被解码进 ImageCache（翻页首帧就有像素）', (
+    testWidgets('紧接着的几屏会被解码进 ImageCache（翻页首帧就有像素）', (
       WidgetTester tester,
     ) async {
       final repository = FakeReaderRepository();
@@ -465,6 +467,30 @@ void main() {
 
       expect(find.byType(CircularProgressIndicator), findsNothing);
       expect(find.byKey(const Key('reader-image-0')), findsOneWidget);
+    });
+
+    testWidgets('真没加载好时：露出转圈，而不是拿上一页顶替', (WidgetTester tester) async {
+      // 只有 3 页：页图 fixture 只有 3 张，页数一多会循环复用（p5 就是 p2），
+      // "第 2 页没缓存"这个前提就不成立了。
+      final repository = FakeReaderRepository();
+      // 第 2 页"网络"挂住：预取也取不到，翻过去必然是冷的。
+      final gate = Completer<void>();
+      repository.pageGates[2] = gate;
+
+      await pumpReader(tester, repository: repository, book: demoReaderBook());
+      await tapRightOneFrame(tester);
+
+      // 页码已经变了，图没有 → 必须明确显示"在加载"，不能继续画第 1 页：
+      // 否则用户看到的是"页码变了、图没变"，会以为是 bug（真被这么反馈过）。
+      expect(find.byKey(const Key('reader-image-0')), findsNothing);
+      expect(find.byKey(const Key('reader-image-1')), findsNothing);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.text('2 / 3'), findsOneWidget, reason: '页码照常前进');
+
+      gate.complete();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('reader-image-1')), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
     });
   });
 

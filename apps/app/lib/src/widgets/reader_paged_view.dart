@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/providers/reader_providers.dart';
@@ -242,11 +240,14 @@ class _ReaderPagedViewState extends State<ReaderPagedView> {
 /// 单页图片（含加载中/失败/重试）。
 ///
 /// 翻页时**第一帧**必须已经有像素，否则用户看到的就是"闪一下黑"。
-/// 三条路径按优先级：
+/// 两条路径按优先级：
 /// 1. provider 已经有值（同屏内的重绘）；
-/// 2. 仓库同步缓存里有这页的字节（翻回去 / 预取过）——直接画，不进 loading；
-/// 3. 实在没有，就先画**上一帧**，等新页到了再换掉（冷页也不黑屏）。
-class ReaderPage extends ConsumerStatefulWidget {
+/// 2. 仓库同步缓存里有这页的字节（翻回去 / 预取过）——直接画，不进 loading。
+///
+/// 缓存里没有的页就**老老实实转圈**：这是"还没加载好"，不是内容本身。
+/// 曾经试过"先继续画上一页"，反馈是"页码变了图没变，像 bug"——所以不要
+/// 拿旧画面顶替，黑底 + 转圈反而是更准确的表达。
+class ReaderPage extends ConsumerWidget {
   const ReaderPage({
     required this.bookId,
     required this.pageIndex,
@@ -262,53 +263,37 @@ class ReaderPage extends ConsumerStatefulWidget {
   final ReaderPalette palette;
 
   @override
-  ConsumerState<ReaderPage> createState() => _ReaderPageState();
-}
-
-class _ReaderPageState extends ConsumerState<ReaderPage> {
-  /// 这个位置上一次画出来的图。换页时新页还没到就先顶一会儿，
-  /// 而不是退回 Scaffold 的黑底。
-  Uint8List? _lastBytes;
-
-  @override
-  Widget build(BuildContext context) {
-    final page = widget.pageIndex + 1;
-    final request = (bookId: widget.bookId, page: page);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final page = pageIndex + 1;
+    final request = (bookId: bookId, page: page);
     final async = ref.watch(readerPageImageProvider(request));
 
     // 同步问一句"这页的字节现在在不在内存里"：在就直接画第一帧。
     // 只等 provider 的话，autoDispose 的 provider 每换一页都会先给一次
     // AsyncLoading，那一帧就是用户看到的闪烁。
-    final fresh =
+    final bytes =
         async.value ??
-        ref
-            .watch(readerRepositoryProvider)
-            .cachedPageImage(widget.bookId, page);
+        ref.watch(readerRepositoryProvider).cachedPageImage(bookId, page);
     final error = async.error;
 
-    if (fresh == null && error != null) {
-      return Center(
-        child: PageError(
-          error: error,
-          palette: widget.palette,
-          onRetry: () => ref.invalidate(readerPageImageProvider(request)),
-        ),
-      );
-    }
-
-    final bytes = fresh ?? _lastBytes;
     if (bytes != null) {
-      if (fresh != null) _lastBytes = fresh;
       return Image.memory(
         bytes,
-        key: Key('reader-image-${widget.pageIndex}'),
+        key: Key('reader-image-$pageIndex'),
         fit: BoxFit.contain,
         gaplessPlayback: true,
         filterQuality: FilterQuality.medium,
       );
     }
-    return Center(
-      child: CircularProgressIndicator(color: widget.palette.muted),
-    );
+    if (error != null) {
+      return Center(
+        child: PageError(
+          error: error,
+          palette: palette,
+          onRetry: () => ref.invalidate(readerPageImageProvider(request)),
+        ),
+      );
+    }
+    return Center(child: CircularProgressIndicator(color: palette.muted));
   }
 }
