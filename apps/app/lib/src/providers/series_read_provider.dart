@@ -24,7 +24,8 @@ class SeriesReadController extends Notifier<Set<String>> {
       if (_disposed) return;
       // 服务端已经改了：让详情、书列表、继续阅读都重新取。
       ref.invalidate(seriesDetailProvider(seriesId));
-      ref.invalidate(seriesBooksProvider(seriesId));
+      // 书列表是 family（每本书数一档），invalidate 整个 family 最省事也最稳。
+      ref.invalidate(seriesBooksProvider);
       ref.invalidate(ondeckProvider);
     } finally {
       if (!_disposed) state = <String>{...state}..remove(seriesId);

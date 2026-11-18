@@ -27,6 +27,7 @@ class SeriesSinglePane extends StatelessWidget {
     required this.seriesId,
     required this.onRefresh,
     required this.onOpenBook,
+    this.onLoadMore,
     super.key,
   });
 
@@ -35,6 +36,9 @@ class SeriesSinglePane extends StatelessWidget {
   final String seriesId;
   final Future<void> Function() onRefresh;
   final OpenSeriesBook onOpenBook;
+
+  /// 书比当前加载的多时"加载更多"（UI-P2-4）。
+  final VoidCallback? onLoadMore;
 
   @override
   Widget build(BuildContext context) {
@@ -62,6 +66,7 @@ class SeriesSinglePane extends StatelessWidget {
             books: books,
             series: series,
             onOpenBook: onOpenBook,
+            onLoadMore: onLoadMore,
           ),
         ],
       ),
@@ -80,6 +85,7 @@ class SeriesTwoPane extends StatelessWidget {
     required this.seriesId,
     required this.onRefresh,
     required this.onOpenBook,
+    this.onLoadMore,
     super.key,
   });
 
@@ -88,6 +94,9 @@ class SeriesTwoPane extends StatelessWidget {
   final String seriesId;
   final Future<void> Function() onRefresh;
   final OpenSeriesBook onOpenBook;
+
+  /// 书比当前加载的多时"加载更多"（UI-P2-4）。
+  final VoidCallback? onLoadMore;
 
   @override
   Widget build(BuildContext context) {
@@ -123,6 +132,7 @@ class SeriesTwoPane extends StatelessWidget {
                 books: books,
                 series: series,
                 onOpenBook: onOpenBook,
+                onLoadMore: onLoadMore,
               ),
             ),
           ),
@@ -138,6 +148,7 @@ List<Widget> seriesBookSlivers(
   required PageResult<Book> books,
   required Series? series,
   required OpenSeriesBook onOpenBook,
+  VoidCallback? onLoadMore,
 }) {
   final l10n = AppLocalizations.of(context);
   final theme = Theme.of(context);
@@ -165,17 +176,33 @@ List<Widget> seriesBookSlivers(
         separatorBuilder: (BuildContext context, int index) =>
             const Divider(height: AppSizes.hairline),
       ),
+    // 还有更多就让用户拉下来（UI-P2-4 解除 100 本上限）：以前这里只有一句
+    // "只显示了前 N 本"，大系列（几百本）根本读不到后面的。
     if (truncated)
       SliverToBoxAdapter(
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.md),
-          child: Text(
-            l10n.showingBooks(books.items.length, books.totalElements),
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
+          child: onLoadMore == null
+              ? Text(
+                  l10n.showingBooks(books.items.length, books.totalElements),
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                )
+              : Center(
+                  child: OutlinedButton.icon(
+                    key: const Key('series-load-more'),
+                    onPressed: () => onLoadMore(),
+                    icon: const Icon(Icons.expand_more),
+                    label: Text(
+                      l10n.showingBooks(
+                        books.items.length,
+                        books.totalElements,
+                      ),
+                    ),
+                  ),
+                ),
         ),
       ),
   ];
@@ -285,7 +312,7 @@ class SeriesBookRow extends ConsumerWidget {
         .setRead(book.id, read: action, pagesCount: book.pagesCount);
     if (!context.mounted) return;
     // 书列表是"本地进度叠加"出来的，改完要让详情重新取一遍。
-    ref.invalidate(seriesBooksProvider(book.seriesId));
+    ref.invalidate(seriesBooksProvider);
     ref.invalidate(seriesDetailProvider(book.seriesId));
   }
 }

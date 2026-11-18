@@ -220,7 +220,10 @@ class FakeLibraryRepository implements LibraryRepository {
     final failure = booksFailure;
     if (failure != null) throw failure;
 
-    final items = <Book>[
+    // 按 size 切片：详情页的"加载更多"就是"要更多本"（UI-P2-4），
+    // 假仓库必须尊重 size，否则 `items.length == totalElements` 永远成立，
+    // 那段交互在测试里根本走不到。
+    final all = <Book>[
       for (var i = 1; i <= bookCount; i++)
         Book(
           id: '$seriesId-b$i',
@@ -246,10 +249,14 @@ class FakeLibraryRepository implements LibraryRepository {
                           : null)),
         ),
     ];
+    final start = page * size;
+    final items = start >= all.length
+        ? const <Book>[]
+        : all.sublist(start, math.min(start + size, all.length));
 
     return PageResult<Book>(
       items: items,
-      totalElements: items.length,
+      totalElements: all.length,
       page: page,
       size: size,
     );

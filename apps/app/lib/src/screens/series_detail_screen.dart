@@ -18,52 +18,62 @@ import 'package:material_ui/material_ui.dart';
 ///
 /// 窄屏是"头部 + 列表"一条滚动流；宽屏（`WindowSizeClass.expanded`）换成
 /// 左头部 / 右书列表两栏，具体布局在 `widgets/series_two_pane.dart`。
-class SeriesDetailScreen extends ConsumerWidget {
+///
+/// 为什么是 StatefulWidget：书列表要能"加载更多"（UI-P2-4 解除 100 本上限），
+/// 而"要多少本"是**视图状态**（重进详情页从 100 本重新开始就够），
+/// 所以放在页面里，请求本身仍然只发生在 Repository 层。
+class SeriesDetailScreen extends ConsumerStatefulWidget {
   const SeriesDetailScreen({required this.seriesId, super.key});
 
   final String seriesId;
 
-  Future<void> _refresh(WidgetRef ref) async {
+  @override
+  ConsumerState<SeriesDetailScreen> createState() => _SeriesDetailScreenState();
+}
+
+class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
+  /// 当前请求的书数；点"加载更多"加一页。
+  int _size = 100;
+
+  String get seriesId => widget.seriesId;
+
+  SeriesBooksQuery get _booksQuery => (seriesId: seriesId, size: _size);
+
+  Future<void> _refresh() async {
     ref.invalidate(seriesDetailProvider(seriesId));
-    ref.invalidate(seriesBooksProvider(seriesId));
-    await ref.read(seriesBooksProvider(seriesId).future);
+    ref.invalidate(seriesBooksProvider);
+    await ref.read(seriesBooksProvider(_booksQuery).future);
   }
 
+  /// 加载更多：多要一页（`size` 变了就是一次新查询，客户端不拼列表）。
+  void _loadMore() => setState(() => _size += kSeriesBooksPageSize);
+
   /// 进阅读器；回来时刷新进度。不刷新的话"读完还是 0 of N"（真机上撞到过）。
-  Future<void> _openBook(
-    BuildContext context,
-    WidgetRef ref,
-    Book book,
-    ReadingDirection direction,
-  ) async {
+  Future<void> _openBook(Book book, ReadingDirection direction) async {
     await context.push(
       '/reader/${book.id}',
       extra: ReaderArgs(book: book, direction: direction),
     );
     ref.invalidate(seriesDetailProvider(seriesId));
-    ref.invalidate(seriesBooksProvider(seriesId));
+    ref.invalidate(seriesBooksProvider);
   }
 
   /// 标记整系列已读/未读；失败时用 SnackBar 说明，不把详情页变成错误页。
-  Future<void> _markSeriesRead(
-    BuildContext context,
-    WidgetRef ref, {
-    required bool read,
-  }) async {
+  Future<void> _markSeriesRead({required bool read}) async {
     try {
       await ref.read(seriesReadProvider.notifier).setRead(seriesId, read: read);
     } on ShelfFailure catch (failure) {
-      if (!context.mounted) return;
+      if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(failure.message)));
     }
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final detail = ref.watch(seriesDetailProvider(seriesId));
-    final books = ref.watch(seriesBooksProvider(seriesId));
+    final books = ref.watch(seriesBooksProvider(_booksQuery));
     final series = detail.value;
 
     // 注意：Riverpod 3 里"首次加载失败"会表现为 AsyncLoading + hasError，
@@ -87,7 +97,7 @@ class SeriesDetailScreen extends ConsumerWidget {
             icon: const Icon(Icons.done_all),
             tooltip: l10n.markReadTooltip,
             onSelected: (String value) =>
-                unawaited(_markSeriesRead(context, ref, read: value == 'read')),
+                unawaited(_markSeriesRead(read: value == 'read')),
             itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
               PopupMenuItem<String>(
                 key: const Key('series-mark-read'),
@@ -105,7 +115,7 @@ class SeriesDetailScreen extends ConsumerWidget {
       ),
       body: Column(
         children: <Widget>[
-          OfflineBanner(onRetry: () => unawaited(_refresh(ref))),
+          OfflineBanner(onRetry: () => unawaited(_refresh())),
           Expanded(
             // 三态之间交叉淡入（UI-P2-8）：这里的内容是 box 而不是 sliver，
             // 可以直接用 `AnimatedSwitcher`（书架页用 `PhaseFade`，见那边的注释）。
@@ -122,7 +132,7 @@ class SeriesDetailScreen extends ConsumerWidget {
                 child: switch ((error, page)) {
                   (final Object failure, _) => _ErrorView(
                     failure: failure,
-                    onRetry: () => unawaited(_refresh(ref)),
+                    onRetry: () => unawaited(_refresh()),
                   ),
                   (null, final PageResult<Book> data) =>
                     wide
@@ -130,21 +140,17 @@ class SeriesDetailScreen extends ConsumerWidget {
                             series: series,
                             books: data,
                             seriesId: seriesId,
-                            onRefresh: () => _refresh(ref),
-                            onOpenBook: (
-                              Book book,
-                              ReadingDirection direction,
-                            ) => _openBook(context, ref, book, direction),
+                            onRefresh: _refresh,
+                            onLoadMore: _loadMore,
+                            onOpenBook: _openBook,
                           )
                         : SeriesSinglePane(
                             series: series,
                             books: data,
                             seriesId: seriesId,
-                            onRefresh: () => _refresh(ref),
-                            onOpenBook: (
-                              Book book,
-                              ReadingDirection direction,
-                            ) => _openBook(context, ref, book, direction),
+                            onRefresh: _refresh,
+                            onLoadMore: _loadMore,
+                            onOpenBook: _openBook,
                           ),
                   _ => const _BooksSkeleton(),
                 },

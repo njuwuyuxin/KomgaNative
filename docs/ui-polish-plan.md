@@ -304,9 +304,12 @@ Panels 的高级感主要来自三点，和控件本身关系不大：
 | 主按钮 `series-main-action`：`data/book_selection.dart` 的 `nextBookToRead` 决定"下一本该读的"（优先在读 → 否则第一本未读 → 全读完则不显示按钮），文案是"继续阅读 第 N 本"或"开始阅读"；纯逻辑有单测 |
 | 墨水屏：不做模糊背景，纸色 + 墨色下边框 |
 
-**P2-4 还差一项**：书列表**分页**（当前仍是一次 100 本 + 超出时提示）。要做需要把
-`seriesBooksProvider` 从 `FutureProvider` 换成带 `loadMore` 的 Notifier，并同步改
-`series_detail_screen` / `series_two_pane` 的入参与几个测试，单独一轮做更稳。
+**P2-4 分页（随本批补上）**：`seriesBooksProvider` 的参数从 `String` 改成
+`({String seriesId, int size})`，详情页持有一个"要多少本"的视图状态（默认 100，
+点一次"加载更多"加 50）；截断提示从死文案变成可点的 `series-load-more`。
+客户端不拼列表——`size` 变了就是一次新查询，不存在两份不一致的书列表。
+代价：`ref.invalidate(seriesBooksProvider)` 变成整族失效（比按 key 失效略粗，
+但书列表本来就跟着详情页一起刷新）。
 
 **进度（2026-11-18）：P2-6「正在读」首页。**
 

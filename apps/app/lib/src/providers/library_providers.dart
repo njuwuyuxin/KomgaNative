@@ -52,16 +52,27 @@ final seriesDetailProvider = FutureProvider.family<Series?, String>((
   return ref.watch(libraryRepositoryProvider).seriesById(seriesId);
 });
 
-/// 系列下的书。
+/// 系列下的书（UI-P2-4：支持"加载更多"）。
 ///
-/// 一次要 100 本：绝大多数系列到不了，省掉一整套分页状态机；
-/// 真超过 100 本时 UI 会明说"只显示了前 N 本"，不装作全部都在。
-final seriesBooksProvider = FutureProvider.family<PageResult<Book>, String>((
-  Ref ref,
-  String seriesId,
-) {
-  return ref.watch(libraryRepositoryProvider).books(seriesId);
-});
+/// 参数里带 `size` 而不是在 provider 内部翻页：翻页只是"要更多本"，服务端本来就
+/// 支持一次给一页；把 `size` 放进 family key，请求"前 150 本"就是一次新查询，
+/// 不需要在客户端拼列表，也不会出现两份不一致的书列表。
+///
+/// 默认仍取 100 本（绝大多数系列够用）；超过时详情页出现"加载更多"。
+typedef SeriesBooksQuery = ({String seriesId, int size});
+
+/// 一次"加载更多"多要多少本。
+const int kSeriesBooksPageSize = 50;
+
+final seriesBooksProvider =
+    FutureProvider.family<PageResult<Book>, SeriesBooksQuery>((
+      Ref ref,
+      SeriesBooksQuery query,
+    ) {
+      return ref
+          .watch(libraryRepositoryProvider)
+          .books(query.seriesId, size: query.size);
+    });
 
 /// 单本书的封面。
 final bookCoverProvider = FutureProvider.family<Uint8List?, String>((

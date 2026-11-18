@@ -129,4 +129,33 @@ void main() {
     await pumpDetail(tester);
     expect(find.byType(ImageFiltered), findsOneWidget);
   });
+
+  testWidgets('书多于 100 本：出现「加载更多」，点完不再显示', (WidgetTester tester) async {
+    final library = FakeLibraryRepository(series: <Series>[richSeries()])
+      ..bookCount = 120;
+    await pumpDetail(tester, repository: library);
+
+    // 首屏只取 100 本：截断提示变成可点的按钮，而不是死的"只显示了前 N 本"。
+    final loadMore = find.byKey(const Key('series-load-more'));
+    await tester.scrollUntilVisible(
+      loadMore,
+      400,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    expect(loadMore, findsOneWidget);
+
+    await tester.tap(loadMore);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('series-load-more')), findsNothing);
+    // 第 120 本只有在真的把第二页取回来后才存在；列表是懒构建的，要滚过去看。
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('book-s1-b120')),
+      600,
+      scrollable: find.byType(Scrollable).first,
+      maxScrolls: 80,
+    );
+    expect(find.byKey(const Key('book-s1-b120')), findsWidgets);
+  });
 }
