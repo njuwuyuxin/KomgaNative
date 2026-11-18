@@ -72,8 +72,12 @@ class CurlGeometry {
   /// `s > 0` 处仍是平的纸面，`s < 0` 表示已经卷过去（露出下层）。
   double get normalX => mirrored ? -math.cos(tilt) : math.cos(tilt);
 
-  /// 折线法线的 y 分量（始终向下偏）。
-  double get normalY => math.sin(tilt);
+  /// 折线法线的 y 分量。
+  ///
+  /// **必须是负的**（朝上）。折线从底边的折点往上斜，平铺的一侧在折线**上方**；
+  /// 写成 `+sin` 的话"还没翻走"的一侧跑到底边，被掀起来的就变成左上那半边——
+  /// 表现是"从左上角翻页"，而且 p 刚离开 0 就几乎整页翻掉（跳变）。
+  double get normalY => -math.sin(tilt);
 
   /// 进度为 0 时折线是否穿过"被捏住的角"（左下角 / 镜像时右下角）。
   ///

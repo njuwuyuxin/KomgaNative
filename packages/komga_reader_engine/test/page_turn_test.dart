@@ -47,6 +47,30 @@ void main() {
       expect(lastQuarter, lessThan(middleQuarter));
     });
 
+    test('起手是从左下角掀起：左下角先翻，左上角还是平的', () {
+      // 回归测试：法线 y 分量写反时被掀起的是"左上"那半边，
+      // 真机上看起来像"从左上角翻页"，而且 p 刚离开 0 就几乎整页翻掉（跳变）。
+      //
+      // 只检查前 30%：再往后折线已经扫过左半边，左上角本来就该翻走了。
+      for (var step = 1; step <= 3; step++) {
+        final g = curlGeometry(
+          progress: step / 10,
+          width: width,
+          height: height,
+        );
+        double s(double x, double y) =>
+            (x - g.foldX) * g.normalX + (y - g.foldY) * g.normalY;
+        expect(s(2, height - 2), lessThan(0), reason: '左下角应该先被掀起');
+        expect(s(2, height * 0.4), greaterThan(0), reason: '左上方还没翻走');
+      }
+    });
+
+    test('起手进度很小时只掀起一个角，不会直接跳到半页', () {
+      final g = curlGeometry(progress: 0.02, width: width, height: height);
+      // 折线仍在最左边 3% 以内；法线方向错了的话它会瞬间扫到中间。
+      expect(g.foldX, lessThan(width * 0.03));
+    });
+
     test('中途：还没翻走的那一侧仍然是 s > 0', () {
       final g = curlGeometry(progress: 0.5, width: width, height: height);
       // 页面右侧（靠书脊）还没翻走。

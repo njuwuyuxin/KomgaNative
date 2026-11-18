@@ -160,14 +160,11 @@ class ReaderPagedViewState extends ConsumerState<ReaderPagedView>
     _progress = 0;
     _phase = _TurnPhase.settling;
     setState(() {});
-    unawaited(
-      _turnController.animateTo(
-        1,
-        duration: widget.style.duration,
-        curve: Curves.easeOut,
-      ),
-    );
+    _startSettle(1, widget.style.duration);
   }
+
+  @visibleForTesting
+  double get debugProgress => _progress;
 
   void _onTurnTick() {
     if (!mounted) return;
@@ -307,7 +304,7 @@ class ReaderPagedViewState extends ConsumerState<ReaderPagedView>
       final delta = details.localFocalPoint - _dragOrigin;
       if (delta.dx.abs() > _dragStartSlop &&
           delta.dx.abs() > delta.dy.abs() * 1.4) {
-        _startDrag(delta.dx);
+        _startDrag(delta.dx, details.localFocalPoint);
         return;
       }
       if (delta.dy.abs() > _dragStartSlop) _dragCandidate = false;
@@ -330,16 +327,30 @@ class ReaderPagedViewState extends ConsumerState<ReaderPagedView>
     );
     _commit = decision.commit;
     _phase = _TurnPhase.settling;
+    _startSettle(decision.commit ? 1 : 0, decision.duration);
+  }
+
+  /// 从**当前已翻进度**补完剩下的动画。
+  ///
+  /// 直接 `animateTo(target)` 的话起点是 controller 的旧值（0），表现就是
+  /// "已经翻了 70%，一松手跳回 0 再重播"。这里先把 controller 对齐到 [_progress]，
+  /// 再按剩余距离反算时长——`animateTo` 自己会按剩余比例压缩时长，
+  /// 所以传入的时长要除回去，保证总时长仍然等于 [duration]。
+  void _startSettle(double target, Duration duration) {
+    final remaining = (target - _progress).abs().clamp(0.001, 1.0);
+    _turnController.value = _progress;
     unawaited(
       _turnController.animateTo(
-        decision.commit ? 1 : 0,
-        duration: decision.duration,
+        target,
+        duration: Duration(
+          milliseconds: (duration.inMilliseconds / remaining).round(),
+        ),
         curve: Curves.easeOut,
       ),
     );
   }
 
-  void _startDrag(double dx) {
+  void _startDrag(double dx, Offset position) {
     final forwardSign = widget.rightToLeft ? 1 : -1;
     final forward = dx * forwardSign > 0;
     final neighbour = forward ? widget.nextSpread : widget.previousSpread;
@@ -351,7 +362,8 @@ class ReaderPagedViewState extends ConsumerState<ReaderPagedView>
     _mirrored = _mirrorFor(forward);
     _progress = 0;
     _phase = _TurnPhase.dragging;
-    setState(() {});
+    // 同一个事件里就把进度算出来：否则要等下一次 move 才动，手感会"慢半拍"。
+    _updateDrag(position);
   }
 
   void _updateDrag(Offset position) {
