@@ -93,6 +93,9 @@ class PageCurlPainter extends CustomPainter {
         ..setFloat(9, geometry.normalY)
         ..setFloat(10, geometry.radius)
         ..setFloat(11, geometry.progress)
+        ..setFloat(12, geometry.cornerX + sheetRect.left)
+        ..setFloat(13, geometry.cornerY + sheetRect.top)
+        ..setFloat(14, geometry.coneLength)
         ..setImageSampler(0, sheet);
 
       canvas.drawRect(
@@ -111,6 +114,7 @@ class PageCurlPainter extends CustomPainter {
       oldDelegate.sheet != sheet ||
       oldDelegate.geometry.progress != geometry.progress ||
       oldDelegate.geometry.radius != geometry.radius ||
+      oldDelegate.geometry.coneLength != geometry.coneLength ||
       oldDelegate.sheetRect != sheetRect ||
       oldDelegate.geometry.mirrored != geometry.mirrored;
 }

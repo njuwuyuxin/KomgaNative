@@ -15,10 +15,31 @@ void main() {
       expect(g.startsAtCorner, isTrue, reason: '起手是"捏住左下角"，不是整条边一起抬');
     });
 
-    test('进度 1：折线与书脊重合、倾角为 0（竖直线）', () {
+    test('进度 1：折线越过书脊一个半径（整张纸从右边退出去）', () {
       final g = curlGeometry(progress: 1, width: width, height: height);
-      expect(g.foldX, closeTo(width, 1e-9));
-      expect(g.tilt, closeTo(0, 1e-9));
+      expect(g.tilt, closeTo(0, 1e-9), reason: '贴书脊时折线是竖直的');
+      // 只走到页宽的话，收尾会剩一根竖直白条凭空消失——所以多走一个半径。
+      expect(g.foldX, greaterThan(width));
+      expect(
+        g.foldX - g.radius,
+        greaterThanOrEqualTo(width - 1e-6),
+        reason: '卷筒必须完全滑出纸面，不能停在右边缘',
+      );
+    });
+
+    test('卷筒半径从被捏住的角往外变粗（起手是一个尖页脚）', () {
+      final g = curlGeometry(progress: 0.2, width: width, height: height);
+      expect(g.cornerX, 0, reason: 'RTL：捏的是左下角');
+      expect(g.cornerY, height);
+      expect(g.coneLength, greaterThan(0));
+
+      final mirrored = curlGeometry(
+        progress: 0.2,
+        width: width,
+        height: height,
+        mirrored: true,
+      );
+      expect(mirrored.cornerX, width, reason: 'LTR：捏的是右下角');
     });
 
     test('倾角随进度单调减小（越翻越立直）', () {
@@ -101,8 +122,9 @@ void main() {
         height: height,
         mirrored: true,
       );
-      expect(end.foldX, closeTo(0, 1e-9));
+      expect(end.foldX, lessThan(0), reason: '镜像时从左边退出去');
       expect(end.tilt, closeTo(0, 1e-9));
+      expect(end.foldX + end.radius, lessThanOrEqualTo(1e-6));
     });
 
     test('卷筒随翻动变粗：起手只是一个翘起的页脚', () {

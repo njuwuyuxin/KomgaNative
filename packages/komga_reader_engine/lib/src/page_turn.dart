@@ -25,6 +25,12 @@ const double kCurlRadiusStart = 0.22;
 /// 卷筒长到最大半径时的进度。
 const double kCurlRadiusGrowAt = 0.65;
 
+/// 卷筒半径从"被捏住的角"长到满值所需的距离（/ 页宽）。
+///
+/// 起手时只有角上一个尖尖的页脚：卷筒半径沿折线从角往外逐渐变粗，
+/// 看起来才像"捏住书页角掀起来"，而不是一开始就有根等粗的圆柱。
+const double kCurlConeRatio = 0.30;
+
 /// 折线倾角随进度的衰减指数：>1 表示前段一直斜、临近书脊才迅速立直。
 const double kCurlTiltDecay = 1.8;
 
@@ -64,6 +70,7 @@ class CurlGeometry {
     required this.height,
     required this.progress,
     required this.mirrored,
+    required this.coneLength,
   });
 
   /// 折线经过的一个点。
@@ -102,16 +109,26 @@ class CurlGeometry {
   ///
   /// 单测用它保证"起手一定从角上开始"，而不是整条边一起抬。
   bool get startsAtCorner {
-    final cornerX = mirrored ? width : 0.0;
-    final distance = (cornerX - foldX) * normalX + (height - foldY) * normalY;
+    final distance = (cornerX - foldX) * normalX + (cornerY - foldY) * normalY;
     return distance.abs() < 1e-6;
   }
+
+  /// "被捏住的角"（RTL 左下角 / LTR 右下角）。
+  ///
+  /// 卷筒半径从角往外逐渐变大：起手是一个**尖的页脚**，不是一上来就一根圆柱。
+  double get cornerX => mirrored ? width : 0;
+
+  double get cornerY => height;
+
+  /// 卷筒半径从角长到满值所需的距离。
+  final double coneLength;
 }
 
 /// 计算某一帧的折线几何。
 ///
 /// [progress] 是跟手进度（0..1）。折线点沿底边从左（镜像时从右）扫到书脊，
-/// 倾角按 [curlTiltAt] 衰减；进度到 1 时折线与书脊重合、倾角为 0。
+/// 倾角按 [curlTiltAt] 衰减；进度到 1 时折线已经**越过书脊一个半径**，
+/// 也就是整张纸（连同卷筒）从屏幕右侧退出去——不是原地消失。
 CurlGeometry curlGeometry({
   required double progress,
   required double width,
@@ -121,16 +138,20 @@ CurlGeometry curlGeometry({
 }) {
   final p = progress.clamp(0.0, 1.0);
   final tilt = curlTiltAt(p);
-  final along = curlPositionEase(p) * width;
+  final radius = curlRadiusAt(p, width) * (radiusRatio / kCurlRadiusRatio);
+  // 折线要走满 "页宽 + 卷筒半径"：最后阶段卷筒从右边滑出去并逐渐变窄，
+  // 只走到页宽的话，收尾会剩一根竖直白条凭空消失（真机上截到过）。
+  final along = curlPositionEase(p) * (width + radius);
   return CurlGeometry(
     foldX: mirrored ? width - along : along,
     foldY: height,
     tilt: tilt,
-    radius: curlRadiusAt(p, width) * (radiusRatio / kCurlRadiusRatio),
+    radius: radius,
     width: width,
     height: height,
     progress: p,
     mirrored: mirrored,
+    coneLength: width * kCurlConeRatio,
   );
 }
 
