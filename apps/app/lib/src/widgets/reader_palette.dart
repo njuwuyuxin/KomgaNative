@@ -12,6 +12,7 @@ class ReaderPalette {
     required this.foreground,
     required this.muted,
     required this.outline,
+    required this.isEink,
   });
 
   /// 普通设备：黑底。
@@ -20,6 +21,7 @@ class ReaderPalette {
     foreground: Color(0xFFFFFFFF),
     muted: Color(0xB3FFFFFF),
     outline: Color(0x33FFFFFF),
+    isEink: false,
   );
 
   /// 墨水屏：白底黑字（与 `AppTheme.eink` 的纸色一致）。
@@ -28,6 +30,7 @@ class ReaderPalette {
     foreground: AppTheme.einkInk,
     muted: AppTheme.einkMuted,
     outline: Color(0x33000000),
+    isEink: true,
   );
 
   final Color background;
@@ -35,7 +38,18 @@ class ReaderPalette {
   final Color muted;
   final Color outline;
 
+  /// 是否走墨水屏配色。**不读主题**：阅读器的深浅由设置项的"强制墨水屏"决定，
+  /// 与本机主题可以不一致。
+  final bool isEink;
+
   static ReaderPalette of({required bool isEink}) => isEink ? eink : dark;
 
   bool get isLight => background.computeLuminance() > 0.5;
+
+  /// 阅读器 chrome（顶栏 / 底栏 / 书末卡片）的材质。
+  ///
+  /// 普通设备永远用深色毛玻璃：chrome 压在漫画画面上，与系统深浅色无关
+  /// （iOS 相册、图书都是这么做的）。墨水屏退化成不透明纸色 + 墨色描边。
+  AppMaterial get chromeMaterial =>
+      AppMaterial.resolve(AppMaterialKind.chrome, eink: isEink, dark: true);
 }

@@ -50,6 +50,13 @@ class FakeReaderRepository implements ReaderRepository {
   /// 用来造"这一页还没加载好"的状态（冷页 loading 态）。
   final Map<int, Completer<void>> pageGates = <int, Completer<void>>{};
 
+  /// 只让这些页（1 基）取图失败。
+  ///
+  /// 与 [imageFailure] 的区别：那个是"整本都取不到"，这个是"其中几页取不到"。
+  /// 缩略图占位这类测试需要在**首帧之前**就确定哪些页失败——首帧之后再设
+  /// [imageFailure] 是来不及的，那时缩略图早就把字节请回来了。
+  final Set<int> failingPages = <int>{};
+
   final Map<String, Uint8List> _bytes = <String, Uint8List>{};
 
   @override
@@ -85,6 +92,7 @@ class FakeReaderRepository implements ReaderRepository {
     pageRequests.add(page);
     final gate = pageGates[page];
     if (gate != null) await gate.future;
+    if (failingPages.contains(page)) throw const NetworkFailure();
     final failure = imageFailure;
     if (failure != null) throw failure;
 

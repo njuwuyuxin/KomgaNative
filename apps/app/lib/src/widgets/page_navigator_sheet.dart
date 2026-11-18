@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/providers/reader_providers.dart';
+import 'package:komga_native/src/widgets/page_thumbnail.dart';
 import 'package:komga_native/src/widgets/reader_palette.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -66,11 +66,8 @@ class PageNavigatorSheet extends StatelessWidget {
               children: <Widget>[
                 Text(
                   l10n.pagesTitle,
-                  style: TextStyle(
-                    color: palette.foreground,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: AppTypography.of(context).headline
+                      .copyWith(color: palette.foreground),
                 ),
                 const Spacer(),
                 Text(
@@ -132,11 +129,6 @@ class _PageThumbnail extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final image = ref.watch(
-      readerPageImageProvider((bookId: bookId, page: page)),
-    );
-    final bytes = image.value;
-
     return InkWell(
       onTap: () => Navigator.of(context).pop(page),
       child: DecoratedBox(
@@ -153,30 +145,12 @@ class _PageThumbnail extends ConsumerWidget {
           child: Stack(
             fit: StackFit.expand,
             children: <Widget>[
-              if (bytes != null)
-                Image.memory(
-                  bytes,
-                  fit: BoxFit.cover,
-                  cacheWidth: 240,
-                  gaplessPlayback: true,
-                )
-              else
-                Center(
-                  child: image.hasError
-                      ? Icon(
-                          Icons.broken_image_outlined,
-                          size: AppSizes.iconMd,
-                          color: palette.muted,
-                        )
-                      : SizedBox(
-                          width: AppSizes.iconXs,
-                          height: AppSizes.iconXs,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: palette.muted,
-                          ),
-                        ),
-                ),
+              PageThumbnailImage(
+                bookId: bookId,
+                page: page,
+                palette: palette,
+                cacheWidth: 240,
+              ),
               Align(
                 alignment: Alignment.bottomRight,
                 child: Container(
@@ -187,7 +161,8 @@ class _PageThumbnail extends ConsumerWidget {
                   color: palette.background.withValues(alpha: 0.7),
                   child: Text(
                     '$page',
-                    style: TextStyle(color: palette.foreground, fontSize: 11),
+                    style: AppTypography.of(context).label
+                        .copyWith(color: palette.foreground),
                   ),
                 ),
               ),

@@ -103,6 +103,10 @@ Future<void> pumpGoldenScreen(
   /// act 结束后再放一小段**真实时间**给异步解码（`Image.memory(cacheWidth:)` 的
   /// ResizeImage 走真实解码，测试的假时钟推不动它，会截到黑块）。
   bool settleAfterActWithRealTime = false,
+
+  /// 首帧之后就放一小段真实时间给异步解码（不依赖 [act]）。
+  /// 阅读器的缩略图滑条一直挂在树上，需要它。
+  bool realTimeSettle = false,
   Future<void> Function(WidgetTester tester)? act,
 }) async {
   tester.view.physicalSize = Size(
@@ -150,6 +154,13 @@ Future<void> pumpGoldenScreen(
     await tester.pumpAndSettle();
   } else {
     await tester.pump(const Duration(milliseconds: 50));
+  }
+
+  if (realTimeSettle) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 300)),
+    );
+    if (settle) await tester.pumpAndSettle();
   }
 
   if (act != null) {

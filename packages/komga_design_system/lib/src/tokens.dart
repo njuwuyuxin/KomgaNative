@@ -63,6 +63,15 @@ abstract final class AppSizes {
   /// 横向货架整行高度：封面 + 两行文字。
   static const double shelfRowHeight = 196;
 
+  /// 阅读器底部缩略图滑条里的单张缩略图。
+  static const Size thumb = Size(36, 52);
+
+  /// 缩略图滑条整行高度：缩略图 + 上下留白。
+  static const double thumbStripHeight = 68;
+
+  /// 卡片行里的小封面（书末"下一本"卡片）。
+  static const Size rowCover = Size(44, 62);
+
   /// 表单里"标签：值"的标签列宽（证书面板）。
   static const double labelColumn = 92;
 

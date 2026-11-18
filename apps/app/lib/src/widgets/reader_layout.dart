@@ -61,9 +61,26 @@ class ReaderLayout {
   }
 
   /// 当前屏包含的 0 基页索引。
-  List<int> get spread => spreads.isEmpty
-      ? <int>[page - 1]
-      : spreads[spreadIndex < 0 ? 0 : spreadIndex];
+  List<int> get spread => screenAt(screenIndex);
+
+  /// 一共多少"屏"：双页模式按跨页数，其他模式按页数。
+  ///
+  /// 缩略图滑条（UI-P1-2）按屏分组显示，所以这里把两种模式统一成同一组接口，
+  /// 调用方不必再判断模式。
+  int get screenCount => spreads.isEmpty ? total : spreads.length;
+
+  /// 第 [index] 屏包含的 0 基页索引。
+  List<int> screenAt(int index) {
+    if (spreads.isEmpty) return <int>[index];
+    return spreads[index.clamp(0, spreads.length - 1)];
+  }
+
+  /// 当前屏在 [screenCount] 里的下标。
+  int get screenIndex {
+    if (total <= 0) return 0;
+    if (spreads.isEmpty) return (page - 1).clamp(0, total - 1);
+    return spreadIndex < 0 ? 0 : spreadIndex;
+  }
 
   bool get canGoBack => switch (mode) {
     ReadingMode.paged => page > 1,

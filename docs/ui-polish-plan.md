@@ -184,6 +184,17 @@ Panels 的高级感主要来自三点，和控件本身关系不大：
 
 **P1 出口**：`docs/reader.md` 同步更新（设置表、手势、chrome 部分）；装到模拟器上实际走查一遍阅读器。
 
+**进度（2026-11-18）：第 2 批完成（P1-1 / P1-2 / P1-7）。**
+
+| 编号 | 落地 |
+|---|---|
+| P1-1 | `ReaderFrame` 改成"阅读区全屏 + chrome 浮层"：淡入淡出 + 8px 位移（`AppMotion.standard`），动画结束用 `Offstage` 摘掉（不销毁）；顶栏/底栏改用 `FrostedSurface(chrome)`；新增 `ReaderSystemUi`（隐藏→`immersiveSticky`、显示→`edgeToEdge`、退出必恢复，帧后调用）；chrome 内边距用 `viewPadding`；`reader_immersive_test.dart` 钉住调用顺序、退出恢复与"阅读区尺寸不变" |
+| P1-2 | `ReaderThumbnailStrip`：按屏分组（`ReaderLayout.screenAt`/`screenCount`）、`ListView.builder` + 固定 `itemExtent` 懒加载、当前屏自动居中、RTL `reverse`、拖动每过一屏一次 `AppHaptics.selection()`；缩略图抽成 `PageThumbnailImage` 与网格面板共用，占位改成静态方块（转圈会让 `pumpAndSettle` 永不静止）；网格面板保留 |
+| P1-7 | `ReaderFinishedCard` 取代 `ReaderFinishedBar`：下一本封面/书名/卷号 + "继续阅读"主按钮 + "返回系列"，入场淡入上浮；书尾继续往前翻直接进下一本（往回翻不触发）；拿不到下一本仍是"已读完"一行，不报错 |
+
+基线变更原因：chrome 从"占位的行"变成浮层毛玻璃、阅读区改为全屏、底栏多了缩略图滑条、
+书末从条变卡片。`reader_finished@phone_dark` 改用真实书列表以便卡片能显示下一本封面。
+
 ---
 
 ## P2：书架与详情页

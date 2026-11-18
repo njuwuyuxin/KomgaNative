@@ -39,3 +39,6 @@ tmp-verify/
 # OS
 Thumbs.db
 .DS_Store
+
+# 黄金图比对失败时 flutter_test 落盘的临时图（每次失败都会重新生成）
+apps/app/test/golden/failures/

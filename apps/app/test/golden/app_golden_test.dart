@@ -283,13 +283,17 @@ void main() {
     required String name,
     required Size size,
     required ThemeData theme,
+    String bookId = 'b1',
+    Book? book,
+    List<Override> extraOverrides = const <Override>[],
+    List<Uint8List> extraImages = const <Uint8List>[],
     List<int> precachePages = const <int>[1],
     bool settleAfterActWithRealTime = false,
     Future<void> Function(WidgetTester tester)? act,
     bool forceEink = false,
   }) async {
     final repository = FakeReaderRepository();
-    final pageBytes = <Uint8List>[];
+    final pageBytes = <Uint8List>[...extraImages];
     for (final page in precachePages) {
       final bytes = await repository.warmPage(page);
       if (bytes != null) pageBytes.add(bytes);
@@ -297,7 +301,7 @@ void main() {
 
     await pumpGoldenScreen(
       tester,
-      screen: ReaderScreen(bookId: 'b1', book: demoReaderBook()),
+      screen: ReaderScreen(bookId: bookId, book: book ?? demoReaderBook()),
       size: size,
       theme: theme,
       overrides: <Override>[
@@ -316,8 +320,12 @@ void main() {
         // 阅读器配色跟着 settings.forceEink 走，与 AppTheme 必须成对换；
         // 只换主题的话基线会画成黑底（踩过一次）。
         if (forceEink) settingsProvider.overrideWith(EinkSettings.new),
+        ...extraOverrides,
       ],
       precacheImages: pageBytes,
+      // 底栏的缩略图滑条用 `cacheWidth` 解码，是真实异步解码：假时钟推不动，
+      // 不放一段真实时间的话基线里滑条是空的。
+      realTimeSettle: true,
       settleAfterActWithRealTime: settleAfterActWithRealTime,
       act: act,
     );
@@ -401,11 +409,27 @@ void main() {
   });
 
   testWidgets('reader_finished@phone_dark', (WidgetTester tester) async {
+    // 书末卡片要展示下一本的封面，所以这一张接管了书列表：书 id 必须是
+    // 系列里真实存在的（`nextBookProvider` 按 id 找下一条）。
+    final library = FakeLibraryRepository(series: demoShelf());
+    final nextCover = await library.bookCover('s1-b2');
     await pumpReaderGolden(
       tester,
       name: 'reader_finished@phone_dark',
       size: GoldenSizes.phone,
       theme: AppTheme.dark(),
+      bookId: 's1-b1',
+      book: const Book(
+        id: 's1-b1',
+        seriesId: 's1',
+        name: 'Vol. 1',
+        number: '1',
+        pagesCount: 3,
+      ),
+      extraOverrides: <Override>[
+        libraryRepositoryProvider.overrideWithValue(library),
+      ],
+      extraImages: <Uint8List>[if (nextCover != null) nextCover],
       precachePages: <int>[1, 2, 3],
       act: (WidgetTester t) async {
         for (var i = 0; i < 2; i++) {

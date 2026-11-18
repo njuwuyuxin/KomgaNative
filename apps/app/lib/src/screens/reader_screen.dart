@@ -11,13 +11,14 @@ import 'package:komga_native/src/providers/reader_prefs_provider.dart';
 import 'package:komga_native/src/providers/reader_providers.dart';
 import 'package:komga_native/src/providers/settings_provider.dart';
 import 'package:komga_native/src/widgets/page_curl.dart';
-import 'package:komga_native/src/widgets/reader_chrome.dart';
+import 'package:komga_native/src/widgets/reader_bottom_chrome.dart';
 import 'package:komga_native/src/widgets/reader_frame.dart';
 import 'package:komga_native/src/widgets/reader_layout.dart';
 import 'package:komga_native/src/widgets/reader_pages_gate.dart';
 import 'package:komga_native/src/widgets/reader_paged_view.dart';
 import 'package:komga_native/src/widgets/reader_palette.dart';
 import 'package:komga_native/src/widgets/reader_preloader.dart';
+import 'package:komga_native/src/widgets/reader_system_ui.dart';
 import 'package:komga_native/src/widgets/reader_top_bar.dart';
 import 'package:komga_native/src/widgets/reader_progress_writer.dart';
 import 'package:komga_native/src/widgets/reader_vertical_view.dart';
@@ -220,14 +221,12 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     _progress.schedule(target);
   }
 
-  /// 翻页动效：墨水屏和"系统关闭动画"直接不做动画；单页、双页都卷页
-  /// （单页↔双页交界那一下由 `ReaderPagedView` 自己退化成平移）。
-  PageTurnStyle _turnStyle() {
-    if (ref.watch(settingsProvider).forceEink ||
-        (MediaQuery.maybeDisableAnimationsOf(context) ?? false)) {
-      return const PageTurnStyle(effect: PageTurnEffect.none);
-    }
-    return const PageTurnStyle();
+  /// 只在完成态查"下一本"：没读完时多一次列表请求纯属浪费。
+  Book? _nextBookFor(ReaderLayout layout, Book? book) {
+    if (!layout.completed || book == null) return null;
+    return ref
+        .watch(nextBookProvider((seriesId: book.seriesId, bookId: book.id)))
+        .value;
   }
 
   void _toggleChrome() => setState(() => _chromeVisible = !_chromeVisible);
@@ -269,15 +268,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     // 打开、翻页、跳页、切模式都会经过这里：页码/模式变了就在下一帧重排预取。
     _schedulePreload(page, mode);
     final rightToLeft = widget.direction.isRightToLeft;
-    final completed = layout.completed;
-    // 只在完成态查"下一本"：没读完时多一次列表请求纯属浪费。
-    final nextBook = completed && book != null
-        ? ref
-              .watch(
-                nextBookProvider((seriesId: book.seriesId, bookId: book.id)),
-              )
-              .value
-        : null;
+    final nextBook = _nextBookFor(layout, book);
 
     final readerBar = ReaderTopBar(
       bookId: widget.bookId,
@@ -309,10 +300,20 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         palette: palette,
         nextSpread: layout.neighbour(1),
         previousSpread: layout.neighbour(-1),
-        style: _turnStyle(),
+        style: PageTurnStyle.resolve(
+          eink: ref.watch(settingsProvider).forceEink,
+          disableAnimations:
+              MediaQuery.maybeDisableAnimationsOf(context) ?? false,
+        ),
         onTurn: (int delta) {
           final target = layout.turnTarget(delta);
-          if (target != null) _setPage(target, total);
+          if (target != null) {
+            _setPage(target, total);
+            return;
+          }
+          // 到书尾还继续往回翻不了、往前翻得动：直接进下一本（Panels 的行为）。
+          // 拿不到下一本时什么都不做，不报错。
+          if (delta > 0 && nextBook != null) _openNext(nextBook);
         },
         onToggleChrome: _toggleChrome,
       ),
@@ -320,28 +321,27 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 
     return WakeLockScope(
       enabled: prefs.keepAwake,
-      child: ReaderFrame(
-        palette: palette,
-        chromeVisible: _chromeVisible,
-        dimOpacity: prefs.dimOpacity,
-        topBar: readerBar,
-        content: content,
-        finishedBar: completed
-            ? ReaderFinishedBar(
-                palette: palette,
-                nextBook: nextBook,
-                onNext: nextBook == null ? null : () => _openNext(nextBook),
-                onBack: () => context.pop(),
-              )
-            : null,
-        bottomBar: ReaderControls(
-          pageLabel: layout.positionLabel(l10n),
+      // chrome 显隐同时驱动两件事：浮层动画（ReaderFrame）与系统栏（ReaderSystemUi）。
+      child: ReaderSystemUi(
+        immersive: !_chromeVisible,
+        child: ReaderFrame(
           palette: palette,
-          // 点击区与底部箭头共用这一个判断：RTL 时左侧（点/箭头）
-          // 都是"下一页"。后续加"阅读方向"设置时只改这里的来源。
-          leftTurnsNext: rightToLeft,
-          onPrevious: layout.canGoBack ? () => _requestTurn(-1, mode) : null,
-          onNext: layout.canGoForward ? () => _requestTurn(1, mode) : null,
+          chromeVisible: _chromeVisible,
+          dimOpacity: prefs.dimOpacity,
+          topBar: readerBar,
+          content: content,
+          bottomBar: ReaderBottomChrome(
+            bookId: widget.bookId,
+            layout: layout,
+            palette: palette,
+            rightToLeft: rightToLeft,
+            nextBook: nextBook,
+            onJump: (int p) => _jumpToPage(p, total),
+            onOpenNext: nextBook == null ? null : () => _openNext(nextBook),
+            onBack: () => context.pop(),
+            onPrevious: layout.canGoBack ? () => _requestTurn(-1, mode) : null,
+            onNext: layout.canGoForward ? () => _requestTurn(1, mode) : null,
+          ),
         ),
       ),
     );

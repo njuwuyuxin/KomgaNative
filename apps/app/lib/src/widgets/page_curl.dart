@@ -24,6 +24,14 @@ class PageTurnStyle {
   final Duration duration;
 
   bool get animates => effect != PageTurnEffect.none;
+
+  /// 按当前环境选风格：墨水屏和系统"减少动态效果"直接瞬切。
+  static PageTurnStyle resolve({
+    required bool eink,
+    required bool disableAnimations,
+  }) => (eink || disableAnimations)
+      ? const PageTurnStyle(effect: PageTurnEffect.none)
+      : const PageTurnStyle();
 }
 
 /// 加载并缓存 `shaders/page_curl.frag`。

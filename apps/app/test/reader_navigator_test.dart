@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/widgets/page_navigator_sheet.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -44,15 +43,16 @@ void main() {
   });
 
   testWidgets('缩略图加载失败只画占位，面板照常可用', (WidgetTester tester) async {
-    final repository = FakeReaderRepository();
+    // 只让第 2、3 页失败：第 1 页（正在读的那页）照常，缩略图和面板里那两页退化成占位。
+    // 失败必须在首帧之前定好——底栏滑条一上来就会把可见页的字节请回来。
+    final repository = FakeReaderRepository()..failingPages.addAll(<int>[2, 3]);
     await pumpReader(tester, repository: repository, book: demoReaderBook());
-    // 打开面板之前让后续取图失败：缩略图应该退化成占位图标，而不是抛异常。
-    repository.imageFailure = const NetworkFailure();
 
     await tester.tap(find.byKey(const Key('reader-pages-button')));
     await tester.pumpAndSettle();
 
     expect(find.byType(PageNavigatorSheet), findsOneWidget);
     expect(find.byIcon(Icons.broken_image_outlined), findsWidgets);
+    expect(find.byKey(const Key('reader-image-0')), findsOneWidget);
   });
 }

@@ -88,6 +88,11 @@ class ReaderPage extends ConsumerWidget {
         ),
       );
     }
-    return Center(child: CircularProgressIndicator(color: palette.muted));
+    return Center(
+      child: CircularProgressIndicator(
+        key: Key('reader-page-loading-$pageIndex'),
+        color: palette.muted,
+      ),
+    );
   }
 }

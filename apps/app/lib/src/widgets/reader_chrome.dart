@@ -1,5 +1,4 @@
 import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/widgets/reader_palette.dart';
@@ -204,74 +203,7 @@ IconData iconForMode(ReadingMode mode) => switch (mode) {
   ReadingMode.verticalScroll => Icons.view_agenda_outlined,
 };
 
-/// 书末：告诉用户"读完了"，并给出下一步（下一本 / 回系列）。
-///
-/// 不用弹窗：弹窗会打断"翻到最后一页想再看一眼"的动作，而且每次进阅读器
-/// 都弹一次很烦。条状常驻，只在完成态出现。
-class ReaderFinishedBar extends StatelessWidget {
-  const ReaderFinishedBar({
-    required this.palette,
-    required this.onBack,
-    this.nextBook,
-    this.onNext,
-    super.key,
-  });
-
-  final ReaderPalette palette;
-  final Book? nextBook;
-  final VoidCallback? onNext;
-  final VoidCallback onBack;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final next = nextBook;
-    final nextLabel = next == null
-        ? null
-        : (next.number.isEmpty ? next.name : '#${next.number}');
-    final label = nextLabel == null
-        ? l10n.finished
-        : l10n.finishedNext(nextLabel);
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.xs,
-      ),
-      child: Row(
-        key: const Key('reader-finished'),
-        children: <Widget>[
-          Icon(
-            Icons.check_circle_outline,
-            size: AppSizes.iconSm,
-            color: palette.foreground,
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: palette.foreground),
-            ),
-          ),
-          if (next != null)
-            TextButton(
-              key: const Key('reader-next-book'),
-              style: TextButton.styleFrom(foregroundColor: palette.foreground),
-              onPressed: onNext,
-              child: Text(l10n.nextBook),
-            ),
-          TextButton(
-            key: const Key('reader-back-series'),
-            style: TextButton.styleFrom(foregroundColor: palette.muted),
-            onPressed: onBack,
-            child: Text(l10n.seriesButton),
-          ),
-        ],
-      ),
-    );
-  }
-}
+/// 书末的"读完 / 下一本"卡片见 `reader_finished_card.dart`（UI-P1-7：从条改成卡片）。
 
 /// 底部：上一屏 / 当前页码 / 下一屏。
 ///

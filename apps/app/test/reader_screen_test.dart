@@ -20,7 +20,8 @@ void main() {
     await pumpReader(tester, repository: repository, book: demoReaderBook());
 
     expect(find.text('1 / 3'), findsOneWidget);
-    expect(find.byType(Image), findsOneWidget);
+    // 只看页图本身：chrome 里的缩略图滑条也是 `Image`，按类型数会把它算进来。
+    expect(find.byKey(const Key('reader-image-0')), findsOneWidget);
     expect(repository.pageImageCalls, greaterThanOrEqualTo(1));
   });
 
@@ -129,7 +130,7 @@ void main() {
     await tester.tap(find.text('Retry'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(Image), findsOneWidget);
+    expect(find.byKey(const Key('reader-image-0')), findsOneWidget);
   });
 
   testWidgets('进度回写失败不影响继续阅读', (WidgetTester tester) async {
@@ -203,11 +204,13 @@ void main() {
 
       // 第 1 屏只有封面。
       expect(find.text('1 / 3'), findsOneWidget);
-      expect(find.byType(Image), findsOneWidget);
+      expect(find.byKey(const Key('reader-image-0')), findsOneWidget);
+      expect(find.byKey(const Key('reader-image-1')), findsNothing);
 
       await tapRight(tester);
       expect(find.text('2–3 / 3'), findsOneWidget);
-      expect(find.byType(Image), findsNWidgets(2));
+      expect(find.byKey(const Key('reader-image-1')), findsOneWidget);
+      expect(find.byKey(const Key('reader-image-2')), findsOneWidget);
     });
 
     testWidgets('右到左时后一页画在左边', (WidgetTester tester) async {
@@ -239,7 +242,8 @@ void main() {
 
       await tapRight(tester);
       expect(find.text('2 / 3'), findsOneWidget);
-      expect(find.byType(Image), findsOneWidget);
+      expect(find.byKey(const Key('reader-image-1')), findsOneWidget);
+      expect(find.byKey(const Key('reader-image-2')), findsNothing);
     });
 
     testWidgets('切模式不丢页码：单页第 2 页 ↔ 双页 2–3', (WidgetTester tester) async {
@@ -451,7 +455,7 @@ void main() {
 
       // `pumpAndSettle` 会把中间那一帧 loading 吞掉，所以这里只推进一帧：
       // 用户看到的就是这一帧（黑底 + 转圈 = "闪一下"）。
-      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.byKey(const Key('reader-page-loading-1')), findsNothing);
       expect(find.byKey(const Key('reader-image-1')), findsOneWidget);
     });
 
@@ -465,7 +469,7 @@ void main() {
 
       await tapLeftOneFrame(tester);
 
-      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.byKey(const Key('reader-page-loading-0')), findsNothing);
       expect(find.byKey(const Key('reader-image-0')), findsOneWidget);
     });
 
@@ -486,13 +490,13 @@ void main() {
       // 否则用户看到的是"页码变了、图没变"，会以为是 bug（真被这么反馈过）。
       expect(find.byKey(const Key('reader-image-0')), findsNothing);
       expect(find.byKey(const Key('reader-image-1')), findsNothing);
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.byKey(const Key('reader-page-loading-1')), findsOneWidget);
       expect(find.text('2 / 3'), findsOneWidget, reason: '页码照常前进');
 
       gate.complete();
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('reader-image-1')), findsOneWidget);
-      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.byKey(const Key('reader-page-loading-1')), findsNothing);
     });
   });
 
