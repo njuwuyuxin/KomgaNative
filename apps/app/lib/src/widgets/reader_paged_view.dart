@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:flutter/rendering.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_domain/komga_domain.dart';
+import 'package:komga_native/src/data/shelf_failure.dart';
+import 'package:komga_native/src/providers/reader_providers.dart';
 import 'package:komga_native/src/widgets/page_curl.dart';
 import 'package:komga_native/src/widgets/reader_page.dart';
 import 'package:komga_native/src/widgets/reader_palette.dart';
@@ -36,7 +39,7 @@ class _SpreadFrame {
 /// 翻页动画也在这里：横向拖动时把当前屏截成一张快照（`toImage`），
 /// 上层用着色器把快照卷起来（`page_curl.dart`），下层露出相邻那一屏。
 /// 快照只在空闲时拍，所以开始拖的那一刻就有图可用。
-class ReaderPagedView extends StatefulWidget {
+class ReaderPagedView extends ConsumerStatefulWidget {
   const ReaderPagedView({
     required this.bookId,
     required this.pages,
@@ -77,7 +80,7 @@ class ReaderPagedView extends StatefulWidget {
   ReaderPagedViewState createState() => ReaderPagedViewState();
 }
 
-class ReaderPagedViewState extends State<ReaderPagedView>
+class ReaderPagedViewState extends ConsumerState<ReaderPagedView>
     with SingleTickerProviderStateMixin {
   /// 指针移动超过这个距离就不算点击（拖拽/缩放）。
   static const double _tapSlop = 12;
@@ -104,7 +107,6 @@ class ReaderPagedViewState extends State<ReaderPagedView>
   Offset? _downAt;
 
   // ---- 翻页动画 ----
-  final GlobalKey _sheetKey = GlobalKey();
   late final AnimationController _turnController;
   _TurnPhase _phase = _TurnPhase.idle;
   bool _forward = true;
@@ -114,6 +116,12 @@ class ReaderPagedViewState extends State<ReaderPagedView>
   bool _gestureZoom = false;
   bool _dragCandidate = false;
   Offset _dragOrigin = Offset.zero;
+
+  /// 卷页用的"这张纸"：当前页解码后的位图。
+  ///
+  /// 没用 `RepaintBoundary.toImage()`：它在真机上取不到 layer（null check 崩），
+  /// 本地 widget 测试却能跑，属于"测试绿、真机死"。页图字节本来就在仓库 LRU 里，
+  /// 自己解成 `ui.Image` 更短也更可控。
   ui.Image? _sheet;
   Rect _sheetRect = Rect.zero;
 
@@ -126,7 +134,7 @@ class ReaderPagedViewState extends State<ReaderPagedView>
     )..addListener(_onTurnTick);
     _turnController.addStatusListener(_onTurnStatus);
     unawaited(PageCurlProgram.ensureLoaded());
-    _scheduleCapture();
+    _scheduleSheet();
   }
 
   @override
@@ -181,13 +189,12 @@ class ReaderPagedViewState extends State<ReaderPagedView>
     _turnController.reset();
     setState(() {});
     if (commit) widget.onTurn(_forward ? 1 : -1);
-    _scheduleCapture();
+    _scheduleSheet();
   }
 
   bool get _canAnimate =>
       widget.style.animates &&
       _phase == _TurnPhase.idle &&
-      _sheet != null &&
       _zoom <= 1.0 &&
       _viewport.width > 0;
 
@@ -198,36 +205,43 @@ class ReaderPagedViewState extends State<ReaderPagedView>
   PageTurnEffect get _effect {
     if (widget.style.effect != PageTurnEffect.curl) return widget.style.effect;
     // 往后翻需要"上一屏的快照"，我们只有当前屏的；退化成平移。
-    if (!_forward || PageCurlProgram.program == null)
+    if (!_forward || _sheet == null || PageCurlProgram.program == null) {
       return PageTurnEffect.slide;
+    }
     return PageTurnEffect.curl;
   }
 
-  /// 空闲时把当前屏截成一张图，供下一次翻页动画使用。
-  void _scheduleCapture() {
-    if (widget.style.effect == PageTurnEffect.none) return;
+  /// 空闲时把当前页解码成位图，供下一次卷页使用。
+  ///
+  /// 单页模式才需要（双页/往后翻都走平移，不需要位图）；解码失败就不做卷页，
+  /// 自动退化成平移，不打断阅读。
+  void _scheduleSheet() {
+    if (widget.style.effect != PageTurnEffect.curl) return;
+    if (widget.spread.length != 1) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _phase != _TurnPhase.idle) return;
-      unawaited(_captureSheet());
+      unawaited(_decodeSheet(widget.spread.first));
     });
   }
 
-  Future<void> _captureSheet() async {
-    final boundary = _sheetKey.currentContext?.findRenderObject();
-    if (boundary is! RenderRepaintBoundary) return;
-    final pixelRatio = MediaQuery.devicePixelRatioOf(context);
-    final ui.Image image;
+  Future<void> _decodeSheet(int pageIndex) async {
+    final repository = ref.read(readerRepositoryProvider);
+    final page = pageIndex + 1;
+    Uint8List? bytes = repository.cachedPageImage(widget.bookId, page);
     try {
-      image = await boundary.toImage(pixelRatio: pixelRatio);
-    } on Object {
+      bytes ??= await repository.pageImage(widget.bookId, page);
+    } on ShelfFailure {
       return;
     }
+    final codec = await ui.instantiateImageCodec(bytes);
+    final frame = await codec.getNextFrame();
+    codec.dispose();
     if (!mounted || _phase != _TurnPhase.idle) {
-      image.dispose();
+      frame.image.dispose();
       return;
     }
     final old = _sheet;
-    _sheet = image;
+    _sheet = frame.image;
     old?.dispose();
   }
 
@@ -245,7 +259,7 @@ class ReaderPagedViewState extends State<ReaderPagedView>
       _zoom = 1;
       _pan = Offset.zero;
       _dropSheet();
-      _scheduleCapture();
+      _scheduleSheet();
     }
   }
 
@@ -467,14 +481,14 @@ class ReaderPagedViewState extends State<ReaderPagedView>
     child: child,
   );
 
-  Widget _curlLayer() {
+  /// 翻页过程中的上层：有当前页位图就卷页，否则把这一屏整体推出去（平移）。
+  Widget _turningLayer(_SpreadFrame frame) {
     final sheet = _sheet;
-    if (sheet == null) return const SizedBox.shrink();
-    final effect = _effect;
-    return CustomPaint(
-      size: Size.infinite,
-      painter: effect == PageTurnEffect.curl
-          ? PageCurlPainter(
+    if (_effect == PageTurnEffect.curl && sheet != null) {
+      return Positioned.fill(
+        child: IgnorePointer(
+          child: CustomPaint(
+            painter: PageCurlPainter(
               sheet: sheet,
               sheetRect: _sheetRect,
               geometry: curlGeometry(
@@ -483,19 +497,21 @@ class ReaderPagedViewState extends State<ReaderPagedView>
                 height: _sheetRect.height,
                 mirrored: _mirrored,
               ),
-            )
-          : PageSlidePainter(
-              sheet: sheet,
-              sheetRect: _sheetRect,
-              progress: _progress,
-              mirrored: _mirrored,
             ),
+          ),
+        ),
+      );
+    }
+    final dx = (_mirrored ? -1 : 1) * frame.content.width * _progress;
+    return _positioned(
+      frame,
+      Transform.translate(offset: Offset(dx, 0), child: _spreadRow(frame)),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final turning = _phase != _TurnPhase.idle && _sheet != null;
+    final turning = _phase != _TurnPhase.idle;
     final neighbour = turning
         ? (_forward ? widget.nextSpread : widget.previousSpread)
         : null;
@@ -538,13 +554,10 @@ class ReaderPagedViewState extends State<ReaderPagedView>
               children: <Widget>[
                 if (neighbourFrame != null)
                   _positioned(neighbourFrame, _spreadRow(neighbourFrame)),
-                if (!turning)
-                  _positioned(
-                    frame,
-                    RepaintBoundary(key: _sheetKey, child: _spreadRow(frame)),
-                  ),
                 if (turning)
-                  Positioned.fill(child: IgnorePointer(child: _curlLayer())),
+                  _turningLayer(frame)
+                else
+                  _positioned(frame, _spreadRow(frame)),
               ],
             ),
           ),

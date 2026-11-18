@@ -108,12 +108,17 @@
 
 **渲染**（`widgets/page_curl.dart` + `shaders/page_curl.frag`）：
 
-- 上层是"当前屏的一张快照"，用片元着色器把它绕一条折线卷成圆柱——不是平移贴图，
+- 上层是"当前屏的一张位图"，用片元着色器把它绕一条折线卷成圆柱——不是平移贴图，
   折线两侧的采样方式不同，越靠折线内容被压得越扁，才有"纸被卷起来"的拉伸；
-- 快照在**空闲时**拍（`RenderRepaintBoundary.toImage`，每次翻页结束一帧后），
-  所以开始拖的那一刻就有图，不占翻页关键帧；
+- 位图在**空闲时**由页图字节解码得到（`ui.instantiateImageCodec`，每次翻页结束一帧后），
+  所以开始拖的那一刻就有图，不占翻页关键帧；页图字节本来就在仓库 LRU 里，等于不额外下载；
 - 下层是**相邻那一屏本身**的 widget：翻页时它已经被预取过，正常加载；
   万一没加载好，这里就是黑底 + 转圈，上层的卷页照常进行（用户看得到"下一页在下面"）。
+
+> **踩过的坑**：第一版用 `RenderRepaintBoundary.toImage()` 截当前屏当"这张纸"。
+> 本地 widget 测试能跑通，真机上 `toImage` 永远拿不到 layer（`Null check operator
+> used on a null value`），滑动翻页直接没有任何反馈。改成从页图字节自己解码后一次通过。
+> 结论：截图类 API 必须真机验证，`pumpAndSettle` 绿了不代表设备上能用。
 
 **几何**（`packages/komga_reader_engine/lib/src/page_turn.dart`，纯数值 + 单测）：
 
