@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart' show kDoubleTapTimeout;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -33,13 +34,10 @@ void main() {
     await pumpReader(tester, book: demoReaderBook());
     expect(calls, isEmpty, reason: '打开阅读器本身不该改系统 UI 模式');
 
-    final rect = tester.getRect(find.byKey(const Key('reader-tap-layer')));
-    await tester.tapAt(rect.center);
-    await tester.pumpAndSettle();
+    await tapMiddle(tester);
     expect(calls, <String>['SystemUiMode.immersiveSticky']);
 
-    await tester.tapAt(rect.center);
-    await tester.pumpAndSettle();
+    await tapMiddle(tester);
     expect(calls.last, 'SystemUiMode.edgeToEdge');
   });
 
@@ -47,9 +45,7 @@ void main() {
     final calls = recordSystemUi(tester);
     await pumpReader(tester, book: demoReaderBook());
 
-    final rect = tester.getRect(find.byKey(const Key('reader-tap-layer')));
-    await tester.tapAt(rect.center);
-    await tester.pumpAndSettle();
+    await tapMiddle(tester);
     expect(calls, <String>['SystemUiMode.immersiveSticky']);
 
     // 换掉整棵树 = 离开阅读器。
@@ -63,9 +59,7 @@ void main() {
     final before = tester.getRect(find.byKey(const Key('reader-tap-layer')));
     final imageBefore = tester.getRect(find.byKey(const Key('reader-image-0')));
 
-    final rect = tester.getRect(find.byKey(const Key('reader-tap-layer')));
-    await tester.tapAt(rect.center);
-    await tester.pumpAndSettle();
+    await tapMiddle(tester);
 
     expect(
       tester.getRect(find.byKey(const Key('reader-tap-layer'))),
@@ -84,8 +78,9 @@ void main() {
 
     final rect = tester.getRect(find.byKey(const Key('reader-tap-layer')));
     await tester.tapAt(rect.center);
-    // 只推进一帧：淡出刚开始，chrome 仍在树上。
-    await tester.pump();
+    // 先让单击判定窗口过去，再推进一帧：此时淡出刚开始，chrome 仍在树上。
+    await tester.pump(kDoubleTapTimeout);
+    await tester.pump(const Duration(milliseconds: 16));
     expect(find.byTooltip('Close'), findsOneWidget);
 
     await tester.pumpAndSettle();
@@ -97,6 +92,7 @@ void main() {
 
     final rect = tester.getRect(find.byKey(const Key('reader-tap-layer')));
     await tester.tapAt(rect.center);
+    await tester.pump(kDoubleTapTimeout);
     await tester.pump();
 
     expect(find.byTooltip('Close'), findsNothing);

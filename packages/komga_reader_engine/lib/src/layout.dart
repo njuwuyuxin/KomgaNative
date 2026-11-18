@@ -5,6 +5,9 @@ enum FitMode {
   /// 整页可见（默认）。
   contain,
 
+  /// 铺满屏幕：取两个方向里更大的比例，溢出的方向允许平移。
+  cover,
+
   /// 宽度铺满，允许纵向滚动/裁切。
   fitWidth,
 
@@ -57,6 +60,7 @@ double fitScaleFor({
   final scaleY = viewport.height / pageHeight;
   return switch (mode) {
     FitMode.contain => scaleX < scaleY ? scaleX : scaleY,
+    FitMode.cover => scaleX > scaleY ? scaleX : scaleY,
     FitMode.fitWidth => scaleX,
     FitMode.fitHeight => scaleY,
     FitMode.original => 1.0,
@@ -69,6 +73,8 @@ double fitScaleFor({
 /// 1. 缩放范围 `[fit, max(fit * 4, 1)]`；
 /// 2. 内容超出视口时按 [pan] 平移并夹紧，保证不出现空白边；
 /// 3. 内容小于视口时居中（忽略 pan）。
+///
+/// 双页模式一律按 [FitMode.contain]：一跨页两页并排，任何"铺满"都会把另一页裁掉。
 PagedLayout computePagedLayout({
   required int pageWidth,
   required int pageHeight,
@@ -114,6 +120,14 @@ PagedLayout computePagedLayout({
     content: RectD(left, top, contentWidth, contentHeight),
   );
 }
+
+/// 内容是否在某个方向上溢出视口。
+///
+/// 溢出的方向要允许单指平移（例如"填满屏幕"的宽页纵向溢出、长条页横向溢出），
+/// 手势层用它决定"这次拖动是平移还是翻页"。
+bool contentOverflows(PagedLayout layout, SizeD viewport) =>
+    layout.content.width > viewport.width + 0.5 ||
+    layout.content.height > viewport.height + 0.5;
 
 /// 以双指焦点为中心缩放后，内容的新左上角（视口坐标）。
 ///

@@ -285,6 +285,8 @@ void main() {
     required ThemeData theme,
     String bookId = 'b1',
     Book? book,
+    FakeReaderRepository? repository,
+    ReaderPrefs? prefs,
     List<Override> extraOverrides = const <Override>[],
     List<Uint8List> extraImages = const <Uint8List>[],
     List<int> precachePages = const <int>[1],
@@ -292,10 +294,10 @@ void main() {
     Future<void> Function(WidgetTester tester)? act,
     bool forceEink = false,
   }) async {
-    final repository = FakeReaderRepository();
+    final reader = repository ?? FakeReaderRepository();
     final pageBytes = <Uint8List>[...extraImages];
     for (final page in precachePages) {
-      final bytes = await repository.warmPage(page);
+      final bytes = await reader.warmPage(page);
       if (bytes != null) pageBytes.add(bytes);
     }
 
@@ -305,9 +307,11 @@ void main() {
       size: size,
       theme: theme,
       overrides: <Override>[
-        readerRepositoryProvider.overrideWithValue(repository),
+        readerRepositoryProvider.overrideWithValue(reader),
         // 设置面板会写偏好：黄金图里必须换成内存实现，否则会打真钥匙串通道。
-        readerPrefsStoreProvider.overrideWithValue(InMemoryReaderPrefsStore()),
+        readerPrefsStoreProvider.overrideWithValue(
+          InMemoryReaderPrefsStore(prefs),
+        ),
         // 翻页动画会跨过 600ms 的进度防抖，真实现会去开 sqlite（path_provider
         // 在测试里没有通道）。换成内存 store，基线不依赖本机文件系统。
         progressSyncProvider.overrideWithValue(
@@ -405,6 +409,18 @@ void main() {
       theme: AppTheme.dark(),
       precachePages: <int>[1, 2],
       act: (WidgetTester t) => pickMode(t, ReadingMode.verticalScroll),
+    );
+  });
+
+  /// 动态背景（UI-P1-5）：页边是青绿色的合成页，底色应该跟着变成青绿而不是黑色。
+  testWidgets('reader_dynamic@phone_dark', (WidgetTester tester) async {
+    await pumpReaderGolden(
+      tester,
+      name: 'reader_dynamic@phone_dark',
+      size: GoldenSizes.phone,
+      theme: AppTheme.dark(),
+      repository: FakeReaderRepository(pageNames: const <String>['edge_teal']),
+      prefs: const ReaderPrefs(background: ReaderBackgroundChoice.dynamic),
     );
   });
 

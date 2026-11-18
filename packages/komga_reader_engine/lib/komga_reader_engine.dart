@@ -5,6 +5,7 @@
 library;
 
 export 'src/curl_motion.dart';
+export 'src/edges.dart';
 export 'src/geometry.dart';
 export 'src/layout.dart';
 export 'src/page_turn.dart';

@@ -3,11 +3,13 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_api/komga_api.dart';
 import 'package:komga_domain/komga_domain.dart';
+import 'package:komga_native/src/data/page_edge_color.dart';
 import 'package:komga_native/src/data/reader_repository.dart';
 import 'package:komga_native/src/providers/cache_providers.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/providers/progress_providers.dart';
 import 'package:komga_native/src/session/session_controller.dart';
+import 'package:komga_reader_engine/komga_reader_engine.dart';
 
 /// 阅读器仓库：跟着会话走，会话变了就重建并关掉旧连接。
 final Provider<ReaderRepository> readerRepositoryProvider =
@@ -54,6 +56,19 @@ final readerPageImageProvider = FutureProvider.family<Uint8List, PageRequest>((
   PageRequest req,
 ) {
   return ref.watch(readerRepositoryProvider).pageImage(req.bookId, req.page);
+}, isAutoDispose: true);
+
+/// 一页的**页边主色**（动态背景用，UI-P1-5）。
+///
+/// 也是 autoDispose：它依赖页图字节，必须跟着一起回收——否则读一本 200 页的书，
+/// 每一页的字节都会被这个 provider 一直持有（family 默认不回收）。
+/// 翻回去重算一次很便宜（32px 解码 + 一千像素平均）。
+final pageEdgeColorProvider = FutureProvider.family<RgbColor?, PageRequest>((
+  Ref ref,
+  PageRequest req,
+) async {
+  final bytes = await ref.watch(readerPageImageProvider(req).future);
+  return pageEdgeColor(bytes);
 }, isAutoDispose: true);
 
 /// 查"下一本"的键：书 id + 所属系列。

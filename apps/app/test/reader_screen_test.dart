@@ -92,13 +92,11 @@ void main() {
     await pumpReader(tester, book: demoReaderBook());
     expect(find.byTooltip('Close'), findsOneWidget);
 
-    final rect = tester.getRect(find.byKey(const Key('reader-tap-layer')));
-    await tester.tapAt(rect.center);
-    await tester.pumpAndSettle();
+    // 中间区域要等双击判定窗口过去，单击才生效（见 UI-P1-6）。
+    await tapMiddle(tester);
     expect(find.byTooltip('Close'), findsNothing);
 
-    await tester.tapAt(rect.center);
-    await tester.pumpAndSettle();
+    await tapMiddle(tester);
     expect(find.byTooltip('Close'), findsOneWidget);
   });
 

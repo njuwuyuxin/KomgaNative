@@ -7,14 +7,17 @@ import 'support/fake_reader.dart';
 import 'support/fakes.dart';
 import 'support/reader_harness.dart';
 
-/// 阅读设置面板：模式持久化、亮度、常亮、跳页。
+/// 阅读设置面板：模式持久化、适配、方向、背景、亮度、常亮、跳页。
 void main() {
-  testWidgets('面板列出四项设置', (WidgetTester tester) async {
+  testWidgets('面板列出七组设置', (WidgetTester tester) async {
     await pumpReader(tester, book: demoReaderBook());
     await openSettings(tester);
 
     expect(find.text('Reading settings'), findsOneWidget);
     expect(find.text('READING MODE'), findsOneWidget);
+    expect(find.text('PAGE FIT'), findsOneWidget);
+    expect(find.text('READING DIRECTION'), findsOneWidget);
+    expect(find.text('BACKGROUND'), findsOneWidget);
     expect(find.text('BRIGHTNESS'), findsOneWidget);
     expect(find.text('Keep screen awake'), findsOneWidget);
     expect(find.text('GO TO PAGE'), findsOneWidget);
@@ -27,6 +30,14 @@ void main() {
     ]) {
       expect(find.text(label), findsOneWidget);
     }
+    // 适配方式四档、方向三档、背景三档。
+    expect(find.text('Fit screen'), findsOneWidget);
+    expect(find.text('Fill screen'), findsOneWidget);
+    expect(find.text('Fit width'), findsOneWidget);
+    expect(find.text('Fit height'), findsOneWidget);
+    expect(find.text('Left to right'), findsOneWidget);
+    expect(find.text('Right to left'), findsOneWidget);
+    expect(find.text('Match the page'), findsOneWidget);
   });
 
   group('模式', () {
@@ -71,10 +82,9 @@ void main() {
       expect(find.byKey(const Key('reader-dimmer')), findsNothing);
 
       await openSettings(tester);
-      await tester.drag(
-        find.byKey(const Key('reader-brightness-slider')),
-        const Offset(-400, 0),
-      );
+      final slider = find.byKey(const Key('reader-brightness-slider'));
+      await revealInSheet(tester, slider);
+      await tester.drag(slider, const Offset(-400, 0));
       await tester.pumpAndSettle();
       await closeSheet(tester);
 
@@ -97,10 +107,9 @@ void main() {
       expect(find.byKey(const Key('reader-dimmer')), findsOneWidget);
 
       await openSettings(tester);
-      await tester.drag(
-        find.byKey(const Key('reader-brightness-slider')),
-        const Offset(400, 0),
-      );
+      final slider = find.byKey(const Key('reader-brightness-slider'));
+      await revealInSheet(tester, slider);
+      await tester.drag(slider, const Offset(400, 0));
       await tester.pumpAndSettle();
       await closeSheet(tester);
 
@@ -115,7 +124,9 @@ void main() {
       expect(wakeLock.enabled, isFalse, reason: '默认不常亮');
 
       await openSettings(tester);
-      await tester.tap(find.byType(Switch));
+      final toggle = find.byType(Switch);
+      await revealInSheet(tester, toggle);
+      await tester.tap(toggle);
       await tester.pumpAndSettle();
       await closeSheet(tester);
 
@@ -146,10 +157,9 @@ void main() {
       await pumpReader(tester, repository: repository, book: demoReaderBook());
 
       await openSettings(tester);
-      await tester.drag(
-        find.byKey(const Key('reader-jump-slider')),
-        const Offset(500, 0),
-      );
+      final slider = find.byKey(const Key('reader-jump-slider'));
+      await revealInSheet(tester, slider);
+      await tester.drag(slider, const Offset(500, 0));
       await tester.pumpAndSettle();
       await closeSheet(tester);
 
@@ -166,10 +176,9 @@ void main() {
       );
 
       await openSettings(tester);
-      await tester.drag(
-        find.byKey(const Key('reader-jump-slider')),
-        const Offset(500, 0),
-      );
+      final slider = find.byKey(const Key('reader-jump-slider'));
+      await revealInSheet(tester, slider);
+      await tester.drag(slider, const Offset(500, 0));
       await tester.pumpAndSettle();
       await closeSheet(tester);
 
@@ -184,10 +193,9 @@ void main() {
       );
 
       await openSettings(tester);
-      await tester.drag(
-        find.byKey(const Key('reader-jump-slider')),
-        const Offset(500, 0),
-      );
+      final slider = find.byKey(const Key('reader-jump-slider'));
+      await revealInSheet(tester, slider);
+      await tester.drag(slider, const Offset(500, 0));
       await tester.pumpAndSettle();
       await closeSheet(tester);
 
@@ -199,6 +207,7 @@ void main() {
       await openSettings(tester);
 
       final slider = find.byKey(const Key('reader-jump-slider'));
+      await revealInSheet(tester, slider);
       expect(tester.widget<Slider>(slider).value, 1.0);
 
       await tester.drag(slider, const Offset(500, 0));

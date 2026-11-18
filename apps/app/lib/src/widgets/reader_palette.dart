@@ -1,11 +1,19 @@
 import 'package:komga_design_system/komga_design_system.dart';
+import 'package:komga_native/src/data/reader_prefs.dart';
+import 'package:komga_reader_engine/komga_reader_engine.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 阅读器的配色。
 ///
 /// 为什么不用 `Theme.of(context)`：阅读区要看的是**内容**，不是导航 chrome。
 /// 普通设备上黑底白字最不抢画面；墨水屏上黑底会触发整屏全刷（还费电），
-/// 必须反过来用白底黑字。这套值只有两套，显式列出来比从主题推导更可预期。
+/// 必须反过来用白底黑字。
+///
+/// 两个颜色域要分清（UI-P1-5 之后背景可以是白/动态色）：
+/// - [foreground] / [muted] / [outline]：**chrome**（顶栏、底栏、面板）上的颜色。
+///   普通设备的 chrome 永远是深色毛玻璃，所以这里永远是白色；
+/// - [onBackground] / [onBackgroundMuted]：直接画在阅读区底色上的文字
+///   （错误页、加载态）。它跟着 [background] 的亮度走，白底上就是黑字。
 class ReaderPalette {
   const ReaderPalette({
     required this.background,
@@ -33,6 +41,17 @@ class ReaderPalette {
     isEink: true,
   );
 
+  /// 普通设备的白底（"白色"背景选项）。
+  ///
+  /// 注意 [foreground] 还是白色：chrome 压在深色毛玻璃上，白底只是**阅读区**的底色。
+  static const ReaderPalette white = ReaderPalette(
+    background: Color(0xFFFFFFFF),
+    foreground: Color(0xFFFFFFFF),
+    muted: Color(0xB3FFFFFF),
+    outline: Color(0x33FFFFFF),
+    isEink: false,
+  );
+
   final Color background;
   final Color foreground;
   final Color muted;
@@ -44,7 +63,42 @@ class ReaderPalette {
 
   static ReaderPalette of({required bool isEink}) => isEink ? eink : dark;
 
+  /// 按设置解析配色。
+  ///
+  /// 墨水屏固定纸色（黑底会触发整屏全刷）；[RgbColor] 还没算出来时退回黑色，
+  /// 等算完再由下一帧换成动态色——不会先闪一帧奇怪的颜色。
+  static ReaderPalette resolve({
+    required bool isEink,
+    required ReaderBackgroundChoice choice,
+    RgbColor? dynamic,
+  }) {
+    if (isEink) return eink;
+    return switch (choice) {
+      ReaderBackgroundChoice.black => dark,
+      ReaderBackgroundChoice.white => white,
+      ReaderBackgroundChoice.dynamic =>
+        dynamic == null
+            ? dark
+            : ReaderPalette._withBackground(
+                Color.fromARGB(255, dynamic.r, dynamic.g, dynamic.b),
+              ),
+    };
+  }
+
+  /// 只换底色：chrome 颜色保持普通设备的白字。
+  const ReaderPalette._withBackground(this.background)
+    : foreground = const Color(0xFFFFFFFF),
+      muted = const Color(0xB3FFFFFF),
+      outline = const Color(0x33FFFFFF),
+      isEink = false;
+
   bool get isLight => background.computeLuminance() > 0.5;
+
+  /// 直接画在 [background] 上的文字色（错误页、加载态）。
+  Color get onBackground =>
+      isLight ? const Color(0xFF1C1C1E) : const Color(0xFFFFFFFF);
+
+  Color get onBackgroundMuted => onBackground.withValues(alpha: 0.7);
 
   /// 阅读器 chrome（顶栏 / 底栏 / 书末卡片）的材质。
   ///

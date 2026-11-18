@@ -184,6 +184,19 @@ Panels 的高级感主要来自三点，和控件本身关系不大：
 
 **P1 出口**：`docs/reader.md` 同步更新（设置表、手势、chrome 部分）；装到模拟器上实际走查一遍阅读器。
 
+**进度（2026-11-18）：第 3 批完成（P1-3 / P1-4 / P1-6 / P1-5）。**
+
+| 编号 | 落地 |
+|---|---|
+| P1-3 | 引擎新增 `FitMode.cover` 与 `contentOverflows`；设置面板加"适配方式"四档（适应屏幕 / 填满屏幕 / 适应宽度 / 适应高度）；填满/适应宽度时**溢出的方向单指平移**（拖动夹紧区间与引擎一致，不会出现拖过头的粘滞）；双页模式一律 `contain`（引擎里挡）；引擎补 cover/超长页/正方形页/双页忽略 fit 的边界单测 |
+| P1-4 | `ReaderDirectionChoice`（跟随系列/LTR/RTL）+ 设置项；`rightToLeft` 一个来源派生点击区、底栏箭头、缩略图滑条方向与卷页镜像；组合单测覆盖 auto/LTR/RTL × 系列方向 |
+| P1-6 | 双击缩放：中区双击 2.5 倍、再双击还原，`gentle` 弹簧 + `zoomAboutFocal` 保焦点；中区单击等 `kDoubleTapTimeout` 才切 chrome，左右翻页区立即响应；放大状态下点击/音量键/箭头都不翻页；墨水屏与"减少动态效果"直接到位。手势状态机拆成 `reader_page_turn`（翻页）/`reader_zoom`（缩放与点击）/`reader_paged_view`（布局），三个文件都在 350 行内 |
+| P1-5 | 引擎 `edges.dart`：`edgeColor`（只看页边、跳过透明像素、1×1 与非法尺寸有单测）+ `averageColors`；`page_edge_color.dart` 用 `targetWidth: 32` 降采样解码后内联求平均（不开 isolate，理由见 docs/reader.md）；`pageEdgeColorProvider`（autoDispose，跟着页图一起回收）；背景三选项（黑/白/跟随画面），换色是 450ms 交叉渐变；墨水屏不给"动态"，存档里是动态也用纸色。`ReaderPalette` 区分 chrome 色与 `onBackground` 色 |
+
+基线变更原因：设置面板多了三组选项（模式/适配/方向/背景/亮度/常亮/跳页），
+新增 `reader_dynamic@phone_dark`（青绿页边的合成页 `test/fixtures/pages/edge_teal.png` 验证提色）。
+新增的合成页只为黄金图存在，不进 App 包。
+
 **进度（2026-11-18）：第 2 批完成（P1-1 / P1-2 / P1-7）。**
 
 | 编号 | 落地 |

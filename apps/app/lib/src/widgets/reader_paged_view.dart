@@ -2,7 +2,10 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/gestures.dart' show kDoubleTapTimeout;
+import 'package:flutter/physics.dart' show SpringSimulation;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/reader_providers.dart';
@@ -14,6 +17,7 @@ import 'package:material_ui/material_ui.dart';
 
 part 'reader_curl_plan.dart';
 part 'reader_page_turn.dart';
+part 'reader_zoom.dart';
 
 /// 一次翻页所处的阶段。
 enum _TurnPhase { idle, dragging, settling }
@@ -27,6 +31,7 @@ enum _TurnPhase { idle, dragging, settling }
 /// 翻页动画在 `reader_page_turn.dart`：单页模式卷走当前页 / 卷回上一页；
 /// 双页模式像真书一样，半边页铰接在书脊上翻过去，纸背就是下一屏的那一页。
 /// 位图不全或屏的页数变了（单页↔双页）时退化成平移。
+/// 缩放、平移与双击缩放在 `reader_zoom.dart`。
 class ReaderPagedView extends ConsumerStatefulWidget {
   const ReaderPagedView({
     required this.bookId,
@@ -36,6 +41,8 @@ class ReaderPagedView extends ConsumerStatefulWidget {
     required this.palette,
     required this.onTurn,
     required this.onToggleChrome,
+    this.fit = FitMode.contain,
+    this.doublePage = false,
     this.nextSpread,
     this.previousSpread,
     this.style = const PageTurnStyle(),
@@ -53,6 +60,12 @@ class ReaderPagedView extends ConsumerStatefulWidget {
   final bool rightToLeft;
   final ReaderPalette palette;
 
+  /// 单页适配方式（UI-P1-3）。双页模式下一律按 `contain`，见引擎注释。
+  final FitMode fit;
+
+  /// 当前是不是双页模式：决定引擎是否忽略 [fit]（一跨页两页并排，铺满会裁掉另一页）。
+  final bool doublePage;
+
   /// 翻页请求：-1 上一屏，+1 下一屏（由外部决定是"一页"还是"一跨页"）。
   final ValueChanged<int> onTurn;
 
@@ -69,40 +82,27 @@ class ReaderPagedView extends ConsumerStatefulWidget {
 }
 
 class ReaderPagedViewState extends ConsumerState<ReaderPagedView>
-    with SingleTickerProviderStateMixin, _PageTurn {
-  /// 指针移动超过这个距离就不算点击（拖拽/缩放）。
-  static const double _tapSlop = 12;
-
-  /// 超过这个横向位移才开始跟手翻页（太小会误吃点击）。
-  static const double _dragStartSlop = 14;
-
-  @override
-  double _zoom = 1;
-  Offset _pan = Offset.zero;
-  Offset _startFocal = Offset.zero;
-  double _startZoom = 1;
-
+    with TickerProviderStateMixin, _PageTurn, _Zoom {
   // 手势回调里拿不到 LayoutBuilder 的 constraints，所以 build 时缓存一份：
   // 缩放要以焦点为基准，需要"缩放前的有效比例 + 内容左上角"。
   int _pageWidth = kFallbackPageWidth;
   int _pageHeight = kFallbackPageHeight;
-  @override
   SizeD _viewport = const SizeD(0, 0);
-  double _startScale = 1;
-  Offset _startContent = Offset.zero;
 
-  /// 点击判定用自己的指针记账：`onTapUp` 与 `onScaleStart/Update` 在同一个
-  /// gesture arena 里会互相抢，实测 tap 会被 scale 吃掉，翻页完全不响应。
-  int _activePointers = 0;
-  Offset? _downAt;
+  /// 交给引擎的阅读模式：双页时引擎会忽略 [ReaderPagedView.fit]。
+  @override
+  ReadingMode get _engineMode =>
+      widget.doublePage ? ReadingMode.doublePage : ReadingMode.paged;
 
   @override
   void didUpdateWidget(ReaderPagedView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // 换了一屏就复位：上一屏的缩放/平移套到新页上会看到莫名其妙的位置。
-    if (!_sameSpread(oldWidget.spread, widget.spread)) {
-      _zoom = 1;
-      _pan = Offset.zero;
+    // 换了一屏、或换了适配方式就复位：上一屏的缩放/平移套到新页上会看到
+    // 莫名其妙的位置；适配方式变了，原来的平移区间也不再成立。
+    if (!_sameSpread(oldWidget.spread, widget.spread) ||
+        oldWidget.fit != widget.fit ||
+        oldWidget.doublePage != widget.doublePage) {
+      _resetZoom();
       _scheduleSheets();
     }
   }
@@ -115,105 +115,8 @@ class ReaderPagedViewState extends ConsumerState<ReaderPagedView>
     return true;
   }
 
-  // ---- 手势 ----
-
-  void _onScaleStart(ScaleStartDetails details) {
-    _startZoom = _zoom;
-    _startFocal = details.localFocalPoint;
-    final layout = computePagedLayout(
-      pageWidth: _pageWidth,
-      pageHeight: _pageHeight,
-      viewport: _viewport,
-      zoomFactor: _zoom,
-      panX: _pan.dx,
-      panY: _pan.dy,
-    );
-    _startScale = layout.scale;
-    _startContent = Offset(layout.content.left, layout.content.top);
-    _gestureZoom = details.pointerCount > 1;
-    _dragOrigin = details.localFocalPoint;
-    _dragCandidate = _canAnimate;
-  }
-
-  void _onScaleUpdate(ScaleUpdateDetails details) {
-    if (details.pointerCount > 1) {
-      _gestureZoom = true;
-      _dragCandidate = false;
-      if (_phase == _TurnPhase.dragging) _cancelDrag();
-      _applyZoom(details);
-      return;
-    }
-    if (_phase == _TurnPhase.dragging) {
-      _updateDrag(details.localFocalPoint);
-      return;
-    }
-    if (_dragCandidate && !_gestureZoom) {
-      final delta = details.localFocalPoint - _dragOrigin;
-      if (delta.dx.abs() > _dragStartSlop &&
-          delta.dx.abs() > delta.dy.abs() * 1.4) {
-        _startDrag(delta.dx, details.localFocalPoint);
-        return;
-      }
-      if (delta.dy.abs() > _dragStartSlop) _dragCandidate = false;
-    }
-    if (_zoom > 1.0) _applyZoom(details);
-  }
-
-  void _onScaleEnd(ScaleEndDetails details) {
-    _dragCandidate = false;
-    _gestureZoom = false;
-    if (_phase != _TurnPhase.dragging) return;
-    _endDrag(details);
-  }
-
-  void _applyZoom(ScaleUpdateDetails details) {
-    final nextZoom = (_startZoom * details.scale).clamp(1.0, 4.0);
-    if (nextZoom <= 1.0) {
-      setState(() {
-        _zoom = nextZoom;
-        // 缩回适配尺寸时内容居中，旧平移没有意义。
-        _pan = Offset.zero;
-      });
-      return;
-    }
-    // 先用引擎算出"缩放后的有效比例"，再以两指中点为基准反推新的内容左上角。
-    // 直接用 zoomFactor 当比例会忽略夹紧（fit 很小时 max 可能小于 fit*4）。
-    final nextScale = computePagedLayout(
-      pageWidth: _pageWidth,
-      pageHeight: _pageHeight,
-      viewport: _viewport,
-      zoomFactor: nextZoom,
-    ).scale;
-    final origin = zoomAboutFocal(
-      contentLeft: _startContent.dx,
-      contentTop: _startContent.dy,
-      scale: _startScale,
-      nextScale: nextScale,
-      focalX: _startFocal.dx,
-      focalY: _startFocal.dy,
-      focalDeltaX: details.localFocalPoint.dx - _startFocal.dx,
-      focalDeltaY: details.localFocalPoint.dy - _startFocal.dy,
-    );
-    setState(() {
-      _zoom = nextZoom;
-      _pan = Offset(origin.left, origin.top);
-    });
-  }
-
-  void _onTap(double dx, double width) {
-    if (_phase != _TurnPhase.idle) return;
-    final fraction = width <= 0 ? 0.5 : dx / width;
-    if (fraction < 0.33) {
-      // 左侧三分之一：LTR 往回翻，RTL 往前翻（日漫）。
-      turn(widget.rightToLeft ? 1 : -1);
-    } else if (fraction > 0.67) {
-      turn(widget.rightToLeft ? -1 : 1);
-    } else {
-      widget.onToggleChrome();
-    }
-  }
-
   // ---- 布局 ----
+
   @override
   _SpreadFrame _frameFor(
     List<int> spread,
@@ -240,6 +143,8 @@ class ReaderPagedViewState extends ConsumerState<ReaderPagedView>
       pageWidth: totalWidth,
       pageHeight: maxHeight,
       viewport: viewport,
+      fit: widget.fit,
+      mode: _engineMode,
       zoomFactor: applyZoom ? _zoom : 1,
       panX: applyZoom ? _pan.dx : 0,
       panY: applyZoom ? _pan.dy : 0,
@@ -250,6 +155,17 @@ class ReaderPagedViewState extends ConsumerState<ReaderPagedView>
       layout.content.width,
       layout.content.height,
     );
+    if (applyZoom) {
+      // 记住"哪个方向溢出"和"平移能走多远"：手势回调里拿不到 constraints，
+      // 而夹紧区间必须和引擎一致，否则会出现拖过头的粘滞。
+      _currentScale = layout.scale;
+      _contentLeft = content.left;
+      _contentTop = content.top;
+      _overflowX = content.width > viewport.width + 0.5;
+      _overflowY = content.height > viewport.height + 0.5;
+      _panMinX = _overflowX ? viewport.width - content.width : 0;
+      _panMinY = _overflowY ? viewport.height - content.height : 0;
+    }
     // 每页按宽度比例占一格、竖直居中（和 contain 的图严格对齐，卷页起手才不跳）。
     final slots = <int, Rect>{};
     final scale = totalWidth <= 0 ? 0.0 : content.width / totalWidth;
@@ -315,23 +231,9 @@ class ReaderPagedViewState extends ConsumerState<ReaderPagedView>
 
         return Listener(
           key: const Key('reader-tap-layer'),
-          onPointerDown: (PointerDownEvent event) {
-            _activePointers++;
-            _downAt = _activePointers == 1 ? event.localPosition : null;
-          },
-          onPointerUp: (PointerUpEvent event) {
-            if (_activePointers > 0) _activePointers--;
-            final down = _downAt;
-            _downAt = null;
-            if (down == null || _activePointers > 0) return;
-            // 移动超过阈值视为拖拽/缩放，不当作翻页点击。
-            if ((event.localPosition - down).distance > _tapSlop) return;
-            _onTap(down.dx, constraints.maxWidth);
-          },
-          onPointerCancel: (PointerCancelEvent event) {
-            _activePointers = 0;
-            _downAt = null;
-          },
+          onPointerDown: _onPointerDown,
+          onPointerUp: _onPointerUp,
+          onPointerCancel: _onPointerCancel,
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onScaleStart: _onScaleStart,

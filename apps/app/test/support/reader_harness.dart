@@ -1,4 +1,5 @@
 import 'package:drift/native.dart';
+import 'package:flutter/gestures.dart' show kDoubleTapTimeout;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
@@ -124,9 +125,39 @@ Future<void> tapLeftOneFrame(WidgetTester tester) async {
   await tester.pump();
 }
 
+/// 点一下屏幕中间：切换 chrome。
+///
+/// 中间区域要等双击判定窗口（[kDoubleTapTimeout]）过去，单击才生效——
+/// 不然双击缩放的第一下就把 chrome 切掉了。所以这里必须推进一段假时间，
+/// 光 `pumpAndSettle` 不够（没有待处理的帧，定时器不会被推进）。
+Future<void> tapMiddle(WidgetTester tester) async {
+  final rect = tester.getRect(find.byKey(const Key('reader-tap-layer')));
+  await tester.tapAt(rect.center);
+  await tester.pump(kDoubleTapTimeout);
+  await tester.pumpAndSettle();
+}
+
+/// 双击屏幕中间：放大到 2.5 倍（已放大时还原）。
+Future<void> doubleTapMiddle(WidgetTester tester) async {
+  final rect = tester.getRect(find.byKey(const Key('reader-tap-layer')));
+  await tester.tapAt(rect.center);
+  await tester.pump(const Duration(milliseconds: 50));
+  await tester.tapAt(rect.center);
+  await tester.pumpAndSettle();
+}
+
 /// 打开设置面板。
 Future<void> openSettings(WidgetTester tester) async {
   await tester.tap(find.byKey(const Key('reader-settings-button')));
+  await tester.pumpAndSettle();
+}
+
+/// 把面板里的控件滚到可见。
+///
+/// 面板比屏幕高（模式 / 适配 / 方向 / 背景 / 亮度 / 常亮 / 跳页），
+/// 直接点下面的控件会落到屏幕外，`tap` 只会打印一条 warning 然后什么也不做。
+Future<void> revealInSheet(WidgetTester tester, Finder finder) async {
+  await tester.ensureVisible(finder);
   await tester.pumpAndSettle();
 }
 
@@ -136,10 +167,17 @@ Future<void> closeSheet(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
-/// 打开面板 → 选模式 → 关掉面板。
-Future<void> pickMode(WidgetTester tester, ReaderModeChoice choice) async {
+/// 打开面板 → 选某一项（`reader-fit-cover` 之类）→ 关掉面板。
+Future<void> pickOption(WidgetTester tester, String key) async {
   await openSettings(tester);
-  await tester.tap(find.byKey(Key('reader-mode-${choice.name}')));
+  final finder = find.byKey(Key(key));
+  await revealInSheet(tester, finder);
+  await tester.tap(finder);
   await tester.pumpAndSettle();
   await closeSheet(tester);
+}
+
+/// 打开面板 → 选模式 → 关掉面板。
+Future<void> pickMode(WidgetTester tester, ReaderModeChoice choice) async {
+  await pickOption(tester, 'reader-mode-${choice.name}');
 }

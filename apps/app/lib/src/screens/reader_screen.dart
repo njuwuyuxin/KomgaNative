@@ -11,6 +11,7 @@ import 'package:komga_native/src/providers/reader_prefs_provider.dart';
 import 'package:komga_native/src/providers/reader_providers.dart';
 import 'package:komga_native/src/providers/settings_provider.dart';
 import 'package:komga_native/src/widgets/page_curl.dart';
+import 'package:komga_native/src/widgets/reader_background.dart';
 import 'package:komga_native/src/widgets/reader_bottom_chrome.dart';
 import 'package:komga_native/src/widgets/reader_frame.dart';
 import 'package:komga_native/src/widgets/reader_layout.dart';
@@ -118,9 +119,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   }
 
   /// 音量上 = 上一页，音量下 = 下一页（阅读顺序，不跟着 RTL 反转）。
-  ///
-  /// 纵向模式直接忽略：滚动由 ListView 负责，再按键翻页会跟滚动位置打架。
-  /// 页数据还没到时也忽略——此时 `_turn` 没有 total 可用。
+  /// 纵向模式忽略：滚动交给 ListView；页数据没到时也没有 total 可用。
   void _onVolumeKey(PageTurnKey key) {
     final pages = ref.read(readerPagesProvider(widget.bookId)).value;
     if (pages == null || pages.isEmpty) return;
@@ -128,10 +127,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     _requestTurn(key == PageTurnKey.next ? 1 : -1, mode);
   }
 
-  /// 外部翻页（底栏箭头 / 音量键）统一入口。
-  ///
-  /// 单页/双页交给绘制层播动画，动画结束后它再回调 `onTurn` 真正换页；
-  /// 绘制层还没建好时（页数据未到）什么也不做。
+  /// 外部翻页（底栏箭头 / 音量键）统一入口：交给绘制层播动画，动画结束后
+  /// 它再回调 `onTurn` 真正换页；绘制层还没建好时（页数据未到）什么也不做。
   void _requestTurn(int delta, ReadingMode mode) {
     if (mode == ReadingMode.verticalScroll) return;
     _pagedKey.currentState?.turn(delta);
@@ -189,15 +186,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   void _setPage(int page, int total) {
     if (page == _page) return;
     setState(() => _page = page);
-    // 预取不在各个入口各写一遍：`build` 里的 `_schedulePreload` 会看到
-    // 页码/模式变化并重排，翻页、跳页、切模式走的是同一条路。
+    // 预取不用在这里排：`build` 里的 `_schedulePreload` 会看到页码变化重排。
     _progress.schedule(page);
   }
 
-  /// 打开下一本：**替换**当前页而不是压栈。
-  ///
-  /// 压栈的话连读十本要按十次返回才能回系列；替换后"读完一本 → 下一本"始终是
-  /// "系列 → 当前这本"的两层结构。
+  /// 打开下一本：**替换**当前页而不是压栈（连读十本不必按十次返回）。
   void _openNext(Book next) {
     final handler = widget.onOpenNext;
     if (handler != null) {
@@ -233,26 +226,20 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 
   /// 音量键在整个阅读器期间都归阅读器（包括页列表还在加载时）。
   @override
-  Widget build(BuildContext context) =>
-      VolumeKeyScope(onKey: _onVolumeKey, child: _buildReader(context));
-
-  Widget _buildReader(BuildContext context) {
-    final palette = ReaderPalette.of(
-      isEink: ref.watch(settingsProvider).forceEink,
-    );
-    return ReaderPagesGate(
-      pages: ref.watch(readerPagesProvider(widget.bookId)),
-      palette: palette,
-      onRetry: () => ref.invalidate(readerPagesProvider(widget.bookId)),
-      builder: (List<PageInfo> pages) => _buildPages(context, palette, pages),
+  Widget build(BuildContext context) {
+    final isEink = ref.watch(settingsProvider).forceEink;
+    return VolumeKeyScope(
+      onKey: _onVolumeKey,
+      child: ReaderPagesGate(
+        pages: ref.watch(readerPagesProvider(widget.bookId)),
+        palette: ReaderPalette.of(isEink: isEink),
+        onRetry: () => ref.invalidate(readerPagesProvider(widget.bookId)),
+        builder: (List<PageInfo> pages) => _buildPages(context, isEink, pages),
+      ),
     );
   }
 
-  Widget _buildPages(
-    BuildContext context,
-    ReaderPalette palette,
-    List<PageInfo> pages,
-  ) {
+  Widget _buildPages(BuildContext context, bool isEink, List<PageInfo> pages) {
     final l10n = AppLocalizations.of(context);
     final prefs = ref.watch(readerPrefsProvider);
     final book =
@@ -263,11 +250,21 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       mode: _modeFor(prefs),
       page: _resolvePage(total),
     );
+    // 配色在这一屏才算得出来：动态背景要读当前屏各页的页边主色（UI-P1-5）。
+    final palette = resolveReaderPalette(
+      isEink: isEink,
+      prefs: prefs,
+      layout: layout,
+      ref: ref,
+      bookId: widget.bookId,
+    );
     final mode = layout.mode;
     final page = layout.page;
     // 打开、翻页、跳页、切模式都会经过这里：页码/模式变了就在下一帧重排预取。
     _schedulePreload(page, mode);
-    final rightToLeft = widget.direction.isRightToLeft;
+    // 阅读方向：设置优先，`auto` 时才跟随系列（UI-P1-4）。
+    // 点击区、底栏箭头、缩略图滑条、卷页方向都从这一个值派生。
+    final rightToLeft = prefs.direction.resolveRightToLeft(widget.direction);
     final nextBook = _nextBookFor(layout, book);
 
     final readerBar = ReaderTopBar(
@@ -298,6 +295,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         spread: layout.spread,
         rightToLeft: rightToLeft,
         palette: palette,
+        fit: prefs.fit.fit,
+        doublePage: mode == ReadingMode.doublePage,
         nextSpread: layout.neighbour(1),
         previousSpread: layout.neighbour(-1),
         style: PageTurnStyle.resolve(

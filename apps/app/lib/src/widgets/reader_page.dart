@@ -91,7 +91,7 @@ class ReaderPage extends ConsumerWidget {
     return Center(
       child: CircularProgressIndicator(
         key: Key('reader-page-loading-$pageIndex'),
-        color: palette.muted,
+        color: palette.onBackgroundMuted,
       ),
     );
   }

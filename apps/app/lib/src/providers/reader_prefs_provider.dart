@@ -38,6 +38,14 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
   void setKeepAwake(bool enabled) =>
       _update(state.copyWith(keepAwake: enabled));
 
+  void setFit(ReaderFitChoice fit) => _update(state.copyWith(fit: fit));
+
+  void setDirection(ReaderDirectionChoice direction) =>
+      _update(state.copyWith(direction: direction));
+
+  void setBackground(ReaderBackgroundChoice background) =>
+      _update(state.copyWith(background: background));
+
   void _update(ReaderPrefs next) {
     if (next == state) return;
     _touched = true;

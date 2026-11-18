@@ -49,6 +49,16 @@ class ReaderFrame extends StatelessWidget {
       body: Stack(
         fit: StackFit.expand,
         children: <Widget>[
+          // 底色单独一层、单独做交叉渐变：动态背景翻页换色时只有这一层在动，
+          // 页图和 chrome 不跟着每帧重建（UI-P1-5）。
+          TweenAnimationBuilder<Color?>(
+            key: const Key('reader-background'),
+            tween: ColorTween(end: palette.background),
+            duration: motion.emphasized,
+            curve: motion.standardCurve,
+            builder: (BuildContext context, Color? color, Widget? _) =>
+                ColoredBox(color: color ?? palette.background),
+          ),
           // 阅读区铺满整屏：不做 SafeArea，画面可以伸到刘海 / 圆角下面。
           content,
           Align(

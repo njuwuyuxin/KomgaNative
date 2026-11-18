@@ -248,5 +248,28 @@
     "placeholders": {
       "url": {"type": "String"}
     }
-  }
+  },
+  "readerFit": "Page fit",
+  "readerFitContain": "Fit screen",
+  "readerFitContainHint": "Whole page visible, nothing cropped",
+  "readerFitCover": "Fill screen",
+  "readerFitCoverHint": "Fills the screen; drag to see the cropped part",
+  "readerFitWidth": "Fit width",
+  "readerFitWidthHint": "Width fills the screen; tall pages can be dragged",
+  "readerFitHeight": "Fit height",
+  "readerFitHeightHint": "Height fills the screen; wide pages can be dragged",
+  "readerDirection": "Reading direction",
+  "readerDirectionAuto": "Follow the series",
+  "readerDirectionAutoHint": "Uses the direction set on the series",
+  "readerDirectionLtr": "Left to right",
+  "readerDirectionLtrHint": "Tap the right side for the next page",
+  "readerDirectionRtl": "Right to left",
+  "readerDirectionRtlHint": "Tap the left side for the next page",
+  "readerBackground": "Background",
+  "readerBackgroundBlack": "Black",
+  "readerBackgroundBlackHint": "Neutral, easiest on the eyes in the dark",
+  "readerBackgroundWhite": "White",
+  "readerBackgroundWhiteHint": "Bright pages blend into the screen",
+  "readerBackgroundDynamic": "Match the page",
+  "readerBackgroundDynamicHint": "Takes the colour from the page edges"
 }

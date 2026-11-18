@@ -35,7 +35,9 @@ class ReaderPagesGate extends StatelessWidget {
     if (value == null) {
       return Scaffold(
         backgroundColor: palette.background,
-        body: Center(child: CircularProgressIndicator(color: palette.muted)),
+        body: Center(
+          child: CircularProgressIndicator(color: palette.onBackgroundMuted),
+        ),
       );
     }
     if (value.isEmpty) {

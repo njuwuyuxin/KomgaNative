@@ -28,7 +28,7 @@ class ReaderFailure extends StatelessWidget {
       backgroundColor: palette.background,
       appBar: AppBar(
         backgroundColor: palette.background,
-        foregroundColor: palette.foreground,
+        foregroundColor: palette.onBackground,
         title: Text(l10n.readerTitle),
       ),
       body: Center(
@@ -40,19 +40,19 @@ class ReaderFailure extends StatelessWidget {
               Icon(
                 Icons.broken_image_outlined,
                 size: AppSpacing.xxl,
-                color: palette.muted,
+                color: palette.onBackgroundMuted,
               ),
               const SizedBox(height: AppSpacing.md),
               Text(
                 title ?? message?.message ?? l10n.readerOpenFailed,
-                style: TextStyle(color: palette.foreground),
+                style: TextStyle(color: palette.onBackground),
                 textAlign: TextAlign.center,
               ),
               if (message?.hint != null) ...<Widget>[
                 const SizedBox(height: AppSpacing.sm),
                 Text(
                   message!.hint!,
-                  style: TextStyle(color: palette.muted),
+                  style: TextStyle(color: palette.onBackgroundMuted),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -88,13 +88,13 @@ class PageError extends StatelessWidget {
       children: <Widget>[
         Icon(
           Icons.broken_image_outlined,
-          color: palette.muted,
+          color: palette.onBackgroundMuted,
           size: AppSpacing.xl,
         ),
         const SizedBox(height: AppSpacing.sm),
         Text(
           message?.message ?? l10n.readerPageFailed,
-          style: TextStyle(color: palette.muted),
+          style: TextStyle(color: palette.onBackgroundMuted),
         ),
         const SizedBox(height: AppSpacing.sm),
         TextButton(onPressed: onRetry, child: Text(l10n.retry)),

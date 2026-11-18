@@ -68,6 +68,98 @@ void main() {
         1,
       );
     });
+
+    group('cover（填满屏幕）', () {
+      test('取两个方向里更大的比例，宽的溢出、高的不溢出', () {
+        // 390/1000 = 0.39, 844/1500 = 0.5627 → cover 取 0.5627
+        final scale = fitScaleFor(
+          pageWidth: portraitPage.w,
+          pageHeight: portraitPage.h,
+          viewport: phoneViewport,
+          mode: FitMode.cover,
+        );
+        expect(scale, closeTo(844 / 1500, 1e-9));
+
+        final layout = computePagedLayout(
+          pageWidth: portraitPage.w,
+          pageHeight: portraitPage.h,
+          viewport: phoneViewport,
+          fit: FitMode.cover,
+        );
+        expect(layout.content.width, greaterThan(phoneViewport.width));
+        expect(
+          layout.content.height,
+          closeTo(phoneViewport.height, 0.001),
+          reason: '高度方向正好铺满',
+        );
+      });
+
+      test('宽页在竖屏里 cover：横向溢出、纵向铺满', () {
+        final layout = computePagedLayout(
+          pageWidth: 2000,
+          pageHeight: 1000,
+          viewport: phoneViewport,
+          fit: FitMode.cover,
+        );
+        expect(layout.content.width, greaterThan(phoneViewport.width));
+        expect(layout.content.height, closeTo(phoneViewport.height, 0.001));
+        expect(contentOverflows(layout, phoneViewport), isTrue);
+      });
+
+      test('溢出的方向可以平移，且被夹在不露白边的范围内', () {
+        // 竖屏 + 宽页：横向溢出，向左拖到底。
+        final layout = computePagedLayout(
+          pageWidth: 2000,
+          pageHeight: 1000,
+          viewport: phoneViewport,
+          fit: FitMode.cover,
+          panX: -99999,
+        );
+        expect(
+          layout.content.left,
+          closeTo(phoneViewport.width - layout.content.width, 0.001),
+        );
+        expect(
+          layout.content.right,
+          closeTo(phoneViewport.width, 0.001),
+          reason: '夹紧后右边缘贴住视口',
+        );
+      });
+
+      test('cover 下没有任何方向溢出时不算溢出', () {
+        // 正方形页 + 正方形视口：两个比例都是 1，正好铺满。
+        final layout = computePagedLayout(
+          pageWidth: 500,
+          pageHeight: 500,
+          viewport: const SizeD(500, 500),
+          fit: FitMode.cover,
+        );
+        expect(contentOverflows(layout, const SizeD(500, 500)), isFalse);
+      });
+    });
+
+    test('fitWidth 在超长页上纵向溢出（要能平移）', () {
+      final layout = computePagedLayout(
+        pageWidth: 800,
+        pageHeight: 8000,
+        viewport: phoneViewport,
+        fit: FitMode.fitWidth,
+      );
+      expect(layout.content.height, greaterThan(phoneViewport.height));
+      expect(contentOverflows(layout, phoneViewport), isTrue);
+    });
+
+    test('双页模式忽略 cover，仍按 contain（不能把另一页裁掉）', () {
+      final layout = computePagedLayout(
+        pageWidth: portraitPage.w,
+        pageHeight: portraitPage.h,
+        viewport: phoneViewport,
+        fit: FitMode.cover,
+        mode: ReadingMode.doublePage,
+      );
+      expect(layout.scale, closeTo(0.39, 1e-9));
+      expect(contentOverflows(layout, phoneViewport), isFalse);
+    });
   });
 
   group('zoomAboutFocal', () {

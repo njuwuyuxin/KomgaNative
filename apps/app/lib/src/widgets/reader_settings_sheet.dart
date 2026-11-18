@@ -5,11 +5,12 @@ import 'package:komga_native/src/data/reader_prefs.dart';
 import 'package:komga_native/src/providers/reader_prefs_provider.dart';
 import 'package:komga_native/src/widgets/reader_mode_text.dart';
 import 'package:komga_native/src/widgets/reader_palette.dart';
+import 'package:komga_native/src/widgets/reader_settings_rows.dart';
 import 'package:material_ui/material_ui.dart';
 
-/// 阅读设置面板：模式 / 亮度 / 常亮 / 跳页。
+/// 阅读设置面板：模式 / 适配 / 方向 / 背景 / 亮度 / 常亮 / 跳页。
 ///
-/// 为什么放在底部面板而不是顶栏一排图标：四项设置里有两项是"连续值"（亮度、页码），
+/// 为什么放在底部面板而不是顶栏一排图标：这些设置里有"连续值"（亮度、页码），
 /// 只有面板放得下；而且它盖住内容的同时还能看到页面在变，调亮度时有参照。
 Future<void> showReaderSettingsSheet(
   BuildContext context, {
@@ -20,15 +21,25 @@ Future<void> showReaderSettingsSheet(
 }) {
   return showModalBottomSheet<void>(
     context: context,
-    // 内容可能超过默认的 9/16 高度（大字号/平板上的模式说明），必须可滚动。
+    // 内容可能超过默认的 9/16 高度（小屏、大字号、平板上四个区块），必须可滚动。
     isScrollControlled: true,
-    backgroundColor: palette.background,
-    elevation: palette.isLight ? 0 : 8,
-    builder: (BuildContext context) => ReaderSettingsSheet(
-      palette: palette,
-      page: page,
-      total: total,
-      onJump: onJump,
+    // 面板自己用设计系统的 sheet 材质（毛玻璃 + 顶部圆角；墨水屏退化成纸色 + 描边）。
+    backgroundColor: Colors.transparent,
+    elevation: 0,
+    builder: (BuildContext context) => FrostedSurface(
+      kind: AppMaterialKind.sheet,
+      shape: AppShapes.sheet(eink: palette.isEink),
+      // 透明 Material：面板里的 InkWell / SwitchListTile 要在这里画水波纹，
+      // 否则它们会穿到毛玻璃后面（Flutter 会直接断言"水波纹可能看不见"）。
+      child: Material(
+        type: MaterialType.transparency,
+        child: ReaderSettingsSheet(
+          palette: palette,
+          page: page,
+          total: total,
+          onJump: onJump,
+        ),
+      ),
     ),
   );
 }
@@ -119,21 +130,58 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
               ),
               Text(
                 l10n.readingSettings,
-                style: textStyle.titleMedium?.copyWith(
-                  color: palette.foreground,
-                ),
+                style: AppTypography.of(context).title
+                    .copyWith(color: palette.foreground),
               ),
               const SizedBox(height: AppSpacing.md),
-              _Label(l10n.readingMode, palette: palette),
-              for (final choice in ReaderModeChoice.values)
-                _ModeRow(
-                  choice: choice,
-                  selected: prefs.mode == choice,
-                  palette: palette,
-                  onTap: () => controller.setMode(choice),
-                ),
+              ReaderOptionSection<ReaderModeChoice>(
+                title: l10n.readingMode,
+                values: ReaderModeChoice.values,
+                selected: prefs.mode,
+                label: readerModeLabel,
+                hint: readerModeHint,
+                keyPrefix: 'reader-mode',
+                palette: palette,
+                onSelect: controller.setMode,
+              ),
               const SizedBox(height: AppSpacing.md),
-              _Label(l10n.brightness, palette: palette),
+              ReaderOptionSection<ReaderFitChoice>(
+                title: l10n.readerFit,
+                values: ReaderFitChoice.values,
+                selected: prefs.fit,
+                label: readerFitLabel,
+                hint: readerFitHint,
+                keyPrefix: 'reader-fit',
+                palette: palette,
+                onSelect: controller.setFit,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              ReaderOptionSection<ReaderDirectionChoice>(
+                title: l10n.readerDirection,
+                values: ReaderDirectionChoice.values,
+                selected: prefs.direction,
+                label: readerDirectionLabel,
+                hint: readerDirectionHint,
+                keyPrefix: 'reader-direction',
+                palette: palette,
+                onSelect: controller.setDirection,
+              ),
+              // 墨水屏不给背景选项：它固定白底黑字（黑底会触发整屏全刷）。
+              if (!palette.isEink) ...<Widget>[
+                const SizedBox(height: AppSpacing.md),
+                ReaderOptionSection<ReaderBackgroundChoice>(
+                  title: l10n.readerBackground,
+                  values: ReaderBackgroundChoice.values,
+                  selected: prefs.background,
+                  label: readerBackgroundLabel,
+                  hint: readerBackgroundHint,
+                  keyPrefix: 'reader-background',
+                  palette: palette,
+                  onSelect: controller.setBackground,
+                ),
+              ],
+              const SizedBox(height: AppSpacing.md),
+              ReaderSectionLabel(l10n.brightness, palette: palette),
               Row(
                 children: <Widget>[
                   Icon(
@@ -184,7 +232,7 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
                 const SizedBox(height: AppSpacing.sm),
                 Row(
                   children: <Widget>[
-                    _Label(l10n.goToPage, palette: palette),
+                    ReaderSectionLabel(l10n.goToPage, palette: palette),
                     const Spacer(),
                     Text(
                       l10n.readerPageOf(
@@ -215,91 +263,6 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
               ],
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _Label extends StatelessWidget {
-  const _Label(this.text, {required this.palette});
-
-  final String text;
-  final ReaderPalette palette;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-      child: Text(
-        text.toUpperCase(),
-        style: theme.textTheme.labelSmall?.copyWith(
-          letterSpacing: 1.2,
-          color: palette.muted,
-        ),
-      ),
-    );
-  }
-}
-
-class _ModeRow extends StatelessWidget {
-  const _ModeRow({
-    required this.choice,
-    required this.selected,
-    required this.palette,
-    required this.onTap,
-  });
-
-  final ReaderModeChoice choice;
-  final bool selected;
-  final ReaderPalette palette;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    return InkWell(
-      key: Key('reader-mode-${choice.name}'),
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Icon(
-              selected
-                  ? Icons.radio_button_checked
-                  : Icons.radio_button_unchecked,
-              size: AppSizes.iconMd,
-              color: selected ? palette.foreground : palette.muted,
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    readerModeLabel(l10n, choice),
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: palette.foreground,
-                      fontWeight: selected ? FontWeight.w600 : null,
-                    ),
-                  ),
-                  // 说明只给选中项看：四个选项全带说明会把面板撑到屏幕外，
-                  // 而用户真正需要解释的只有"我正要选的那个"。
-                  if (selected)
-                    Text(
-                      readerModeHint(l10n, choice),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: palette.muted,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ],
         ),
       ),
     );

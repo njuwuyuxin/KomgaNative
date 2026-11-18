@@ -175,9 +175,7 @@ void main() {
     await pumpReader(tester, book: demoReaderBook());
     expect(find.byKey(const Key('reader-thumb-strip')), findsOneWidget);
 
-    final rect = tester.getRect(find.byKey(const Key('reader-tap-layer')));
-    await tester.tapAt(rect.center);
-    await tester.pumpAndSettle();
+    await tapMiddle(tester);
 
     expect(find.byKey(const Key('reader-thumb-strip')), findsNothing);
   });

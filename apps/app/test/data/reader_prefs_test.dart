@@ -5,6 +5,7 @@ import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
 import 'package:komga_native/src/widgets/reader_mode_text.dart';
+import 'package:komga_native/src/widgets/reader_settings_rows.dart';
 import 'package:komga_reader_engine/komga_reader_engine.dart';
 
 void main() {
@@ -65,6 +66,83 @@ void main() {
         ReaderPrefs.minBrightness,
       );
     });
+
+    test('适配 / 方向 / 背景的默认值：适应屏幕、跟随系列、黑色', () {
+      const prefs = ReaderPrefs();
+      expect(prefs.fit, ReaderFitChoice.contain);
+      expect(prefs.direction, ReaderDirectionChoice.auto);
+      expect(prefs.background, ReaderBackgroundChoice.black);
+    });
+
+    test('适配 / 方向 / 背景一起往返', () {
+      const prefs = ReaderPrefs(
+        fit: ReaderFitChoice.cover,
+        direction: ReaderDirectionChoice.rightToLeft,
+        background: ReaderBackgroundChoice.dynamic,
+      );
+      final parsed = ReaderPrefs.fromJson(prefs.toJson());
+      expect(parsed.fit, ReaderFitChoice.cover);
+      expect(parsed.direction, ReaderDirectionChoice.rightToLeft);
+      expect(parsed.background, ReaderBackgroundChoice.dynamic);
+    });
+
+    test('未知的适配/方向/背景值回默认（旧版本存档不会崩）', () {
+      final prefs = ReaderPrefs.fromJson(<String, Object?>{
+        'fit': 'stretch',
+        'direction': 'sideways',
+        'background': 42,
+      });
+      expect(prefs.fit, ReaderFitChoice.contain);
+      expect(prefs.direction, ReaderDirectionChoice.auto);
+      expect(prefs.background, ReaderBackgroundChoice.black);
+    });
+  });
+
+  group('ReaderFitChoice → FitMode', () {
+    test('四档一一对应，没有遗漏', () {
+      expect(ReaderFitChoice.contain.fit, FitMode.contain);
+      expect(ReaderFitChoice.cover.fit, FitMode.cover);
+      expect(ReaderFitChoice.fitWidth.fit, FitMode.fitWidth);
+      expect(ReaderFitChoice.fitHeight.fit, FitMode.fitHeight);
+      expect(
+        ReaderFitChoice.values.map((ReaderFitChoice c) => c.fit).toSet(),
+        hasLength(ReaderFitChoice.values.length),
+      );
+    });
+  });
+
+  group('ReaderDirectionChoice.resolveRightToLeft', () {
+    test('auto 跟随系列，其余两项强制', () {
+      expect(
+        ReaderDirectionChoice.auto.resolveRightToLeft(
+          ReadingDirection.rightToLeft,
+        ),
+        isTrue,
+      );
+      expect(
+        ReaderDirectionChoice.auto.resolveRightToLeft(
+          ReadingDirection.leftToRight,
+        ),
+        isFalse,
+      );
+      // 系列没填方向时按从左到右（LTR 是阅读器里最常见的默认）。
+      expect(
+        ReaderDirectionChoice.auto.resolveRightToLeft(ReadingDirection.unknown),
+        isFalse,
+      );
+      expect(
+        ReaderDirectionChoice.leftToRight.resolveRightToLeft(
+          ReadingDirection.rightToLeft,
+        ),
+        isFalse,
+      );
+      expect(
+        ReaderDirectionChoice.rightToLeft.resolveRightToLeft(
+          ReadingDirection.leftToRight,
+        ),
+        isTrue,
+      );
+    });
   });
 
   group('ReaderModeChoice.resolve', () {
@@ -111,6 +189,31 @@ void main() {
         expect(readerModeLabel(zh, choice), isNotEmpty);
         expect(readerModeHint(zh, choice), isNotEmpty);
         expect(readerModeLabel(en, choice), isNot(readerModeLabel(zh, choice)));
+      }
+    });
+  });
+
+  group('新增三组设置的文案', () {
+    test('适配 / 方向 / 背景都有中英文标签与说明', () {
+      final en = lookupAppLocalizations(const Locale('en'));
+      final zh = lookupAppLocalizations(const Locale('zh'));
+      for (final choice in ReaderFitChoice.values) {
+        expect(readerFitLabel(en, choice), isNotEmpty);
+        expect(readerFitHint(en, choice), isNotEmpty);
+        expect(readerFitLabel(zh, choice), isNotEmpty);
+        expect(readerFitHint(zh, choice), isNotEmpty);
+      }
+      for (final choice in ReaderDirectionChoice.values) {
+        expect(readerDirectionLabel(en, choice), isNotEmpty);
+        expect(readerDirectionHint(en, choice), isNotEmpty);
+        expect(readerDirectionLabel(zh, choice), isNotEmpty);
+        expect(readerDirectionHint(zh, choice), isNotEmpty);
+      }
+      for (final choice in ReaderBackgroundChoice.values) {
+        expect(readerBackgroundLabel(en, choice), isNotEmpty);
+        expect(readerBackgroundHint(en, choice), isNotEmpty);
+        expect(readerBackgroundLabel(zh, choice), isNotEmpty);
+        expect(readerBackgroundHint(zh, choice), isNotEmpty);
       }
     });
   });
