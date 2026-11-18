@@ -40,6 +40,11 @@ class FakeLibraryRepository implements LibraryRepository {
       <({String seriesId, bool read})>[];
   ShelfFailure? seriesReadFailure;
 
+  /// 记录"标记单本书已读/未读"的调用（UI-P2-5）。
+  final List<({String bookId, bool read, int pagesCount})> bookReadCalls =
+      <({String bookId, bool read, int pagesCount})>[];
+  ShelfFailure? bookReadFailure;
+
   /// 非 final：测试里可以先失败、再改成功来验证"重试"。
   ShelfFailure? seriesFailure;
   ShelfFailure? librariesFailure;
@@ -156,6 +161,17 @@ class FakeLibraryRepository implements LibraryRepository {
   Future<void> setSeriesRead(String seriesId, {required bool read}) async {
     seriesReadCalls.add((seriesId: seriesId, read: read));
     final failure = seriesReadFailure;
+    if (failure != null) throw failure;
+  }
+
+  @override
+  Future<void> setBookRead(
+    String bookId, {
+    required bool read,
+    required int pagesCount,
+  }) async {
+    bookReadCalls.add((bookId: bookId, read: read, pagesCount: pagesCount));
+    final failure = bookReadFailure;
     if (failure != null) throw failure;
   }
 

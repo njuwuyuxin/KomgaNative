@@ -42,6 +42,18 @@ abstract interface class LibraryRepository {
   /// 只改服务端的话，界面会显示"刚标记未读，书架却还是读过"。
   Future<void> setSeriesRead(String seriesId, {required bool read});
 
+  /// 把单本书标记已读/未读（UI-P2-5）。
+  ///
+  /// 端点早已存在（`PATCH` / `DELETE /books/{id}/read-progress`，见
+  /// `docs/komga-api-verification.md`），这里只是把它接到书架层：
+  /// 已读 = `page = 页数 + completed`，未读 = 删掉进度。
+  /// 页数未知（<=0）时只发 `completed`，让服务端保留自己的页码。
+  Future<void> setBookRead(
+    String bookId, {
+    required bool read,
+    required int pagesCount,
+  });
+
   /// 系列封面。返回 `null` 表示"没有封面"——装饰性资源**不允许**让整页报错。
   Future<Uint8List?> seriesCover(String seriesId);
 
@@ -168,6 +180,38 @@ class KomgaLibraryRepository implements LibraryRepository {
                 )
               : null,
         );
+      }
+    } on KomgaError catch (error) {
+      throw shelfFailureOf(error);
+    }
+  }
+
+  @override
+  Future<void> setBookRead(
+    String bookId, {
+    required bool read,
+    required int pagesCount,
+  }) async {
+    try {
+      final now = DateTime.now().toUtc();
+      if (read) {
+        await _session.updateReadProgress(
+          bookId,
+          page: pagesCount <= 0 ? null : pagesCount,
+          completed: true,
+        );
+        // 本地也改：outbox 里可能还有这本书没提交的旧进度。
+        await _sync.forceAdopt(
+          bookId,
+          ReadProgress(
+            page: pagesCount <= 0 ? 1 : pagesCount,
+            completed: true,
+            lastModified: now,
+          ),
+        );
+      } else {
+        await _session.markBookUnread(bookId);
+        await _sync.forceAdopt(bookId, null);
       }
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);

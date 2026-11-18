@@ -172,5 +172,9 @@
   "readerBackgroundWhite": "白色",
   "readerBackgroundWhiteHint": "画面不会和背景割裂",
   "readerBackgroundDynamic": "跟随画面",
-  "readerBackgroundDynamicHint": "从页边取色，翻页时渐变"
+  "readerBackgroundDynamicHint": "从页边取色，翻页时渐变",
+  "bookMarkRead": "标记已读",
+  "bookMarkUnread": "标记未读",
+  "readFromStart": "从头阅读",
+  "viewDetails": "查看详情"
 }

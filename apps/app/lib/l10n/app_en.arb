@@ -271,5 +271,9 @@
   "readerBackgroundWhite": "White",
   "readerBackgroundWhiteHint": "Bright pages blend into the screen",
   "readerBackgroundDynamic": "Match the page",
-  "readerBackgroundDynamicHint": "Takes the colour from the page edges"
+  "readerBackgroundDynamicHint": "Takes the colour from the page edges",
+  "bookMarkRead": "Mark read",
+  "bookMarkUnread": "Mark unread",
+  "readFromStart": "Read from the start",
+  "viewDetails": "View details"
 }

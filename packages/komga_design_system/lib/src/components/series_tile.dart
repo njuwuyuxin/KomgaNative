@@ -21,6 +21,7 @@ class SeriesTile extends StatelessWidget {
   const SeriesTile({
     required this.series,
     this.onTap,
+    this.onLongPress,
     this.cover,
     this.semanticsLabel,
     super.key,
@@ -28,6 +29,9 @@ class SeriesTile extends StatelessWidget {
 
   final Series series;
   final VoidCallback? onTap;
+
+  /// 长按（打开上下文菜单，UI-P2-5）。按下的缩放反馈由 [PressableScale] 负责。
+  final VoidCallback? onLongPress;
 
   /// 封面内容，铺满封面区域（通常是一张 `Image`）。
   final Widget? cover;
@@ -73,6 +77,7 @@ class SeriesTile extends StatelessWidget {
         child: PressableScale(
           child: InkWell(
             onTap: onTap,
+            onLongPress: onLongPress,
             borderRadius: BorderRadius.circular(AppRadii.md),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
