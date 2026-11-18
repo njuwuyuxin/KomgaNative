@@ -18,6 +18,9 @@
 
 ## 2. 如何复现（本机已验证）
 
+> 启停现在统一走仓库脚本：`dart run tool/komga.dart start|stop|status`（说明见 `docs/environment-setup.md` §12）。
+> 下面是一次性的原始复现命令，保留下来作为**参数、claim 流程、建库扫描**的记录。
+
 ```powershell
 # 1) 下载服务端（单文件 jar，127 MB）
 $dst = 'D:\DevTools\_verify\komga\komga-1.30.1.jar'

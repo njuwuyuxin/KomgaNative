@@ -25,6 +25,18 @@
 /// 折线倾角不再是拍脑袋的参数：手指往上走折线就斜，水平拖折线就竖——
 /// 由 `F` 的位置唯一决定。
 ///
+/// ## 双页：铰接在书脊上
+///
+/// 双页模式下被卷的是半边页，它的书脊那条边（标准形里 `x = width`）钉死在
+/// 书上，不能跟着卷走（[solveCurl] 的 `hinged`）：
+///
+/// - 轴线不得越过书脊：`d(书脊两端) <= 0`，即 `a <= −max((S − C)·u)`；
+/// - 落下时半径收成 0：角走到 `(2·width, height)` 时纸正好沿书脊镜像，
+///   背面严丝合缝地盖住另一半页（`R > 0` 时平压部分会差出 `πR`）。
+///
+/// 所以一次翻页分前后两段：前半段从角上卷起、向书脊推进；
+/// 后半段越过书脊、半径收拢，纸平落在另一半上。
+///
 /// 坐标系：纸面矩形左上角为原点，y 向下。
 /// 标准形（`mirrored == false`）对应"书脊在右边、从**左下角**掀起"；
 /// 镜像形是左右翻转（书脊在左边、从右下角掀起）。
@@ -57,6 +69,15 @@ double curlRadiusFor(double reach, double maxRadius) {
   if (maxRadius <= 0 || reach <= 0) return 0;
   final t = math.min(1.0, reach / (4 * maxRadius));
   return maxRadius * t * (2 - t);
+}
+
+/// 铰接（双页）时半径的收拢系数：角离落点 `2·width` 还剩 [remaining] 时。
+///
+/// 和 [curlRadiusFor] 同一条 `t(2 − t)` 曲线倒过来用，落地前斜率连续为 0。
+double _landingTaper(double remaining, double maxRadius) {
+  if (maxRadius <= 0) return 0;
+  final t = (remaining / (4 * maxRadius)).clamp(0.0, 1.0);
+  return t * (2 - t);
 }
 
 /// 某一帧的卷页几何（纸面坐标，单位与纸面矩形一致）。
@@ -138,6 +159,7 @@ CurlFrame solveCurl({
   required double width,
   required double height,
   bool mirrored = false,
+  bool hinged = false,
   double radiusRatio = kCurlRadiusRatio,
 }) {
   final f = constrainFinger(fingerX: fingerX, fingerY: fingerY, height: height);
@@ -158,8 +180,25 @@ CurlFrame solveCurl({
   } else {
     ux = -vx / reach;
     uy = -vy / reach;
-    radius = curlRadiusFor(reach, width * radiusRatio);
+    final maxRadius = width * radiusRatio;
+    radius = curlRadiusFor(reach, maxRadius);
+    if (hinged) radius *= _landingTaper(2 * width - reach, maxRadius);
     a = (reach + math.pi * radius) / 2;
+  }
+  var fx = f.x;
+  var fy = f.y;
+  if (hinged && reach > _flatEpsilon) {
+    // 书脊两端 S = (width, 0)、(width, height)，角 C = (0, height)：
+    // d(S) = (S − C)·u + a <= 0。
+    final aMax = math.max(0.0, -math.max(width * ux - height * uy, width * ux));
+    if (a > aMax) {
+      a = aMax;
+      // 纸长不够卷半圈时把半径也收小，平压部分长度 2a − πR 不能为负。
+      radius = math.min(radius, 2 * a / math.pi);
+      final landed = 2 * a - math.pi * radius;
+      fx = -ux * landed;
+      fy = height - uy * landed;
+    }
   }
   final axisX = 0 - ux * a;
   final axisY = height - uy * a;
@@ -170,8 +209,8 @@ CurlFrame solveCurl({
     dirX: mirrored ? -ux : ux,
     dirY: uy,
     radius: radius,
-    fingerX: mirrored ? width - f.x : f.x,
-    fingerY: f.y,
+    fingerX: mirrored ? width - fx : fx,
+    fingerY: fy,
     width: width,
     height: height,
     mirrored: mirrored,
@@ -183,11 +222,15 @@ CurlFrame solveCurl({
 /// [exitX] 是从被捏住的角那条边量到"屏幕另一侧边缘"的距离（≥ 页宽）：
 /// 卷筒必须滑出**屏幕**，而不是只滑出纸面——否则页面窄于屏幕时，
 /// 收尾会剩一根白柱停在空白处凭空消失。
+///
+/// 铰接（双页）时终点是角落到另一半页的对应角上：`2·width`。
 double curlTravel({
   required double width,
   required double exitX,
+  bool hinged = false,
   double radiusRatio = kCurlRadiusRatio,
 }) {
+  if (hinged) return 2 * width;
   final maxRadius = width * radiusRatio;
   // 走完时半径已饱和（travel ≫ 4R_max），所以直接用 R_max 反解：
   // 轴线要到 exitX + R，于是 a = exitX + R，|F − C| = 2a − πR。
@@ -206,12 +249,14 @@ double curlTravel({
   required double height,
   required double exitX,
   double liftY = 0,
+  bool hinged = false,
   double radiusRatio = kCurlRadiusRatio,
 }) {
   final p = progress.clamp(0.0, 1.0);
   final travel = curlTravel(
     width: width,
     exitX: exitX,
+    hinged: hinged,
     radiusRatio: radiusRatio,
   );
   final arch = width * kCurlArchRatio * math.sin(math.pi * p);
@@ -226,6 +271,7 @@ CurlFrame curlFrameAt({
   required double exitX,
   double liftY = 0,
   bool mirrored = false,
+  bool hinged = false,
   double radiusRatio = kCurlRadiusRatio,
 }) {
   final f = curlFingerAt(
@@ -234,6 +280,7 @@ CurlFrame curlFrameAt({
     height: height,
     exitX: exitX,
     liftY: liftY,
+    hinged: hinged,
     radiusRatio: radiusRatio,
   );
   return solveCurl(
@@ -242,6 +289,7 @@ CurlFrame curlFrameAt({
     width: width,
     height: height,
     mirrored: mirrored,
+    hinged: hinged,
     radiusRatio: radiusRatio,
   );
 }

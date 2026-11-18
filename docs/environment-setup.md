@@ -118,7 +118,9 @@ D:\DevTools\
 │  ├─ platform-tools\          # adb / fastboot
 │  ├─ platforms\               # android-35 / android-36（Gradle 也可按需补）
 │  ├─ build-tools\
-│  ├─ emulator\                # 模拟器（可选）
+│  ├─ emulator\                # 模拟器（可选，已装：§11）
+│  ├─ system-images\           # 模拟器系统镜像（可选，已装：§11）
+│  ├─ extras\google\           # AEHD 驱动安装包（可选：§11）
 │  └─ licenses\                # 许可（由 sdkmanager 写入）
 ├─ flutter\
 │  └─ 3.50.0\                  # Flutter SDK（PATH 指向 bin）
@@ -133,6 +135,8 @@ D:\DevTools\
 | `ANDROID_HOME` / `ANDROID_SDK_ROOT` | `D:\DevTools\android-sdk` |
 | `Path`（追加） | `...\jdk-17\bin`、`...\android-sdk\platform-tools`、`...\android-sdk\cmdline-tools\latest\bin`、`...\android-sdk\emulator`、`...\flutter\3.50.0\bin`、`C:\Program Files\Git\cmd` |
 
+> `bootstrap.ps1` 写 PATH 前会检查目录是否存在，**不存在就跳过并打印警告**。本机首次引导时 `emulator\` 还不存在，所以实际 PATH 里没有这一条；装完模拟器再重跑 `bootstrap.ps1` 才会补上。不补也不影响：`dart run tool/emulator.dart` 用绝对路径调用，不依赖 PATH（§11）。
+
 ---
 
 ## 6. 验收标准
@@ -144,6 +148,7 @@ flutter --version          # 应输出 Flutter 3.50.0 / Dart 3.14.0
 java -version              # 应输出 17.0.x
 adb version                # 应输出 Android Debug Bridge version ...
 flutter doctor -v
+dart run tool/emulator.dart --list   # 可选：装了模拟器才有意义（§11）
 ```
 
 `flutter doctor` 的健康状态（本项目只需要这几项打勾）：
@@ -270,7 +275,9 @@ Remove-Item D:\DevTools -Recurse -Force
 | 磁盘占用 | `D:\DevTools` 8.15GB（其中 `_downloads` 2.06GB 可删）+ `.gradle` 缓存 3.5GB |
 | 耗时 | 下载约 25 分钟（约 1.5GB，实测 1.3MB/s）；安装配置约 10 分钟 |
 | 首次 APK 构建 | 636 秒（冷缓存），Gradle 自动补装 NDK r28c + CMake 3.22.1，产出 153MB debug APK |
-| 未装 | Android 模拟器与系统镜像（可选，约 1.5GB）、Docker |
+| 模拟器（可选，2026-11-17 补装） | emulator 37.2.13 + `system-images;android-36;google_apis;x86_64`（r07）+ AEHD 2.2.0；AVD `kn_api36`（pixel_7 / 4GB RAM / `-gpu host`），详见 §11 |
+| 模拟器磁盘 | emulator 1.04GB + 系统镜像 4.27GB（`D:\DevTools` 合计 8.15→13.6GB）+ AVD 5.58GB（`%USERPROFILE%\.android\avd`，随快照/数据增长） |
+| 未装 | Docker |
 
 ### 10.1 实测结论（覆盖了文档里的两个"想当然"）
 
@@ -297,9 +304,142 @@ Remove-Item D:\DevTools -Recurse -Force
 
 ---
 
-## 11. 变更记录
+## 11. 模拟器（可选：本机预览 Android 效果）
+
+> 只有要在 PC 上看 Android 效果时才需要。**不进仓库、不参与 CI**：SDK 包在 `D:\DevTools`，AVD 在 `%USERPROFILE%\.android\avd`，都是机器级产物。
+> 日常启动统一走仓库里的 `dart run tool/emulator.dart`（§11.3）；本节只记录一次性安装与踩坑。
+
+### 11.1 一次性安装（3 步，只有第 2 步要管理员）
+
+| 步骤 | 命令 | 管理员 |
+|---|---|---|
+| 1. 装模拟器 + 镜像 + AEHD 安装包 | `sdkmanager "emulator" "system-images;android-36;google_apis;x86_64" "extras;google;Android_Emulator_Hypervisor_Driver"` | 否 |
+| 2. 装 AEHD 驱动 | `D:\DevTools\android-sdk\extras\google\Android_Emulator_Hypervisor_Driver\silent_install.bat`（脚本自己弹 UAC） | **是**（一次） |
+| 3. 验证 | `dart run tool/emulator.dart --list` → `AEHD (version 2.2) is installed and usable.`；`sc query aehd` → `RUNNING` | 否 |
+
+不需要 Android Studio（cmdline-tools 够用）。镜像选 `google_apis` 而不是 `playstore`：体积小、可 `adb root`，本项目不依赖 GMS。
+下载量约 5.3GB（emulator 1.04GB + 系统镜像 4.27GB），首次启动还会在 AVD 目录再写 5–6GB。
+
+**为什么用 AEHD 而不是 WHPX**：WHPX 要启用 Hyper-V 平台并**重启**，且 Hyper-V 会连带影响 VirtualBox/VMware；AEHD 是内核驱动，装完即用、不重启。两者**不能同时用**——Hyper-V 开着时 AEHD 装不上也跑不起来（`-accel-check` 报冲突）。
+
+### 11.2 硬件加速的前置条件
+
+| 条件 | 本机 | 检查方式 |
+|---|---|---|
+| BIOS 里 CPU 虚拟化（SVM / VT-x）打开 | ✅ | 任务管理器 → 性能 → CPU →「虚拟化：已启用」 |
+| 未启用 Hyper-V / WHPX | ✅ | `(Get-CimInstance Win32_OptionalFeature -Filter "Name='HypervisorPlatform'").InstallState` = `2`（未启用） |
+| 内核隔离 / 内存完整性关闭 | ✅ | `Win32_DeviceGuard.VirtualizationBasedSecurityStatus` = `0` |
+
+后两条任一不满足时，`sc start aehd` 会失败或 `-accel-check` 报错；先解决再装驱动。
+
+### 11.3 启动与交互
+
+```powershell
+dart run tool/emulator.dart          # 首次自动建 AVD（kn_api36），等到开机完成并打印 serial
+dart run tool/emulator.dart --run    # 启动 + flutter run（热重载 r / 热重启 R）
+dart run tool/emulator.dart --list   # AVD 列表 + 加速状态
+dart run tool/emulator.dart --stop   # 关机
+```
+
+脚本行为（`tool/emulator.dart`）：
+
+- 用 `ANDROID_HOME` / `ANDROID_SDK_ROOT` 找 SDK，找不到退回 `D:\DevTools\android-sdk`；
+- 同名 AVD 已在运行时直接复用（打印 serial 后退出），不会重复启动；`--run` 仍会接上 `flutter run`；
+- **绝对路径**调用 `emulator.exe` / `adb.exe`，不依赖 PATH；
+- AVD 不存在时用 `avdmanager` 创建（`pixel_7` / API 36），随后 `-memory 4096 -gpu host -no-boot-anim` 启动；
+- 默认带 `-feature -Vulkan`（原因见 §11.4 第一条），代价是不能用 guest Vulkan，本项目用不到；
+- 轮询 `adb devices` + `sys.boot_completed` 直到开机（上限 300 秒；**60 秒内 adb 看不到设备就直接判失败**，不用干等）；
+- 失败时打印 `%TEMP%\komganative-emulator.log` 尾部——注意模拟器输出接在管道上时会被缓冲，日志可能是空的，这时手动 `emulator -avd kn_api36 -verbose` 复现最快。
+
+交互要点：
+
+- 单击=点按、按住=长按、拖动=滑动、滚轮=滚动、`Ctrl`+拖动=双指缩放；键盘直接输入；工具栏有返回/主页/最近任务/旋转/音量/电源。
+- 把 APK 拖进窗口即安装；等价命令 `adb install -r apps/app/build/app/outputs/flutter-apk/app-debug.apk`。
+- `flutter run` 里 `r` 热重载、`R` 热重启、`s` 截图；DevTools 的 widget inspector 能在模拟器里点控件、看布局树。
+- 模拟器里的 `10.0.2.2` 是宿主机回环：本地 Komga 填 `http://10.0.2.2:25600`；或 `adb reverse tcp:25600 tcp:25600` 后填 `127.0.0.1:25600`。
+- **墨水屏形态看不到**：`EinkProbe` 的原生实现要到 M5，模拟器上恒为 `EinkInfo.unknown`，走普通主题；eink 主题只能看黄金图。平板/手机布局靠换 AVD 的屏幕分辨率，拖窗口不一定改变 Android 的 display size。
+
+### 11.4 已知坑
+
+| 现象 | 原因 | 处理 |
+|---|---|---|
+| 启动后 `adb devices` 一直 `offline`、窗口停在开机画面 | gfxstream 的 Vulkan 后端在部分 NVIDIA 驱动上会让 guest 卡死（本机 2026-11-17：`-gpu host` 10 分钟未开机，加 `-feature -Vulkan` 后 10–25 秒开机） | 脚本已默认加 `-feature -Vulkan`；手动启动时也要加，或改用 `--gpu swiftshader_indirect` |
+| `ERROR: x86_64 emulation currently requires hardware acceleration` | AEHD / WHPX 未就绪 | 回 §11.1 |
+| `silent_install.bat` 里 `sc start aehd` 失败 | Hyper-V 开着，或内核隔离开着 | 关掉后重试（§11.2） |
+| `emulator` 命令找不到 | bootstrap 写 PATH 时该目录还不存在，被跳过 | 用 `dart run tool/emulator.dart`；或补 PATH 后重开终端 |
+| 窗口黑屏 / 启动即崩 | 显卡驱动、远程桌面、多显卡 | `dart run tool/emulator.dart --gpu swiftshader_indirect` |
+| 首次启动 0.5–3 分钟 | 冷启动 + 首次解压镜像 | 正常；之后走 quickboot 快照，异常时加 `--cold` |
+| C 盘被占 | AVD 默认在 `%USERPROFILE%\.android\avd` | 设 `ANDROID_AVD_HOME` 指向别的盘，再重建 AVD |
+
+### 11.5 与仓库的关系
+
+- 模拟器安装产物（SDK 包、系统镜像、AVD、驱动）**一律不进 git**；仓库里只多 `tool/emulator.dart` 和本节文档。
+- CI 不跑模拟器：`ci.yml` 跑测试与黄金图，`build-android.yml` 只出 APK。模拟器是纯人工预览手段，不能替代黄金图验收。
+
+---
+
+## 12. 本地 Komga 服务器（可选：联调与抓 fixture）
+
+> 只有要对着真实服务器联调、或重新抓 fixture 时才需要；**不参与 CI**，单测与黄金图全部走假实现。
+> 服务器是**原生 jar**（`java -jar`），不是 Docker（本机也没装 Docker）。
+
+日常只用仓库里的 `dart run tool/komga.dart`：
+
+```powershell
+dart run tool/komga.dart start     # 启动，等到 HTTP 就绪（首次约 10–20 秒）
+dart run tool/komga.dart status    # 进程 / 端口 / 日志位置
+dart run tool/komga.dart stop      # 停止
+```
+
+脚本行为（`tool/komga.dart`）：
+
+- 站点目录按 `--home` → `$KOMGA_HOME` → 仓库 `.komga/` → `D:\DevTools\_verify\komga`（历史实例）的顺序取；
+- Java 必须是 17+：按 `--java` → `$KOMGA_JAVA` → `$JAVA_HOME` → `D:\DevTools\jdk-17` → PATH 依次探测，**PATH 上的 java 是 11 时自动跳过**；
+- 端口：`--port` → `$KOMGA_PORT` → 25600；
+- 用 `ProcessStartMode.detached` 启动，脚本退出后服务器继续跑；stdout 不接管，**日志在 `<站点目录>\config\logs\komga.log`**；
+- 就绪判定是 `GET /api/v1/libraries` 返回 401/200；10 秒后进程已退出会提前判失败，不干等 120 秒；
+- 运行状态写在 `<站点目录>\.komga-run.json`（pid/port/jar/startedAt），`stop` 先按它精确杀；文件丢了就按 `komga-*.jar` 扫 java 进程，再杀不掉才报错；
+- Windows 上 stop 是 `TerminateProcess`（没有 Ctrl+C 那套优雅关闭），SQLite 的 `-wal` 下次启动会自己恢复，不用手工清理。
+
+站点目录里有什么：
+
+| 路径 | 内容 | 进 git？ |
+|---|---|---|
+| `komga-<ver>.jar` | 服务端，127 MB | 否 |
+| `config\` | database / sessions / tasks 三套 SQLite + lucene | 否 |
+| `library\` | 漫画文件（本机是 `Verify Series #1.cbz`） | 否 |
+| `pages\` | 页图缓存（跟着**启动时的工作目录**走，脚本已固定为该目录） | 否 |
+| `.komga-run.json` | 脚本写的运行状态 | 否（`.gitignore` 里是 `.komga/`） |
+
+客户端怎么连：
+
+- 宿主机 / iOS 模拟器：`http://127.0.0.1:25600`
+- Android 模拟器：`http://10.0.2.2:25600`；或 `adb reverse tcp:25600 tcp:25600` 后用 `127.0.0.1:25600`
+- 本机实例的账号是首次 `POST /api/v1/claim` 建的：`komga@example.com` / `komga`（弱口令，仅本机验证用）
+
+从零搭一个新实例（换机器时）：
+
+```powershell
+# 1) 下 jar（单文件，JDK 17 即可跑，不需要 Docker）
+$dst = 'D:\DevTools\_verify\komga'
+New-Item -ItemType Directory -Force $dst | Out-Null
+Invoke-WebRequest 'https://github.com/gotson/komga/releases/download/1.30.1/komga-1.30.1.jar' -OutFile "$dst\komga-1.30.1.jar"
+
+# 2) 起服务（脚本自己建 config\；第一次没有账号，必须 claim）
+dart run tool/komga.dart start --home $dst
+Invoke-WebRequest -Uri 'http://127.0.0.1:25600/api/v1/claim' -Method POST -UseBasicParsing `
+  -Headers @{ 'X-Komga-Email' = 'komga@example.com'; 'X-Komga-Password' = 'komga' }
+
+# 3) 建库 + 扫描：见 docs/komga-api-verification.md §2
+```
+
+---
+
+## 13. 变更记录
 
 | 日期 | 变更 |
 |---|---|
 | 2026-11-17 | 初版：用户级安装、免管理员；Flutter 改用官方 zip + sha256（不用 `fvm install`）；黄金图基线平台定为 Windows（与开发机一致） |
 | 2026-11-17 | 本机实装完成并回填实测结论（§10）；补充 PS 5.1 兼容性、执行策略、长路径三类踩坑 |
+| 2026-11-17 | 补装模拟器：emulator 37.2.13 + `system-images;android-36;google_apis;x86_64` + AEHD 2.2.0；新增 §11 与 `tool/emulator.dart`；修正 PATH 说明（bootstrap 会跳过不存在的目录，故首次引导后 PATH 里没有 `emulator\`） |
+| 2026-11-17 | 新增 §12 与 `tool/komga.dart`：本地 Komga 是原生 jar（不是 Docker），start/stop/status 不再手输 `java -jar`；`.gitignore` 忽略仓库内默认站点目录 `.komga/` |

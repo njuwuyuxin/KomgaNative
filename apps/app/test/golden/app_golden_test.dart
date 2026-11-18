@@ -241,6 +241,16 @@ void main() {
     );
   });
 
+  /// 宽屏两栏：左头部 / 右书列表。1024 宽正好落在 `WindowSizeClass.expanded`。
+  testWidgets('series@tablet_two_pane', (WidgetTester tester) async {
+    await pumpSeriesGolden(
+      tester,
+      name: 'series@tablet_two_pane',
+      size: GoldenSizes.tablet,
+      theme: AppTheme.light(),
+    );
+  });
+
   testWidgets('series@eink', (WidgetTester tester) async {
     await pumpSeriesGolden(
       tester,

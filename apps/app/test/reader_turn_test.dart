@@ -93,6 +93,45 @@ void main() {
     expect(find.text('2–3 / 6'), findsOneWidget);
   });
 
+  testWidgets('双页模式：位图就绪后走铰接卷页，翻完按屏换页（RTL）', (WidgetTester tester) async {
+    await pumpReader(
+      tester,
+      repository: FakeReaderRepository(pageCount: 6),
+      book: demoReaderBook(),
+      direction: ReadingDirection.rightToLeft,
+    );
+    await pickMode(tester, ReaderModeChoice.double);
+    // 封面单独一屏（[0] → [1, 2] 页数不配对，走平移），先翻到 [1, 2]。
+    final layer = tester.getRect(find.byKey(const Key('reader-tap-layer')));
+    await tester.tapAt(Offset(layer.left + 10, layer.center.dy));
+    await tester.pumpAndSettle();
+    expect(find.text('2–3 / 6'), findsOneWidget);
+    // 位图在空闲帧里真解码（instantiateImageCodec），要给真实的异步时间。
+    for (var i = 0; i < 5; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
+      await tester.pump();
+    }
+    final state = tester.state<ReaderPagedViewState>(
+      find.byType(ReaderPagedView),
+    );
+    final rect = tester.getRect(find.byKey(const Key('reader-tap-layer')));
+    final gesture = await tester.startGesture(
+      rect.centerLeft + const Offset(40, 0),
+    );
+    await gesture.moveBy(Offset(rect.width * 0.5, 0));
+    await tester.pump();
+
+    expect(state.debugCurling, isTrue, reason: '双页也要卷页，不能退化成平移');
+    expect(state.debugHinged, isTrue, reason: '双页的纸铰接在书脊上');
+    expect(find.byKey(const Key('reader-curl-layer')), findsOneWidget);
+
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(find.text('4–5 / 6'), findsOneWidget);
+  });
+
   testWidgets('松手后从"当前已翻进度"补完，不会跳回起点重播', (WidgetTester tester) async {
     await pumpReader(
       tester,

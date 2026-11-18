@@ -32,6 +32,10 @@ apps/app/ios/Flutter/Flutter.podspec
 secrets/
 *.log
 
+# 本地 Komga 站点（tool/komga.dart 的默认站点目录）
+.komga/
+tmp-verify/
+
 # OS
 Thumbs.db
 .DS_Store

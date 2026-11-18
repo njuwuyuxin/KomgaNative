@@ -17,12 +17,16 @@ void main() {
   });
 
   /// 画一张"页面"：浅底、深色网格、左下角红块、右上角蓝块。
-  Future<ui.Image> syntheticSheet(int w, int h) async {
+  Future<ui.Image> syntheticSheet(
+    int w,
+    int h, {
+    Color paper = const Color(0xFFEDE7DA),
+  }) async {
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
     canvas.drawRect(
       Rect.fromLTWH(0, 0, w.toDouble(), h.toDouble()),
-      Paint()..color = const Color(0xFFEDE7DA),
+      Paint()..color = paper,
     );
     final ink = Paint()
       ..color = const Color(0xFF2E2A25)
@@ -109,6 +113,102 @@ void main() {
       matchesGoldenFile('goldens/$name.png'),
     );
   }
+
+  /// 双页：半边页铰接在书脊上翻过去，纸背是下一屏落在另一半的那页（黄底）。
+  ///
+  /// 下层左右两块纯色：被掀起那一侧露出的是下一屏的页（绿），
+  /// 另一侧是当前屏留着的页（灰），翻到最后被纸背盖住。
+  Future<void> pumpSpread(
+    WidgetTester tester, {
+    required String name,
+    required double turn,
+    bool mirrored = false,
+  }) async {
+    const size = GoldenSizes.tablet;
+    tester.view.physicalSize = size * kGoldenDevicePixelRatio;
+    tester.view.devicePixelRatio = kGoldenDevicePixelRatio;
+    addTearDown(tester.view.reset);
+
+    final sheet = (await tester.runAsync(() => syntheticSheet(500, 700)))!;
+    final back = (await tester.runAsync(
+      () => syntheticSheet(500, 700, paper: const Color(0xFFF3E3A6)),
+    ))!;
+    addTearDown(sheet.dispose);
+    addTearDown(back.dispose);
+
+    const left = Rect.fromLTWH(32, 34, 480, 700);
+    const right = Rect.fromLTWH(512, 34, 480, 700);
+    // RTL 掀左半页、落在右半；LTR 反过来。
+    final sheetRect = mirrored ? right : left;
+    final landRect = mirrored ? left : right;
+    const motion = CurlMotion(
+      forward: true,
+      width: 480,
+      height: 700,
+      exitX: 480,
+      hinged: true,
+    );
+    final frame = motion.frame(motion.fingerAt(turn), mirrored: mirrored);
+
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: RepaintBoundary(
+          key: const Key('curl'),
+          child: Stack(
+            children: <Widget>[
+              Positioned.fill(child: Container(color: const Color(0xFF1C1B1A))),
+              Positioned.fromRect(
+                rect: sheetRect,
+                child: Container(color: const Color(0xFFB9C7B4)),
+              ),
+              Positioned.fromRect(
+                rect: landRect,
+                child: Container(color: const Color(0xFFC9C4BC)),
+              ),
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: PageCurlPainter(
+                    sheet: sheet,
+                    sheetRect: sheetRect,
+                    back: back,
+                    backRect: landRect,
+                    spineX: mirrored ? right.left : left.right,
+                    frame: frame,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await expectLater(
+      find.byKey(const Key('curl')),
+      matchesGoldenFile('goldens/$name.png'),
+    );
+  }
+
+  testWidgets('page_curl@spread_lift', (WidgetTester tester) async {
+    await pumpSpread(tester, name: 'page_curl@spread_lift', turn: 0.2);
+  });
+
+  testWidgets('page_curl@spread_middle', (WidgetTester tester) async {
+    await pumpSpread(tester, name: 'page_curl@spread_middle', turn: 0.5);
+  });
+
+  testWidgets('page_curl@spread_landing', (WidgetTester tester) async {
+    await pumpSpread(tester, name: 'page_curl@spread_landing', turn: 0.85);
+  });
+
+  testWidgets('page_curl@spread_mirrored', (WidgetTester tester) async {
+    await pumpSpread(
+      tester,
+      name: 'page_curl@spread_mirrored',
+      turn: 0.5,
+      mirrored: true,
+    );
+  });
 
   testWidgets('page_curl@start', (WidgetTester tester) async {
     await pumpCurl(tester, name: 'page_curl@start', forward: true, turn: 0.1);

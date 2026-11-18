@@ -14,6 +14,8 @@ dart run tool/ci.dart check      # 全量门禁：格式 + 分析 + 分层 + 全
 dart run tool/ci.dart fix        # 自动格式化 + dart fix
 dart run tool/ci.dart test       # 只跑测试
 dart run tool/ci.dart golden     # 重新生成黄金图基线（Windows）
+dart run tool/emulator.dart      # 启动本地 Android 模拟器（可选，见 docs/environment-setup.md §11）
+dart run tool/komga.dart start   # 启停本地 Komga 服务器（可选，联调用；stop / status，见 §12）
 ```
 
 单包测试（更快，改纯逻辑时优先）：
@@ -35,6 +37,8 @@ packages/komga_api            Komga REST 传输层、错误模型、URL 构造
 packages/komga_design_system  设计 token、三套主题、基础组件
 packages/komga_platform       平台能力抽象（设备形态、墨水屏探测）
 tool/ci.dart                  统一校验入口
+tool/emulator.dart            本地模拟器启动器（可选，见 docs/environment-setup.md §11）
+tool/komga.dart               本地 Komga 启停（可选，联调用，见 §12）
 docs/                         选型、环境、spec、ADR
 ```
 

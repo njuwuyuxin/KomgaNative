@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_native/src/providers/reader_providers.dart';
 import 'package:komga_native/src/widgets/reader_chrome.dart';
@@ -11,9 +13,8 @@ const int kFallbackPageHeight = 1500;
 /// 单页图片（含加载中/失败/重试）。
 ///
 /// 翻页时**第一帧**必须已经有像素，否则用户看到的就是"闪一下黑"。
-/// 两条路径按优先级：
-/// 1. provider 已经有值（同屏内的重绘）；
-/// 2. 仓库同步缓存里有这页的字节（翻回去 / 预取过）——直接画，不进 loading。
+/// 字节取 provider 的值或仓库同步缓存；但字节就绪不保证 Image.memory 已解码。
+/// 卷页交接时借用同一页的 decodedImage，在普通图片首帧返回前继续画现有像素。
 ///
 /// 缓存里没有的页就**老老实实转圈**：这是"还没加载好"，不是内容本身。
 /// 曾经试过"先继续画上一页"，反馈是"页码变了图没变，像 bug"——所以不要
@@ -23,6 +24,7 @@ class ReaderPage extends ConsumerWidget {
     required this.bookId,
     required this.pageIndex,
     required this.palette,
+    this.decodedImage,
     super.key,
   });
 
@@ -32,6 +34,16 @@ class ReaderPage extends ConsumerWidget {
   final int pageIndex;
 
   final ReaderPalette palette;
+
+  /// 同一页已经解好的卷页位图，由 CurlSheets 持有；这里只借用，不释放。
+  /// 字节缓存命中不等于 MemoryImage 的首帧已解码，交接时用它填补解码空窗。
+  final ui.Image? decodedImage;
+
+  Widget _decoded(ui.Image image) => RawImage(
+    image: image,
+    fit: BoxFit.contain,
+    filterQuality: FilterQuality.medium,
+  );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -54,6 +66,17 @@ class ReaderPage extends ConsumerWidget {
         fit: BoxFit.contain,
         gaplessPlayback: true,
         filterQuality: FilterQuality.medium,
+        frameBuilder: (context, child, frame, synchronous) {
+          final image = decodedImage;
+          return frame == null && image != null ? _decoded(image) : child;
+        },
+      );
+    }
+    final image = decodedImage;
+    if (image != null) {
+      return KeyedSubtree(
+        key: Key('reader-image-$pageIndex'),
+        child: _decoded(image),
       );
     }
     if (error != null) {

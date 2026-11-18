@@ -17,6 +17,10 @@
 // （d = 0）处硬切也看不出缝。早先用绝对光照 + 半像素过渡，轴线上会透出
 // 一条细亮线（"高亮虚影"），斜向翻页时最明显。
 //
+// **纸背**：单页模式是"白纸 + 透印"；双页模式（uHasBack = 1）纸背就是下一屏
+// 落在另一半的那页——纸沿书脊（x = uSpineX）镜像平落，所以纸面点 q 的背面
+// 取 uBack 在镜像点 (2·spine − q.x, q.y) 处的像素，落地那一帧和真实页面严丝合缝。
+//
 // 只有一个出口：带 sampler 的 main 里多个 return 在 Windows 上可能编不过
 // （flutter issue 190809）。
 
@@ -25,7 +29,11 @@ uniform vec4 uRect;     // 纸面矩形：x, y, w, h（画布坐标）
 uniform vec2 uAxis;     // 圆柱轴线经过的点（画布坐标）
 uniform vec2 uDir;      // u：单位向量，从轴线指向被卷起的一侧
 uniform float uRadius;  // 圆柱半径（px），可以为 0（折痕）
+uniform vec4 uBackRect; // 纸背那页落地后的矩形（画布坐标），uHasBack = 0 时不用
+uniform float uSpineX;  // 书脊 x（画布坐标），纸背沿它镜像
+uniform float uHasBack; // 1 = 纸背是真实页面（双页），0 = 白纸
 uniform sampler2D uSheet;
+uniform sampler2D uBack;
 
 out vec4 fragColor;
 
@@ -63,9 +71,15 @@ vec3 sheetAt(vec2 q) {
     return texture(uSheet, uv).rgb;
 }
 
-// 纸背：白纸 + 很淡的透印。
+// 纸背：双页是镜像过去的真实页面（页面外留白纸），单页是白纸 + 很淡的透印。
 vec3 backAt(vec2 q) {
-    return mix(kPaper, sheetAt(q), kShowThrough);
+    vec3 blank = mix(kPaper, sheetAt(q), kShowThrough);
+    vec2 m = vec2(2.0 * uSpineX - q.x, q.y);
+    vec2 uv = (m - uBackRect.xy) / max(uBackRect.zw, vec2(1.0));
+    vec2 inside = step(vec2(0.0), uv) * step(uv, vec2(1.0));
+    vec3 page = texture(uBack, clamp(uv, 0.0, 1.0)).rgb;
+    float use = uHasBack * inside.x * inside.y;
+    return mix(blank, page, use);
 }
 
 // 法线 n（(u, z) 平面）相对平铺纸面（n = (0, 1)）的亮度比。
@@ -182,7 +196,9 @@ void main() {
     }
 
     // ---- 4. 翻过去平压在上面的背面（d <= 0，最高的一层）----
-    if (flatSide && r > 0.01) {
+    // 双页落地那一帧 R = 0、纸整张平压在另一半上，这一层必须照画；
+    // 单页 R = 0 只出现在起手（还没卷），跳过以免角上留半像素的边。
+    if (flatSide && (r > 0.01 || uHasBack > 0.5)) {
         vec2 qFlip = p + u * (kPi * r - 2.0 * d);
         color = over(color, backAt(qFlip), coverage(qFlip));
     }

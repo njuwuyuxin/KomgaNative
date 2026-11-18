@@ -229,6 +229,104 @@ void main() {
     });
   });
 
+  group('双页：铰接在书脊上', () {
+    const half = 700.0;
+    const hinged = CurlMotion(
+      forward: true,
+      width: half,
+      height: height,
+      exitX: half,
+      hinged: true,
+    );
+
+    /// 书脊两端（标准形 x = width）到轴线的有符号距离都不能为正。
+    void expectSpineFlat(CurlFrame f, String reason) {
+      final spineX = f.mirrored ? 0.0 : f.width;
+      // 夹紧时轴线正好压在书脊端点上，允许浮点误差。
+      expect(f.signedDistance(spineX, 0), lessThan(1e-6), reason: '上端 $reason');
+      expect(
+        f.signedDistance(spineX, f.height),
+        lessThan(1e-6),
+        reason: '下端 $reason',
+      );
+    }
+
+    test('整段路径（含往上拖）轴线都不越过书脊', () {
+      for (final lift in <double>[0, -200, -600]) {
+        for (var i = 0; i <= 100; i++) {
+          final finger = hinged.fingerAt(i / 100);
+          final f = hinged.frame((
+            x: finger.x,
+            y: finger.y + lift,
+          ), mirrored: false);
+          expectSpineFlat(f, '@$i lift=$lift');
+        }
+      }
+    });
+
+    test('终点：半径收成 0，纸沿书脊镜像，角落在另一半页的对应角上', () {
+      expect(hinged.travel, closeTo(2 * half, 1e-9));
+      final f = hinged.frame(hinged.fingerAt(1), mirrored: false);
+      expect(f.radius, closeTo(0, 1e-9));
+      expect(f.axisX, closeTo(half, 1e-9));
+      expect(f.dirX, closeTo(-1, 1e-9));
+      expect(f.dirY, closeTo(0, 1e-9));
+      final landed = flippedScreen(f, 0, height);
+      expect(landed.x, closeTo(2 * half, 1e-6));
+      expect(landed.y, closeTo(height, 1e-6));
+    });
+
+    test('前半段卷起、后半段落下：半径先增后减，全程连续', () {
+      var peak = 0.0;
+      var previous = 0.0;
+      for (var i = 0; i <= 200; i++) {
+        final f = hinged.frame(hinged.fingerAt(i / 200), mirrored: false);
+        expect(
+          (f.radius - previous).abs(),
+          lessThan(half * 0.01),
+          reason: '$i',
+        );
+        if (f.radius > peak) peak = f.radius;
+        previous = f.radius;
+      }
+      expect(peak, greaterThan(half * kCurlRadiusRatio * 0.8));
+    });
+
+    test('镜像（LTR）：书脊在左，几何左右对称', () {
+      final finger = hinged.fingerAt(0.6);
+      final a = hinged.frame(finger, mirrored: false);
+      final b = hinged.frame(finger, mirrored: true);
+      expect(b.axisX, closeTo(half - a.axisX, 1e-9));
+      expect(b.dirX, closeTo(-a.dirX, 1e-9));
+      expect(b.radius, a.radius);
+      expectSpineFlat(b, 'mirrored');
+    });
+
+    test('往回翻：起点纸已平落在另一半上（与当前屏一致），终点平铺', () {
+      const back = CurlMotion(
+        forward: false,
+        width: half,
+        height: height,
+        exitX: half,
+        hinged: true,
+      );
+      final start = back.frame(back.fingerAt(0), mirrored: false);
+      expect(start.radius, closeTo(0, 1e-9));
+      expect(start.axisX, closeTo(half, 1e-9));
+      final end = back.frame(back.fingerAt(1), mirrored: false);
+      expect(end.isFlatAt(0, height), isTrue);
+    });
+
+    test('拖过头：手指夹在终点，不会把纸从书脊上扯下来', () {
+      final f = hinged.frame(
+        hinged.dragFinger(along: 5000, dy: 0),
+        mirrored: false,
+      );
+      expectSpineFlat(f, 'overdrag');
+      expect(f.radius, closeTo(0, 1e-9));
+    });
+  });
+
   group('CurlMotion', () {
     const forward = CurlMotion(
       forward: true,

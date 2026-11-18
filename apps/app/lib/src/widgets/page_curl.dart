@@ -67,6 +67,9 @@ class PageCurlPainter extends CustomPainter {
     required this.sheet,
     required this.sheetRect,
     required this.frame,
+    this.back,
+    this.backRect = Rect.zero,
+    this.spineX = 0,
   });
 
   final ui.Image sheet;
@@ -76,6 +79,15 @@ class PageCurlPainter extends CustomPainter {
 
   /// 纸面坐标系下的几何（原点是 [sheetRect] 的左上角）。
   final CurlFrame frame;
+
+  /// 纸背的真实页面（双页模式）；null 时纸背是白纸。
+  final ui.Image? back;
+
+  /// [back] 落地后在画布上的矩形。
+  final Rect backRect;
+
+  /// 书脊 x（画布坐标）：纸背沿它镜像。
+  final double spineX;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -96,7 +108,15 @@ class PageCurlPainter extends CustomPainter {
         ..setFloat(8, frame.dirX)
         ..setFloat(9, frame.dirY)
         ..setFloat(10, frame.radius)
-        ..setImageSampler(0, sheet);
+        ..setFloat(11, backRect.left)
+        ..setFloat(12, backRect.top)
+        ..setFloat(13, backRect.width)
+        ..setFloat(14, backRect.height)
+        ..setFloat(15, spineX)
+        ..setFloat(16, back == null ? 0 : 1)
+        ..setImageSampler(0, sheet)
+        // 采样器必须绑定；没有纸背时绑同一张图，着色器按 uHasBack 不用它。
+        ..setImageSampler(1, back ?? sheet);
 
       canvas.drawRect(
         Offset.zero & size,
@@ -112,7 +132,10 @@ class PageCurlPainter extends CustomPainter {
   @override
   bool shouldRepaint(PageCurlPainter oldDelegate) =>
       oldDelegate.sheet != sheet ||
+      oldDelegate.back != back ||
       oldDelegate.sheetRect != sheetRect ||
+      oldDelegate.backRect != backRect ||
+      oldDelegate.spineX != spineX ||
       oldDelegate.frame.axisX != frame.axisX ||
       oldDelegate.frame.axisY != frame.axisY ||
       oldDelegate.frame.dirX != frame.dirX ||
@@ -120,69 +143,61 @@ class PageCurlPainter extends CustomPainter {
       oldDelegate.frame.radius != frame.radius;
 }
 
-/// 卷页要用的两张位图：当前页（往前翻时卷走它）和上一页（往回翻时把它卷回来）。
+/// 卷页要用的位图，按页（0 基）索引。
 ///
-/// 页图字节本来就在仓库 LRU 里，这里只负责解码与释放。
+/// 单页：当前页（往前翻卷走它）、上一页（往回翻把它卷回来）；
+/// 双页：两个方向各自要卷的半页 + 它们的纸背。
+/// 页图字节本来就在仓库 LRU 里，这里只负责解码与释放；翻一页后
+/// 仍然需要的位图直接复用，不重新解码。
 /// 换掉的位图可能还被上一帧的 raster 线程引用着，立刻 `dispose()` 有时会
 /// 闪一帧空白，所以统一等下一帧结束再释放。
 class CurlSheets {
-  ui.Image? _current;
-  ui.Image? _previous;
-  int? _currentPage;
-  int? _previousPage;
+  final Map<int, ui.Image> _images = <int, ui.Image>{};
   final List<ui.Image> _retired = <ui.Image>[];
+  final Map<int, Future<void>> _pending = <int, Future<void>>{};
+  Set<int> _wanted = <int>{};
+  bool Function() _stillWanted = () => false;
+  bool _disposed = false;
 
-  /// [page] 是当前页（0 基）的位图；不匹配时返回 null。
-  ui.Image? currentFor(int page) => _currentPage == page ? _current : null;
+  /// 第 [page] 页的位图；还没解码好时为 null。
+  ui.Image? imageFor(int page) => _images[page];
 
-  /// [page] 是上一页（0 基）的位图；不匹配时返回 null。
-  ui.Image? previousFor(int page) => _previousPage == page ? _previous : null;
-
-  /// 当前要的两页（null 表示不需要），已有的直接复用（往前翻一页后，
-  /// 原来的"当前页"正好变成新的"上一页"，不必重新解码）。
+  /// 只保留 [pages]，缺的逐张解码；[stillWanted] 为 false 说明已经换屏，丢弃结果。
   Future<void> ensure({
-    required int? current,
-    required int? previous,
+    required Set<int> pages,
     required Future<ui.Image?> Function(int page) decode,
     required bool Function() stillWanted,
   }) async {
-    final pool = <int, ui.Image>{
-      if (_currentPage != null && _current != null) _currentPage!: _current!,
-      if (_previousPage != null && _previous != null)
-        _previousPage!: _previous!,
-    };
-    final keep = <int>{?current, ?previous};
-    for (final entry in pool.entries) {
-      if (!keep.contains(entry.key)) _retire(entry.value);
+    if (_disposed || !stillWanted()) return;
+    _wanted = Set<int>.of(pages);
+    _stillWanted = stillWanted;
+    for (final page in _images.keys.toList()) {
+      if (!_wanted.contains(page)) _retire(_images.remove(page));
     }
-    _current = current == null ? null : pool[current];
-    _currentPage = _current == null ? null : current;
-    _previous = previous == null ? null : pool[previous];
-    _previousPage = _previous == null ? null : previous;
-
-    if (current != null && _current == null) {
-      final image = await decode(current);
-      if (image != null && !_adopt(image, stillWanted)) return;
-      if (image != null) {
-        _retire(_current);
-        _current = image;
-        _currentPage = current;
-      }
-    }
-    if (previous != null && _previous == null) {
-      final image = await decode(previous);
-      if (image != null && _adopt(image, stillWanted)) {
-        _retire(_previous);
-        _previous = image;
-        _previousPage = previous;
-      }
+    for (final page in pages) {
+      if (_disposed || !stillWanted()) return;
+      if (_images.containsKey(page)) continue;
+      // 动画完成和 didUpdateWidget 都会排预加载；合并同页解码，避免替换
+      // 正被 ReaderPage 借用的位图（或把刚解好的那一张释放掉）。
+      await (_pending[page] ??= _decodeAndAdopt(page, decode));
     }
   }
 
-  bool _adopt(ui.Image image, bool Function() stillWanted) {
-    if (stillWanted()) return true;
-    image.dispose();
-    return false;
+  Future<void> _decodeAndAdopt(
+    int page,
+    Future<ui.Image?> Function(int page) decode,
+  ) async {
+    try {
+      final image = await decode(page);
+      if (image == null) return;
+      if (_disposed || !_wanted.contains(page) || !_stillWanted()) {
+        image.dispose();
+        return;
+      }
+      _images[page] = image;
+    } finally {
+      _pending.remove(page);
+    }
   }
 
   void _retire(ui.Image? image) {
@@ -199,10 +214,12 @@ class CurlSheets {
   }
 
   void dispose() {
-    _current?.dispose();
-    _previous?.dispose();
-    _current = null;
-    _previous = null;
+    _disposed = true;
+    _wanted.clear();
+    for (final image in _images.values) {
+      image.dispose();
+    }
+    _images.clear();
     _flushRetired();
   }
 }

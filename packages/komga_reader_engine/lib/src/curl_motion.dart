@@ -18,6 +18,7 @@ class CurlMotion {
     required this.width,
     required this.height,
     required this.exitX,
+    this.hinged = false,
     this.radiusRatio = kCurlRadiusRatio,
   });
 
@@ -31,6 +32,9 @@ class CurlMotion {
   /// 从被捏住的角那条边量到屏幕另一侧边缘的距离，见 [curlTravel]。
   final double exitX;
 
+  /// true = 双页：纸铰接在书脊上，翻过去平落在另一半页（见 `page_turn.dart`）。
+  final bool hinged;
+
   final double radiusRatio;
 
   /// 翻页进度 → 路径进度（往回翻是倒放）。
@@ -42,12 +46,17 @@ class CurlMotion {
     width: width,
     height: height,
     exitX: exitX,
+    hinged: hinged,
     radiusRatio: radiusRatio,
   );
 
   /// 整段路径的长度（手指要走多远纸才完全翻走）。
-  double get travel =>
-      curlTravel(width: width, exitX: exitX, radiusRatio: radiusRatio);
+  double get travel => curlTravel(
+    width: width,
+    exitX: exitX,
+    hinged: hinged,
+    radiusRatio: radiusRatio,
+  );
 
   /// 跟手：手指相对按下点的位移（[along] 为朝翻页方向的横向距离，[dy] 纵向）。
   ///
@@ -100,6 +109,7 @@ class CurlMotion {
         width: width,
         height: height,
         mirrored: mirrored,
+        hinged: hinged,
         radiusRatio: radiusRatio,
       );
 }

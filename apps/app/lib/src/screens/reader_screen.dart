@@ -431,19 +431,16 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     return <int>[target - 1];
   }
 
-  /// 翻页动效：墨水屏和"系统关闭动画"直接不做动画；双页回退成平移。
-  PageTurnStyle _turnStyle(ReadingMode mode) {
+  /// 翻页动效：墨水屏和"系统关闭动画"直接不做动画；单页、双页都卷页
+  /// （单页↔双页交界那一下由 `ReaderPagedView` 自己退化成平移）。
+  PageTurnStyle _turnStyle() {
     if (ref.watch(settingsProvider).forceEink) {
       return const PageTurnStyle(effect: PageTurnEffect.none);
     }
     if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
       return const PageTurnStyle(effect: PageTurnEffect.none);
     }
-    return PageTurnStyle(
-      effect: mode == ReadingMode.doublePage
-          ? PageTurnEffect.slide
-          : PageTurnEffect.curl,
-    );
+    return const PageTurnStyle();
   }
 
   List<List<int>> _spreadsFor(List<PageInfo> pages, ReadingMode mode) {
@@ -650,7 +647,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                         palette: palette,
                         nextSpread: nextSpread,
                         previousSpread: previousSpread,
-                        style: _turnStyle(mode),
+                        style: _turnStyle(),
                         onTurn: (int delta) =>
                             _turn(delta, total, mode, spreadIndex, spreads),
                         onToggleChrome: () =>
