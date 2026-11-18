@@ -123,6 +123,60 @@ abstract final class AppTheme {
         indicatorColor: scheme.secondaryContainer,
         labelType: NavigationRailLabelType.all,
       ),
+      // iOS 式侧滑转场（UI-P2-3）：Android 也用同一套——目标是"像 iOS 原生质感"，
+      // 不是跟随平台默认。代价是 Android 的预测性返回手势退化成普通返回动画。
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: <TargetPlatform, PageTransitionsBuilder>{
+          TargetPlatform.android: IosSlidePageTransitionsBuilder(),
+          TargetPlatform.iOS: IosSlidePageTransitionsBuilder(),
+        },
+      ),
+    );
+  }
+}
+
+/// iOS 式侧滑转场。
+///
+/// 为什么自己写：`material_ui`（本仓库的统一 Material 入口）只给了 M3 的
+/// `ZoomPageTransitionsBuilder` / `FadeForwardsPageTransitionsBuilder`，
+/// 没有 Cupertino 那个 builder；而 `package:flutter/cupertino.dart` 在
+/// Flutter 3.47 之后已标记废弃（要求换成 `cupertino_ui`，属于新依赖）。
+/// 这里只做"新页从左滑入 + 旧页以 30% 速度左移"这一层——正是 iOS 侧滑的观感主体。
+///
+/// **已知缺口**：边缘右滑返回需要自定义 `PageRoute`（手势在 Cupertino 的
+/// Route 里，不在转场 builder 里），见 `docs/ui-polish-plan.md` 的记录；
+/// Android 的系统返回手势不受影响。
+class IosSlidePageTransitionsBuilder extends PageTransitionsBuilder {
+  const IosSlidePageTransitionsBuilder();
+
+  /// 旧页往左移的比例：iOS 上是 1/3 左右，太多会显得两页在赛跑。
+  static const double _parallax = 0.3;
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    // 首个路由没有"从右边进来"这回事，直接给它，省一层重绘。
+    if (route.isFirst) return child;
+    final enter = animation.drive(
+      Tween<Offset>(
+        begin: const Offset(1, 0),
+        end: Offset.zero,
+      ).chain(CurveTween(curve: Curves.easeOutCubic)),
+    );
+    final leave = secondaryAnimation.drive(
+      Tween<Offset>(
+        begin: Offset.zero,
+        end: const Offset(-_parallax, 0),
+      ).chain(CurveTween(curve: Curves.easeOutCubic)),
+    );
+    return SlideTransition(
+      position: enter,
+      child: SlideTransition(position: leave, child: child),
     );
   }
 }

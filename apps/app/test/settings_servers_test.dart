@@ -51,6 +51,24 @@ void main() {
     );
   }
 
+  /// 滚到某个 key 可见。
+  ///
+  /// 设置页改成大标题（`SliverAppBar.large`）后首屏少了约 100px，
+  /// 服务器列表掉到屏幕外；而 `SliverList` **不构建屏幕外的项**，
+  /// 所以 `ensureVisible` 会先失败——得先 `scrollUntilVisible` 把它滚进来。
+  Future<void> revealKey(WidgetTester tester, String key) async {
+    final finder = find.byKey(Key(key));
+    if (finder.evaluate().isEmpty) {
+      await tester.scrollUntilVisible(
+        finder,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+    }
+    await tester.ensureVisible(finder);
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('列出已保存服务器，点另一台即切换', (WidgetTester tester) async {
     final first = storedServer();
     final second = otherServer();
@@ -62,12 +80,9 @@ void main() {
       ], active: first),
     );
 
-    expect(find.byKey(Key('server-${first.id}')), findsOneWidget);
-    expect(find.byKey(Key('server-${second.id}')), findsOneWidget);
+    await revealKey(tester, 'server-${first.id}');
+    await revealKey(tester, 'server-${second.id}');
 
-    // 设置页外观区变长（触感反馈开关），服务器列表可能在首屏之外：先滚到可见。
-    await tester.ensureVisible(find.byKey(Key('server-${second.id}')));
-    await tester.pumpAndSettle();
     await tester.tap(find.byKey(Key('server-${second.id}')));
     await tester.pumpAndSettle();
 
@@ -83,12 +98,12 @@ void main() {
       store: InMemoryServerStore.withAll(<StoredServer>[first], active: first),
     );
 
-    await tester.ensureVisible(find.byKey(const Key('server-add')));
-    await tester.pumpAndSettle();
+    await revealKey(tester, 'server-add');
     await tester.tap(find.byKey(const Key('server-add')));
     await tester.pumpAndSettle();
 
     expect(container.read(sessionProvider), isA<SessionDisconnected>());
+    await revealKey(tester, 'server-${first.id}');
     expect(find.byKey(Key('server-${first.id}')), findsOneWidget);
   });
 
@@ -103,8 +118,7 @@ void main() {
       ], active: first),
     );
 
-    await tester.ensureVisible(find.byKey(Key('server-remove-${first.id}')));
-    await tester.pumpAndSettle();
+    await revealKey(tester, 'server-remove-${first.id}');
     await tester.tap(find.byKey(Key('server-remove-${first.id}')));
     await tester.pumpAndSettle();
     expect(find.text('Remove server?'), findsOneWidget);
@@ -112,6 +126,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(Key('server-${first.id}')), findsNothing);
+    await revealKey(tester, 'server-${second.id}');
     expect(find.byKey(Key('server-${second.id}')), findsOneWidget);
     expect(container.read(sessionProvider), isA<SessionDisconnected>());
   });

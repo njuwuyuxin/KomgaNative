@@ -16,6 +16,7 @@ class AppMotion {
     required this.quick,
     required this.standard,
     required this.emphasized,
+    required this.shimmer,
     required this.standardCurve,
     required this.emphasizedCurve,
     required this.exitCurve,
@@ -32,6 +33,9 @@ class AppMotion {
 
   /// 页面级过渡、共享元素。
   final Duration emphasized;
+
+  /// 骨架屏微光扫过一轮的时长（UI-P2-8）。
+  final Duration shimmer;
 
   /// 进入 / 常规过渡：快起慢收。
   final Curve standardCurve;
@@ -56,6 +60,7 @@ class AppMotion {
     quick: Duration(milliseconds: 150),
     standard: Duration(milliseconds: 300),
     emphasized: Duration(milliseconds: 450),
+    shimmer: Duration(milliseconds: 1400),
     standardCurve: Curves.easeOutCubic,
     emphasizedCurve: Cubic(0.2, 0.9, 0.25, 1.05),
     exitCurve: Curves.easeInCubic,
@@ -72,6 +77,7 @@ class AppMotion {
     quick: Duration.zero,
     standard: Duration.zero,
     emphasized: Duration.zero,
+    shimmer: Duration(milliseconds: 1400),
     standardCurve: Curves.linear,
     emphasizedCurve: Curves.linear,
     exitCurve: Curves.linear,

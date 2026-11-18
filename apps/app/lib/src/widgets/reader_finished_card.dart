@@ -3,6 +3,7 @@ import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
+import 'package:komga_native/src/widgets/cover_image.dart';
 import 'package:komga_native/src/widgets/reader_palette.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -147,11 +148,7 @@ class _NextBook extends ConsumerWidget {
                 size: AppSizes.rowCover,
                 child: cover == null
                     ? ColoredBox(color: palette.outline)
-                    : Image.memory(
-                        cover,
-                        fit: BoxFit.cover,
-                        gaplessPlayback: true,
-                      ),
+                    : CoverImage(bytes: cover),
               ),
             ),
             const SizedBox(width: AppSpacing.sm),

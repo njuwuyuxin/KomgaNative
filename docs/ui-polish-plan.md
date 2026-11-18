@@ -264,6 +264,24 @@ Panels 的高级感主要来自三点，和控件本身关系不大：
 **P2 出口**：书架、系列详情、新首页三套黄金图完整；在模拟器上能看到书架内容；
 `docs/series-queries.md` 同步更新排序部分。
 
+**进度（2026-11-18）：第 4 批完成（P2-1 / P2-2 / P2-3 / P2-8）。**
+
+| 编号 | 落地 |
+|---|---|
+| P2-1 | `SeriesTile` 封面改 `AppShapes.cover` 连续圆角 + `AppShadows.cover` 柔和投影（墨水屏两者都退化）；已读角标改成半透明胶囊（等宽数字）；进度条挪到**封面内侧**底部；整张卡片包 `PressableScale`；新增 `CoverImage`（书架卡片 / 继续阅读 / 书末"下一本"三处共用），解码首帧淡入 |
+| P2-2 | 书架卡片 → 系列详情头部用同一个 `series-<id>` tag（`seriesHeroTag`），墨水屏不挂 Hero；`shelf_polish_test` 断言 tag 唯一、详情页接到同一个 tag |
+| P2-3 | 新增 `IosSlidePageTransitionsBuilder`（新页从左滑入 + 旧页 30% 视差），light/dark 主题在 Android 与 iOS 都用它，墨水屏保持零转场；书架与设置页改成 `SliverAppBar.large` 可折叠大标题，整页合成一条 `CustomScrollView`（继续阅读 / 搜索 / 筛选都成了 sliver） |
+| P2-8 | 新增 `SkeletonBox` + `Shimmer`（周期取 `AppMotion.shimmer`）；墨水屏与"减少动态效果"下**不画微光**（灰阶屏上就是拖影）；系列详情三态用 `AnimatedSwitcher` 交叉淡入，书架三态用 `PhaseFade`（sliver 不能重叠，只做入场淡入，理由见组件注释） |
+
+**与计划的偏差（明说）**：
+- 边缘右滑返回**没有做**：`material_ui` 没有 Cupertino 的 transitions builder，而手势在
+  Cupertino 的 `PageRoute` 里、不在转场 builder 里，要做得自定义 Route 并接管 go_router 的路由构造。
+  Android 的系统返回手势不受影响。需要的话单开一条需求。
+- P2-2 的"继续阅读卡片 → 阅读器首页"没做：阅读器首页的图是异步解码的，飞行途中首页可能还是
+  转圈，Hero 反而更怪。目前只做"书架 → 详情"。
+
+基线变更原因：封面形状/阴影/角标/进度条位置、大标题（书架/设置）、骨架微光。
+
 ---
 
 ## P3：长尾功能

@@ -7,6 +7,8 @@ import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/widgets/book_download_button.dart';
+import 'package:komga_native/src/widgets/cover_image.dart';
+import 'package:komga_native/src/widgets/series_shelf_tile.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 打开一本书（带上系列阅读方向），由 `SeriesDetailScreen` 负责路由与刷新。
@@ -175,30 +177,40 @@ class SeriesHeader extends ConsumerWidget {
     };
     final read = series?.booksReadCount ?? 0;
     final total = series?.booksCount ?? 0;
+    // Hero 的另一半：tag 必须和书架卡片上那个一模一样（UI-P2-2）。
+    // 墨水屏不飞：灰阶屏上的共享元素只会变成一层拖影。
+    final coverBox = SizedBox(
+      width: AppSpacing.xxl * 2,
+      height: AppSpacing.xxl * 3,
+      child: bytes == null
+          ? DecoratedBox(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+              ),
+            )
+          : CoverImage(bytes: bytes),
+    );
+    final coverShape = AppShapes.of(context, AppShapes.panel);
+    final coverWidget = DecoratedBox(
+      decoration: ShapeDecoration(
+        shape: coverShape,
+        shadows: AppShadows.of(context, AppShadows.cover),
+      ),
+      child: ClipPath(
+        clipper: ShapeBorderClipper(shape: coverShape),
+        child: coverBox,
+      ),
+    );
 
     return Padding(
       padding: const EdgeInsets.all(AppSpacing.md),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          ClipRRect(
-            borderRadius: BorderRadius.circular(AppRadii.md),
-            child: SizedBox(
-              width: AppSpacing.xxl * 2,
-              height: AppSpacing.xxl * 3,
-              child: bytes == null
-                  ? DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.surfaceContainerHighest,
-                      ),
-                    )
-                  : Image.memory(
-                      bytes,
-                      fit: BoxFit.cover,
-                      gaplessPlayback: true,
-                    ),
-            ),
-          ),
+          if (AppTheme.isEink(theme))
+            coverWidget
+          else
+            Hero(tag: seriesHeroTag(seriesId), child: coverWidget),
           const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(

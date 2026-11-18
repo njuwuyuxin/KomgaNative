@@ -1,4 +1,7 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:komga_design_system/src/components/pressable_scale.dart';
+import 'package:komga_design_system/src/materials.dart';
+import 'package:komga_design_system/src/shapes.dart';
 import 'package:komga_design_system/src/tokens.dart';
 import 'package:komga_domain/komga_domain.dart';
 
@@ -6,6 +9,10 @@ import 'package:komga_domain/komga_domain.dart';
 ///
 /// [cover] 负责真实封面（由调用方提供，设计系统不关心它从哪来）；
 /// 为空时退化成「渐变色 + 首字」占位，因此断网/缺图也不会破版。
+///
+/// 质感（UI-P2-1）：封面用 [AppShapes.cover] 的连续圆角 + [AppShadows.cover]
+/// 的柔和投影，进度条贴在封面**内侧**底部、角标是胶囊——"封面就是主视觉，
+/// 界面元素越少越好"。
 ///
 /// [semanticsLabel] 是读屏播报的整句文案。设计系统不持有 l10n，
 /// 默认只播报标题；调用方（如 `SeriesShelfTile`）负责传入本地化的
@@ -54,6 +61,8 @@ class SeriesTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final shape = AppShapes.of(context, AppShapes.cover);
+    final shadows = AppShadows.of(context, AppShadows.cover);
     return Semantics(
       container: true,
       button: onTap != null,
@@ -61,56 +70,67 @@ class SeriesTile extends StatelessWidget {
       onTap: onTap,
       // 读屏时只播报上面这一句，而不是把封面首字、角标、标题逐条念一遍。
       child: ExcludeSemantics(
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(AppRadii.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              // 封面用 Expanded 吸收剩余高度：文本放大时压缩封面而不是撑破卡片。
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(AppRadii.md),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: <Widget>[
-                      cover ??
-                          _PlaceholderCover(
-                            color: _placeholder,
-                            initial: _initial,
-                          ),
-                      if (series.booksCount > 0)
-                        Positioned(
-                          right: AppSpacing.xs,
-                          bottom: AppSpacing.xs,
-                          child: _CountBadge(
-                            read: series.booksReadCount,
-                            total: series.booksCount,
-                          ),
-                        ),
-                    ],
+        child: PressableScale(
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(AppRadii.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                // 封面用 Expanded 吸收剩余高度：文本放大时压缩封面而不是撑破卡片。
+                Expanded(
+                  child: DecoratedBox(
+                    decoration: ShapeDecoration(shape: shape, shadows: shadows),
+                    child: ClipPath(
+                      clipper: ShapeBorderClipper(shape: shape),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: <Widget>[
+                          cover ??
+                              _PlaceholderCover(
+                                color: _placeholder,
+                                initial: _initial,
+                              ),
+                          if (series.booksCount > 0) ...<Widget>[
+                            // 进度条贴在封面内侧底部：比放在标题下面更"像书"，
+                            // 也不占额外的垂直空间。
+                            Positioned(
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              child: LinearProgressIndicator(
+                                value: series.progress,
+                                minHeight: AppSizes.progressBar,
+                                backgroundColor: Colors.black.withValues(
+                                  alpha: 0.35,
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              right: AppSpacing.xs,
+                              bottom: AppSpacing.sm,
+                              child: _CountBadge(
+                                read: series.booksReadCount,
+                                total: series.booksCount,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                series.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  series.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(AppRadii.sm),
-                child: LinearProgressIndicator(
-                  value: series.progress,
-                  minHeight: 3,
-                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -118,6 +138,7 @@ class SeriesTile extends StatelessWidget {
   }
 }
 
+/// 已读/总数：半透明胶囊，压在封面右下角。
 class _CountBadge extends StatelessWidget {
   const _CountBadge({required this.read, required this.total});
 
@@ -127,19 +148,21 @@ class _CountBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: BoxDecoration(
+      decoration: ShapeDecoration(
         color: Colors.black.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(AppRadii.sm),
+        shape: const StadiumBorder(),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.sm,
-          vertical: 2,
+          vertical: AppSpacing.xxs,
         ),
         child: Text(
           '$read/$total',
-          style: Theme.of(context).textTheme.labelSmall
-              ?.copyWith(color: Colors.white),
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: Colors.white,
+            fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
+          ),
         ),
       ),
     );

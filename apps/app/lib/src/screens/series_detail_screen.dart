@@ -107,31 +107,49 @@ class SeriesDetailScreen extends ConsumerWidget {
         children: <Widget>[
           OfflineBanner(onRetry: () => unawaited(_refresh(ref))),
           Expanded(
-            child: switch ((error, page)) {
-              (final Object failure, _) => _ErrorView(
-                failure: failure,
-                onRetry: () => unawaited(_refresh(ref)),
+            // 三态之间交叉淡入（UI-P2-8）：这里的内容是 box 而不是 sliver，
+            // 可以直接用 `AnimatedSwitcher`（书架页用 `PhaseFade`，见那边的注释）。
+            child: AnimatedSwitcher(
+              duration: AppMotion.of(context).standard,
+              switchInCurve: AppMotion.of(context).standardCurve,
+              switchOutCurve: AppMotion.of(context).exitCurve,
+              child: KeyedSubtree(
+                key: ValueKey<String>(
+                  error != null
+                      ? 'error'
+                      : (page != null ? 'books' : 'loading'),
+                ),
+                child: switch ((error, page)) {
+                  (final Object failure, _) => _ErrorView(
+                    failure: failure,
+                    onRetry: () => unawaited(_refresh(ref)),
+                  ),
+                  (null, final PageResult<Book> data) =>
+                    wide
+                        ? SeriesTwoPane(
+                            series: series,
+                            books: data,
+                            seriesId: seriesId,
+                            onRefresh: () => _refresh(ref),
+                            onOpenBook: (
+                              Book book,
+                              ReadingDirection direction,
+                            ) => _openBook(context, ref, book, direction),
+                          )
+                        : SeriesSinglePane(
+                            series: series,
+                            books: data,
+                            seriesId: seriesId,
+                            onRefresh: () => _refresh(ref),
+                            onOpenBook: (
+                              Book book,
+                              ReadingDirection direction,
+                            ) => _openBook(context, ref, book, direction),
+                          ),
+                  _ => const _BooksSkeleton(),
+                },
               ),
-              (null, final PageResult<Book> data) =>
-                wide
-                    ? SeriesTwoPane(
-                        series: series,
-                        books: data,
-                        seriesId: seriesId,
-                        onRefresh: () => _refresh(ref),
-                        onOpenBook: (Book book, ReadingDirection direction) =>
-                            _openBook(context, ref, book, direction),
-                      )
-                    : SeriesSinglePane(
-                        series: series,
-                        books: data,
-                        seriesId: seriesId,
-                        onRefresh: () => _refresh(ref),
-                        onOpenBook: (Book book, ReadingDirection direction) =>
-                            _openBook(context, ref, book, direction),
-                      ),
-              _ => const _BooksSkeleton(),
-            },
+            ),
           ),
         ],
       ),
@@ -168,34 +186,26 @@ class _BooksSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = Theme.of(context).colorScheme.surfaceContainerHighest;
-    return ListView.separated(
-      key: const Key('series-skeleton'),
-      padding: const EdgeInsets.all(AppSpacing.md),
-      itemCount: 6,
-      separatorBuilder: (BuildContext context, int index) =>
-          const SizedBox(height: AppSpacing.sm),
-      itemBuilder: (BuildContext context, int index) => Row(
-        children: <Widget>[
-          Container(
-            width: AppSpacing.xl,
-            height: AppSpacing.xxl,
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(AppRadii.sm),
+    return Shimmer(
+      child: ListView.separated(
+        key: const Key('series-skeleton'),
+        padding: const EdgeInsets.all(AppSpacing.md),
+        itemCount: 6,
+        separatorBuilder: (BuildContext context, int index) =>
+            const SizedBox(height: AppSpacing.sm),
+        itemBuilder: (BuildContext context, int index) => const Row(
+          children: <Widget>[
+            SizedBox(
+              width: AppSpacing.xl,
+              height: AppSpacing.xxl,
+              child: SkeletonBox(),
             ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Container(
-              height: AppSpacing.md,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(AppRadii.sm),
-              ),
+            SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: SizedBox(height: AppSpacing.md, child: SkeletonBox()),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

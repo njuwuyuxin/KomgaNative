@@ -156,25 +156,24 @@ class ShelfPagingFooter extends StatelessWidget {
   }
 }
 
-/// 首屏加载时的骨架：只画色块，不做 shimmer（墨水屏上 shimmer 就是拖影）。
+/// 首屏加载时的骨架：微光扫过的色块（UI-P2-8）。
+///
+/// 墨水屏与"减少动态效果"下 [Shimmer] 自动退化成静态色块——
+/// 灰阶屏上的微光只会变成一层拖影。
 class ShelfSkeleton extends StatelessWidget {
   const ShelfSkeleton({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final color = Theme.of(context).colorScheme.surfaceContainerHighest;
-    return GridView.builder(
-      key: const Key('shelf-skeleton'),
-      padding: const EdgeInsets.all(AppSpacing.md),
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: shelfGridDelegate(),
-      // 两屏的量足够盖住首屏加载，多了纯属浪费。
-      itemCount: 8,
-      itemBuilder: (BuildContext context, int index) => DecoratedBox(
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(AppRadii.md),
-        ),
+    return Shimmer(
+      child: GridView.builder(
+        key: const Key('shelf-skeleton'),
+        padding: const EdgeInsets.all(AppSpacing.md),
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: shelfGridDelegate(),
+        // 两屏的量足够盖住首屏加载，多了纯属浪费。
+        itemCount: 8,
+        itemBuilder: (BuildContext context, int index) => const SkeletonBox(),
       ),
     );
   }

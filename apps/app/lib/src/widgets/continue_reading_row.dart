@@ -3,6 +3,7 @@ import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
+import 'package:komga_native/src/widgets/cover_image.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 打开一本书（方向来自所属系列，拿不到就按未知处理）。
@@ -82,6 +83,7 @@ class _ContinueCard extends ConsumerWidget {
 
     // 整张卡片是一个按钮：读屏念「书名 + 进度」，不逐条念封面/标题/页码。
     // 卡片宽 96、高 196，满足最小点击区（48）要求。
+    final shape = AppShapes.of(context, AppShapes.cover);
     return Semantics(
       key: Key('continue-${book.id}'),
       container: true,
@@ -89,45 +91,50 @@ class _ContinueCard extends ConsumerWidget {
       label: '${book.name}, $progressLabel',
       onTap: () => onOpen(book, direction),
       child: ExcludeSemantics(
-        child: InkWell(
-          onTap: () => onOpen(book, direction),
-          child: SizedBox(
-            width: AppSizes.shelfCover.width,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(AppRadii.sm),
-                  child: SizedBox(
-                    width: AppSizes.shelfCover.width,
-                    height: AppSizes.shelfCover.height,
-                    child: cover == null
-                        ? ColoredBox(
-                            color: theme.colorScheme.surfaceContainerHighest,
-                          )
-                        : Image.memory(
-                            cover,
-                            fit: BoxFit.cover,
-                            gaplessPlayback: true,
-                          ),
+        child: PressableScale(
+          child: InkWell(
+            onTap: () => onOpen(book, direction),
+            child: SizedBox(
+              width: AppSizes.shelfCover.width,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  DecoratedBox(
+                    decoration: ShapeDecoration(
+                      shape: shape,
+                      shadows: AppShadows.of(context, AppShadows.cover),
+                    ),
+                    child: ClipPath(
+                      clipper: ShapeBorderClipper(shape: shape),
+                      child: SizedBox(
+                        width: AppSizes.shelfCover.width,
+                        height: AppSizes.shelfCover.height,
+                        child: cover == null
+                            ? ColoredBox(
+                                color:
+                                    theme.colorScheme.surfaceContainerHighest,
+                              )
+                            : CoverImage(bytes: cover),
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  book.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelMedium,
-                ),
-                Text(
-                  progressLabel,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    book.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelMedium,
                   ),
-                ),
-              ],
+                  Text(
+                    progressLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

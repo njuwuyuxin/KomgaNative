@@ -9,6 +9,7 @@ export 'src/breakpoints.dart';
 export 'src/components/frosted_surface.dart';
 export 'src/components/pressable_scale.dart';
 export 'src/components/series_tile.dart';
+export 'src/components/skeleton.dart';
 export 'src/components/status_view.dart';
 export 'src/haptics.dart';
 export 'src/materials.dart';
