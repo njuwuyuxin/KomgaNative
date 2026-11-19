@@ -25,6 +25,10 @@ class SeriesSinglePane extends StatelessWidget {
     required this.onOpenBook,
     this.toolbar,
     this.filtered = false,
+    this.selected = const <String>{},
+    this.selecting = false,
+    this.onToggleSelect,
+    this.onMarkManyBooks,
     this.onLoadMore,
     super.key,
   });
@@ -46,6 +50,13 @@ class SeriesSinglePane extends StatelessWidget {
 
   /// 当前是否带筛选（决定空态文案）。
   final bool filtered;
+
+  /// 多选状态（SER-02）。
+  final Set<String> selected;
+  final bool selecting;
+  final void Function(String bookId)? onToggleSelect;
+  final Future<void> Function(List<String> bookIds, {required bool read})?
+  onMarkManyBooks;
 
   /// 书比当前加载的多时"加载更多"（UI-P2-4）。
   final VoidCallback? onLoadMore;
@@ -86,6 +97,10 @@ class SeriesSinglePane extends StatelessWidget {
               onLoadMore: onLoadMore,
               toolbar: toolbar,
               filtered: filtered,
+              selected: selected,
+              selecting: selecting,
+              onToggleSelect: onToggleSelect,
+              onMarkManyBooks: onMarkManyBooks,
             ),
           ),
         ],
@@ -111,6 +126,10 @@ class SeriesTwoPane extends StatelessWidget {
     required this.onOpenBook,
     this.toolbar,
     this.filtered = false,
+    this.selected = const <String>{},
+    this.selecting = false,
+    this.onToggleSelect,
+    this.onMarkManyBooks,
     this.onLoadMore,
     super.key,
   });
@@ -132,6 +151,13 @@ class SeriesTwoPane extends StatelessWidget {
 
   /// 当前是否带筛选（决定空态文案）。
   final bool filtered;
+
+  /// 多选状态（SER-02）。
+  final Set<String> selected;
+  final bool selecting;
+  final void Function(String bookId)? onToggleSelect;
+  final Future<void> Function(List<String> bookIds, {required bool read})?
+  onMarkManyBooks;
 
   /// 书比当前加载的多时"加载更多"（UI-P2-4）。
   final VoidCallback? onLoadMore;

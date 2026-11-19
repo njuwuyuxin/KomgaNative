@@ -6,8 +6,11 @@ import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
+import 'package:komga_native/src/providers/book_read_provider.dart';
+import 'package:komga_native/src/providers/book_selection_provider.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/providers/series_read_provider.dart';
+import 'package:komga_native/src/widgets/shelf_selection_bar.dart';
 import 'package:komga_native/src/screens/reader_screen.dart';
 import 'package:komga_native/src/widgets/edge_swipe_back.dart';
 import 'package:komga_native/src/widgets/offline_banner.dart';
@@ -77,6 +80,57 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
     ref.invalidate(seriesBooksProvider);
   }
 
+  /// 批量条正在提交（避免连点）。
+  bool _batchBusy = false;
+
+  /// 对选中的书批量标记（SER-02）：逐个调用，失败不中断，最后统一提示。
+  Future<void> _markSelectedBooks({required bool read}) async {
+    final ids = ref.read(bookSelectionProvider).ids.toList();
+    await _markBooks(ids, read: read);
+    ref.read(bookSelectionProvider.notifier).exit();
+  }
+
+  /// 长按菜单里的"标记之前所有为已读/未读"。
+  Future<void> _markManyBooks(List<String> bookIds, {required bool read}) =>
+      _markBooks(bookIds, read: read);
+
+  Future<void> _markBooks(List<String> bookIds, {required bool read}) async {
+    if (bookIds.isEmpty || _batchBusy || !mounted) return;
+    setState(() => _batchBusy = true);
+    final byId = <String, Book>{
+      for (final book
+          in ref.read(seriesBooksProvider(_booksQuery)).value?.items ??
+              const <Book>[])
+        book.id: book,
+    };
+    final reader = ref.read(bookReadProvider.notifier);
+    var failed = 0;
+    for (final id in bookIds) {
+      final book = byId[id];
+      if (book == null) continue;
+      try {
+        await reader.setRead(id, read: read, pagesCount: book.pagesCount);
+      } on Object {
+        failed++;
+      }
+    }
+    if (!mounted) return;
+    setState(() => _batchBusy = false);
+    // 原地刷新：书列表是"本地进度叠加"出来的，不刷新会留着旧状态。
+    ref.invalidate(seriesBooksProvider);
+    ref.invalidate(seriesDetailProvider(seriesId));
+    final l10n = AppLocalizations.of(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          failed == 0
+              ? l10n.booksBatchDone(bookIds.length - failed)
+              : l10n.batchPartialDone(bookIds.length - failed, failed),
+        ),
+      ),
+    );
+  }
+
   /// 标记整系列已读/未读；失败时用 SnackBar 说明，不把详情页变成错误页。
   Future<void> _markSeriesRead({required bool read}) async {
     try {
@@ -104,6 +158,11 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
 
     // 排序 / 筛选（SER-01）：放在书列表上方，窄屏宽屏共用同一个工具条。
     final filtered = _sort != null || _readStatus != null;
+    final selection = ref.watch(bookSelectionProvider);
+    final selecting = ref.read(bookSelectionProvider.notifier);
+    final bookIds = <String>[
+      for (final book in page?.items ?? <Book>[]) book.id,
+    ];
     final toolbar = SeriesBooksToolbar(
       total: page?.totalElements ?? 0,
       sort: _sort,
@@ -111,6 +170,12 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
       onSort: (BooksSort? value) => setState(() => _sort = value),
       onReadStatus: (SeriesReadStatus? value) =>
           setState(() => _readStatus = value),
+      selecting: selection.active,
+      selectedCount: selection.ids.length,
+      allSelected: bookIds.isNotEmpty && selection.ids.length == bookIds.length,
+      onEnterSelection: selecting.enter,
+      onExitSelection: selecting.exit,
+      onSelectAll: () => selecting.selectAll(bookIds),
     );
 
     // 宽屏两栏；窄屏一条滚动流。断点判断只在这里做一次（WindowSizeClass）。
@@ -120,6 +185,17 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
 
     return EdgeSwipeBack(
       child: Scaffold(
+        // 多选批量条：与书架一致，放在 footer 而不是浮层，避免盖住最后一行。
+        persistentFooterButtons: selection.active
+            ? <Widget>[
+                ShelfBatchBar(
+                  count: selection.ids.length,
+                  busy: _batchBusy,
+                  onMarkRead: () => _markSelectedBooks(read: true),
+                  onMarkUnread: () => _markSelectedBooks(read: false),
+                ),
+              ]
+            : null,
         appBar: GlassTopBar(
           header: GlassHeader(
             leading: GlassIconButton(
@@ -167,6 +243,10 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                       onOpenBook: _openBook,
                       toolbar: toolbar,
                       filtered: filtered,
+                      selected: selection.ids,
+                      selecting: selection.active,
+                      onToggleSelect: selecting.toggle,
+                      onMarkManyBooks: _markManyBooks,
                     )
                   : SeriesSinglePane(
                       series: series,
@@ -181,6 +261,10 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                       onOpenBook: _openBook,
                       toolbar: toolbar,
                       filtered: filtered,
+                      selected: selection.ids,
+                      selecting: selection.active,
+                      onToggleSelect: selecting.toggle,
+                      onMarkManyBooks: _markManyBooks,
                     ),
             ),
           ],

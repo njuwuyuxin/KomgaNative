@@ -1,6 +1,7 @@
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
+import 'package:komga_native/src/widgets/shelf_selection_bar.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 系列内书列表的工具条（SER-01）：总数 + 排序 + 阅读状态筛选。
@@ -15,6 +16,12 @@ class SeriesBooksToolbar extends StatelessWidget {
     required this.readStatus,
     required this.onSort,
     required this.onReadStatus,
+    this.selecting = false,
+    this.selectedCount = 0,
+    this.allSelected = false,
+    this.onEnterSelection,
+    this.onExitSelection,
+    this.onSelectAll,
     super.key,
   });
 
@@ -24,11 +31,30 @@ class SeriesBooksToolbar extends StatelessWidget {
   final ValueChanged<BooksSort?> onSort;
   final ValueChanged<SeriesReadStatus?> onReadStatus;
 
+  /// 多选态（SER-02）：进入后这一行换成"已选 N / 全选 / 取消"。
+  final bool selecting;
+  final int selectedCount;
+  final bool allSelected;
+  final VoidCallback? onEnterSelection;
+  final VoidCallback? onExitSelection;
+  final VoidCallback? onSelectAll;
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final filtered = sort != null || readStatus != null;
+
+    if (selecting) {
+      return ShelfSelectionBar(
+        count: selectedCount,
+        total: total,
+        allSelected: allSelected,
+        onSelectAll: onSelectAll ?? () {},
+        onClose: onExitSelection ?? () {},
+        countLabel: l10n.booksSelected,
+      );
+    }
 
     return Padding(
       key: const Key('series-books-toolbar'),
@@ -110,6 +136,13 @@ class SeriesBooksToolbar extends StatelessWidget {
                 onReadStatus(null);
               },
               icon: const Icon(Icons.close),
+            ),
+          if (onEnterSelection != null)
+            IconButton(
+              key: const Key('series-books-select'),
+              tooltip: l10n.selectSeries,
+              onPressed: onEnterSelection,
+              icon: const Icon(Icons.checklist),
             ),
         ],
       ),

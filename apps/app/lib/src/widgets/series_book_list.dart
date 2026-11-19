@@ -38,6 +38,11 @@ List<Widget> seriesBookPhaseSlivers(
   VoidCallback? onLoadMore,
   Widget? toolbar,
   bool filtered = false,
+  Set<String> selected = const <String>{},
+  bool selecting = false,
+  void Function(String bookId)? onToggleSelect,
+  Future<void> Function(List<String> bookIds, {required bool read})?
+  onMarkManyBooks,
 }) {
   // 失败优先：与改造前一致（刷新失败也会显示错误态，不静默保留旧列表）。
   if (failure != null) {
@@ -60,6 +65,10 @@ List<Widget> seriesBookPhaseSlivers(
     onLoadMore: onLoadMore,
     toolbar: toolbar,
     filtered: filtered,
+    selected: selected,
+    selecting: selecting,
+    onToggleSelect: onToggleSelect,
+    onMarkManyBooks: onMarkManyBooks,
   );
 }
 
@@ -72,6 +81,11 @@ List<Widget> _seriesBookSlivers(
   VoidCallback? onLoadMore,
   Widget? toolbar,
   bool filtered = false,
+  Set<String> selected = const <String>{},
+  bool selecting = false,
+  void Function(String bookId)? onToggleSelect,
+  Future<void> Function(List<String> bookIds, {required bool read})?
+  onMarkManyBooks,
 }) {
   final l10n = AppLocalizations.of(context);
   final theme = Theme.of(context);
@@ -94,10 +108,26 @@ List<Widget> _seriesBookSlivers(
     else
       SliverList.separated(
         itemCount: books.items.length,
-        itemBuilder: (BuildContext context, int index) => SeriesBookRow(
-          book: books.items[index],
-          onOpen: () => onOpenBook(books.items[index], direction),
-        ),
+        itemBuilder: (BuildContext context, int index) {
+          final book = books.items[index];
+          // "之前所有" = 当前顺序里排在这本书前面的那些（含自己？不含——
+          // 用户点的是"之前"，自己另外单点更符合预期）。
+          final previous = <String>[
+            for (var i = 0; i < index; i++) books.items[i].id,
+          ];
+          return SeriesBookRow(
+            book: book,
+            selected: selected.contains(book.id),
+            onOpen: () => onOpenBook(book, direction),
+            onToggleSelect: selecting
+                ? () => onToggleSelect?.call(book.id)
+                : null,
+            onMarkPrevious: onMarkManyBooks == null || previous.isEmpty
+                ? null
+                : ({required bool read}) =>
+                      onMarkManyBooks(previous, read: read),
+          );
+        },
         separatorBuilder: (BuildContext context, int index) =>
             const Divider(height: AppSizes.hairline),
       ),

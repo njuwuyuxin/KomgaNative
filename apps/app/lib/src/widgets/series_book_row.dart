@@ -20,11 +20,23 @@ class SeriesBookRow extends ConsumerWidget {
     required this.book,
     required this.onOpen,
     this.showSeriesTitle = false,
+    this.selected = false,
+    this.onToggleSelect,
+    this.onMarkPrevious,
     super.key,
   });
 
   final Book book;
   final Future<void> Function() onOpen;
+
+  /// 多选模式下这一行是否被勾中。
+  final bool selected;
+
+  /// 多选模式下点击这一行：勾选/取消，而不是打开书。
+  final VoidCallback? onToggleSelect;
+
+  /// 长按菜单里"标记之前所有为已读/未读"（SER-02）。为空时不显示这两项。
+  final Future<void> Function({required bool read})? onMarkPrevious;
 
   /// 搜索结果里书是**脱离系列**出现的：标题前要补系列名，
   /// 否则一屏都是 "Vol. 1 / Vol. 2"，分不清是哪套书（FIX-06）。
@@ -64,6 +76,8 @@ class SeriesBookRow extends ConsumerWidget {
       onTap: () => unawaited(onOpen()),
       child: PressableScale(
         child: ListTile(
+          selected: selected,
+          selectedTileColor: theme.colorScheme.primary.withValues(alpha: 0.08),
           contentPadding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.md,
             vertical: AppSpacing.xs,
@@ -101,40 +115,74 @@ class SeriesBookRow extends ConsumerWidget {
               ),
             ],
           ),
-          onTap: () => unawaited(onOpen()),
+          onTap: onToggleSelect ?? () => unawaited(onOpen()),
           onLongPress: () => unawaited(_showMenu(context, ref)),
         ),
       ),
     );
   }
 
-  /// 长按一本书：标记已读 / 未读（UI-P2-5 顺带补上的单本书标记）。
+  /// 长按一本书：标记这一本已读/未读；在系列页还可以"标记之前所有"。
   Future<void> _showMenu(BuildContext context, WidgetRef ref) async {
     final l10n = AppLocalizations.of(context);
     unawaited(AppHaptics.light());
-    final action = await showContextMenu<bool>(
+    // 用枚举而不是 bool：单本和"之前所有"是两组不同的动作，
+    // 以前两组共用一个 true/false，点"之前所有"会被当成"标记这一本"（踩过）。
+    final action = await showContextMenu<BookMenuAction>(
       context: context,
       anchor: context,
-      entries: <ContextMenuEntry<bool>>[
+      entries: <ContextMenuEntry<BookMenuAction>>[
         ContextMenuEntry(
-          value: true,
+          value: BookMenuAction.markRead,
           label: l10n.bookMarkRead,
           icon: Icons.done,
         ),
         ContextMenuEntry(
-          value: false,
+          value: BookMenuAction.markUnread,
           label: l10n.bookMarkUnread,
           icon: Icons.remove_done,
         ),
+        if (onMarkPrevious != null) ...<ContextMenuEntry<BookMenuAction>>[
+          ContextMenuEntry(
+            value: BookMenuAction.markPreviousRead,
+            label: l10n.markPreviousRead,
+            icon: Icons.done_all,
+          ),
+          ContextMenuEntry(
+            value: BookMenuAction.markPreviousUnread,
+            label: l10n.markPreviousUnread,
+            icon: Icons.remove_done,
+          ),
+        ],
       ],
     );
-    if (action == null || !context.mounted) return;
-    await ref
-        .read(bookReadProvider.notifier)
-        .setRead(book.id, read: action, pagesCount: book.pagesCount);
-    if (!context.mounted) return;
-    // 书列表是"本地进度叠加"出来的，改完要让详情重新取一遍。
-    ref.invalidate(seriesBooksProvider);
-    ref.invalidate(seriesDetailProvider(book.seriesId));
+    if (action == null) return;
+    switch (action) {
+      case BookMenuAction.markPreviousRead:
+        await onMarkPrevious?.call(read: true);
+      case BookMenuAction.markPreviousUnread:
+        await onMarkPrevious?.call(read: false);
+      case BookMenuAction.markRead:
+      case BookMenuAction.markUnread:
+        await ref
+            .read(bookReadProvider.notifier)
+            .setRead(
+              book.id,
+              read: action == BookMenuAction.markRead,
+              pagesCount: book.pagesCount,
+            );
+        if (!context.mounted) return;
+        // 书列表是"本地进度叠加"出来的，改完要让详情重新取一遍。
+        ref.invalidate(seriesBooksProvider);
+        ref.invalidate(seriesDetailProvider(book.seriesId));
+    }
   }
+}
+
+/// 书行长按菜单的动作。
+enum BookMenuAction {
+  markRead,
+  markUnread,
+  markPreviousRead,
+  markPreviousUnread,
 }

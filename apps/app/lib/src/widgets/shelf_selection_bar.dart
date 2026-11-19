@@ -14,6 +14,7 @@ class ShelfSelectionBar extends StatelessWidget {
     required this.allSelected,
     required this.onSelectAll,
     required this.onClose,
+    this.countLabel,
     super.key,
   });
 
@@ -22,6 +23,9 @@ class ShelfSelectionBar extends StatelessWidget {
   final bool allSelected;
   final VoidCallback onSelectAll;
   final VoidCallback onClose;
+
+  /// "已选 N"的文案；默认按"个"（书架），系列页传"本"。
+  final String Function(int count)? countLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +42,7 @@ class ShelfSelectionBar extends StatelessWidget {
         ),
         Expanded(
           child: Text(
-            l10n.selectedCount(count),
+            countLabel?.call(count) ?? l10n.selectedCount(count),
             key: const Key('shelf-selection-count'),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
