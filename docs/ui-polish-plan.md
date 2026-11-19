@@ -545,6 +545,14 @@ Panels 的高级感主要来自三点，和控件本身关系不大：
 | 动画中断处理：新选中项到来时从胶囊当前所在位置续弹；墨水屏 / 减少动态效果直接跳终值，不建 `Opacity` 合成层（稳态下一层都不多） |
 | 测试：`floating_nav_bar_test` / `glass_controls_test` 各覆盖"60ms 还在半路、最终落位"的弹簧补间与墨水屏瞬时到位；`collections@*`、`connection@*`、`settings@eink` 基线按新几何重生成 |
 
+**进度（2026-11-19）：主页面切换的水平滑动。**
+
+| 落地 |
+|---|
+| 新增 `SlidingBranchContainer`，在 `router.dart` 里替代 `StatefulShellRoute.indexedStack` 的默认容器；分支 Navigator 仍常驻（`Offstage` + `TickerMode`），切换时只显示旧/新两页并向切换方向滑动，远距离切 tab 不闪中间页 |
+| 弹簧取 `AppMotion.gentle`（页面级手感）；墨水屏 / 减少动态效果直接切页。容器不接管手势，避免与收藏页内部的横向 `TabBarView` 冲突 |
+| 测试：`sliding_branch_container_test` 覆盖旧/新页位移、RTL 反向、远距离不闪中间页、墨水屏瞬时切换、切走再回来状态保留；`app_smoke_test` 在真实路由下点 dock 验证滑动中两页同时在场、结束后旧页离场 |
+
 ## 不做
 
 | 需求 | 理由 |

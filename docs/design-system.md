@@ -161,6 +161,16 @@ chrome 永远压在漫画画面上：浅色模式下用浅色毛玻璃，白底�
 - 四个 tab 平分胶囊，单格 48 点按区仍然成立；`floating_nav_bar_test` 钉了
   第一个/最后一个 tab 与外层胶囊端头的关系。
 - 平板侧边栏 `NavigationRail` 也同步有 5 个目标（含搜索）。
+- **切 tab 时主页面水平滑动**：`SlidingBranchContainer` 替换 go_router 默认的
+  `IndexedStack`。所有分支仍然常驻（滚动位置、返回栈、页面状态不丢），但切换时
+  只显示旧页与新页——旧页向切换方向滑出，新页从另一侧滑入；远距离切 tab 不会
+  闪过中间页（`Library` / `Collections` 的 Navigator 即使已加载也不参与这次滑动）。
+  弹簧取 `AppMotion.gentle`（页面级手感，比 dock 胶囊的 `snappy` 稳），墨水屏 /
+  "减少动态效果"直接切页。
+- 容器**不接管手势**：收藏页自己有一条横向 `TabBarView`（收藏集 / 阅读列表），
+  再叠一层可拖动的 `PageView` 会抢手势，所以滑动只由 tab 点击驱动。
+- 外层 `ClipRect` 是必需的：`FractionalTranslation` 不会把"画出边界"报告给
+  `Stack`，不裁的话滑出的一半会盖到 dock / 状态栏上。
 
 ## 其他页面的控件
 
@@ -225,6 +235,11 @@ chrome 永远压在漫画画面上：浅色模式下用浅色毛玻璃，白底�
 - `packages/komga_design_system/test/tokens_test.dart`：各 token 的普通 / 墨水屏 / 减少动态效果三种取值，
   `PressableScale` 的按下回弹、不抢点击、墨水屏透传，`FrostedSurface` / `GlassSurface` 的墨水屏退化
   （不模糊、不反光、无阴影），`AppHaptics` 的映射与开关。
+- `apps/app/test/widgets/sliding_branch_container_test.dart`：主页面切换容器——
+  旧页左移 / 新页右移（RTL 反向）、远距离切 tab 只滑新旧两页、墨水屏直接切页、
+  切走再回来分支状态保留（`Offstage` 而不是销毁）。
+- `apps/app/test/app_smoke_test.dart`：真实路由下点 dock 的"书架"，滑动中旧页
+  （`ReadingNowScreen`）与新页（`LibraryScreen`）同时在场，结束后旧页离场。
 - `apps/app/test/widgets/floating_nav_bar_test.dart`：导航条的点击派发、48 点按区、
   `selected` 语义、搜索圆球的读屏标签、墨水屏反白、1.3 倍字号不溢出，选中胶囊
   四边等宽内缩 / 内外半径差 = 内缩（端头半圆同心）、四个槽位等宽，以及

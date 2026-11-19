@@ -9,6 +9,8 @@ import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/providers/progress_providers.dart';
 import 'package:komga_native/src/providers/reader_providers.dart';
 import 'package:komga_native/src/data/progress/progress_store.dart';
+import 'package:komga_native/src/screens/library_screen.dart';
+import 'package:komga_native/src/screens/reading_now_screen.dart';
 import 'package:komga_native/src/session/connection_service.dart';
 import 'package:komga_native/src/session/server_store.dart';
 import 'package:komga_native/src/session/session_controller.dart';
@@ -68,6 +70,27 @@ void main() {
     // 手机形态是自定义的悬浮玻璃导航（不再是 Material 的 NavigationBar）。
     expect(find.byType(FloatingNavBar), findsOneWidget);
     expect(find.byType(NavigationBar), findsNothing);
+  });
+
+  testWidgets('切 dock tab：主页面水平滑动，旧页离场', (WidgetTester tester) async {
+    await pumpApp(tester, store: InMemoryServerStore(storedServer()));
+    expect(find.byType(ReadingNowScreen), findsOneWidget);
+    expect(find.byType(LibraryScreen), findsNothing);
+
+    await tester.tap(find.byKey(const Key('nav-tab-1')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 80));
+
+    expect(
+      find.byType(ReadingNowScreen),
+      findsOneWidget,
+      reason: '滑动过程中旧页应仍可见',
+    );
+    expect(find.byType(LibraryScreen), findsOneWidget, reason: '滑动过程中新页应已进入');
+
+    await tester.pumpAndSettle();
+    expect(find.byType(ReadingNowScreen), findsNothing);
+    expect(find.byType(LibraryScreen), findsOneWidget);
   });
 
   testWidgets('填写账号密码并连接 → 进入书架', (WidgetTester tester) async {

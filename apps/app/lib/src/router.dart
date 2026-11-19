@@ -15,6 +15,7 @@ import 'package:komga_native/src/screens/settings_screen.dart';
 import 'package:komga_native/src/screens/splash_screen.dart';
 import 'package:komga_native/src/session/session_controller.dart';
 import 'package:komga_native/src/widgets/adaptive_shell.dart';
+import 'package:komga_native/src/widgets/sliding_branch_container.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 路由表 + 登录态守卫。
@@ -53,12 +54,23 @@ GoRouter createRouter({
         builder: (BuildContext context, GoRouterState state) =>
             const ConnectionScreen(),
       ),
-      StatefulShellRoute.indexedStack(
+      StatefulShellRoute(
         builder: (
           BuildContext context,
           GoRouterState state,
           StatefulNavigationShell shell,
         ) => AdaptiveShell(shell: shell),
+        // 主页面切换用水平滑动（旧页滑出 / 新页滑入），而不是默认的
+        // IndexedStack 瞬切；分支持久化与返回栈仍由 go_router 负责。
+        navigatorContainerBuilder:
+            (
+              BuildContext context,
+              StatefulNavigationShell shell,
+              List<Widget> children,
+            ) => SlidingBranchContainer(
+              currentIndex: shell.currentIndex,
+              children: children,
+            ),
         branches: <StatefulShellBranch>[
           // "正在读"是首页（UI-P2-6）：打开 App 先看到"上次看到哪"。
           StatefulShellBranch(
