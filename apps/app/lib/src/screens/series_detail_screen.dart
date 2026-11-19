@@ -14,6 +14,7 @@ import 'package:komga_native/src/widgets/shelf_selection_bar.dart';
 import 'package:komga_native/src/screens/reader_screen.dart';
 import 'package:komga_native/src/widgets/edge_swipe_back.dart';
 import 'package:komga_native/src/widgets/offline_banner.dart';
+import 'package:komga_native/src/widgets/series_download_menu.dart';
 import 'package:komga_native/src/widgets/series_hero_tag.dart';
 import 'package:komga_native/src/widgets/series_books_toolbar.dart';
 import 'package:komga_native/src/widgets/series_two_pane.dart';
@@ -204,22 +205,31 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
               onPressed: () => context.pop(),
             ),
             // 刻意不放标题：系列名在头部（封面右边）已经有了，标题栏再重复一次
-            // 既挤占宽度又显得多余。这里只留返回 / 更多两个圆球。
-            trailing: GlassMenuButton(
-              key: const Key('series-mark-menu'),
-              orb: true,
-              icon: Icons.done_all,
-              label: l10n.markReadTooltip,
-              menuChildren: <Widget>[
-                GlassMenuItemButton(
-                  key: const Key('series-mark-read'),
-                  label: l10n.markAllRead,
-                  onPressed: () => unawaited(_markSeriesRead(read: true)),
+            // 既挤占宽度又显得多余。这里只留返回 / 下载 / 更多。
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                SeriesDownloadMenu(
+                  seriesId: seriesId,
+                  books: page?.items ?? const <Book>[],
                 ),
-                GlassMenuItemButton(
-                  key: const Key('series-mark-unread'),
-                  label: l10n.markAllUnread,
-                  onPressed: () => unawaited(_markSeriesRead(read: false)),
+                GlassMenuButton(
+                  key: const Key('series-mark-menu'),
+                  orb: true,
+                  icon: Icons.done_all,
+                  label: l10n.markReadTooltip,
+                  menuChildren: <Widget>[
+                    GlassMenuItemButton(
+                      key: const Key('series-mark-read'),
+                      label: l10n.markAllRead,
+                      onPressed: () => unawaited(_markSeriesRead(read: true)),
+                    ),
+                    GlassMenuItemButton(
+                      key: const Key('series-mark-unread'),
+                      label: l10n.markAllUnread,
+                      onPressed: () => unawaited(_markSeriesRead(read: false)),
+                    ),
+                  ],
                 ),
               ],
             ),

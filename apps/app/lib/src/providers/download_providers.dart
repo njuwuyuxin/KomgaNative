@@ -205,6 +205,47 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
     await _pump();
   }
 
+  /// 批量入队（SER-03）：跳过已经下好的、跳过已在队列/正在下的，返回实际入队数量。
+  ///
+  /// 为什么要在这里判重而不是交给 [start]：批量时每本都走一遍 `start` 会反复
+  /// `_pump`，而且"跳过了几本"这个数字要能回给用户看。
+  Future<({int queued, int skipped})> startMany(List<Book> books) async {
+    var queued = 0;
+    var skipped = 0;
+    for (final book in books) {
+      final already =
+          await _service.downloaded(book.id) != null ||
+          _queue.any((Book q) => q.id == book.id) ||
+          _active == book.id ||
+          state[book.id]?.isRunning == true;
+      if (already) {
+        skipped++;
+        continue;
+      }
+      _queue.add(book);
+      queued++;
+      _set(book.id, const DownloadStatus(queued: true));
+      _persist(
+        _db.enqueueDownload(
+          bookId: book.id,
+          seriesId: book.seriesId,
+          name: book.name,
+          number: book.number,
+          pagesCount: book.pagesCount,
+        ),
+      );
+    }
+    if (queued > 0) await _pump();
+    return (queued: queued, skipped: skipped);
+  }
+
+  /// 取消指定的一批（SER-03 的"取消"按钮：只撤掉这次入队的）。
+  void cancelMany(Iterable<String> bookIds) {
+    for (final id in bookIds.toList()) {
+      cancel(id);
+    }
+  }
+
   Future<void> _pump() async {
     if (_active != null) return;
     while (_queue.isNotEmpty) {
