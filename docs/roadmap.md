@@ -144,4 +144,5 @@
 ## 下一阶段：UI 精致化（对标 Panels）
 
 需求清单、优先级（P0 设计系统地基 → P1 阅读器 → P2 书架/详情 → P3 长尾）与批次依赖见
-[docs/ui-polish-plan.md](ui-polish-plan.md)。
+[docs/ui-polish-plan.md](ui-polish-plan.md)；截至 2026-11-19 的完成度、与 Panels 的功能/UI 细节对比、
+以及下一批建议见 [docs/panels-comparison.md](panels-comparison.md)。
