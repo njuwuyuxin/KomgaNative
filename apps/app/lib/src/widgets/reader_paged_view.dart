@@ -49,6 +49,9 @@ class ReaderPagedView extends ConsumerStatefulWidget {
     this.style = const PageTurnStyle(),
     this.lockZoom = false,
     this.trimBorders = false,
+    this.tapZone = TapZonePreset.automatic,
+    this.invertTapZones = false,
+    this.doubleTapZoom = true,
     super.key,
   });
 
@@ -82,6 +85,12 @@ class ReaderPagedView extends ConsumerStatefulWidget {
 
   /// 翻页后保持缩放比例（UI-P3-4）。
   final bool lockZoom;
+
+  /// 点击区预设、反转与双击缩放（RDR-07）。由宿主从 `ReaderPrefs` 传进来，
+  /// 这一层不认识偏好存储。
+  final TapZonePreset tapZone;
+  final bool invertTapZones;
+  final bool doubleTapZoom;
 
   /// 自动裁掉页图白边（UI-P3-10）。
   final bool trimBorders;

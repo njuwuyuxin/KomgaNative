@@ -81,7 +81,7 @@
 
 | ID | 需求 | P | 状态 | commit |
 |---|---|---|---|---|
-| RDR-07 | 点击区预设 + 反转 | P2 | TODO | — |
+| RDR-07 | 点击区预设 + 反转 | P2 | DONE | `feat(reader): 点击区预设/反转/双击开关` |
 | RDR-08 | 条漫自动滚动 | P2 | TODO | — |
 | SER-04 | 收藏集新建/编辑（API 验证后） | P2 | TODO | — |
 | I18N-02 | 语言扩展框架（日/繁中/西/法） | P2 | TODO | — |
@@ -228,6 +228,28 @@
   `continueReadingProgress` 是 FIX-06 之后失效的）。
 - 验证：55 条阅读器测试 + 黄金图全部不变（零行为变更）；设备上打开第 114/227 页
   照常渲染，滑杆与"剩 113 页"一致。
+
+### RDR-07 点击区预设 + 反转
+
+- 引擎新增纯函数 `resolveTapZone`（`komga_reader_engine/lib/src/tap_zones.dart`）：
+  五种预设 → `previous / next / toggleChrome`。
+  - `automatic`：竖屏按左右，横屏按 L 形；
+  - `leftRight`：左/右 1/3 翻页，中间 chrome；
+  - `lShaped`：左列上一页、右下角（x≥0.6 且 y≥0.5）下一页；
+  - `kindle`：左右各 40%，中间 20% chrome；
+  - `edge`：只有最外侧 15% 翻页。
+  （`lShaped`/`edge` 的具体边界是这次定的，写在代码注释里，别处没有"行业标准"可对。）
+- **反转只翻页、不挪 chrome 区**：否则用户勾了反转会连"点中间切菜单"都跟着变，很难解释。
+  RTL 与反转是两次独立镜像，叠加等于还原。
+- 阅读器接线：`ReaderPagedView` 接收 `tapZone/invertTapZones/doubleTapZoom`，
+  `_handleTap` 改走解析器；**关掉双击放大后，中间区单击不再等 300ms** 双击窗口。
+- 偏好持久化：`tapZone` / `invertTapZones` / `doubleTapZoom` 三项进 `ReaderPrefs`
+  （json/相等/坏值回默认），设置页"阅读"组有对应 chip 组与两个开关。
+- 测试：引擎 `tap_zones_test.dart` 9 条（五种预设的边界、RTL 镜像、invert 叠加、
+  invert 不动 chrome、零尺寸安全）、应用侧 2 条持久化往返。
+- 黄金图：`settings@*` 四张因新增控件重生成。
+- 设备走查：设置 → 阅读 → 点击区（自动/左右/L 形/Kindle/仅边缘）+ 反转翻页方向 +
+  双击放大，渲染正确。
 
 ### UI-03 黄金图矩阵补齐
 

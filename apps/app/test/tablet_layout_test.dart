@@ -94,6 +94,33 @@ void main() {
     });
   });
 
+  group('点击区偏好持久化（RDR-07）', () {
+    test('默认值与往返', () {
+      const defaults = ReaderPrefs();
+      expect(defaults.tapZone, TapZonePreset.automatic);
+      expect(defaults.invertTapZones, isFalse);
+      expect(defaults.doubleTapZoom, isTrue);
+
+      final saved = defaults.copyWith(
+        tapZone: TapZonePreset.kindle,
+        invertTapZones: true,
+        doubleTapZoom: false,
+      );
+      final restored = ReaderPrefs.fromJson(saved.toJson());
+      expect(restored.tapZone, TapZonePreset.kindle);
+      expect(restored.invertTapZones, isTrue);
+      expect(restored.doubleTapZoom, isFalse);
+      expect(restored, saved);
+    });
+
+    test('坏值回默认', () {
+      final restored = ReaderPrefs.fromJson(<String, Object?>{
+        'tapZone': 'diagonal',
+      });
+      expect(restored.tapZone, TapZonePreset.automatic);
+    });
+  });
+
   group('偏好持久化', () {
     test('默认 auto，存档往返保留', () {
       const defaults = ReaderPrefs();

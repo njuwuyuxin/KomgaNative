@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
 import 'package:komga_native/src/data/reader_prefs_store.dart';
+import 'package:komga_reader_engine/komga_reader_engine.dart'
+    show TapZonePreset;
 import 'package:komga_platform/komga_platform.dart';
 
 /// 阅读偏好：模式 / 亮度 / 常亮。
@@ -68,6 +70,20 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
 
   void setPageTurn(ReaderPageTurnChoice choice, {String? seriesId}) =>
       _updateConfig(seriesId, (ReaderPrefs p) => p.copyWith(pageTurn: choice));
+
+  /// 点击区预设 / 反转 / 双击缩放（RDR-07）：都跟着书走。
+  void setTapZone(TapZonePreset preset, {String? seriesId}) =>
+      _updateConfig(seriesId, (ReaderPrefs p) => p.copyWith(tapZone: preset));
+
+  void setInvertTapZones(bool enabled, {String? seriesId}) => _updateConfig(
+    seriesId,
+    (ReaderPrefs p) => p.copyWith(invertTapZones: enabled),
+  );
+
+  void setDoubleTapZoom(bool enabled, {String? seriesId}) => _updateConfig(
+    seriesId,
+    (ReaderPrefs p) => p.copyWith(doubleTapZoom: enabled),
+  );
 
   /// 平板默认排版（PLT-02）：全局设置，不进系列覆盖。
   void setTabletLayout(TabletLayoutChoice choice) =>

@@ -3,6 +3,8 @@ import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/app_settings.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
+import 'package:komga_reader_engine/komga_reader_engine.dart'
+    show TapZonePreset;
 import 'package:komga_native/src/data/shelf_view_options.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/session/session_controller.dart';
@@ -102,6 +104,50 @@ class SettingsReadingSection extends ConsumerWidget {
             ),
           ),
         ),
+        ListTile(
+          key: const Key('settings-tap-zones'),
+          title: Text(l10n.settingsTapZones),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: AppSpacing.sm),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Wrap(
+                  spacing: AppSpacing.xs,
+                  runSpacing: AppSpacing.xs,
+                  children: <Widget>[
+                    for (final preset in TapZonePreset.values)
+                      ChoiceChip(
+                        key: Key('settings-tap-zone-${preset.name}'),
+                        label: Text(_tapZoneLabel(l10n, preset)),
+                        selected: prefs.tapZone == preset,
+                        onSelected: (bool selected) {
+                          if (selected) controller.setTapZone(preset);
+                        },
+                      ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.xxs),
+                Text(
+                  l10n.settingsTapZonesHint,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+        ),
+        SwitchListTile(
+          key: const Key('settings-invert-tap-zones'),
+          value: prefs.invertTapZones,
+          title: Text(l10n.settingsInvertTapZones),
+          onChanged: controller.setInvertTapZones,
+        ),
+        SwitchListTile(
+          key: const Key('settings-double-tap-zoom'),
+          value: prefs.doubleTapZoom,
+          title: Text(l10n.settingsDoubleTapZoom),
+          onChanged: controller.setDoubleTapZoom,
+        ),
         SwitchListTile(
           key: const Key('settings-show-session-time'),
           value: prefs.showSessionTime,
@@ -112,6 +158,15 @@ class SettingsReadingSection extends ConsumerWidget {
       ],
     );
   }
+
+  static String _tapZoneLabel(AppLocalizations l10n, TapZonePreset preset) =>
+      switch (preset) {
+        TapZonePreset.automatic => l10n.tapZoneAutomatic,
+        TapZonePreset.leftRight => l10n.tapZoneLeftRight,
+        TapZonePreset.lShaped => l10n.tapZoneLShaped,
+        TapZonePreset.kindle => l10n.tapZoneKindle,
+        TapZonePreset.edge => l10n.tapZoneEdge,
+      };
 
   static String _tabletLabel(
     AppLocalizations l10n,

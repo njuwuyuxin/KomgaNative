@@ -170,6 +170,9 @@ class ReaderPrefs {
     this.spreadFrom = const <String, int>{},
     this.showSessionTime = true,
     this.tabletLayout = TabletLayoutChoice.auto,
+    this.tapZone = TapZonePreset.automatic,
+    this.invertTapZones = false,
+    this.doubleTapZoom = true,
     this.presets = const <ReaderPreset>[],
     this.seriesOverrides = const <String, ReaderPrefs>{},
   });
@@ -209,6 +212,15 @@ class ReaderPrefs {
 
   /// 平板上的默认排版（PLT-02）：只在平板上生效，手机不受影响。
   final TabletLayoutChoice tabletLayout;
+
+  /// 点击区预设（RDR-07）。
+  final TapZonePreset tapZone;
+
+  /// 交换前后页（RDR-07）：只翻转页方向，不挪动 chrome 区。
+  final bool invertTapZones;
+
+  /// 双击放大（RDR-07）：关掉后中间区单击不再等双击窗口。
+  final bool doubleTapZoom;
 
   /// 用户保存的阅读预设（UI-P3-1）；按保存顺序排列。
   final List<ReaderPreset> presets;
@@ -283,6 +295,9 @@ class ReaderPrefs {
       spreadFrom: spreadFrom,
       showSessionTime: showSessionTime,
       tabletLayout: tabletLayout,
+      tapZone: tapZone,
+      invertTapZones: invertTapZones,
+      doubleTapZoom: doubleTapZoom,
       presets: presets,
       seriesOverrides: seriesOverrides,
     );
@@ -341,6 +356,9 @@ class ReaderPrefs {
     Map<String, int>? spreadFrom,
     bool? showSessionTime,
     TabletLayoutChoice? tabletLayout,
+    TapZonePreset? tapZone,
+    bool? invertTapZones,
+    bool? doubleTapZoom,
     List<ReaderPreset>? presets,
     Map<String, ReaderPrefs>? seriesOverrides,
   }) => ReaderPrefs(
@@ -356,6 +374,9 @@ class ReaderPrefs {
     spreadFrom: spreadFrom ?? this.spreadFrom,
     showSessionTime: showSessionTime ?? this.showSessionTime,
     tabletLayout: tabletLayout ?? this.tabletLayout,
+    tapZone: tapZone ?? this.tapZone,
+    invertTapZones: invertTapZones ?? this.invertTapZones,
+    doubleTapZoom: doubleTapZoom ?? this.doubleTapZoom,
     presets: presets ?? this.presets,
     seriesOverrides: seriesOverrides ?? this.seriesOverrides,
   );
@@ -374,6 +395,9 @@ class ReaderPrefs {
         if (spreadFrom.isNotEmpty) 'spreadFrom': spreadFrom,
         'showSessionTime': showSessionTime,
         'tabletLayout': tabletLayout.name,
+        'tapZone': tapZone.name,
+        'invertTapZones': invertTapZones,
+        'doubleTapZoom': doubleTapZoom,
         if (includePresets && presets.isNotEmpty)
           'presets': <Object?>[for (final preset in presets) preset.toJson()],
         if (includePresets && seriesOverrides.isNotEmpty)
@@ -441,6 +465,13 @@ class ReaderPrefs {
         TabletLayoutChoice.values,
         TabletLayoutChoice.auto,
       ),
+      tapZone: _parse(
+        json['tapZone'],
+        TapZonePreset.values,
+        TapZonePreset.automatic,
+      ),
+      invertTapZones: json['invertTapZones'] == true,
+      doubleTapZoom: json['doubleTapZoom'] != false,
       presets: presets,
       seriesOverrides: overrides,
     );
@@ -484,6 +515,9 @@ class ReaderPrefs {
       _sameSpreadFrom(other.spreadFrom, spreadFrom) &&
       other.showSessionTime == showSessionTime &&
       other.tabletLayout == tabletLayout &&
+      other.tapZone == tapZone &&
+      other.invertTapZones == invertTapZones &&
+      other.doubleTapZoom == doubleTapZoom &&
       _samePresets(other.presets, presets) &&
       _sameOverrides(other.seriesOverrides, seriesOverrides);
 
@@ -531,6 +565,9 @@ class ReaderPrefs {
         (MapEntry<String, int> e) => Object.hash(e.key, e.value),
       ),
     ),
+    tapZone,
+    invertTapZones,
+    doubleTapZoom,
     Object.hashAll(presets),
     Object.hashAll(
       seriesOverrides.entries.map(

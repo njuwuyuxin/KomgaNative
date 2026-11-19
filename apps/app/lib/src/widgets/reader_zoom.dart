@@ -111,16 +111,32 @@ mixin _Zoom on _PageTurn {
   /// 中间区域既要能切 chrome、又要能双击缩放，所以单击必须等
   /// [kDoubleTapTimeout] 过去才生效——否则双击的第一下就把 chrome 切掉了。
   /// 左右翻页区**不等**：为了双击把翻页拖慢 300ms 是不可接受的。
+  /// 点击分派（RDR-07）：按用户选的点击区预设决定翻页/切 chrome。
+  ///
+  /// 翻页区**不等**双击窗口（为了双击把翻页拖慢 300ms 不可接受）；
+  /// 中间区既要切 chrome、又要能双击缩放，所以单击必须等窗口过去——
+  /// 除非用户关掉了双击缩放，那时中间区也立即生效。
   void _handleTap(Offset position, double width) {
     if (_phase != _TurnPhase.idle) return;
-    final fraction = width <= 0 ? 0.5 : position.dx / width;
-    if (fraction < 0.33) {
-      // 左侧三分之一：LTR 往回翻，RTL 往前翻（日漫）。
-      turn(widget.rightToLeft ? 1 : -1);
+    final zone = resolveTapZone(
+      preset: widget.tapZone,
+      dx: position.dx,
+      dy: position.dy,
+      width: width,
+      height: _viewport.height,
+      rightToLeft: widget.rightToLeft,
+      inverted: widget.invertTapZones,
+    );
+    if (zone == TapZoneAction.previous) {
+      turn(-1);
       return;
     }
-    if (fraction > 0.67) {
-      turn(widget.rightToLeft ? -1 : 1);
+    if (zone == TapZoneAction.next) {
+      turn(1);
+      return;
+    }
+    if (!widget.doubleTapZoom) {
+      widget.onToggleChrome();
       return;
     }
     final pending = _singleTapTimer;
@@ -136,7 +152,6 @@ mixin _Zoom on _PageTurn {
       widget.onToggleChrome();
     });
   }
-
   // ---- 缩放 ----
 
   void _onScaleStart(ScaleStartDetails details) {

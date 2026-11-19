@@ -12,4 +12,5 @@ export 'src/layout.dart';
 export 'src/page_turn.dart';
 export 'src/preload.dart';
 export 'src/spreads.dart';
+export 'src/tap_zones.dart';
 export 'src/vertical.dart';
