@@ -17,6 +17,9 @@ import 'package:material_ui/material_ui.dart';
 ///
 /// 不新建索引：Komga 的 `/series?search=` 与 `/books?search=` 都由服务端 Lucene
 /// 匹配标题/作者/标签，客户端只负责合并展示。防抖用 `AppMotion.emphasized`。
+///
+/// 顶部的搜索框**就是**标题栏：玻璃胶囊里直接嵌输入框（iOS 搜索页的形态），
+/// 不再套一层 `AppBar` + `TextField`。
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
 
@@ -49,34 +52,31 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(
-        title: TextField(
-          key: const Key('search-field'),
-          controller: _controller,
-          autofocus: true,
-          textInputAction: TextInputAction.search,
-          onChanged: _onChanged,
-          decoration: InputDecoration(
-            hintText: l10n.searchHint,
-            border: InputBorder.none,
-          ),
-        ),
-        actions: <Widget>[
-          if (_query.isNotEmpty)
-            IconButton(
-              key: const Key('search-clear'),
-              tooltip: l10n.closeSearch,
-              onPressed: () {
-                _controller.clear();
-                _onChanged('');
-              },
-              icon: const Icon(Icons.close),
+      body: GlassPageBackground(
+        child: CustomScrollView(
+          slivers: <Widget>[
+            GlassHeaderSliver(
+              header: GlassHeader(
+                bar: GlassSearchField(
+                  key: const Key('search-field'),
+                  controller: _controller,
+                  hintText: l10n.searchHint,
+                  clearLabel: l10n.closeSearch,
+                  autofocus: true,
+                  onChanged: _onChanged,
+                ),
+              ),
             ),
-        ],
+            if (_query.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: _SearchHint(text: l10n.searchHint),
+              )
+            else
+              _SearchResults(query: _query),
+          ],
+        ),
       ),
-      body: _query.isEmpty
-          ? _SearchHint(text: l10n.searchHint)
-          : _SearchResults(query: _query),
     );
   }
 }
@@ -95,20 +95,32 @@ class _SearchResults extends ConsumerWidget {
     final bookItems = books.value?.items ?? const <Book>[];
     final loading = series.value == null || books.value == null;
 
-    if (loading) return const Center(child: CircularProgressIndicator());
+    if (loading) {
+      return const SliverFillRemaining(
+        hasScrollBody: false,
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
     if (series.hasError && books.hasError) {
       final error = series.error;
-      return Center(
-        child: Text(error is ShelfFailure ? error.message : l10n.errorGeneric),
+      return SliverFillRemaining(
+        hasScrollBody: false,
+        child: Center(
+          child: Text(
+            error is ShelfFailure ? error.message : l10n.errorGeneric,
+          ),
+        ),
       );
     }
     if (seriesItems.isEmpty && bookItems.isEmpty) {
-      return _SearchHint(text: l10n.searchNoResults(query));
+      return SliverFillRemaining(
+        hasScrollBody: false,
+        child: _SearchHint(text: l10n.searchNoResults(query)),
+      );
     }
 
-    return ListView(
+    return SliverList.list(
       // 悬浮导航条浮在内容上：结果列表末尾让开它。
-      padding: const EdgeInsets.only(bottom: AppSizes.navBarClearance),
       children: <Widget>[
         if (seriesItems.isNotEmpty) ...<Widget>[
           _Header(text: l10n.searchSeriesTab),
@@ -132,6 +144,7 @@ class _SearchResults extends ConsumerWidget {
               },
             ),
         ],
+        const SizedBox(height: AppSizes.navBarClearance),
       ],
     );
   }
@@ -151,7 +164,7 @@ class _Header extends StatelessWidget {
         AppSpacing.md,
         AppSpacing.xs,
       ),
-      child: Text(text, style: Theme.of(context).textTheme.titleSmall),
+      child: Text(text, style: AppTypography.of(context).title),
     );
   }
 }

@@ -25,19 +25,36 @@ class CollectionDetailScreen extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final async = ref.watch(collectionSeriesProvider(collectionId));
     return Scaffold(
-      appBar: AppBar(title: Text(title ?? l10n.collectionFallback)),
-      body: _SeriesList(
-        async: async,
-        onRetry: () {
-          ref.invalidate(collectionSeriesProvider(collectionId));
-        },
+      body: GlassPageBackground(
+        child: CustomScrollView(
+          slivers: <Widget>[
+            GlassHeaderSliver(
+              header: GlassHeader(
+                leading: GlassIconButton(
+                  icon: Icons.chevron_left,
+                  label: MaterialLocalizations.of(context).backButtonTooltip,
+                  onPressed: () => context.pop(),
+                ),
+                title: Text(title ?? l10n.collectionFallback),
+              ),
+            ),
+            _SeriesSliver(
+              async: async,
+              onRetry: () =>
+                  ref.invalidate(collectionSeriesProvider(collectionId)),
+            ),
+            const SliverToBoxAdapter(
+              child: SizedBox(height: AppSizes.navBarClearance),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _SeriesList extends StatelessWidget {
-  const _SeriesList({required this.async, required this.onRetry});
+class _SeriesSliver extends StatelessWidget {
+  const _SeriesSliver({required this.async, required this.onRetry});
 
   final AsyncValue<PageResult<Series>> async;
   final VoidCallback onRetry;
@@ -46,38 +63,44 @@ class _SeriesList extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     if (async.hasError && !async.hasValue) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Text(
-              async.error is ShelfFailure
-                  ? (async.error! as ShelfFailure).message
-                  : l10n.errorGeneric,
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            FilledButton(onPressed: onRetry, child: Text(l10n.retry)),
-          ],
+      return SliverFillRemaining(
+        hasScrollBody: false,
+        child: StatusView(
+          icon: Icons.cloud_off_outlined,
+          title: async.error is ShelfFailure
+              ? (async.error! as ShelfFailure).message
+              : l10n.errorGeneric,
+          actionLabel: l10n.retry,
+          onAction: onRetry,
         ),
       );
     }
     final page = async.value;
-    if (page == null) return const Center(child: CircularProgressIndicator());
-    if (page.items.isEmpty) {
-      return Center(child: Text(l10n.collectionsEmpty));
+    if (page == null) {
+      return const SliverFillRemaining(
+        hasScrollBody: false,
+        child: Center(child: CircularProgressIndicator()),
+      );
     }
-    return ListView.separated(
+    if (page.items.isEmpty) {
+      return SliverFillRemaining(
+        hasScrollBody: false,
+        child: StatusView(
+          icon: Icons.collections_bookmark_outlined,
+          title: l10n.collectionsEmpty,
+        ),
+      );
+    }
+    return SliverList.list(
       key: const Key('collection-series-list'),
-      itemCount: page.items.length,
-      separatorBuilder: (_, _) => const Divider(height: AppSizes.hairline),
-      itemBuilder: (BuildContext context, int index) {
-        final series = page.items[index];
-        return SeriesShelfRow(
-          series: series,
-          coverSize: ShelfCoverSize.medium,
-          onTap: () => context.push('/series/${series.id}'),
-        );
-      },
+      children: <Widget>[
+        for (final series in page.items)
+          SeriesShelfRow(
+            series: series,
+            coverSize: ShelfCoverSize.medium,
+            onTap: () => context.push('/series/${series.id}'),
+          ),
+      ],
     );
   }
 }

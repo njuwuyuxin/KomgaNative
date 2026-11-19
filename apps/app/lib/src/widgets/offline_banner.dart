@@ -24,34 +24,43 @@ class OfflineBanner extends ConsumerWidget {
         if (!isOffline) return const SizedBox.shrink();
         final l10n = AppLocalizations.of(context);
         final theme = Theme.of(context);
-        final foreground = theme.colorScheme.onSecondaryContainer;
-        return Material(
-          key: const Key('offline-banner'),
-          color: theme.colorScheme.secondaryContainer,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.xs,
-            ),
-            child: Row(
-              children: <Widget>[
-                Icon(
-                  Icons.cloud_off_outlined,
-                  size: AppSizes.iconXs,
-                  color: foreground,
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Text(
-                    l10n.offlineSavedContent,
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: foreground,
+        final foreground = theme.colorScheme.onSurfaceVariant;
+        return Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.xs,
+          ),
+          child: GlassSurface(
+            key: const Key('offline-banner'),
+            shape: const StadiumBorder(),
+            shadows: AppShadows.card,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                AppSpacing.xxs,
+                AppSpacing.xs,
+                AppSpacing.xxs,
+              ),
+              child: Row(
+                children: <Widget>[
+                  Icon(
+                    Icons.cloud_off_outlined,
+                    size: AppSizes.iconXs,
+                    color: foreground,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      l10n.offlineSavedContent,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: foreground,
+                      ),
                     ),
                   ),
-                ),
-                if (onRetry != null)
-                  TextButton(onPressed: onRetry, child: Text(l10n.retry)),
-              ],
+                  if (onRetry != null)
+                    TextButton(onPressed: onRetry, child: Text(l10n.retry)),
+                ],
+              ),
             ),
           ),
         );

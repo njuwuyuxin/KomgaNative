@@ -37,47 +37,34 @@ class ReadingNowScreen extends ConsumerWidget {
     final libraries = ref.watch(librariesProvider).value ?? const <Library>[];
 
     return Scaffold(
-      body: RefreshIndicator(
-        onRefresh: () async {
-          ref.invalidate(ondeckProvider);
-          ref.invalidate(recentSeriesProvider);
-          for (final library in libraries) {
-            ref.invalidate(libraryShelfProvider(library.id));
-          }
-        },
-        child: CustomScrollView(
-          key: const Key('reading-now-scroll'),
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: <Widget>[
-            SliverAppBar.large(title: Text(l10n.readingNow)),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                child: ondeck.isEmpty
-                    ? const _EmptyContinueCard()
-                    : _ContinueCard(book: ondeck.first),
+      body: GlassPageBackground(
+        child: RefreshIndicator(
+          edgeOffset:
+              MediaQuery.paddingOf(context).top + AppSizes.glassHeaderClearance,
+          onRefresh: () async {
+            ref.invalidate(ondeckProvider);
+            ref.invalidate(recentSeriesProvider);
+            for (final library in libraries) {
+              ref.invalidate(libraryShelfProvider(library.id));
+            }
+          },
+          child: CustomScrollView(
+            key: const Key('reading-now-scroll'),
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: <Widget>[
+              GlassHeaderSliver(
+                header: GlassHeader(title: Text(l10n.readingNow)),
               ),
-            ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.md,
-                  AppSpacing.lg,
-                  AppSpacing.md,
-                  AppSpacing.xs,
-                ),
-                child: Text(
-                  l10n.recentlyAdded,
-                  style: AppTypography.of(context).title,
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                  ),
+                  child: ondeck.isEmpty
+                      ? const _EmptyContinueCard()
+                      : _ContinueCard(book: ondeck.first),
                 ),
               ),
-            ),
-            _SeriesShelf(
-              key: const Key('reading-now-recent'),
-              heroScope: 'reading-now-recent',
-              series: ref.watch(recentSeriesProvider).value ?? const <Series>[],
-            ),
-            for (final library in libraries) ...<Widget>[
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(
@@ -87,23 +74,45 @@ class ReadingNowScreen extends ConsumerWidget {
                     AppSpacing.xs,
                   ),
                   child: Text(
-                    library.name,
+                    l10n.recentlyAdded,
                     style: AppTypography.of(context).title,
                   ),
                 ),
               ),
               _SeriesShelf(
-                key: Key('reading-now-library-${library.id}'),
-                heroScope: 'reading-now-library-${library.id}',
+                key: const Key('reading-now-recent'),
+                heroScope: 'reading-now-recent',
                 series:
-                    ref.watch(libraryShelfProvider(library.id)).value ??
-                    const <Series>[],
+                    ref.watch(recentSeriesProvider).value ?? const <Series>[],
+              ),
+              for (final library in libraries) ...<Widget>[
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.md,
+                      AppSpacing.lg,
+                      AppSpacing.md,
+                      AppSpacing.xs,
+                    ),
+                    child: Text(
+                      library.name,
+                      style: AppTypography.of(context).title,
+                    ),
+                  ),
+                ),
+                _SeriesShelf(
+                  key: Key('reading-now-library-${library.id}'),
+                  heroScope: 'reading-now-library-${library.id}',
+                  series:
+                      ref.watch(libraryShelfProvider(library.id)).value ??
+                      const <Series>[],
+                ),
+              ],
+              const SliverToBoxAdapter(
+                child: SizedBox(height: AppSizes.navBarClearance),
               ),
             ],
-            const SliverToBoxAdapter(
-              child: SizedBox(height: AppSizes.navBarClearance),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -133,7 +142,7 @@ class _ContinueCard extends ConsumerWidget {
     final label = progress == null
         ? l10n.bookPages(book.pagesCount)
         : l10n.continueReadingProgress(progress.page, book.pagesCount);
-    final shape = AppShapes.of(context, AppShapes.card);
+    final shape = AppShapes.of(context, AppShapes.panel);
     // 墨水屏 / 减少动态效果不做 Hero；其余情况把 tag 一路带到阅读器开场。
     final heroTag =
         AppTheme.isEink(theme) ||
@@ -160,14 +169,12 @@ class _ContinueCard extends ConsumerWidget {
       onTap: () => unawaited(_open(context, book, direction, heroTag)),
       child: ExcludeSemantics(
         child: PressableScale(
-          child: InkWell(
-            borderRadius: BorderRadius.circular(AppRadii.md),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onTap: () => unawaited(_open(context, book, direction, heroTag)),
-            child: DecoratedBox(
-              decoration: ShapeDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
-                shape: shape,
-              ),
+            child: GlassSurface(
+              shape: shape,
+              shadows: AppShadows.card,
               child: Padding(
                 padding: const EdgeInsets.all(AppSpacing.md),
                 child: Row(
@@ -200,11 +207,12 @@ class _ContinueCard extends ConsumerWidget {
                             ),
                           ),
                           const SizedBox(height: AppSpacing.sm),
-                          FilledButton(
+                          GlassPillButton(
+                            icon: Icons.play_arrow,
+                            label: l10n.continueReading,
                             onPressed: () => unawaited(
                               _open(context, book, direction, heroTag),
                             ),
-                            child: Text(l10n.continueReading),
                           ),
                         ],
                       ),

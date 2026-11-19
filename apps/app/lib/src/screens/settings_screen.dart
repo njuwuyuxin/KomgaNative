@@ -10,6 +10,9 @@ import 'package:komga_native/src/session/session_controller.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 设置页：外观 + 多服务器 + 存储 + 关于。
+///
+/// 版式按 iOS 的"inset grouped"：每个分组是一张圆角卡（[AppListGroup]），
+/// 分组说明留在卡外；主题/语言用玻璃分段控件，与书架、导航条同一套材质。
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
@@ -34,173 +37,189 @@ class SettingsScreen extends ConsumerWidget {
         : (usage.hasError ? l10n.unavailable : l10n.calculating);
 
     return Scaffold(
-      // 大标题：滚动时收缩成普通标题栏（UI-P2-3），与书架页同一套观感。
-      body: CustomScrollView(
-        slivers: <Widget>[
-          SliverAppBar.large(title: Text(l10n.settingsTitle)),
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-            sliver: SliverList.list(
-              children: <Widget>[
-                _SectionHeader(l10n.appearance),
-                ListTile(
-                  title: Text(l10n.theme),
-                  subtitle: Padding(
-                    padding: const EdgeInsets.only(top: AppSpacing.sm),
-                    child: SegmentedButton<ThemeMode>(
-                      segments: <ButtonSegment<ThemeMode>>[
-                        ButtonSegment<ThemeMode>(
-                          value: ThemeMode.system,
-                          label: Text(l10n.themeSystem),
-                        ),
-                        ButtonSegment<ThemeMode>(
-                          value: ThemeMode.light,
-                          label: Text(l10n.themeLight),
-                        ),
-                        ButtonSegment<ThemeMode>(
-                          value: ThemeMode.dark,
-                          label: Text(l10n.themeDark),
-                        ),
-                      ],
-                      selected: <ThemeMode>{settings.themeMode},
-                      onSelectionChanged: (Set<ThemeMode> selection) =>
-                          controller.setThemeMode(selection.first),
-                    ),
-                  ),
-                ),
-                SwitchListTile(
-                  value: settings.forceEink,
-                  onChanged: controller.setForceEink,
-                  title: Text(l10n.einkMode),
-                  subtitle: Text(l10n.einkModeHint),
-                ),
-                SwitchListTile(
-                  key: const Key('settings-haptics'),
-                  value: settings.haptics,
-                  onChanged: controller.setHaptics,
-                  title: Text(l10n.haptics),
-                  subtitle: Text(l10n.hapticsHint),
-                ),
-                ListTile(
-                  key: const Key('settings-language'),
-                  title: Text(l10n.language),
-                  subtitle: Padding(
-                    padding: const EdgeInsets.only(top: AppSpacing.sm),
-                    child: SegmentedButton<AppLanguage>(
-                      segments: <ButtonSegment<AppLanguage>>[
-                        ButtonSegment<AppLanguage>(
-                          value: AppLanguage.system,
-                          label: Text(l10n.languageSystem),
-                        ),
-                        ButtonSegment<AppLanguage>(
-                          value: AppLanguage.en,
-                          label: Text(l10n.languageEnglish),
-                        ),
-                        ButtonSegment<AppLanguage>(
-                          value: AppLanguage.zh,
-                          label: Text(l10n.languageChinese),
-                        ),
-                      ],
-                      selected: <AppLanguage>{settings.language},
-                      onSelectionChanged: (Set<AppLanguage> selection) =>
-                          controller.setLanguage(selection.first),
-                    ),
-                  ),
-                ),
-                const Divider(),
-                _SectionHeader(l10n.servers),
-                if (servers.isEmpty)
-                  ListTile(
-                    title: Text(l10n.noSavedServers),
-                    subtitle: Text(l10n.noSavedServersHint),
-                  ),
-                for (final item in servers)
-                  ListTile(
-                    key: Key('server-${item.id}'),
-                    leading: Icon(
-                      item.id == current?.id
-                          ? Icons.check_circle
-                          : Icons.dns_outlined,
-                      color: item.id == current?.id
-                          ? Theme.of(context).colorScheme.primary
-                          : null,
-                    ),
-                    title: Text(item.label),
-                    subtitle: Text(item.address.baseUrl),
-                    trailing: IconButton(
-                      key: Key('server-remove-${item.id}'),
-                      tooltip: l10n.removeServerTooltip,
-                      icon: const Icon(Icons.delete_outline),
-                      onPressed: () => _removeServer(context, ref, item),
-                    ),
-                    onTap: item.id == current?.id
-                        ? null
-                        : () =>
-                              ref.read(sessionProvider.notifier).switchTo(item),
-                  ),
-                ListTile(
-                  key: const Key('server-add'),
-                  leading: const Icon(Icons.add),
-                  title: Text(l10n.addServer),
-                  subtitle: Text(l10n.addServerHint),
-                  onTap: () => ref.read(sessionProvider.notifier).signOut(),
-                ),
-                const Divider(),
-                _SectionHeader(l10n.storage),
-                ListTile(
-                  title: Text(l10n.offlineContent),
-                  subtitle: Text(cacheSubtitle),
-                  leading: const Icon(Icons.sd_storage_outlined),
-                  trailing: TextButton(
-                    onPressed: cacheUsage == null || cacheUsage.isEmpty
-                        ? null
-                        : () => _clearCache(context, ref),
-                    child: Text(l10n.clear),
-                  ),
-                ),
-                ListTile(
-                  key: const Key('settings-downloads'),
-                  title: Text(l10n.downloadedBooks),
-                  subtitle: Text(
-                    downloads == null
-                        ? '—'
-                        : l10n.downloadedUsage(
-                            downloads.entries,
-                            downloads.humanSize,
-                          ),
-                  ),
-                  leading: const Icon(Icons.download_done_outlined),
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (BuildContext context) =>
-                          const DownloadsScreen(),
-                    ),
-                  ),
-                ),
-                const Divider(),
-                _SectionHeader(l10n.about),
-                ListTile(
-                  title: Text(l10n.version),
-                  trailing: const Text('0.1.0 (v1)'),
-                ),
-                ListTile(
-                  key: const Key('settings-licenses'),
-                  leading: const Icon(Icons.description_outlined),
-                  title: Text(l10n.openSourceLicenses),
-                  onTap: () => showLicensePage(
-                    context: context,
-                    applicationName: 'KomgaNative',
-                    applicationVersion: '0.1.0',
-                  ),
-                ),
-              ],
+      body: GlassPageBackground(
+        child: CustomScrollView(
+          slivers: <Widget>[
+            GlassHeaderSliver(
+              header: GlassHeader(title: Text(l10n.settingsTitle)),
             ),
-          ),
-          // 悬浮导航条压在内容之上：最后一块要能让开它。
-          const SliverToBoxAdapter(
-            child: SizedBox(height: AppSizes.navBarClearance),
-          ),
-        ],
+            SliverPadding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              sliver: SliverList.list(
+                children: <Widget>[
+                  AppListGroup(
+                    header: l10n.appearance,
+                    children: <Widget>[
+                      ListTile(
+                        title: Text(l10n.theme),
+                        subtitle: Padding(
+                          padding: const EdgeInsets.only(top: AppSpacing.sm),
+                          child: GlassSegmentedControl<ThemeMode>(
+                            segments: <GlassSegment<ThemeMode>>[
+                              GlassSegment<ThemeMode>(
+                                value: ThemeMode.system,
+                                label: l10n.themeSystem,
+                              ),
+                              GlassSegment<ThemeMode>(
+                                value: ThemeMode.light,
+                                label: l10n.themeLight,
+                              ),
+                              GlassSegment<ThemeMode>(
+                                value: ThemeMode.dark,
+                                label: l10n.themeDark,
+                              ),
+                            ],
+                            selected: settings.themeMode,
+                            onSelected: controller.setThemeMode,
+                          ),
+                        ),
+                      ),
+                      ListTile(
+                        key: const Key('settings-language'),
+                        title: Text(l10n.language),
+                        subtitle: Padding(
+                          padding: const EdgeInsets.only(top: AppSpacing.sm),
+                          child: GlassSegmentedControl<AppLanguage>(
+                            segments: <GlassSegment<AppLanguage>>[
+                              GlassSegment<AppLanguage>(
+                                value: AppLanguage.system,
+                                label: l10n.languageSystem,
+                              ),
+                              GlassSegment<AppLanguage>(
+                                value: AppLanguage.en,
+                                label: l10n.languageEnglish,
+                              ),
+                              GlassSegment<AppLanguage>(
+                                value: AppLanguage.zh,
+                                label: l10n.languageChinese,
+                              ),
+                            ],
+                            selected: settings.language,
+                            onSelected: controller.setLanguage,
+                          ),
+                        ),
+                      ),
+                      SwitchListTile(
+                        value: settings.forceEink,
+                        onChanged: controller.setForceEink,
+                        title: Text(l10n.einkMode),
+                        subtitle: Text(l10n.einkModeHint),
+                      ),
+                      SwitchListTile(
+                        key: const Key('settings-haptics'),
+                        value: settings.haptics,
+                        onChanged: controller.setHaptics,
+                        title: Text(l10n.haptics),
+                        subtitle: Text(l10n.hapticsHint),
+                      ),
+                    ],
+                  ),
+                  AppListGroup(
+                    header: l10n.servers,
+                    children: <Widget>[
+                      if (servers.isEmpty)
+                        ListTile(
+                          title: Text(l10n.noSavedServers),
+                          subtitle: Text(l10n.noSavedServersHint),
+                        ),
+                      for (final item in servers)
+                        ListTile(
+                          key: Key('server-${item.id}'),
+                          leading: Icon(
+                            item.id == current?.id
+                                ? Icons.check_circle
+                                : Icons.dns_outlined,
+                            color: item.id == current?.id
+                                ? Theme.of(context).colorScheme.primary
+                                : null,
+                          ),
+                          title: Text(item.label),
+                          subtitle: Text(item.address.baseUrl),
+                          trailing: IconButton(
+                            key: Key('server-remove-${item.id}'),
+                            tooltip: l10n.removeServerTooltip,
+                            icon: const Icon(Icons.delete_outline),
+                            onPressed: () => _removeServer(context, ref, item),
+                          ),
+                          onTap: item.id == current?.id
+                              ? null
+                              : () => ref
+                                    .read(sessionProvider.notifier)
+                                    .switchTo(item),
+                        ),
+                      ListTile(
+                        key: const Key('server-add'),
+                        leading: const Icon(Icons.add),
+                        title: Text(l10n.addServer),
+                        subtitle: Text(l10n.addServerHint),
+                        onTap: () =>
+                            ref.read(sessionProvider.notifier).signOut(),
+                      ),
+                    ],
+                  ),
+                  AppListGroup(
+                    header: l10n.storage,
+                    children: <Widget>[
+                      ListTile(
+                        title: Text(l10n.offlineContent),
+                        subtitle: Text(cacheSubtitle),
+                        leading: const Icon(Icons.sd_storage_outlined),
+                        trailing: TextButton(
+                          onPressed: cacheUsage == null || cacheUsage.isEmpty
+                              ? null
+                              : () => _clearCache(context, ref),
+                          child: Text(l10n.clear),
+                        ),
+                      ),
+                      ListTile(
+                        key: const Key('settings-downloads'),
+                        title: Text(l10n.downloadedBooks),
+                        subtitle: Text(
+                          downloads == null
+                              ? '—'
+                              : l10n.downloadedUsage(
+                                  downloads.entries,
+                                  downloads.humanSize,
+                                ),
+                        ),
+                        leading: const Icon(Icons.download_done_outlined),
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (BuildContext context) =>
+                                const DownloadsScreen(),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  AppListGroup(
+                    header: l10n.about,
+                    children: <Widget>[
+                      ListTile(
+                        title: Text(l10n.version),
+                        trailing: const Text('0.1.0 (v1)'),
+                      ),
+                      ListTile(
+                        key: const Key('settings-licenses'),
+                        leading: const Icon(Icons.description_outlined),
+                        title: Text(l10n.openSourceLicenses),
+                        onTap: () => showLicensePage(
+                          context: context,
+                          applicationName: 'KomgaNative',
+                          applicationVersion: '0.1.0',
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            // 悬浮导航条压在内容之上：最后一块要能让开它。
+            const SliverToBoxAdapter(
+              child: SizedBox(height: AppSizes.navBarClearance),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -250,31 +269,5 @@ Future<void> _removeServer(
   ref.invalidate(serverListProvider);
   if (session is SessionConnected && session.server.id == server.id) {
     await ref.read(sessionProvider.notifier).signOut();
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader(this.title);
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        AppSpacing.md,
-        AppSpacing.md,
-        AppSpacing.xs,
-      ),
-      child: Text(
-        title.toUpperCase(),
-        style: theme.textTheme.labelSmall?.copyWith(
-          letterSpacing: 1.2,
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-      ),
-    );
   }
 }

@@ -76,6 +76,43 @@ abstract final class AppTheme {
           borderRadius: BorderRadius.zero,
         ),
       ),
+      // 墨水屏的输入框：不留白底，靠 1px 墨框划定边界（灰阶上没有"填充色差"）。
+      inputDecorationTheme: const InputDecorationThemeData(
+        filled: false,
+        isDense: true,
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.md,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.zero,
+          borderSide: BorderSide(color: einkInk),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.zero,
+          borderSide: BorderSide(color: einkInk),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.zero,
+          borderSide: BorderSide(color: einkInk, width: 2),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(0, AppSizes.minTouch),
+          shape: const RoundedRectangleBorder(
+            side: BorderSide(color: einkInk),
+            borderRadius: BorderRadius.zero,
+          ),
+        ),
+      ),
+      dialogTheme: const DialogThemeData(
+        backgroundColor: einkPaper,
+        shape: RoundedRectangleBorder(
+          side: BorderSide(color: einkInk),
+          borderRadius: BorderRadius.zero,
+        ),
+      ),
       progressIndicatorTheme: const ProgressIndicatorThemeData(
         color: einkInk,
         linearTrackColor: Color(0xFFCCCCCC),
@@ -117,6 +154,53 @@ abstract final class AppTheme {
         backgroundColor: scheme.surface,
         indicatorColor: scheme.secondaryContainer,
         labelType: NavigationRailLabelType.all,
+      ),
+      // iOS 式输入框：无描边的浅填充、12 圆角，聚焦时一圈主题色。
+      // 搜索框（GlassSearchField）显式关掉填充，免得盖住玻璃底色。
+      inputDecorationTheme: InputDecorationThemeData(
+        filled: true,
+        fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.55),
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.md,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadii.md),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadii.md),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadii.md),
+          borderSide: BorderSide(color: scheme.primary, width: 1.5),
+        ),
+        hintStyle: TextStyle(color: scheme.onSurfaceVariant),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(0, AppSizes.minTouch),
+          shape: const StadiumBorder(),
+        ),
+      ),
+      dividerTheme: DividerThemeData(
+        color: scheme.outlineVariant.withValues(alpha: 0.5),
+        space: AppSizes.hairline,
+        thickness: AppSizes.hairline,
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.md),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: scheme.surfaceContainerHigh,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.lg),
+        ),
       ),
       // iOS 式侧滑转场（UI-P2-3）：Android 也用同一套——目标是"像 iOS 原生质感"，
       // 不是跟随平台默认。代价是 Android 的预测性返回手势退化成普通返回动画。

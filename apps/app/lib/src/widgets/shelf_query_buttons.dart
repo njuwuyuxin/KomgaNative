@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/shelf_view_options.dart';
@@ -23,10 +24,16 @@ String _readStatusLabel(AppLocalizations l10n, SeriesReadStatus status) =>
       SeriesReadStatus.read => l10n.statusRead,
     };
 
+/// 菜单项左侧的对勾占位：选中项打勾，未选中留同宽空位，文字不左右跳。
+Widget _check(bool selected) => selected
+    ? const Icon(Icons.check, size: AppSizes.iconXs)
+    : const SizedBox(width: AppSizes.iconXs);
+
 /// 书架排序按钮。
 ///
-/// 菜单值用 `String` 而不是可空枚举：`PopupMenuButton` 对 `null` 值不会回调
-/// `onSelected`，"恢复默认顺序"这个选项就会失效（踩过）。空串代表"不指定"。
+/// 用 [GlassMenuButton]（`MenuAnchor`）而不是 `PopupMenuButton`：触发器是标题栏
+/// 玻璃胶囊里的一格，菜单是圆角浮层；值直接传枚举，不再需要 `String` + 空串
+/// 绕开"`PopupMenuButton` 对 null 值不回调"的坑（踩过）。
 class ShelfSortButton extends ConsumerWidget {
   const ShelfSortButton({super.key});
 
@@ -34,26 +41,25 @@ class ShelfSortButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final sort = ref.watch(shelfProvider.select((ShelfState s) => s.sort));
-    return PopupMenuButton<String>(
+    final controller = ref.read(shelfProvider.notifier);
+    return GlassMenuButton(
       key: const Key('shelf-sort-menu'),
-      tooltip: l10n.shelfSortTooltip,
-      icon: const Icon(Icons.sort),
-      initialValue: sort?.name ?? '',
-      onSelected: (String value) => ref
-          .read(shelfProvider.notifier)
-          .setSort(
-            value.isEmpty
-                ? null
-                : SeriesSort.values.firstWhere(
-                    (SeriesSort s) => s.name == value,
-                  ),
-          ),
-      itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-        PopupMenuItem<String>(value: '', child: Text(l10n.defaultOrder)),
+      icon: Icons.sort,
+      label: l10n.shelfSortTooltip,
+      // 非默认排序时给一格选中底：不让"改过排序"只藏在下拉里。
+      selected: sort != null,
+      menuChildren: <Widget>[
+        MenuItemButton(
+          key: const Key('shelf-sort-default'),
+          onPressed: () => controller.setSort(null),
+          leadingIcon: _check(sort == null),
+          child: Text(l10n.defaultOrder),
+        ),
         for (final option in SeriesSort.values)
-          PopupMenuItem<String>(
-            value: option.name,
+          MenuItemButton(
             key: Key('shelf-sort-${option.name}'),
+            onPressed: () => controller.setSort(option),
+            leadingIcon: _check(sort == option),
             child: Text(_sortLabel(l10n, option)),
           ),
       ],
@@ -62,54 +68,52 @@ class ShelfSortButton extends ConsumerWidget {
 }
 
 /// 书架视图按钮（UI-P2-7）：网格 / 列表，以及封面小、中、大三档。
-///
-/// 菜单值用 `String`（`grid` / `list` / `size-*`）——`PopupMenuButton` 对 `null`
-/// 值不回调 `onSelected`，混着两种枚举还会让 `initialValue` 失去意义。
 class ShelfViewButton extends ConsumerWidget {
   const ShelfViewButton({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
     final state = ref.watch(shelfProvider);
     final controller = ref.read(shelfProvider.notifier);
-    return PopupMenuButton<String>(
+    return GlassMenuButton(
       key: const Key('shelf-view-menu'),
-      tooltip: l10n.shelfViewTooltip,
-      icon: Icon(
-        state.view == ShelfView.grid ? Icons.grid_view : Icons.view_list,
-      ),
-      onSelected: (String value) {
-        if (value == 'grid') controller.setView(ShelfView.grid);
-        if (value == 'list') controller.setView(ShelfView.list);
-        for (final size in ShelfCoverSize.values) {
-          if (value == 'size-${size.name}') controller.setCoverSize(size);
-        }
-      },
-      itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-        CheckedPopupMenuItem<String>(
+      icon: state.view == ShelfView.grid ? Icons.grid_view : Icons.view_list,
+      label: l10n.shelfViewTooltip,
+      menuChildren: <Widget>[
+        MenuItemButton(
           key: const Key('shelf-view-grid'),
-          value: 'grid',
-          checked: state.view == ShelfView.grid,
+          onPressed: () => controller.setView(ShelfView.grid),
+          leadingIcon: _check(state.view == ShelfView.grid),
           child: Text(l10n.viewGrid),
         ),
-        CheckedPopupMenuItem<String>(
+        MenuItemButton(
           key: const Key('shelf-view-list'),
-          value: 'list',
-          checked: state.view == ShelfView.list,
+          onPressed: () => controller.setView(ShelfView.list),
+          leadingIcon: _check(state.view == ShelfView.list),
           child: Text(l10n.viewList),
         ),
-        const PopupMenuDivider(),
-        PopupMenuItem<String>(
-          key: const Key('shelf-cover-size-header'),
-          enabled: false,
-          child: Text(l10n.coverSize),
+        const Divider(height: AppSizes.hairline),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md,
+            AppSpacing.sm,
+            AppSpacing.md,
+            AppSpacing.xs,
+          ),
+          child: Text(
+            l10n.coverSize,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
         ),
         for (final size in ShelfCoverSize.values)
-          CheckedPopupMenuItem<String>(
+          MenuItemButton(
             key: Key('shelf-cover-${size.name}'),
-            value: 'size-${size.name}',
-            checked: state.coverSize == size,
+            onPressed: () => controller.setCoverSize(size),
+            leadingIcon: _check(state.coverSize == size),
             child: Text(switch (size) {
               ShelfCoverSize.small => l10n.coverSmall,
               ShelfCoverSize.medium => l10n.coverMedium,
@@ -131,30 +135,24 @@ class ShelfFilterButton extends ConsumerWidget {
     final status = ref.watch(
       shelfProvider.select((ShelfState s) => s.readStatus),
     );
-    return PopupMenuButton<String>(
+    final controller = ref.read(shelfProvider.notifier);
+    return GlassMenuButton(
       key: const Key('shelf-filter-menu'),
-      tooltip: l10n.shelfFilterTooltip,
-      icon: const Icon(Icons.filter_list),
-      initialValue: status?.name ?? '',
-      onSelected: (String value) => ref
-          .read(shelfProvider.notifier)
-          .setReadStatus(
-            value.isEmpty
-                ? null
-                : SeriesReadStatus.values.firstWhere(
-                    (SeriesReadStatus s) => s.name == value,
-                  ),
-          ),
-      itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-        PopupMenuItem<String>(
+      icon: Icons.filter_list,
+      label: l10n.shelfFilterTooltip,
+      selected: status != null,
+      menuChildren: <Widget>[
+        MenuItemButton(
           key: const Key('shelf-filter-all'),
-          value: '',
+          onPressed: () => controller.setReadStatus(null),
+          leadingIcon: _check(status == null),
           child: Text(l10n.all),
         ),
         for (final option in SeriesReadStatus.values)
-          PopupMenuItem<String>(
+          MenuItemButton(
             key: Key('shelf-filter-${option.name}'),
-            value: option.name,
+            onPressed: () => controller.setReadStatus(option),
+            leadingIcon: _check(status == option),
             child: Text(_readStatusLabel(l10n, option)),
           ),
       ],

@@ -23,35 +23,63 @@ class DownloadsScreen extends ConsumerWidget {
     }.toList(growable: false);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.downloadedBooks)),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          ref.invalidate(downloadedBooksProvider);
-          ref.invalidate(downloadsUsageProvider);
-        },
-        child: ids.isEmpty
-            ? ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                children: <Widget>[
-                  const SizedBox(height: AppSpacing.xxl),
-                  Icon(
-                    Icons.download_outlined,
-                    size: AppSpacing.xxl,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+      body: GlassPageBackground(
+        child: RefreshIndicator(
+          edgeOffset:
+              MediaQuery.paddingOf(context).top + AppSizes.glassHeaderClearance,
+          onRefresh: () async {
+            ref.invalidate(downloadedBooksProvider);
+            ref.invalidate(downloadsUsageProvider);
+          },
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: <Widget>[
+              GlassHeaderSliver(
+                header: GlassHeader(
+                  leading: GlassIconButton(
+                    icon: Icons.chevron_left,
+                    label: MaterialLocalizations.of(context).backButtonTooltip,
+                    onPressed: () => Navigator.of(context).maybePop(),
                   ),
-                  const SizedBox(height: AppSpacing.md),
-                  Center(child: Text(l10n.downloadsEmpty)),
-                ],
-              )
-            : ListView.separated(
-                key: const Key('downloads-list'),
-                physics: const AlwaysScrollableScrollPhysics(),
-                itemCount: ids.length,
-                separatorBuilder: (_, _) =>
-                    const Divider(height: AppSizes.hairline),
-                itemBuilder: (BuildContext context, int index) =>
-                    _DownloadRow(bookId: ids.elementAt(index)),
+                  title: Text(l10n.downloadedBooks),
+                ),
               ),
+              if (ids.isEmpty)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: <Widget>[
+                      Icon(
+                        Icons.download_outlined,
+                        size: AppSpacing.xxl,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      Text(l10n.downloadsEmpty),
+                    ],
+                  ),
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.only(
+                    top: AppSpacing.sm,
+                    bottom: AppSizes.navBarClearance,
+                  ),
+                  sliver: SliverList.list(
+                    children: <Widget>[
+                      AppListGroup(
+                        key: const Key('downloads-list'),
+                        children: <Widget>[
+                          for (final id in ids) _DownloadRow(bookId: id),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -89,12 +117,15 @@ class _DownloadRow extends ConsumerWidget {
 
     return ListTile(
       key: Key('download-$bookId'),
-      leading: SizedBox(
-        width: AppSizes.rowCover.width,
-        height: AppSizes.rowCover.height,
-        child: cover == null
-            ? ColoredBox(color: theme.colorScheme.surfaceContainerHighest)
-            : CoverImage(bytes: cover),
+      leading: ClipRRect(
+        borderRadius: BorderRadius.circular(AppRadii.xs),
+        child: SizedBox(
+          width: AppSizes.rowCover.width,
+          height: AppSizes.rowCover.height,
+          child: cover == null
+              ? ColoredBox(color: theme.colorScheme.surfaceContainerHighest)
+              : CoverImage(bytes: cover),
+        ),
       ),
       title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Column(

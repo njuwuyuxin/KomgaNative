@@ -109,13 +109,20 @@ void main() {
       );
     });
 
-    testWidgets('书架用可折叠的大标题', (WidgetTester tester) async {
+    testWidgets('书架用钉住的玻璃标题栏', (WidgetTester tester) async {
       await pumpScreen(tester, const LibraryScreen(), theme: AppTheme.light());
       await tester.pumpAndSettle();
 
-      expect(find.byType(SliverAppBar), findsOneWidget);
-      // 大标题同时挂着"收起"和"展开"两份标题。
-      expect(find.text('Library'), findsWidgets);
+      expect(find.byType(GlassHeaderSliver), findsOneWidget);
+      expect(find.text('Library'), findsOneWidget);
+
+      // 往下滚一屏：标题栏是 pinned 的，标题仍在玻璃条里。
+      await tester.drag(
+        find.byKey(const Key('shelf-scroll')),
+        const Offset(0, -600),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Library'), findsOneWidget);
     });
   });
 

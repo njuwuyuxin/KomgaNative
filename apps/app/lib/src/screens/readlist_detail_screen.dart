@@ -20,56 +20,74 @@ class ReadListDetailScreen extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final async = ref.watch(readListBooksProvider(readListId));
     return Scaffold(
-      appBar: AppBar(title: Text(title ?? l10n.readListFallback)),
-      body: Builder(
-        builder: (BuildContext context) {
-          if (async.hasError && !async.hasValue) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  Text(
-                    async.error is ShelfFailure
-                        ? (async.error! as ShelfFailure).message
-                        : l10n.errorGeneric,
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  FilledButton(
-                    onPressed: () =>
-                        ref.invalidate(readListBooksProvider(readListId)),
-                    child: Text(l10n.retry),
-                  ),
-                ],
+      body: GlassPageBackground(
+        child: CustomScrollView(
+          slivers: <Widget>[
+            GlassHeaderSliver(
+              header: GlassHeader(
+                leading: GlassIconButton(
+                  icon: Icons.chevron_left,
+                  label: MaterialLocalizations.of(context).backButtonTooltip,
+                  onPressed: () => context.pop(),
+                ),
+                title: Text(title ?? l10n.readListFallback),
               ),
-            );
-          }
-          final page = async.value;
-          if (page == null) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (page.items.isEmpty) {
-            return Center(child: Text(l10n.readListsEmpty));
-          }
-          return ListView.separated(
-            key: const Key('readlist-books-list'),
-            itemCount: page.items.length,
-            separatorBuilder: (_, _) =>
-                const Divider(height: AppSizes.hairline),
-            itemBuilder: (BuildContext context, int index) {
-              final book = page.items[index];
-              return SeriesBookRow(
-                book: book,
-                onOpen: () async {
-                  await context.push(
-                    '/reader/${book.id}',
-                    extra: ReaderArgs(book: book),
+            ),
+            Builder(
+              builder: (BuildContext context) {
+                if (async.hasError && !async.hasValue) {
+                  return SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: StatusView(
+                      icon: Icons.cloud_off_outlined,
+                      title: async.error is ShelfFailure
+                          ? (async.error! as ShelfFailure).message
+                          : l10n.errorGeneric,
+                      actionLabel: l10n.retry,
+                      onAction: () =>
+                          ref.invalidate(readListBooksProvider(readListId)),
+                    ),
                   );
-                  ref.invalidate(readListBooksProvider(readListId));
-                },
-              );
-            },
-          );
-        },
+                }
+                final page = async.value;
+                if (page == null) {
+                  return const SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                if (page.items.isEmpty) {
+                  return SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: StatusView(
+                      icon: Icons.list_alt_outlined,
+                      title: l10n.readListsEmpty,
+                    ),
+                  );
+                }
+                return SliverList.list(
+                  key: const Key('readlist-books-list'),
+                  children: <Widget>[
+                    for (final book in page.items)
+                      SeriesBookRow(
+                        book: book,
+                        onOpen: () async {
+                          await context.push(
+                            '/reader/${book.id}',
+                            extra: ReaderArgs(book: book),
+                          );
+                          ref.invalidate(readListBooksProvider(readListId));
+                        },
+                      ),
+                  ],
+                );
+              },
+            ),
+            const SliverToBoxAdapter(
+              child: SizedBox(height: AppSizes.navBarClearance),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -109,17 +109,15 @@ class SeriesHeader extends ConsumerWidget {
             ),
           ] else if (next != null) ...<Widget>[
             const SizedBox(height: AppSpacing.md),
-            FilledButton.icon(
+            GlassPillButton(
               key: const Key('series-main-action'),
               onPressed: () => onOpenBook(next),
-              icon: Icon(unstarted ? Icons.play_arrow : Icons.menu_book),
-              label: Text(
-                unstarted
-                    ? l10n.startReading
-                    : l10n.continueReadingNumber(
-                        next.number.isEmpty ? next.name : next.number,
-                      ),
-              ),
+              icon: unstarted ? Icons.play_arrow : Icons.menu_book,
+              label: unstarted
+                  ? l10n.startReading
+                  : l10n.continueReadingNumber(
+                      next.number.isEmpty ? next.name : next.number,
+                    ),
             ),
           ],
           if (!metadataLoading && summary.isNotEmpty) ...<Widget>[

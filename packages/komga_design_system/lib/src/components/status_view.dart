@@ -1,5 +1,6 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:komga_design_system/src/components/glass_pill_button.dart';
 import 'package:komga_design_system/src/tokens.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// 空态 / 错误态 / 加载失败的统一展示。
 ///
@@ -51,7 +52,7 @@ class StatusView extends StatelessWidget {
               ],
               if (actionLabel != null && onAction != null) ...<Widget>[
                 const SizedBox(height: AppSpacing.lg),
-                FilledButton(onPressed: onAction, child: Text(actionLabel!)),
+                GlassPillButton(label: actionLabel!, onPressed: onAction),
               ],
             ],
           ),

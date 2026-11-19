@@ -7,9 +7,18 @@ library;
 
 export 'src/breakpoints.dart';
 export 'src/components/frosted_surface.dart';
+export 'src/components/glass_control_colors.dart';
+export 'src/components/glass_header.dart';
+export 'src/components/glass_icon_button.dart';
+export 'src/components/glass_menu_button.dart';
 export 'src/components/glass_optics_layers.dart';
+export 'src/components/glass_pill_button.dart';
+export 'src/components/glass_search_field.dart';
+export 'src/components/glass_segmented_control.dart';
 export 'src/components/glass_surface.dart';
 export 'src/components/liquid_glass_shader.dart' show LiquidGlassProgram;
+export 'src/components/list_group.dart';
+export 'src/components/page_background.dart';
 export 'src/components/pressable_scale.dart';
 export 'src/components/series_tile.dart';
 export 'src/components/skeleton.dart';

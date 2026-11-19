@@ -19,9 +19,9 @@ import 'package:material_ui/material_ui.dart';
 
 /// 书架页：真实 `/api/v1/series` 数据 + 封面 + 分页 + 搜索 + 按库筛选。
 ///
-/// 整页是**一条** `CustomScrollView`：大标题（`SliverAppBar.large`）在滚动时收缩，
-/// 继续阅读行 / 搜索框 / 库筛选都挂在同一条滚动流里（UI-P2-3）。
-/// 这样"往下滑看封面"时标题会收起来，把整屏留给内容，而不是标题永远占一条。
+/// 整页是**一条** `CustomScrollView`：顶部是钉住的悬浮玻璃标题栏
+/// （与底部导航条同一材质、同一留白），搜索框 / 库筛选都挂在同一条滚动流里。
+/// 往下滑看封面时标题栏留在顶上，内容从玻璃下面穿过去——iOS 26 的观感。
 ///
 /// 状态机在 [ShelfController] 里，这一层只负责把状态画出来并派发意图；
 /// 视图组件在 `widgets/shelf_views.dart`（拆开是为了守住单文件行数上限）。
@@ -37,20 +37,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   static const double _prefetchExtent = 600;
 
   final TextEditingController _searchController = TextEditingController();
-  bool _searching = false;
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
-  }
-
-  void _toggleSearch() {
-    setState(() => _searching = !_searching);
-    if (!_searching) {
-      _searchController.clear();
-      ref.read(shelfProvider.notifier).search('');
-    }
   }
 
   Future<void> _refresh() {
@@ -77,91 +68,85 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final controller = ref.read(shelfProvider.notifier);
 
     return Scaffold(
-      body: RefreshIndicator(
-        onRefresh: _refresh,
-        child: NotificationListener<ScrollNotification>(
-          onNotification: (ScrollNotification notification) {
-            if (state.hasMore &&
-                notification.metrics.extentAfter < _prefetchExtent) {
-              unawaited(controller.loadMore());
-            }
-            return false;
-          },
-          child: ShelfPinchDetector(
-            enabled: state.view == ShelfView.grid && state.series.isNotEmpty,
-            onPinch: _pinchCover,
-            child: CustomScrollView(
-              key: const Key('shelf-scroll'),
-              physics: const AlwaysScrollableScrollPhysics(),
-              slivers: <Widget>[
-                // 大标题：滚动时收缩成普通标题栏（UI-P2-3）。
-                SliverAppBar.large(
-                  title: Text(l10n.libraryTitle),
-                  actions: <Widget>[
-                    IconButton(
-                      key: const Key('library-collections-button'),
-                      onPressed: () => context.push('/collections'),
-                      icon: const Icon(Icons.collections_bookmark_outlined),
-                      tooltip: l10n.collectionsTitle,
+      body: GlassPageBackground(
+        child: RefreshIndicator(
+          // 标题栏是钉住的浮层：下拉刷新的转圈要出现在它下面，不能被玻璃压住。
+          edgeOffset:
+              MediaQuery.paddingOf(context).top + AppSizes.glassHeaderClearance,
+          onRefresh: _refresh,
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (ScrollNotification notification) {
+              if (state.hasMore &&
+                  notification.metrics.extentAfter < _prefetchExtent) {
+                unawaited(controller.loadMore());
+              }
+              return false;
+            },
+            child: ShelfPinchDetector(
+              enabled: state.view == ShelfView.grid && state.series.isNotEmpty,
+              onPinch: _pinchCover,
+              child: CustomScrollView(
+                key: const Key('shelf-scroll'),
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: <Widget>[
+                  GlassHeaderSliver(
+                    header: GlassHeader(
+                      title: Text(l10n.libraryTitle),
+                      actions: <Widget>[
+                        const ShelfSortButton(),
+                        const ShelfFilterButton(),
+                        const ShelfViewButton(),
+                      ],
+                      trailing: GlassIconButton(
+                        key: const Key('library-collections-button'),
+                        icon: Icons.collections_bookmark_outlined,
+                        label: l10n.collectionsTitle,
+                        onPressed: () => context.push('/collections'),
+                      ),
                     ),
-                    const ShelfSortButton(),
-                    const ShelfFilterButton(),
-                    const ShelfViewButton(),
-                    IconButton(
-                      onPressed: _toggleSearch,
-                      icon: Icon(_searching ? Icons.close : Icons.search),
-                      tooltip: _searching ? l10n.closeSearch : l10n.search,
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                  ],
-                ),
-                // 断网时提示"看的是缓存"，并给一次重新联网的机会。
-                SliverToBoxAdapter(
-                  child: OfflineBanner(onRetry: () => unawaited(_refresh())),
-                ),
-                if (_searching)
+                  ),
+                  // 断网时提示"看的是缓存"，并给一次重新联网的机会。
+                  SliverToBoxAdapter(
+                    child: OfflineBanner(onRetry: () => unawaited(_refresh())),
+                  ),
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(
                         AppSpacing.md,
-                        0,
+                        AppSpacing.xs,
                         AppSpacing.md,
                         AppSpacing.sm,
                       ),
-                      child: TextField(
+                      child: GlassSearchField(
                         key: const Key('shelf-search-field'),
                         controller: _searchController,
-                        autofocus: true,
-                        textInputAction: TextInputAction.search,
+                        hintText: l10n.searchSeriesHint,
+                        clearLabel: l10n.closeSearch,
                         onChanged: controller.search,
-                        decoration: InputDecoration(
-                          hintText: l10n.searchSeriesHint,
-                          prefixIcon: const Icon(Icons.search),
-                          isDense: true,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.md),
-                          ),
-                        ),
                       ),
                     ),
                   ),
-                SliverToBoxAdapter(
-                  child: LibraryFilterBar(
-                    selected: state.libraryId,
-                    onSelected: controller.selectLibrary,
-                  ),
-                ),
-                PhaseFade(
-                  phase: _phaseOf(state),
-                  slivers: <Widget>[
-                    ..._shelfSlivers(l10n, state, controller),
-                    // 底部留白：悬浮导航条压在内容之上，最后一行要能让开它。
-                    const SliverToBoxAdapter(
-                      child: SizedBox(height: AppSizes.navBarClearance),
+                  SliverToBoxAdapter(
+                    child: LibraryFilterBar(
+                      selected: state.libraryId,
+                      onSelected: controller.selectLibrary,
                     ),
-                  ],
-                ),
-              ],
+                  ),
+                  const SliverToBoxAdapter(
+                    child: SizedBox(height: AppSpacing.sm),
+                  ),
+                  PhaseFade(
+                    phase: _phaseOf(state),
+                    slivers: <Widget>[
+                      ..._shelfSlivers(l10n, state, controller),
+                      // 底部留白：悬浮导航条压在内容之上，最后一行要能让开它。
+                      const SliverToBoxAdapter(
+                        child: SizedBox(height: AppSizes.navBarClearance),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),

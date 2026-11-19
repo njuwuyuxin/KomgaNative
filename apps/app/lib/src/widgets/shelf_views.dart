@@ -215,6 +215,9 @@ class RefreshableStatus extends StatelessWidget {
 }
 
 /// 库筛选条。只有一个库时不占空间（选了也等于没选）。
+///
+/// 玻璃分段控件而不是 `ChoiceChip`：Chip 的描边/水波纹是 Material 味，
+/// 而且和标题栏、搜索框不是同一材质。库的个数不定，所以横向滚动、按内容排。
 class LibraryFilterBar extends ConsumerWidget {
   const LibraryFilterBar({
     required this.selected,
@@ -235,30 +238,17 @@ class LibraryFilterBar extends ConsumerWidget {
     };
     if (items.length < 2) return const SizedBox.shrink();
 
-    return SizedBox(
-      height: AppSpacing.xxl,
-      child: ListView(
-        key: const Key('library-filter'),
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-        children: <Widget>[
-          Padding(
-            padding: const EdgeInsets.only(right: AppSpacing.sm),
-            child: ChoiceChip(
-              label: Text(l10n.all),
-              selected: selected == null,
-              onSelected: (bool _) => onSelected(null),
-            ),
-          ),
+    return Padding(
+      key: const Key('library-filter'),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+      child: GlassSegmentedControl<String?>(
+        scrollable: true,
+        selected: selected,
+        onSelected: onSelected,
+        segments: <GlassSegment<String?>>[
+          GlassSegment<String?>(value: null, label: l10n.all),
           for (final library in items)
-            Padding(
-              padding: const EdgeInsets.only(right: AppSpacing.sm),
-              child: ChoiceChip(
-                label: Text(library.name),
-                selected: selected == library.id,
-                onSelected: (bool _) => onSelected(library.id),
-              ),
-            ),
+            GlassSegment<String?>(value: library.id, label: library.name),
         ],
       ),
     );

@@ -103,35 +103,39 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
 
     return EdgeSwipeBack(
       child: Scaffold(
-        appBar: AppBar(
-          title: metadataLoading
-              ? const _AppBarTitleSkeleton()
-              : Text(
-                  series?.title ?? l10n.seriesFallbackTitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-          actions: <Widget>[
-            PopupMenuButton<String>(
+        appBar: GlassTopBar(
+          header: GlassHeader(
+            leading: GlassIconButton(
+              icon: Icons.chevron_left,
+              label: MaterialLocalizations.of(context).backButtonTooltip,
+              onPressed: () => context.pop(),
+            ),
+            title: metadataLoading
+                ? const _AppBarTitleSkeleton()
+                : Text(
+                    series?.title ?? l10n.seriesFallbackTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+            trailing: GlassMenuButton(
               key: const Key('series-mark-menu'),
-              icon: const Icon(Icons.done_all),
-              tooltip: l10n.markReadTooltip,
-              onSelected: (String value) =>
-                  unawaited(_markSeriesRead(read: value == 'read')),
-              itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-                PopupMenuItem<String>(
+              orb: true,
+              icon: Icons.done_all,
+              label: l10n.markReadTooltip,
+              menuChildren: <Widget>[
+                MenuItemButton(
                   key: const Key('series-mark-read'),
-                  value: 'read',
+                  onPressed: () => unawaited(_markSeriesRead(read: true)),
                   child: Text(l10n.markAllRead),
                 ),
-                PopupMenuItem<String>(
+                MenuItemButton(
                   key: const Key('series-mark-unread'),
-                  value: 'unread',
+                  onPressed: () => unawaited(_markSeriesRead(read: false)),
                   child: Text(l10n.markAllUnread),
                 ),
               ],
             ),
-          ],
+          ),
         ),
         body: Column(
           children: <Widget>[

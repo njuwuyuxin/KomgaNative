@@ -93,7 +93,7 @@ void main() {
     // FakeLibraryRepository 里第 1 本在读（第 5 页，共 21 页）；点下去打开哪本
     // 由 `nextBookToRead` 决定，那条逻辑在 data/book_selection_test.dart 里单测。
     expect(find.text('Continue · #1'), findsOneWidget);
-    expect(tester.widget<FilledButton>(action).onPressed, isNotNull);
+    expect(tester.widget<GlassPillButton>(action).onPressed, isNotNull);
   });
 
   testWidgets('一本都没读：主按钮是"开始阅读"', (WidgetTester tester) async {

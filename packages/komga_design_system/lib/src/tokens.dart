@@ -60,6 +60,31 @@ abstract final class AppSizes {
   /// 悬浮玻璃导航条的胶囊高度（搜索圆球同高，所以是正方形）。
   static const double navBarHeight = 64;
 
+  /// 顶部悬浮玻璃标题栏的高度（不含状态栏与上下留白）。
+  ///
+  /// 与导航条同一套形态：离屏幕边缘留白、胶囊形、内容从下面模糊穿过。
+  static const double glassHeaderHeight = 56;
+
+  /// 标题栏在内容流里占的高度：上方留白 8 + 条高 56 + 下方留白 8。
+  ///
+  /// 页面用 `GlassHeaderSliver` / `GlassTopBar` 时不需要自己加；
+  /// 只有自己摆浮层的情况才要和 `MediaQuery.padding.top` 相加。
+  static const double glassHeaderClearance = 72;
+
+  /// 标题栏两端独立玻璃圆球的直径（返回 / 搜索 / 更多）。
+  ///
+  /// 比导航条的搜索球小一档：它只做一个动作，不是常驻导航。
+  static const double glassOrb = 52;
+
+  /// 玻璃搜索框的高度。
+  static const double glassSearchHeight = 44;
+
+  /// 玻璃分段控件整条的高度（含四周 4 的内缩）。
+  static const double glassSegmentHeight = 48;
+
+  /// 玻璃控件里选中嵌入胶囊四周的内缩（与 `navIndicatorInset` 同源）。
+  static const double glassControlInset = 4;
+
   /// 页面滚动内容末尾为悬浮导航条留出的空白：条高 64 + 上方 16 + 下方 8，
   /// 再按最长的一档系统安全区（34）留足，避免最后一行被导航条压住。
   static const double navBarClearance = 112;
