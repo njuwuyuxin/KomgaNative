@@ -7,6 +7,7 @@ import 'package:komga_native/src/providers/download_providers.dart';
 import 'package:komga_native/src/providers/settings_provider.dart';
 import 'package:komga_native/src/screens/downloads_screen.dart';
 import 'package:komga_native/src/widgets/download_settings_section.dart';
+import 'package:komga_native/src/widgets/settings_library_reading_sections.dart';
 import 'package:komga_native/src/session/server_store.dart';
 import 'package:komga_native/src/session/session_controller.dart';
 import 'package:material_ui/material_ui.dart';
@@ -117,6 +118,8 @@ class SettingsScreen extends ConsumerWidget {
                         ),
                       ],
                     ),
+                    const SettingsReadingSection(),
+                    const SettingsLibrarySection(),
                     AppListGroup(
                       header: l10n.servers,
                       children: <Widget>[

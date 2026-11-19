@@ -55,17 +55,31 @@ void main() {
   ///
   /// `SliverList` **不构建屏幕外的项**，所以 `ensureVisible` 会先失败——
   /// 得先 `scrollUntilVisible` 把它滚进来。
+  /// 滚到某个 key 可见。
+  ///
+  /// SliverList **不构建屏幕外的项**，所以 ensureVisible 会先失败——
+  /// 得先真的往下拖。这里直接对页面主滚动视图做 drag：scrollUntilVisible
+  /// 在页面里还有横向分段控件时容易选错 scrollable。
   Future<void> revealKey(WidgetTester tester, String key) async {
     final finder = find.byKey(Key(key));
-    if (finder.evaluate().isEmpty) {
-      await tester.scrollUntilVisible(
-        finder,
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
+    // 先往下找；找不到再往回（页面变短时目标可能跑到视口上方）。
+    for (final step in <double>[-300, 300]) {
+      for (var i = 0; i < 25 && finder.evaluate().isEmpty; i++) {
+        await tester.drag(
+          find.byType(CustomScrollView),
+          Offset(0, step),
+          warnIfMissed: false,
+        );
+        await tester.pump();
+      }
+      if (finder.evaluate().isNotEmpty) break;
+      await tester.pumpAndSettle();
     }
-    await tester.ensureVisible(finder);
     await tester.pumpAndSettle();
+    if (finder.evaluate().isNotEmpty) {
+      await tester.ensureVisible(finder);
+      await tester.pumpAndSettle();
+    }
   }
 
   testWidgets('列出已保存服务器，点另一台即切换', (WidgetTester tester) async {

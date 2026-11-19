@@ -47,6 +47,8 @@
   "downloadQueuedSkipped": "已排队 {queued} 本，跳过已下载 {skipped} 本",
   "download": "下载",
   "downloadsSection": "下载",
+  "settingsReading": "阅读",
+  "settingsLibrary": "书架",
   "downloadWifiOnly": "仅 Wi-Fi 下载",
   "downloadWifiOnlyHint": "移动数据下不下载。",
   "downloadWifiOnlyBlocked": "已开启仅 Wi-Fi 下载——连上 Wi-Fi 或到设置里关掉它。",

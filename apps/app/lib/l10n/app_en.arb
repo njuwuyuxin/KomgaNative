@@ -56,6 +56,8 @@
   "@downloadQueuedSkipped": { "placeholders": { "queued": {}, "skipped": {} } },
   "download": "Download",
   "downloadsSection": "Downloads",
+  "settingsReading": "Reading",
+  "settingsLibrary": "Library",
   "downloadWifiOnly": "Wi-Fi only",
   "downloadWifiOnlyHint": "Never download over mobile data.",
   "downloadWifiOnlyBlocked": "Wi-Fi only is on — connect to Wi-Fi or turn it off in Settings.",
