@@ -42,6 +42,16 @@ class DownloadsScreen extends ConsumerWidget {
                     onPressed: () => Navigator.of(context).maybePop(),
                   ),
                   title: Text(l10n.downloadedBooks),
+                  // 有排队/进行中才出现："取消全部"在没有下载时是个无意义按钮。
+                  trailing: active.isEmpty
+                      ? null
+                      : GlassIconButton(
+                          key: const Key('downloads-cancel-all'),
+                          icon: Icons.stop_circle_outlined,
+                          label: l10n.downloadCancelAll,
+                          onPressed: () =>
+                              ref.read(downloadsProvider.notifier).cancelAll(),
+                        ),
                 ),
               ),
               if (ids.isEmpty)

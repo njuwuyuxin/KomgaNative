@@ -289,6 +289,11 @@ void main() {
       theme: theme,
       overrides: <Override>[
         libraryRepositoryProvider.overrideWithValue(repository),
+        // 书行里的下载按钮会读"待恢复的下载队列"：给内存库，
+        // 否则测试会去开真实的 sqlite（path_provider 没有平台通道）。
+        httpCacheDatabaseProvider.overrideWithValue(
+          HttpCacheDatabase(NativeDatabase.memory()),
+        ),
       ],
       precacheImages: covers,
     );
@@ -520,6 +525,10 @@ void main() {
       theme: theme,
       overrides: <Override>[
         libraryRepositoryProvider.overrideWithValue(library),
+        // 书行的下载按钮会读待恢复队列：给内存库，别去开真实 sqlite。
+        httpCacheDatabaseProvider.overrideWithValue(
+          HttpCacheDatabase(NativeDatabase.memory()),
+        ),
       ],
       precacheImages: covers,
       realTimeSettle: true,

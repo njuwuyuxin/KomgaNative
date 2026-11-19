@@ -16,7 +16,7 @@
 | FIX-04 | 预设应用补齐锁定缩放/去白边 | P0 | DONE | `feat(app): 预设应用共用 withConfig` |
 | FIX-05 | 正在读骨架与空态修正 | P0 | DONE | `488e19d` |
 | FIX-06 | 列表层进度与系列名 | P0 | DONE | `feat: 书行页码与继续卡的系列名` |
-| FIX-07 | 下载队列持久化 | P0 | TODO | — |
+| FIX-07 | 下载队列持久化 | P0 | DONE | `feat(app): 下载队列落盘并恢复` |
 | FIX-08 | 搜索/收藏集/阅读列表分页 | P0 | TODO | — |
 | FIX-09 | 版本号/简介按钮/标签溢出 | P0 | TODO | — |
 
@@ -165,3 +165,21 @@
 - 测试：domain 的 `withProgress` 保留系列名、API fixture 解析 `seriesTitle`、
   书行三档文案、搜索结果的系列名、继续卡文案与 a11y 标签；更新
   `reading_now@*` 与 `readlist_detail@eink` 黄金图。
+
+### FIX-07 下载队列持久化
+
+- 新增 Drift 表 `DownloadQueueEntries`（缓存库 schema v2 → v3，`createTable`
+  迁移）：bookId / seriesId / name / number / pagesCount / state / done / total /
+  createdAt。只存恢复所需的最小书目信息——重启时不一定能联网。
+- 队列状态在入队、开始、每页进度、完成/取消/删除时落盘；重启后由
+  `downloadQueueProvider` 读回，控制器自动接着下。已下载完的条目、以及
+  用户已经手动开始的那一本都会被跳过（不重复入队、不把"下载中"改回"排队中"）。
+- 落盘是**尽力而为**：缓存库打不开（平台通道缺失/磁盘满）只影响"能不能恢复"，
+  绝不让"点下载"变成没反应；读队列走 FutureProvider，失败是 `AsyncError`
+  而不是未捕获异常（裸 `unawaited` 会把整棵 widget 树炸掉，黄金图里当场撞到）。
+- 新增"取消全部"（头部按钮，仅在有排队/进行中时出现）：清空排队、取消进行中、
+  清掉磁盘队列；已下载的书不动。
+- 测试：`downloads_queue_test.dart` 4 条（依次下载、杀进程重启恢复、已下载不重下、
+  取消全部）；`pumpSeriesGolden` / `pumpReadListGolden` 补内存缓存库。
+- 设备走查：点下载 → 2 秒后强杀进程 → 重启进"已下载的书"，
+  显示 `海賊王 卷001 8 / 214` 并在继续跑，头部出现"取消全部"。

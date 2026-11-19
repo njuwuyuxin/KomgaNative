@@ -114,6 +114,7 @@
   "connectAnyway": "仍然连接",
   "unknownDate": "未知",
 
+  "downloadCancelAll": "全部取消",
   "cancelDownload": "取消下载",
   "downloadRetryTooltip": "{error} · 点按重试",
   "downloadedTapToRemove": "已下载 · 点按删除",

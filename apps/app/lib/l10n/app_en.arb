@@ -190,6 +190,8 @@
   "connectAnyway": "Connect anyway",
   "unknownDate": "unknown",
 
+  "downloadCancelAll": "Cancel all",
+  "downloadCancelAll": "Cancel all",
   "cancelDownload": "Cancel download",
   "downloadRetryTooltip": "{error} · tap to retry",
   "@downloadRetryTooltip": {

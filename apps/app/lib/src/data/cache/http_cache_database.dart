@@ -53,6 +53,38 @@ class DownloadedBooks extends Table {
   Set<Column<Object>> get primaryKey => <Column<Object>>{bookId};
 }
 
+/// 下载队列的持久化条目（FIX-07）。
+///
+/// 之前队列只在内存里：杀进程后"排队中/下载中"直接消失，用户以为下载还在跑。
+/// 落盘后重启能恢复成"排队中"，也可以明确地全部取消。
+///
+/// 只存恢复所需的最小书目信息（书名/卷号/页数）——重启时不一定能联网，
+/// 不能靠"再查一次服务器"才能重建队列。
+class DownloadQueueEntries extends Table {
+  TextColumn get bookId => text()();
+
+  TextColumn get seriesId => text()();
+
+  TextColumn get name => text()();
+
+  TextColumn get number => text().withDefault(const Constant(''))();
+
+  IntColumn get pagesCount => integer()();
+
+  /// `queued` / `active`；重启后一律按 `queued` 处理。
+  TextColumn get state => text()();
+
+  /// 已完成页数 / 总页数（恢复后显示"上次的进度"，清零重下也可接受）。
+  IntColumn get done => integer().withDefault(const Constant(0))();
+
+  IntColumn get total => integer().withDefault(const Constant(0))();
+
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => <Column<Object>>{bookId};
+}
+
 /// 缓存占用统计（设置页展示）。
 class CacheUsage {
   const CacheUsage({required this.bytes, required this.entries});
@@ -71,7 +103,9 @@ class CacheUsage {
   }
 }
 
-@DriftDatabase(tables: <Type>[CachedResponses, DownloadedBooks])
+@DriftDatabase(
+  tables: <Type>[CachedResponses, DownloadedBooks, DownloadQueueEntries],
+)
 class HttpCacheDatabase extends _$HttpCacheDatabase {
   HttpCacheDatabase(
     super.executor, {
@@ -92,7 +126,7 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
   int? _seqSeed;
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -103,6 +137,8 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
       // v1 → v2：新增"整本下载"记录表。缓存库是可再生的，但已经下载的书
       // 必须保住记录，否则用户升级后看到"已下载"变回"未下载"。
       if (from < 2) await m.createTable(downloadedBooks);
+      // v2 → v3：新增下载队列表（FIX-07）。旧版本没有队列可恢复，建空表即可。
+      if (from < 3) await m.createTable(downloadQueueEntries);
     },
   );
 
@@ -215,8 +251,66 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
     await (delete(downloadedBooks)..where((t) => t.bookId.equals(bookId))).go();
   }
 
-  /// 删掉一本书已缓存的页图（按 URL 片段）。
-  ///
+  // ---- 下载队列（FIX-07）----
+
+  /// 入队（或更新已有的那一条）。同一本书不会出现两条。
+  Future<void> enqueueDownload({
+    required String bookId,
+    required String seriesId,
+    required String name,
+    required String number,
+    required int pagesCount,
+  }) async {
+    await into(downloadQueueEntries).insertOnConflictUpdate(
+      DownloadQueueEntriesCompanion.insert(
+        bookId: bookId,
+        seriesId: seriesId,
+        name: name,
+        number: Value<String>(number),
+        pagesCount: pagesCount,
+        state: 'queued',
+        createdAt: _now(),
+      ),
+    );
+  }
+
+  /// 更新某一本的状态与进度（`queued` / `active`）。
+  Future<void> updateQueueEntry({
+    required String bookId,
+    required String state,
+    required int done,
+    required int total,
+  }) async {
+    await (update(
+      downloadQueueEntries,
+    )..where((t) => t.bookId.equals(bookId))).write(
+      DownloadQueueEntriesCompanion(
+        state: Value<String>(state),
+        done: Value<int>(done),
+        total: Value<int>(total),
+      ),
+    );
+  }
+
+  Future<void> dequeueDownload(String bookId) async {
+    await (delete(
+      downloadQueueEntries,
+    )..where((t) => t.bookId.equals(bookId))).go();
+  }
+
+  Future<void> clearDownloadQueue() => delete(downloadQueueEntries).go();
+
+  /// 待恢复的队列，按入队顺序（`createdAt` 相同则按 bookId 稳定排序）。
+  Future<List<DownloadQueueEntry>> downloadQueue() {
+    return (select(downloadQueueEntries)
+          ..orderBy(<OrderClauseGenerator<DownloadQueueEntries>>[
+            (t) => OrderingTerm(expression: t.createdAt),
+            (t) => OrderingTerm(expression: t.bookId),
+          ]))
+        .get();
+  }
+
+  /// 删掉一本书已缓存的页图（按 URL 片段）。  ///
   /// 用 `contains` 而不是精确 URL：页图 URL 带 `?zero_based=false`（将来还可能有
   /// `convert=jpeg`），按"书 + /pages/"匹配才不会漏。返回删除条数。
   Future<int> deleteCachedPages({
