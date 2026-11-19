@@ -53,9 +53,8 @@ void main() {
 
   /// 滚到某个 key 可见。
   ///
-  /// 设置页改成大标题（`SliverAppBar.large`）后首屏少了约 100px，
-  /// 服务器列表掉到屏幕外；而 `SliverList` **不构建屏幕外的项**，
-  /// 所以 `ensureVisible` 会先失败——得先 `scrollUntilVisible` 把它滚进来。
+  /// `SliverList` **不构建屏幕外的项**，所以 `ensureVisible` 会先失败——
+  /// 得先 `scrollUntilVisible` 把它滚进来。
   Future<void> revealKey(WidgetTester tester, String key) async {
     final finder = find.byKey(Key(key));
     if (finder.evaluate().isEmpty) {

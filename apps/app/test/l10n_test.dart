@@ -56,14 +56,11 @@ void main() {
     addTearDown(db.close);
 
     await pumpSettings(tester, const Locale('en'), db);
-    // 大标题（SliverAppBar.large）会同时挂"收起"和"展开"两份标题，所以是 findsWidgets。
-    expect(find.text('Settings'), findsWidgets);
     expect(find.text('Language'), findsOneWidget);
     expect(find.text('English'), findsOneWidget);
     expect(find.text('设置'), findsNothing);
 
     await pumpSettings(tester, const Locale('zh'), db);
-    expect(find.text('设置'), findsWidgets);
     expect(find.text('语言'), findsOneWidget);
     expect(find.text('中文'), findsOneWidget);
     expect(find.text('Settings'), findsNothing);

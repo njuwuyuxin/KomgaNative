@@ -89,42 +89,30 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 key: const Key('shelf-scroll'),
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: <Widget>[
+                  // 顶部只保留有用的东西：搜索框 + 右侧三颗动作。
+                  // 不再放页面标题——标题既不提供信息，又占掉一整行。
                   GlassHeaderSliver(
                     header: GlassHeader(
-                      title: Text(l10n.libraryTitle),
-                      actions: <Widget>[
-                        const ShelfSortButton(),
-                        const ShelfFilterButton(),
-                        const ShelfViewButton(),
-                      ],
-                      trailing: GlassIconButton(
-                        key: const Key('library-collections-button'),
-                        icon: Icons.collections_bookmark_outlined,
-                        label: l10n.collectionsTitle,
-                        onPressed: () => context.push('/collections'),
+                      bar: Row(
+                        children: <Widget>[
+                          Expanded(
+                            child: GlassSearchField(
+                              key: const Key('shelf-search-field'),
+                              controller: _searchController,
+                              hintText: l10n.searchSeriesHint,
+                              clearLabel: l10n.closeSearch,
+                              onChanged: controller.search,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          const _LibraryActions(),
+                        ],
                       ),
                     ),
                   ),
                   // 断网时提示"看的是缓存"，并给一次重新联网的机会。
                   SliverToBoxAdapter(
                     child: OfflineBanner(onRetry: () => unawaited(_refresh())),
-                  ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.md,
-                        AppSpacing.xs,
-                        AppSpacing.md,
-                        AppSpacing.sm,
-                      ),
-                      child: GlassSearchField(
-                        key: const Key('shelf-search-field'),
-                        controller: _searchController,
-                        hintText: l10n.searchSeriesHint,
-                        clearLabel: l10n.closeSearch,
-                        onChanged: controller.search,
-                      ),
-                    ),
                   ),
                   SliverToBoxAdapter(
                     child: LibraryFilterBar(
@@ -256,5 +244,31 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   Future<void> _openSeries(Series series) async {
     await context.push('/series/${series.id}');
     await ref.read(shelfProvider.notifier).refreshInPlace();
+  }
+}
+
+/// 书架顶部右侧的三颗动作：排序 / 筛选 / 视图。
+///
+/// 装进一条与搜索框同高的玻璃胶囊，和搜索框并排悬浮；没有标题文字，
+/// 视觉重心留给封面。三条动作各 44×44，加起来仍比原来的整条标题栏省一行。
+class _LibraryActions extends StatelessWidget {
+  const _LibraryActions();
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassSurface(
+      shape: AppShapes.of(context, AppShapes.bar),
+      child: const Padding(
+        padding: EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            ShelfSortButton(),
+            ShelfFilterButton(),
+            ShelfViewButton(),
+          ],
+        ),
+      ),
+    );
   }
 }

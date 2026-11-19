@@ -11,7 +11,7 @@ void main() {
     GlassNavDestination(
       icon: Icons.auto_stories_outlined,
       selectedIcon: Icons.auto_stories,
-      label: 'Reading now',
+      label: 'Reading',
       key: Key('nav-tab-0'),
     ),
     GlassNavDestination(
@@ -21,10 +21,16 @@ void main() {
       key: Key('nav-tab-1'),
     ),
     GlassNavDestination(
+      icon: Icons.collections_bookmark_outlined,
+      selectedIcon: Icons.collections_bookmark,
+      label: 'Saved',
+      key: Key('nav-tab-2'),
+    ),
+    GlassNavDestination(
       icon: Icons.settings_outlined,
       selectedIcon: Icons.settings,
       label: 'Settings',
-      key: Key('nav-tab-2'),
+      key: Key('nav-tab-3'),
     ),
   ];
   const search = GlassNavDestination(
@@ -70,7 +76,7 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('三个 tab 都是 48 点按区，点击派发下标', (WidgetTester tester) async {
+  testWidgets('四个 tab 都是 48 点按区，点击派发下标', (WidgetTester tester) async {
     final taps = <int>[];
     await pumpBar(tester, onTabSelected: taps.add);
 
@@ -83,7 +89,7 @@ void main() {
       await tester.tap(finder);
       await tester.pumpAndSettle();
     }
-    expect(taps, <int>[0, 1, 2]);
+    expect(taps, <int>[0, 1, 2, 3]);
   });
 
   testWidgets('选中项有 selected 语义，其余是普通按钮', (WidgetTester tester) async {
@@ -96,7 +102,7 @@ void main() {
     expect(selected.flagsCollection.isSelected, Tristate.isTrue);
 
     final unselected = tester.getSemantics(find.byKey(const Key('nav-tab-0')));
-    expect(unselected.label, 'Reading now');
+    expect(unselected.label, 'Reading');
     expect(unselected.flagsCollection.isButton, isTrue);
     expect(unselected.flagsCollection.isSelected, Tristate.isFalse);
     handle.dispose();
@@ -137,7 +143,7 @@ void main() {
   testWidgets('文本放大 1.3 倍不溢出', (WidgetTester tester) async {
     await pumpBar(tester, textScale: 1.3);
     expect(tester.takeException(), isNull);
-    expect(find.text('Reading now'), findsOneWidget);
+    expect(find.text('Reading'), findsOneWidget);
   });
 
   testWidgets('选中胶囊四边等宽内缩，端头半圆与外层同心', (WidgetTester tester) async {
@@ -189,7 +195,7 @@ void main() {
       moreOrLessEquals(pill.left, epsilon: 0.01),
     );
     expect(
-      tester.getRect(find.byKey(const Key('nav-tab-2'))).right,
+      tester.getRect(find.byKey(const Key('nav-tab-3'))).right,
       moreOrLessEquals(pill.right, epsilon: 0.01),
     );
   });

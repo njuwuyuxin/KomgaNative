@@ -79,6 +79,17 @@ GoRouter createRouter({
               ),
             ],
           ),
+          // 收藏集也是底部 dock 的一个 tab（与书架并列，见 AdaptiveShell）；
+          // 详情页仍是顶层 push，返回时回到这支分支。
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: '/collections',
+                builder: (BuildContext context, GoRouterState state) =>
+                    const CollectionsScreen(),
+              ),
+            ],
+          ),
           StatefulShellBranch(
             routes: <RouteBase>[
               GoRoute(
@@ -98,11 +109,6 @@ GoRouter createRouter({
             ],
           ),
         ],
-      ),
-      GoRoute(
-        path: '/collections',
-        builder: (BuildContext context, GoRouterState state) =>
-            const CollectionsScreen(),
       ),
       GoRoute(
         path: '/collections/:collectionId',

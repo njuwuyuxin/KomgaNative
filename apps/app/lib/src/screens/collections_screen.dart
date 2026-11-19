@@ -56,12 +56,6 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen>
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                   child: GlassHeader(
-                    leading: GlassIconButton(
-                      icon: Icons.chevron_left,
-                      label: MaterialLocalizations.of(context)
-                          .backButtonTooltip,
-                      onPressed: () => context.pop(),
-                    ),
                     bar: AnimatedBuilder(
                       animation: _tab,
                       builder: (BuildContext context, _) =>

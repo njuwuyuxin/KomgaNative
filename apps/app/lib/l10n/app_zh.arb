@@ -239,6 +239,7 @@
   "showLess": "收起",
   "readingNow": "正在读",
   "navReadingNow": "正在读",
+  "navCollections": "收藏",
   "readingNowEmpty": "还没有在读的书",
   "readingNowEmptyHint": "从书架打开一本，它会出现在这里",
   "recentlyAdded": "最近添加",

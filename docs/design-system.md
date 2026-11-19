@@ -66,7 +66,7 @@ chrome 永远压在漫画画面上：浅色模式下用浅色毛玻璃，白底�
 ## 底部悬浮玻璃导航条
 
 手机形态用 `widgets/floating_nav_bar.dart` 的 `FloatingNavBar`：一条胶囊放
-"正在读 / 书架 / 设置"三个 tab，右侧一颗同高的搜索圆球（iOS 26 的排布）。
+"正在读 / 书架 / 收藏 / 设置"四个 tab，右侧一颗同高的搜索圆球（iOS 26 的排布）。
 它替换了 Material 的 `NavigationBar`——后者的高度、指示器、水波纹和"整条贴底"
 都是安卓味；这里要的是离屏幕边缘留白、内容从下面模糊穿过、按下轻微缩放。
 
@@ -85,9 +85,9 @@ chrome 永远压在漫画画面上：浅色模式下用浅色毛玻璃，白底�
    端头两个 tab 的半圆与上下直线段的间隙才会一样宽。外层胶囊**不要**再加横向
    padding（加了左右内缩就比上下大，端头弧线会错开）——`floating_nav_bar_test` 钉了
    四个方向的间隙与半径差。
-4. **标签比页面标题短一档**：英文 tab 是 "Reading"（页面标题仍是 "Reading now"），
-   因为 "Reading now" 在 1.3 倍字号下会被截成 "Reading n…"。新增 tab 时先用
-   `nav_bar@phone_light_text1.3` 这双眼睛看一下。
+4. **标签比页面标题短一档**：英文 tab 是 "Reading" / "Saved"（页面标题仍是
+   "Reading now" / "Collections"），因为长标签在 1.3 倍字号下会被截断。
+   新增 tab 时先用 `nav_bar@phone_light_text1.3` 这双眼睛看一下。
 5. **只有搜索没有文字**：圆球靠 `Tooltip` + `Semantics(label:)` 表达，读屏念"搜索"。
 
 基线：`nav_bar@{phone_light,phone_dark,eink,phone_light_text1.3}` 是导航条本身
@@ -97,24 +97,26 @@ chrome 永远压在漫画画面上：浅色模式下用浅色毛玻璃，白底�
 
 ## 顶部悬浮玻璃标题栏
 
-首页和所有二级页的顶部都换成同一套玻璃标题栏，和底部导航条共用
-`GlassSurface` + `GlassHeader`：离屏幕边缘留白、胶囊形、内容从玻璃下面穿过。
+只保留**有实际控件**的顶部：没有动作的页面（正在读、设置）不加标题栏，
+内容直接从状态栏下面开始；书架没有标题文字，只留一条搜索框 + 右侧三颗动作。
 
 | 落位 | 用于 | 约定 |
 |---|---|---|
-| `GlassHeaderSliver` | 滚动页：书架、正在读、设置、搜索、下载、收藏集/阅读列表、收藏集详情 | `pinned: true`，占 `状态栏 + 72`；顶部有一层从表面色到透明的短渐变，保证状态栏文字在封面上可读 |
+| `GlassHeaderSliver` | 滚动页：书架（搜索 + 排序/筛选/视图）、搜索、下载、收藏集/阅读列表详情 | `pinned: true`，占 `状态栏 + 72`；顶部有一层从表面色到透明的短渐变，保证状态栏文字在封面上可读 |
 | `GlassTopBar` | 非滚动流页面：系列详情 | 作 `Scaffold.appBar`，`preferredSize` 只算 72，状态栏由 `SafeArea` 补；`Scaffold` 按实际布局高度让 body 下移 |
+| 无 | 正在读、设置、收藏集 | 页面自己 `SafeArea(bottom: false)`，内容从顶部开始；收藏集只留一条分段控件（收藏集 / 阅读列表） |
 
 一行由三段组成：左边独立圆球（返回）、中间胶囊、右边独立圆球（更多）。
 中间胶囊默认是"标题 + 动作"；也可以整条替换：
 
+- **书架**：`bar: Row(搜索框 + 三颗动作的玻璃胶囊)`——没有标题文字，
+  搜索与动作合成一行，比"标题栏 + 搜索框"省掉整整一行；
 - **搜索页**：`bar: GlassSearchField(...)`，搜索框就是标题栏；
-- **收藏集**：`bar: GlassSegmentedControl(...)`（收藏集 / 阅读列表），左边是返回圆球。
+- **收藏集**：`bar: GlassSegmentedControl(...)`，它是 dock 的一个 tab，没有返回键。
 
 几条不要踩的：
 
-1. **标题样式由 `GlassHeader` 统一给**（`AppTypography.title`），调用方只传
-   `Text(l10n.x)`，不要自己 `copyWith` 字号——各页标题才会一样大。
+1. **没有控件就不要标题栏**：空的玻璃条只是把内容往下推。
 2. **条内动作是 `GlassBarAction` / `GlassMenuButton(orb: false)`**，44×44；
    不要再套 `GlassSurface`，两层玻璃叠着又糊又费一次背景读取。
 3. **内容要自己让开**：用 sliver/topbar 时高度已经算好；只有自己摆浮层
@@ -125,21 +127,33 @@ chrome 永远压在漫画画面上：浅色模式下用浅色毛玻璃，白底�
 
 ### 与首页内容的组合
 
-书架页从上到下是：标题栏（钉住）→ 玻璃搜索框 → 玻璃分段控件（按库筛选）→ 封面网格。
+书架页从上到下是：悬浮搜索框 + 右侧动作组（钉住）→ 玻璃分段控件（按库筛选）→ 封面网格。
 搜索框**常驻**，不再用"点放大镜展开"的开关：它既是搜索入口，也是 iOS 搜索栏的视觉锚点。
-筛选/排序/视图收进标题栏的三个图标菜单（`GlassMenuButton`），收藏集入口是右侧圆球。
-背后的 `GlassPageBackground` 只加两团极淡的光晕，让玻璃有东西可折射；
-墨水屏直接透传成纸色。
+排序/筛选/视图收进右侧的三格玻璃胶囊，收藏集入口搬到了底部 dock（见下一节）；
+背后是 `GlassPageBackground` 的两团极淡光晕，让玻璃有东西可折射，墨水屏直接透传成纸色。
+
+## 底部 dock：四个 tab + 搜索
+
+底部胶囊现在是"正在读 / 书架 / 收藏 / 设置"四个 tab，右侧仍是搜索圆球。
+收藏集从原来的书架标题栏按钮搬到这里（路由上是 `/collections` 分支），
+详情页仍是顶层 push，返回时回到收藏 tab。
+
+- 四格标签必须短：英文用 `Reading` / `Library` / `Saved` / `Settings`
+  （页面标题仍是 `Reading now` / `Collections`），1.3 倍字号才不截断；
+  中文是"正在读 / 书架 / 收藏 / 设置"。
+- 四个 tab 平分胶囊，单格 48 点按区仍然成立；`floating_nav_bar_test` 钉了
+  第一个/最后一个 tab 与外层胶囊端头的关系。
+- 平板侧边栏 `NavigationRail` 也同步有 5 个目标（含搜索）。
 
 ## 其他页面的控件
 
 | 页面 | 控件改成了什么 |
 |---|---|
-| 正在读 | 玻璃标题栏；继续阅读的大卡片本身是 `GlassSurface(panel)`，主按钮是 `GlassPillButton` |
-| 设置 | 玻璃标题栏 + `AppListGroup` 分组卡；主题 / 语言换成 `GlassSegmentedControl` |
+| 正在读 | **没有标题栏**，内容直接从状态栏下开始；继续阅读的大卡片本身是 `GlassSurface(panel)`，主按钮是 `GlassPillButton` |
+| 设置 | **没有标题栏**，第一组的分组说明就是最上面的内容；分组卡 + 主题/语言玻璃分段控件 |
 | 搜索 | 玻璃搜索框作标题栏，结果按系列/书分组，底部让开导航条 |
-| 收藏集 | 返回圆球 + 分段控件作标题栏；两组列表是分组卡 |
-| 收藏集 / 阅读列表详情、下载 | 玻璃标题栏 + 分组卡 / 列表；错误态用 `GlassPillButton` 重试 |
+| 收藏集（dock 的 tab） | 只留一条分段控件（收藏集 / 阅读列表），没有返回键；两组列表是分组卡 |
+| 收藏集 / 阅读列表详情、下载 | 玻璃标题栏（有返回圆球和标题）+ 分组卡 / 列表；错误态用 `GlassPillButton` 重试 |
 | 系列详情 | `GlassTopBar`（返回圆球 + 标题 + 标记已读菜单圆球），主按钮换成 `GlassPillButton` |
 | 连接页 | 整张表单放进一块玻璃面板；认证方式用分段控件，连接按钮是 `GlassPillButton(busy:)` |
 | 离线提示条 | 玻璃胶囊（图标 + 文案 + 重试），不再是通栏 `secondaryContainer` |
@@ -201,7 +215,8 @@ chrome 永远压在漫画画面上：浅色模式下用浅色毛玻璃，白底�
   分段控件 / 搜索框 / 标题栏 / 分组卡的行为：点击派发、读屏标签、`busy` 防重复提交、
   搜索框清除键、`GlassHeaderSliver` 滚动后仍钉在顶部、`GlassTopBar.preferredSize`、
   墨水屏不建 `BackdropFilter` 与墨框退化。
-- `apps/app/test/shelf_polish_test.dart`：书架标题栏是钉住的玻璃条（滚动后仍在）。
+- `apps/app/test/shelf_polish_test.dart`：书架顶部的搜索框 + 三颗动作是钉住的
+  （滚动后动作位置不动），并且不再有标题文字。
 - 黄金图 `design_tokens@{phone_light,tablet_dark,eink}`：彩色条纹上的三种毛玻璃、三档阴影与形状、字体层级。
   改 token 时先看这三张图变没变，再看页面。
 - 黄金图 `nav_bar@{phone_light,phone_dark,eink,phone_light_text1.3}`、`nav_bar@phone_light_edge`

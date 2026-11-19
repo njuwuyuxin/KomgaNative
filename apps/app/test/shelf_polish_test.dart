@@ -109,20 +109,35 @@ void main() {
       );
     });
 
-    testWidgets('书架用钉住的玻璃标题栏', (WidgetTester tester) async {
+    testWidgets('书架顶部只有搜索框 + 三颗动作，且钉在顶部', (WidgetTester tester) async {
       await pumpScreen(tester, const LibraryScreen(), theme: AppTheme.light());
       await tester.pumpAndSettle();
 
       expect(find.byType(GlassHeaderSliver), findsOneWidget);
-      expect(find.text('Library'), findsOneWidget);
+      // 标题文字已经去掉：顶部不再有 "Library" 这类纯装饰文本。
+      expect(find.text('Library'), findsNothing);
+      for (final key in <String>[
+        'shelf-sort-menu',
+        'shelf-filter-menu',
+        'shelf-view-menu',
+      ]) {
+        expect(find.byKey(Key(key)), findsOneWidget);
+      }
 
-      // 往下滚一屏：标题栏是 pinned 的，标题仍在玻璃条里。
+      // 往下滚一屏：动作条是 pinned 的，位置不动。
+      final before = tester.getTopLeft(
+        find.byKey(const Key('shelf-sort-menu')),
+      );
       await tester.drag(
         find.byKey(const Key('shelf-scroll')),
         const Offset(0, -600),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Library'), findsOneWidget);
+      expect(find.byKey(const Key('shelf-sort-menu')), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.byKey(const Key('shelf-sort-menu'))).dy,
+        before.dy,
+      );
     });
   });
 

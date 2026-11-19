@@ -95,6 +95,11 @@ class _NavBarProbe extends StatelessWidget {
                   label: 'Library',
                 ),
                 GlassNavDestination(
+                  icon: Icons.collections_bookmark_outlined,
+                  selectedIcon: Icons.collections_bookmark,
+                  label: 'Saved',
+                ),
+                GlassNavDestination(
                   icon: Icons.settings_outlined,
                   selectedIcon: Icons.settings,
                   label: 'Settings',

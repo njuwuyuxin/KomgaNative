@@ -17,12 +17,16 @@ class AdaptiveShell extends StatelessWidget {
 
   final StatefulNavigationShell shell;
 
-  /// 路由分支顺序（`router.dart`）：正在读 / 书架 / 搜索 / 设置。
+  /// 路由分支顺序（`router.dart`）：正在读 / 书架 / 收藏 / 搜索 / 设置。
   static const int _readingBranch = 0;
-  static const int _searchBranch = 2;
+  static const int _collectionsBranch = 2;
+  static const int _searchBranch = 3;
 
   /// 胶囊里放哪几个分支：搜索单独做成右侧圆球，不占胶囊。
-  static const List<int> _tabBranches = <int>[0, 1, 3];
+  ///
+  /// 四个 tab + 一颗搜索球：标签必须短（"Reading" 而不是 "Reading now"），
+  /// 否则 1.3 倍字号下会被截断（`nav_bar@phone_light_text1.3` 是这双眼睛）。
+  static const List<int> _tabBranches = <int>[0, 1, 2, 4];
 
   void _onSelect(int index) =>
       shell.goBranch(index, initialLocation: index == shell.currentIndex);
@@ -43,6 +47,11 @@ class AdaptiveShell extends StatelessWidget {
             label: l10n.libraryTitle,
           ),
           (
+            icon: Icons.collections_bookmark_outlined,
+            selectedIcon: Icons.collections_bookmark,
+            label: l10n.collectionsTitle,
+          ),
+          (
             icon: Icons.search,
             selectedIcon: Icons.search,
             label: l10n.searchTitle,
@@ -54,6 +63,13 @@ class AdaptiveShell extends StatelessWidget {
           ),
         ];
     final sizeClass = WindowSizeClass.of(MediaQuery.sizeOf(context).width);
+
+    /// 胶囊里的标签：页面标题太长时用短一档的导航文案。
+    String labelFor(int branch) {
+      if (branch == _readingBranch) return l10n.navReadingNow;
+      if (branch == _collectionsBranch) return l10n.navCollections;
+      return allDestinations[branch].label;
+    }
 
     if (!sizeClass.useNavigationRail) {
       final selectedTab = _tabBranches.indexOf(shell.currentIndex);
@@ -70,11 +86,9 @@ class AdaptiveShell extends StatelessWidget {
               GlassNavDestination(
                 icon: allDestinations[_tabBranches[i]].icon,
                 selectedIcon: allDestinations[_tabBranches[i]].selectedIcon,
-                // 胶囊里用短一档的标签：英文 "Reading now" 在 1.3 倍字号下会被
-                // 截成 "Reading n…"。页面标题仍是完整写法。
-                label: _tabBranches[i] == _readingBranch
-                    ? l10n.navReadingNow
-                    : allDestinations[_tabBranches[i]].label,
+                // 收藏页面的完整标题是 "Collections"，四格胶囊里放不下，
+                // 导航栏用短一档的 "Saved" / "收藏"（页面内容不变）。
+                label: labelFor(_tabBranches[i]),
                 key: Key('nav-tab-${_tabBranches[i]}'),
               ),
           ],

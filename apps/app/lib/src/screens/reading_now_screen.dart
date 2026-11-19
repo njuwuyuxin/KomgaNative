@@ -38,54 +38,34 @@ class ReadingNowScreen extends ConsumerWidget {
 
     return Scaffold(
       body: GlassPageBackground(
-        child: RefreshIndicator(
-          edgeOffset:
-              MediaQuery.paddingOf(context).top + AppSizes.glassHeaderClearance,
-          onRefresh: () async {
-            ref.invalidate(ondeckProvider);
-            ref.invalidate(recentSeriesProvider);
-            for (final library in libraries) {
-              ref.invalidate(libraryShelfProvider(library.id));
-            }
-          },
-          child: CustomScrollView(
-            key: const Key('reading-now-scroll'),
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: <Widget>[
-              GlassHeaderSliver(
-                header: GlassHeader(title: Text(l10n.readingNow)),
-              ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.md,
-                  ),
-                  child: ondeck.isEmpty
-                      ? const _EmptyContinueCard()
-                      : _ContinueCard(book: ondeck.first),
+        child: SafeArea(
+          bottom: false,
+          child: RefreshIndicator(
+            onRefresh: () async {
+              ref.invalidate(ondeckProvider);
+              ref.invalidate(recentSeriesProvider);
+              for (final library in libraries) {
+                ref.invalidate(libraryShelfProvider(library.id));
+              }
+            },
+            child: CustomScrollView(
+              key: const Key('reading-now-scroll'),
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: <Widget>[
+                // 这一页没有标题栏：直接从"继续阅读"卡片开始。
+                const SliverToBoxAdapter(
+                  child: SizedBox(height: AppSpacing.sm),
                 ),
-              ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.md,
-                    AppSpacing.lg,
-                    AppSpacing.md,
-                    AppSpacing.xs,
-                  ),
-                  child: Text(
-                    l10n.recentlyAdded,
-                    style: AppTypography.of(context).title,
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                    ),
+                    child: ondeck.isEmpty
+                        ? const _EmptyContinueCard()
+                        : _ContinueCard(book: ondeck.first),
                   ),
                 ),
-              ),
-              _SeriesShelf(
-                key: const Key('reading-now-recent'),
-                heroScope: 'reading-now-recent',
-                series:
-                    ref.watch(recentSeriesProvider).value ?? const <Series>[],
-              ),
-              for (final library in libraries) ...<Widget>[
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(
@@ -95,23 +75,45 @@ class ReadingNowScreen extends ConsumerWidget {
                       AppSpacing.xs,
                     ),
                     child: Text(
-                      library.name,
+                      l10n.recentlyAdded,
                       style: AppTypography.of(context).title,
                     ),
                   ),
                 ),
                 _SeriesShelf(
-                  key: Key('reading-now-library-${library.id}'),
-                  heroScope: 'reading-now-library-${library.id}',
+                  key: const Key('reading-now-recent'),
+                  heroScope: 'reading-now-recent',
                   series:
-                      ref.watch(libraryShelfProvider(library.id)).value ??
-                      const <Series>[],
+                      ref.watch(recentSeriesProvider).value ?? const <Series>[],
+                ),
+                for (final library in libraries) ...<Widget>[
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.md,
+                        AppSpacing.lg,
+                        AppSpacing.md,
+                        AppSpacing.xs,
+                      ),
+                      child: Text(
+                        library.name,
+                        style: AppTypography.of(context).title,
+                      ),
+                    ),
+                  ),
+                  _SeriesShelf(
+                    key: Key('reading-now-library-${library.id}'),
+                    heroScope: 'reading-now-library-${library.id}',
+                    series:
+                        ref.watch(libraryShelfProvider(library.id)).value ??
+                        const <Series>[],
+                  ),
+                ],
+                const SliverToBoxAdapter(
+                  child: SizedBox(height: AppSizes.navBarClearance),
                 ),
               ],
-              const SliverToBoxAdapter(
-                child: SizedBox(height: AppSizes.navBarClearance),
-              ),
-            ],
+            ),
           ),
         ),
       ),
