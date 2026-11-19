@@ -1,6 +1,7 @@
 import 'package:komga_design_system/src/components/glass_icon_button.dart';
+import 'package:komga_design_system/src/components/glass_surface.dart';
+import 'package:komga_design_system/src/materials.dart';
 import 'package:komga_design_system/src/shapes.dart';
-import 'package:komga_design_system/src/themes.dart';
 import 'package:komga_design_system/src/tokens.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -8,7 +9,10 @@ import 'package:material_ui/material_ui.dart';
 ///
 /// 用 `MenuAnchor` 而不是 `PopupMenuButton`：后者的水波纹与直角卡片是安卓味，
 /// 而且没法把触发器做成玻璃；这里触发器复用标题栏里的 [GlassBarAction]
-/// 或独立的 [GlassIconButton]，菜单本身是圆角浮层（墨水屏为纸底墨框）。
+/// 或独立的 [GlassIconButton]。
+///
+/// 菜单面板自己也是液态玻璃（[GlassSurface]）：`MenuAnchor` 的 Material 底
+/// 设成全透明，真正画出来的是里面那块玻璃卡——二级菜单也要和一级控件同材质。
 class GlassMenuButton extends StatelessWidget {
   const GlassMenuButton({
     required this.icon,
@@ -24,7 +28,7 @@ class GlassMenuButton extends StatelessWidget {
   /// 读屏标签 / 长按提示。
   final String label;
 
-  /// 菜单项：由调用方构造 `MenuItemButton` / `MenuDivider`，key 也挂在项上。
+  /// 菜单项：由调用方构造 [GlassMenuItemButton] / `MenuDivider`，key 挂在项上。
   final List<Widget> menuChildren;
 
   /// true = 独立玻璃圆球；false = 玻璃条内部的图标（标题栏动作）。
@@ -34,40 +38,34 @@ class GlassMenuButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final eink = AppTheme.isEink(theme);
-    final base = AppShapes.of(context, AppShapes.panel);
-    final outlined = base is OutlinedBorder
-        ? base
-        : const RoundedRectangleBorder();
-    final menuShape = outlined.copyWith(
-      side: eink ? const BorderSide(color: AppTheme.einkInk) : BorderSide.none,
-    );
-
     return MenuAnchor(
       alignmentOffset: const Offset(0, AppSpacing.xs),
-      style: MenuStyle(
-        backgroundColor: WidgetStatePropertyAll(
-          eink ? AppTheme.einkPaper : scheme.surfaceContainerHigh,
-        ),
-        surfaceTintColor: const WidgetStatePropertyAll<Color>(
-          Colors.transparent,
-        ),
-        // 不用 Material 的 elevation 阴影：测试渲染器上高 elevation 会画成
-        // 一圈生硬的黑边（黄金图里量到 8px 实心黑），而 iOS 菜单是极轻的浮起。
-        // 平面圆角卡 + 描边（墨水屏）已经能和背后的内容分开。
-        elevation: const WidgetStatePropertyAll<double>(0),
-        shadowColor: const WidgetStatePropertyAll<Color>(Colors.transparent),
-        side: WidgetStatePropertyAll<BorderSide>(
-          eink ? const BorderSide(color: AppTheme.einkInk) : BorderSide.none,
-        ),
-        shape: WidgetStatePropertyAll<OutlinedBorder>(menuShape),
-        padding: const WidgetStatePropertyAll<EdgeInsets>(
-          EdgeInsets.symmetric(vertical: AppSpacing.xs),
-        ),
+      // 面板本体透明：可见的玻璃底由下面 menuChildren 里的 GlassSurface 画。
+      // 不用 Material 的 elevation 阴影（测试渲染器上高 elevation 会画成一圈
+      // 生硬黑边），浮起感交给 GlassSurface 的 AppShadows.floating。
+      style: const MenuStyle(
+        backgroundColor: WidgetStatePropertyAll<Color>(Colors.transparent),
+        surfaceTintColor: WidgetStatePropertyAll<Color>(Colors.transparent),
+        elevation: WidgetStatePropertyAll<double>(0),
+        shadowColor: WidgetStatePropertyAll<Color>(Colors.transparent),
+        side: WidgetStatePropertyAll<BorderSide>(BorderSide.none),
+        shape: WidgetStatePropertyAll<OutlinedBorder>(RoundedRectangleBorder()),
+        padding: WidgetStatePropertyAll<EdgeInsets>(EdgeInsets.zero),
       ),
-      menuChildren: menuChildren,
+      menuChildren: <Widget>[
+        GlassSurface(
+          shape: AppShapes.of(context, AppShapes.panel),
+          shadows: AppShadows.floating,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: menuChildren,
+            ),
+          ),
+        ),
+      ],
       builder:
           (BuildContext context, MenuController controller, Widget? child) {
             void toggle() {
@@ -93,6 +91,76 @@ class GlassMenuButton extends StatelessWidget {
               onPressed: toggle,
             );
           },
+    );
+  }
+}
+
+/// 玻璃菜单里的一行：**文本始终居中**，选中对勾放在左侧独立槽位。
+///
+/// 为什么不用 `MenuItemButton(leadingIcon: check)`：leadingIcon 会把文本往右挤，
+/// 不同项（有没有对勾）之间的文字会左右跳。这里把对勾放进等宽的左槽位，
+/// 右边再放一个同宽空槽位，文本的中心始终等于菜单的中心线。
+class GlassMenuItemButton extends StatelessWidget {
+  const GlassMenuItemButton({
+    required this.label,
+    required this.onPressed,
+    this.checked = false,
+    this.icon,
+    this.enabled = true,
+    super.key,
+  });
+
+  final String label;
+  final VoidCallback onPressed;
+  final bool checked;
+
+  /// 未选中时可选的左侧图标（排序/筛选菜单目前不用，留给后续）。
+  final IconData? icon;
+
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return MenuItemButton(
+      onPressed: enabled ? onPressed : null,
+      // 对勾用 Positioned 叠在左侧，**不参与** Row 的宽度分配：
+      // 文本始终按整条菜单的中线居中，不管这一项有没有对勾。
+      child: Stack(
+        alignment: Alignment.center,
+        children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSizes.iconLg),
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelLarge,
+            ),
+          ),
+          if (checked)
+            const Positioned(
+              left: AppSpacing.xs,
+              top: 0,
+              bottom: 0,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Icon(Icons.check, size: AppSizes.iconXs),
+              ),
+            )
+          else if (icon != null)
+            Positioned(
+              left: AppSpacing.xs,
+              top: 0,
+              bottom: 0,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Icon(icon, size: AppSizes.iconXs),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

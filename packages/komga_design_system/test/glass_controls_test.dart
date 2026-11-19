@@ -275,6 +275,53 @@ void main() {
     });
   });
 
+  group('GlassMenuButton', () {
+    testWidgets('菜单面是玻璃；菜单项文本按菜单中线居中，对勾在左侧不挤文本', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        host(
+          GlassMenuButton(
+            icon: Icons.filter_list,
+            label: 'Filter',
+            menuChildren: <Widget>[
+              GlassMenuItemButton(
+                label: 'Short',
+                checked: true,
+                onPressed: () {},
+              ),
+              GlassMenuItemButton(
+                label: 'A much longer label',
+                onPressed: () {},
+              ),
+            ],
+          ),
+        ),
+      );
+
+      await tester.tap(find.byType(GlassMenuButton));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(BackdropFilter), findsWidgets, reason: '二级菜单也是玻璃');
+
+      final card = find
+          .ancestor(of: find.text('Short'), matching: find.byType(GlassSurface))
+          .first;
+      final cardRect = tester.getRect(card);
+      final shortRect = tester.getRect(find.text('Short'));
+      final longRect = tester.getRect(find.text('A much longer label'));
+      expect(
+        shortRect.center.dx,
+        moreOrLessEquals(cardRect.center.dx, epsilon: 1),
+      );
+      expect(
+        longRect.center.dx,
+        moreOrLessEquals(cardRect.center.dx, epsilon: 1),
+      );
+
+      final check = tester.getRect(find.byIcon(Icons.check));
+      expect(check.right, lessThan(shortRect.left), reason: '对勾在文本左侧且不重叠');
+    });
+  });
+
   group('AppListGroup', () {
     testWidgets('墨水屏：纸底 + 墨框，没有阴影', (WidgetTester tester) async {
       await tester.pumpWidget(

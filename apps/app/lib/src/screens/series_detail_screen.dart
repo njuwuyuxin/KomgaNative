@@ -123,15 +123,15 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
               icon: Icons.done_all,
               label: l10n.markReadTooltip,
               menuChildren: <Widget>[
-                MenuItemButton(
+                GlassMenuItemButton(
                   key: const Key('series-mark-read'),
+                  label: l10n.markAllRead,
                   onPressed: () => unawaited(_markSeriesRead(read: true)),
-                  child: Text(l10n.markAllRead),
                 ),
-                MenuItemButton(
+                GlassMenuItemButton(
                   key: const Key('series-mark-unread'),
+                  label: l10n.markAllUnread,
                   onPressed: () => unawaited(_markSeriesRead(read: false)),
-                  child: Text(l10n.markAllUnread),
                 ),
               ],
             ),

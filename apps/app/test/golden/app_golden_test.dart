@@ -196,6 +196,20 @@ void main() {
     );
   });
 
+  /// 墨水屏的二级菜单：玻璃退化成纸底墨框，但仍然是圆角卡 + 居中文案。
+  testWidgets('library_sort_menu@eink', (WidgetTester tester) async {
+    await pumpShelfGolden(
+      tester,
+      name: 'library_sort_menu@eink',
+      size: GoldenSizes.eink,
+      theme: AppTheme.eink(),
+      act: (WidgetTester t) async {
+        await t.tap(find.byKey(const Key('shelf-sort-menu')));
+        await t.pumpAndSettle();
+      },
+    );
+  });
+
   /// 列表视图（UI-P2-7）：与网格共用同一份数据，只换 sliver 类型。
   /// 这是一套独立版式（横向封面行），必须有基线，不能只靠 widget 测试。
   testWidgets('library_list@phone_light', (WidgetTester tester) async {

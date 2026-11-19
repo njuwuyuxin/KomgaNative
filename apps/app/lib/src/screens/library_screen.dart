@@ -69,71 +69,82 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
 
     return Scaffold(
       body: GlassPageBackground(
-        child: RefreshIndicator(
-          // 标题栏是钉住的浮层：下拉刷新的转圈要出现在它下面，不能被玻璃压住。
-          edgeOffset:
-              MediaQuery.paddingOf(context).top + AppSizes.glassHeaderClearance,
-          onRefresh: _refresh,
-          child: NotificationListener<ScrollNotification>(
-            onNotification: (ScrollNotification notification) {
-              if (state.hasMore &&
-                  notification.metrics.extentAfter < _prefetchExtent) {
-                unawaited(controller.loadMore());
-              }
-              return false;
-            },
-            child: ShelfPinchDetector(
-              enabled: state.view == ShelfView.grid && state.series.isNotEmpty,
-              onPinch: _pinchCover,
-              child: CustomScrollView(
-                key: const Key('shelf-scroll'),
-                physics: const AlwaysScrollableScrollPhysics(),
-                slivers: <Widget>[
-                  // 顶部只保留有用的东西：搜索框 + 右侧三颗动作。
-                  // 不再放页面标题——标题既不提供信息，又占掉一整行。
-                  GlassHeaderSliver(
-                    header: GlassHeader(
-                      bar: Row(
-                        children: <Widget>[
-                          Expanded(
-                            child: GlassSearchField(
-                              key: const Key('shelf-search-field'),
-                              controller: _searchController,
-                              hintText: l10n.searchSeriesHint,
-                              clearLabel: l10n.closeSearch,
-                              onChanged: controller.search,
+        // Android 的拉伸过度滚动会给整条滚动层加一个 Transform，而液态玻璃
+        // 着色器按屏幕坐标采样背景；下拉刷新时就会读到被变换过的空图层，
+        // 玻璃变黑。这里关掉过度滚动的拉伸/辉光（下拉刷新由 RefreshIndicator
+        // 自己处理，不依赖那个效果）。
+        child: ScrollConfiguration(
+          behavior: ScrollConfiguration.of(context).copyWith(overscroll: false),
+          child: RefreshIndicator(
+            // 标题栏是钉住的浮层：下拉刷新的转圈要出现在它下面，不能被玻璃压住。
+            edgeOffset:
+                MediaQuery.paddingOf(context).top +
+                AppSizes.glassHeaderClearance,
+            onRefresh: _refresh,
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (ScrollNotification notification) {
+                if (state.hasMore &&
+                    notification.metrics.extentAfter < _prefetchExtent) {
+                  unawaited(controller.loadMore());
+                }
+                return false;
+              },
+              child: ShelfPinchDetector(
+                enabled:
+                    state.view == ShelfView.grid && state.series.isNotEmpty,
+                onPinch: _pinchCover,
+                child: CustomScrollView(
+                  key: const Key('shelf-scroll'),
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: <Widget>[
+                    // 顶部只保留有用的东西：搜索框 + 右侧三颗动作。
+                    // 不再放页面标题——标题既不提供信息，又占掉一整行。
+                    GlassHeaderSliver(
+                      header: GlassHeader(
+                        bar: Row(
+                          children: <Widget>[
+                            Expanded(
+                              child: GlassSearchField(
+                                key: const Key('shelf-search-field'),
+                                controller: _searchController,
+                                hintText: l10n.searchSeriesHint,
+                                clearLabel: l10n.closeSearch,
+                                onChanged: controller.search,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          const _LibraryActions(),
-                        ],
+                            const SizedBox(width: AppSpacing.sm),
+                            const _LibraryActions(),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  // 断网时提示"看的是缓存"，并给一次重新联网的机会。
-                  SliverToBoxAdapter(
-                    child: OfflineBanner(onRetry: () => unawaited(_refresh())),
-                  ),
-                  SliverToBoxAdapter(
-                    child: LibraryFilterBar(
-                      selected: state.libraryId,
-                      onSelected: controller.selectLibrary,
-                    ),
-                  ),
-                  const SliverToBoxAdapter(
-                    child: SizedBox(height: AppSpacing.sm),
-                  ),
-                  PhaseFade(
-                    phase: _phaseOf(state),
-                    slivers: <Widget>[
-                      ..._shelfSlivers(l10n, state, controller),
-                      // 底部留白：悬浮导航条压在内容之上，最后一行要能让开它。
-                      const SliverToBoxAdapter(
-                        child: SizedBox(height: AppSizes.navBarClearance),
+                    // 断网时提示"看的是缓存"，并给一次重新联网的机会。
+                    SliverToBoxAdapter(
+                      child: OfflineBanner(
+                        onRetry: () => unawaited(_refresh()),
                       ),
-                    ],
-                  ),
-                ],
+                    ),
+                    SliverToBoxAdapter(
+                      child: LibraryFilterBar(
+                        selected: state.libraryId,
+                        onSelected: controller.selectLibrary,
+                      ),
+                    ),
+                    const SliverToBoxAdapter(
+                      child: SizedBox(height: AppSpacing.sm),
+                    ),
+                    PhaseFade(
+                      phase: _phaseOf(state),
+                      slivers: <Widget>[
+                        ..._shelfSlivers(l10n, state, controller),
+                        // 底部留白：悬浮导航条压在内容之上，最后一行要能让开它。
+                        const SliverToBoxAdapter(
+                          child: SizedBox(height: AppSizes.navBarClearance),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

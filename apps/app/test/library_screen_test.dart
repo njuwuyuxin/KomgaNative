@@ -189,6 +189,25 @@ void main() {
     expect(find.text('Frieren'), findsNothing);
   });
 
+  testWidgets('下拉刷新：拖动后重新请求第一页', (WidgetTester tester) async {
+    final repository = FakeLibraryRepository(series: demoShelf());
+    await pumpShelf(tester, repository);
+    await tester.pumpAndSettle();
+    final before = repository.seriesCalls.length;
+
+    // 书架关掉了 Android 的拉伸过度滚动（液态玻璃着色器会被 Transform 打黑），
+    // 但下拉刷新仍然必须靠 Overscroll 通知触发——这条钉住它没被一起关掉。
+    await tester.fling(
+      find.byKey(const Key('shelf-scroll')),
+      const Offset(0, 320),
+      1000,
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.seriesCalls.length, greaterThan(before));
+    expect(repository.seriesCalls.last.page, 0);
+  });
+
   testWidgets('滚到底部自动追加下一页', (WidgetTester tester) async {
     final repository = FakeLibraryRepository(series: manySeries(45));
     await pumpShelf(tester, repository);

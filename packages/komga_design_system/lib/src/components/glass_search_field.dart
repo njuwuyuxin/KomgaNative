@@ -59,6 +59,7 @@ class GlassSearchField extends StatelessWidget {
               onChanged: onChanged,
               onSubmitted: onSubmitted,
               textInputAction: textInputAction,
+              textAlignVertical: TextAlignVertical.center,
               style: theme.textTheme.bodyLarge,
               cursorColor: scheme.primary,
               decoration: InputDecoration(

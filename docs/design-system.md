@@ -52,7 +52,8 @@ chrome 永远压在漫画画面上：浅色模式下用浅色毛玻璃，白底�
 | `GlassPillButton` | 玻璃胶囊主按钮（继续阅读 / 开始阅读 / 连接 / 重试），可带图标、`expanded`、`busy` | 墨底纸字、直角 |
 | `GlassSegmentedControl` | 玻璃分段控件；`scrollable` 时按内容定宽并横向滚动（库筛选），否则等分（主题 / 语言 / 收藏集） | 选中反白、直角 |
 | `GlassSearchField` | 玻璃胶囊搜索框，左放大镜、有内容才出现清除键；边框/填充全关掉 | 纸底墨边、直角 |
-| `GlassMenuButton` | 玻璃图标 + `MenuAnchor` 圆角菜单（排序 / 筛选 / 视图 / 更多）；菜单项由调用方给 `MenuItemButton`，key 挂在项上 | 纸底墨框菜单 |
+| `GlassMenuButton` | 玻璃图标 + `MenuAnchor` **玻璃菜单**（排序 / 筛选 / 视图 / 更多）；菜单项由调用方给 `GlassMenuItemButton`，key 挂在项上 | 纸底墨框菜单 |
+| `GlassMenuItemButton` | 菜单里的一行：文本按菜单中线居中；对勾/图标用 `Positioned` 叠在左侧，不参与文本排版（不会把文字往右挤） | 同菜单 |
 | `GlassHeader` | 顶部悬浮玻璃标题栏内容行：`leading` 圆球 + 中间胶囊（标题/动作，或用 `bar` 整条替换）+ `trailing` 圆球 | 直角、纸底墨边、整条可见 |
 | `GlassHeaderSliver` / `GlassTopBar` | 标题栏的两种落位：滚动页钉在顶部（占状态栏 + 72）；非滚动页作 `Scaffold.appBar`（`preferredSize` = 72，状态栏由 `SafeArea` 补） | 顶部状态栏区域用整块纸色 |
 | `AppListGroup` | iOS inset grouped 分组卡：一组行 + 卡外分组说明 + 行间细分割线 | 纸底 + 墨框、直角 |
@@ -131,6 +132,12 @@ chrome 永远压在漫画画面上：浅色模式下用浅色毛玻璃，白底�
 搜索框**常驻**，不再用"点放大镜展开"的开关：它既是搜索入口，也是 iOS 搜索栏的视觉锚点。
 排序/筛选/视图收进右侧的三格玻璃胶囊，收藏集入口搬到了底部 dock（见下一节）；
 背后是 `GlassPageBackground` 的两团极淡光晕，让玻璃有东西可折射，墨水屏直接透传成纸色。
+
+> **玻璃 + 下拉刷新（Android）**：默认的拉伸过度滚动会给整条滚动层加一个 `Transform`，
+> 液态玻璃着色器按屏幕坐标采样背景，就会读到变换后的空图层——顶部控件整块变黑。
+> 书架用 `ScrollConfiguration(...copyWith(overscroll: false))` 关掉拉伸/辉光；
+> `RefreshIndicator` 仍然靠 `OverscrollNotification` 工作，`library_screen_test` 里有一条
+> "下拉刷新：拖动后重新请求第一页"钉住它没被一起关掉。iOS 的 Bouncing 不受影响。
 
 ## 底部 dock：四个 tab + 搜索
 
@@ -212,17 +219,20 @@ chrome 永远压在漫画画面上：浅色模式下用浅色毛玻璃，白底�
   `selected` 语义、搜索圆球的读屏标签、墨水屏反白、1.3 倍字号不溢出，以及选中胶囊
   四边等宽内缩 / 内外半径差 = 内缩（端头半圆同心）。
 - `packages/komga_design_system/test/glass_controls_test.dart`：玻璃圆球 / 胶囊按钮 /
-  分段控件 / 搜索框 / 标题栏 / 分组卡的行为：点击派发、读屏标签、`busy` 防重复提交、
+  分段控件 / 搜索框 / 标题栏 / 分组卡 / 二级菜单的行为：点击派发、读屏标签、`busy` 防重复提交、
   搜索框清除键、`GlassHeaderSliver` 滚动后仍钉在顶部、`GlassTopBar.preferredSize`、
-  墨水屏不建 `BackdropFilter` 与墨框退化。
+  墨水屏不建 `BackdropFilter` 与墨框退化；菜单是玻璃面，且菜单项文本按菜单中线居中、
+  对勾在左侧不挤压排版。
 - `apps/app/test/shelf_polish_test.dart`：书架顶部的搜索框 + 三颗动作是钉住的
   （滚动后动作位置不动），并且不再有标题文字。
+- `apps/app/test/library_screen_test.dart`：下拉刷新仍然触发重新请求（关掉 Android
+  拉伸过度滚动不会把 `RefreshIndicator` 一起关掉）。
 - 黄金图 `design_tokens@{phone_light,tablet_dark,eink}`：彩色条纹上的三种毛玻璃、三档阴影与形状、字体层级。
   改 token 时先看这三张图变没变，再看页面。
 - 黄金图 `nav_bar@{phone_light,phone_dark,eink,phone_light_text1.3}`、`nav_bar@phone_light_edge`
   （端头间隙）与 `library_nav@phone_light`：导航条本身 + 真实首页形态（见上一节）。
-- 页面基线：`library@*`（含 `text1.3` / `library_nav` / `library_sort_menu` / `library_offline`）、
-  `reading_now@*`、`settings@eink`、`search@*`、`collections@*`、`collection_detail@*`、
-  `readlist_detail@*`、`downloads@*`、`series@*`、`series_loading@*`、`connection@*`
-  一起钉住标题栏高度、玻璃控件排布、分组卡与墨水屏退化。
+- 页面基线：`library@*`（含 `text1.3` / `library_nav` / `library_sort_menu` / `library_offline`、
+  以及墨水屏的 `library_sort_menu@eink`）、`reading_now@*`、`settings@eink`、`search@*`、
+  `collections@*`、`collection_detail@*`、`readlist_detail@*`、`downloads@*`、`series@*`、
+  `series_loading@*`、`connection@*` 一起钉住标题栏高度、玻璃控件排布、分组卡与墨水屏退化。
 - 中文：见 ADR 0004。
