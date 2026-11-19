@@ -143,8 +143,8 @@ abstract final class AppTheme {
 /// Flutter 3.47 之后已标记废弃（要求换成 `cupertino_ui`，属于新依赖）。
 /// 这里只做"新页从左滑入 + 旧页以 30% 速度左移"这一层——正是 iOS 侧滑的观感主体。
 ///
-/// **已知缺口**：边缘右滑返回需要自定义 `PageRoute`（手势在 Cupertino 的
-/// Route 里，不在转场 builder 里），见 `docs/ui-polish-plan.md` 的记录；
+/// **边缘右滑返回**：由页面层的 `EdgeSwipeBack` 补上（非墨水屏、非"减少动态效果"），
+/// 不追求手指跟手的交互式动画；`cupertino.dart` 已废弃，不引 `cupertino_ui` 新依赖。
 /// Android 的系统返回手势不受影响。
 class IosSlidePageTransitionsBuilder extends PageTransitionsBuilder {
   const IosSlidePageTransitionsBuilder();

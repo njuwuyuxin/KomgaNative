@@ -9,6 +9,7 @@ import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/providers/series_read_provider.dart';
 import 'package:komga_native/src/screens/reader_screen.dart';
+import 'package:komga_native/src/widgets/edge_swipe_back.dart';
 import 'package:komga_native/src/widgets/offline_banner.dart';
 import 'package:komga_native/src/widgets/series_hero_tag.dart';
 import 'package:komga_native/src/widgets/series_two_pane.dart';
@@ -100,68 +101,70 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
         WindowSizeClass.of(MediaQuery.sizeOf(context).width) ==
         WindowSizeClass.expanded;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: metadataLoading
-            ? const _AppBarTitleSkeleton()
-            : Text(
-                series?.title ?? l10n.seriesFallbackTitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-        actions: <Widget>[
-          PopupMenuButton<String>(
-            key: const Key('series-mark-menu'),
-            icon: const Icon(Icons.done_all),
-            tooltip: l10n.markReadTooltip,
-            onSelected: (String value) =>
-                unawaited(_markSeriesRead(read: value == 'read')),
-            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-              PopupMenuItem<String>(
-                key: const Key('series-mark-read'),
-                value: 'read',
-                child: Text(l10n.markAllRead),
-              ),
-              PopupMenuItem<String>(
-                key: const Key('series-mark-unread'),
-                value: 'unread',
-                child: Text(l10n.markAllUnread),
-              ),
-            ],
-          ),
-        ],
-      ),
-      body: Column(
-        children: <Widget>[
-          OfflineBanner(onRetry: () => unawaited(_refresh())),
-          Expanded(
-            child: wide
-                ? SeriesTwoPane(
-                    series: series,
-                    books: page,
-                    failure: failure,
-                    metadataLoading: metadataLoading,
-                    seriesId: seriesId,
-                    heroTag: heroTag,
-                    onRefresh: _refresh,
-                    onRetry: () => unawaited(_refresh()),
-                    onLoadMore: _loadMore,
-                    onOpenBook: _openBook,
-                  )
-                : SeriesSinglePane(
-                    series: series,
-                    books: page,
-                    failure: failure,
-                    metadataLoading: metadataLoading,
-                    seriesId: seriesId,
-                    heroTag: heroTag,
-                    onRefresh: _refresh,
-                    onRetry: () => unawaited(_refresh()),
-                    onLoadMore: _loadMore,
-                    onOpenBook: _openBook,
-                  ),
-          ),
-        ],
+    return EdgeSwipeBack(
+      child: Scaffold(
+        appBar: AppBar(
+          title: metadataLoading
+              ? const _AppBarTitleSkeleton()
+              : Text(
+                  series?.title ?? l10n.seriesFallbackTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+          actions: <Widget>[
+            PopupMenuButton<String>(
+              key: const Key('series-mark-menu'),
+              icon: const Icon(Icons.done_all),
+              tooltip: l10n.markReadTooltip,
+              onSelected: (String value) =>
+                  unawaited(_markSeriesRead(read: value == 'read')),
+              itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                PopupMenuItem<String>(
+                  key: const Key('series-mark-read'),
+                  value: 'read',
+                  child: Text(l10n.markAllRead),
+                ),
+                PopupMenuItem<String>(
+                  key: const Key('series-mark-unread'),
+                  value: 'unread',
+                  child: Text(l10n.markAllUnread),
+                ),
+              ],
+            ),
+          ],
+        ),
+        body: Column(
+          children: <Widget>[
+            OfflineBanner(onRetry: () => unawaited(_refresh())),
+            Expanded(
+              child: wide
+                  ? SeriesTwoPane(
+                      series: series,
+                      books: page,
+                      failure: failure,
+                      metadataLoading: metadataLoading,
+                      seriesId: seriesId,
+                      heroTag: heroTag,
+                      onRefresh: _refresh,
+                      onRetry: () => unawaited(_refresh()),
+                      onLoadMore: _loadMore,
+                      onOpenBook: _openBook,
+                    )
+                  : SeriesSinglePane(
+                      series: series,
+                      books: page,
+                      failure: failure,
+                      metadataLoading: metadataLoading,
+                      seriesId: seriesId,
+                      heroTag: heroTag,
+                      onRefresh: _refresh,
+                      onRetry: () => unawaited(_refresh()),
+                      onLoadMore: _loadMore,
+                      onOpenBook: _openBook,
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }

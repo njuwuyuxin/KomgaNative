@@ -347,6 +347,15 @@ Panels 的高级感主要来自三点，和控件本身关系不大：
 | 测试：`reading_now_test` 断言继续阅读卡片用 `bookHeroTag('s1-b1')`；`reader_screen_test` 新增"页图没来时封面不淡出、页图到了才让位"（用 `pageGates` 卡住首页）；`pumpReader` 增加 `heroTag` / `settle` 参数 |
 | 黄金图不变（Hero 包装不改变静态像素，`reading_now@*` 与 `reader@*` 基线均未动） |
 
+**进度（2026-11-19）：P2-3 边缘右滑返回（补齐缩水）。**
+
+| 落地 |
+|---|
+| 新增 `widgets/edge_swipe_back.dart`：只在**左边缘 24px**（RTL 为右边缘）放一条横向手势条，拖过 64px 或甩速 >700 就 `Navigator.maybePop`；页面中间/横向货架的手势不受影响 |
+| 系列详情与阅读器接入；墨水屏、系统"减少动态效果"、不可 pop 的路由都不挂手势条 |
+| **不是交互式跟手**：Flutter 3.47 起 `package:flutter/cupertino.dart` 已废弃（要求换 `cupertino_ui` 新依赖），真正的跟手返回在 Cupertino 的 `PageRoute` 里。我们保持零新依赖，用"边缘手势 + 主题侧滑转场"实现功能，跟手动画仍是缺口 |
+| 测试：`edge_swipe_back_test` 覆盖"左边缘拖过阈值返回"、"中间拖不返回"、"墨水屏不挂手势条" |
+
 **进度（2026-11-19）：首次打开系列详情的 Hero 一致性。**
 
 | 落地 |
