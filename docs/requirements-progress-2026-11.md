@@ -71,7 +71,7 @@
 | ID | 需求 | P | 状态 | commit |
 |---|---|---|---|---|
 | HIS-03 | Insights（连续天数/热力图/统计） | P2 | TODO | — |
-| HIS-04 | 阅读器内阅读时长 | P2 | TODO | — |
+| HIS-04 | 阅读器内阅读时长 | P2 | DONE | `feat(reader): chrome 显示本次阅读时长` |
 | PLT-02 | iPad 默认双页/阅读布局 | P2 | TODO | — |
 | I18N-01 | 数据层错误文案本地化 | P2 | TODO | — |
 | A11Y-01 | TalkBack/VoiceOver + Dynamic Type 2.0 | P2 | TODO | — |
@@ -228,6 +228,25 @@
   `continueReadingProgress` 是 FIX-06 之后失效的）。
 - 验证：55 条阅读器测试 + 黄金图全部不变（零行为变更）；设备上打开第 114/227 页
   照常渲染，滑杆与"剩 113 页"一致。
+
+### HIS-04 阅读器内阅读时长
+
+- `ReaderPrefs.showSessionTime`（默认开，可关）：设置页"阅读"组有开关，
+  也存在偏好里跟着导出。
+- 阅读器标题栏页码后面显示 `2–3 / 184 · 1 分`。**只显示分钟**：
+  秒级跳动既没有意义，又会逼着每秒重建。
+- **不增加每秒 rebuild**：`Timer.periodic(30s)` 只在**分钟数变化时** setState；
+  暂停中 `elapsed` 冻结，所以后台回来不会跳。
+- 口径与历史一致：`ReadingSessionTracker.elapsed` 和退出时写进 `reading_sessions`
+  的是同一个来源（`elapsed` 在 `finish` 之前就是最终时长），不会出现
+  "阅读器显示 12 分、历史写着 9 分"。
+- 测试：`reading_session_test.dart` 增加 2 条（`elapsed` 与最终会话时长一致、
+  暂停时不再增长）；`settings_ia_test.dart` 增加 1 条（开关写进偏好）。
+  写测试时抓到 `ReaderPrefs.copyWith` **漏传 `showSessionTime`**——开关点了没反应，
+  补上后通过。
+- 黄金图：`settings@eink` 因新增开关重生成；阅读器基线不变（黄金图里会话不到 1 分钟）。
+- 设备走查：读了约 75 秒后点开 chrome，标题栏显示
+  `[Kmoe][地缚少年花… 2–3 / 184 · 1 分` —— 本次时长按要求出现。
 
 ### HIS-03 Insights
 

@@ -99,6 +99,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     // 页列表还没回来也不影响——`_setPage` 之后会把 endPage 更新上去。
     _session.start(page: widget.book?.readProgress?.page ?? 1);
     _recorder = ref.read(readingSessionRecorderProvider);
+    startSessionTicker();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _keyboardFocus.requestFocus();
     });
@@ -108,6 +109,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   void dispose() {
     // 退出阅读器时结算本次会话（HIS-01）。`ref` 在 dispose 里不能再用，
     // 所以 recorder 在 initState 就取好了。
+    stopSessionTicker();
     _settleSession(completed: false);
     WidgetsBinding.instance.removeObserver(this);
     _keyboardFocus.dispose();
@@ -194,7 +196,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       bookId: widget.bookId,
       seriesId: book?.seriesId,
       title: book?.name ?? l10n.readerBookFallback,
-      pageLabel: layout.pageLabel(l10n),
+      pageLabel: _pageLabelWithSession(layout.pageLabel(l10n), l10n),
       palette: palette,
       mode: mode,
       page: page,

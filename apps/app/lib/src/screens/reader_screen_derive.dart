@@ -39,6 +39,42 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
   /// 会话落库用；在 `initState` 里取好，`dispose` 里不能再碰 `ref`。
   late ReadingSessionRecorder _recorder;
 
+  /// chrome 里"本次阅读时长"用（HIS-04）。30 秒一跳，且**只在分钟数变了**
+  /// 才 setState——每秒重建整页会把长条漫画的滚动拖垮。
+  Timer? _sessionTicker;
+  int _shownSessionMinutes = 0;
+
+  void startSessionTicker() {
+    _sessionTicker?.cancel();
+    _sessionTicker = Timer.periodic(
+      const Duration(seconds: 30),
+      (Timer _) => _tickSession(),
+    );
+  }
+
+  void stopSessionTicker() {
+    _sessionTicker?.cancel();
+    _sessionTicker = null;
+  }
+
+  void _tickSession() {
+    if (!mounted) return;
+    if (!ref.read(readerPrefsProvider).showSessionTime) return;
+    final minutes = _session.elapsed.inMinutes;
+    if (minutes == _shownSessionMinutes) return;
+    setState(() => _shownSessionMinutes = minutes);
+  }
+
+  /// 页码文案后面挂上"本次 12 分"（可关）。
+  ///
+  /// 和写进历史的那条会话同一口径（都来自 [ReadingSessionTracker]），
+  /// 不会出现"阅读器里显示 12 分、历史里写着 9 分"。
+  String _pageLabelWithSession(String label, AppLocalizations l10n) {
+    if (!ref.watch(readerPrefsProvider).showSessionTime) return label;
+    if (_shownSessionMinutes <= 0) return label;
+    return l10n.readerPageLabelWithSession(label, _shownSessionMinutes);
+  }
+
   /// 结算本次会话并写库；太短（<10s）直接丢掉。
   ///
   /// 隐身模式下不记：用户开隐身就是想"这次阅读别留痕"。

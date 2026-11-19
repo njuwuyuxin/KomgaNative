@@ -51,6 +51,16 @@ class ReadingSessionTracker {
 
   bool get running => _startedAt != null;
 
+  /// 本次已读时长（暂停中不增长）。
+  ///
+  /// chrome 里的"本次 12:30"用它，保证和退出后写进历史的那条会话同一口径。
+  Duration get elapsed {
+    final started = _startedAt;
+    if (started == null) return Duration.zero;
+    final end = _pausedAt ?? _clock();
+    return end.difference(started);
+  }
+
   /// 进入阅读器（或换书）时开始计时。已经在计时就忽略——一次阅读只算一条。
   void start({required int page}) {
     if (_startedAt != null) return;

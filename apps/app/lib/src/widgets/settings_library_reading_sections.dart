@@ -70,6 +70,13 @@ class SettingsReadingSection extends ConsumerWidget {
             ),
           ),
         ),
+        SwitchListTile(
+          key: const Key('settings-show-session-time'),
+          value: prefs.showSessionTime,
+          title: Text(l10n.settingsShowSessionTime),
+          subtitle: Text(l10n.settingsShowSessionTimeHint),
+          onChanged: controller.setShowSessionTime,
+        ),
       ],
     );
   }

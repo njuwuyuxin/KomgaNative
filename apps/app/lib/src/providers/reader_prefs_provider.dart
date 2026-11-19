@@ -69,6 +69,12 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
   void setPageTurn(ReaderPageTurnChoice choice, {String? seriesId}) =>
       _updateConfig(seriesId, (ReaderPrefs p) => p.copyWith(pageTurn: choice));
 
+  /// chrome 是否显示本次阅读时长（HIS-04）：跟着书走，不是全局开关。
+  void setShowSessionTime(bool enabled, {String? seriesId}) => _updateConfig(
+    seriesId,
+    (ReaderPrefs p) => p.copyWith(showSessionTime: enabled),
+  );
+
   /// 记住/清除某本书的双页分组起点（RDR-06）；[index] 为 null 表示恢复自动。
   void setSpreadFrom(String bookId, int? index) =>
       _update(state.withSpreadFrom(bookId, index));

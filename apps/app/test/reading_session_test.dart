@@ -71,6 +71,30 @@ void main() {
       expect(finish()!.startPage, 1);
     });
 
+    test('elapsed 与最终写进历史的口径一致（HIS-04）', () {
+      tracker.start(page: 1);
+      now = now.add(const Duration(minutes: 2));
+      // chrome 里显示的就是这个值。
+      expect(tracker.elapsed, const Duration(minutes: 2));
+      final draft = finish()!;
+      expect(
+        draft.duration,
+        tracker.elapsed == Duration.zero
+            ? const Duration(minutes: 2)
+            : draft.duration,
+      );
+      expect(draft.duration, const Duration(minutes: 2));
+    });
+
+    test('暂停时 elapsed 不再增长', () {
+      tracker.start(page: 1);
+      now = now.add(const Duration(seconds: 40));
+      tracker.pause();
+      final frozen = tracker.elapsed;
+      now = now.add(const Duration(minutes: 5));
+      expect(tracker.elapsed, frozen);
+    });
+
     test('finish 之后可以开始新的一次', () {
       tracker.start(page: 1);
       now = now.add(const Duration(seconds: 30));

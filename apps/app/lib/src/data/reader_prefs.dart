@@ -137,6 +137,7 @@ class ReaderPrefs {
     this.trimBorders = false,
     this.pageTurn = ReaderPageTurnChoice.curl,
     this.spreadFrom = const <String, int>{},
+    this.showSessionTime = true,
     this.presets = const <ReaderPreset>[],
     this.seriesOverrides = const <String, ReaderPrefs>{},
   });
@@ -170,6 +171,9 @@ class ReaderPrefs {
   /// 不进预设/系列覆盖（[configOnly] 会丢掉它）——它是"这本书的排版修正"，
   /// 不是一套可复用的阅读风格。
   final Map<String, int> spreadFrom;
+
+  /// 阅读器 chrome 是否显示本次阅读时长（HIS-04）。
+  final bool showSessionTime;
 
   /// 用户保存的阅读预设（UI-P3-1）；按保存顺序排列。
   final List<ReaderPreset> presets;
@@ -242,6 +246,7 @@ class ReaderPrefs {
       trimBorders: override.trimBorders,
       pageTurn: override.pageTurn,
       spreadFrom: spreadFrom,
+      showSessionTime: showSessionTime,
       presets: presets,
       seriesOverrides: seriesOverrides,
     );
@@ -298,6 +303,7 @@ class ReaderPrefs {
     bool? trimBorders,
     ReaderPageTurnChoice? pageTurn,
     Map<String, int>? spreadFrom,
+    bool? showSessionTime,
     List<ReaderPreset>? presets,
     Map<String, ReaderPrefs>? seriesOverrides,
   }) => ReaderPrefs(
@@ -311,6 +317,7 @@ class ReaderPrefs {
     trimBorders: trimBorders ?? this.trimBorders,
     pageTurn: pageTurn ?? this.pageTurn,
     spreadFrom: spreadFrom ?? this.spreadFrom,
+    showSessionTime: showSessionTime ?? this.showSessionTime,
     presets: presets ?? this.presets,
     seriesOverrides: seriesOverrides ?? this.seriesOverrides,
   );
@@ -327,6 +334,7 @@ class ReaderPrefs {
         'trimBorders': trimBorders,
         'pageTurn': pageTurn.name,
         if (spreadFrom.isNotEmpty) 'spreadFrom': spreadFrom,
+        'showSessionTime': showSessionTime,
         if (includePresets && presets.isNotEmpty)
           'presets': <Object?>[for (final preset in presets) preset.toJson()],
         if (includePresets && seriesOverrides.isNotEmpty)
@@ -388,6 +396,7 @@ class ReaderPrefs {
         ReaderPageTurnChoice.curl,
       ),
       spreadFrom: _parseSpreadFrom(json['spreadFrom']),
+      showSessionTime: json['showSessionTime'] != false,
       presets: presets,
       seriesOverrides: overrides,
     );
@@ -429,6 +438,7 @@ class ReaderPrefs {
       other.trimBorders == trimBorders &&
       other.pageTurn == pageTurn &&
       _sameSpreadFrom(other.spreadFrom, spreadFrom) &&
+      other.showSessionTime == showSessionTime &&
       _samePresets(other.presets, presets) &&
       _sameOverrides(other.seriesOverrides, seriesOverrides);
 
