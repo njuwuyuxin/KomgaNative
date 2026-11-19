@@ -242,6 +242,9 @@
   "navCollections": "收藏",
   "readingNowEmpty": "还没有在读的书",
   "readingNowEmptyHint": "从书架打开一本，它会出现在这里",
+  "readingNowLoadFailed": "没能加载在读的书",
+  "readingNowLoadFailedHint": "检查一下网络，再试一次。",
+  "readingNowRefreshFailed": "刷新失败 · 显示的是上一次的结果",
   "recentlyAdded": "最近添加",
   "pickUpWhereYouLeftOff": "继续上次读到的位置"
 }

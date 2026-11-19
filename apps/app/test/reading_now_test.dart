@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
@@ -23,6 +25,7 @@ void main() {
   Future<FakeLibraryRepository> pumpPage(
     WidgetTester tester, {
     FakeLibraryRepository? repository,
+    bool settle = true,
   }) async {
     final library =
         repository ??
@@ -48,7 +51,11 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    if (settle) {
+      await tester.pumpAndSettle();
+    } else {
+      await tester.pump();
+    }
     return library;
   }
 
@@ -102,18 +109,75 @@ void main() {
     expect(find.text('Nothing in progress'), findsOneWidget);
   });
 
-  testWidgets('ondeck 失败也不炸整页（只是没有继续阅读卡）', (WidgetTester tester) async {
-    await pumpPage(
-      tester,
-      repository: FakeLibraryRepository(
-        series: demoShelf(),
-        libraries: demoLibraries(),
-        ondeckFailure: const NetworkFailure(),
-      ),
-    );
+  testWidgets('加载中先显示骨架，绝不先闪"没有在读的书"', (WidgetTester tester) async {
+    final gate = Completer<void>();
+    final repository = FakeLibraryRepository(
+      series: demoShelf(),
+      libraries: demoLibraries(),
+      ondeck: demoOndeck(),
+    )..ondeckGate = gate;
 
-    expect(find.byKey(const Key('reading-now-empty')), findsOneWidget);
-    expect(find.byType(SeriesShelfTile), findsWidgets, reason: '货架照常');
+    await pumpPage(tester, repository: repository, settle: false);
+
+    expect(
+      find.byKey(const Key('reading-now-continue-skeleton')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('reading-now-empty')), findsNothing);
+    expect(find.byKey(const Key('reading-now-continue')), findsNothing);
+
+    gate.complete();
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('reading-now-continue')), findsOneWidget);
+    expect(find.byKey(const Key('reading-now-empty')), findsNothing);
+  });
+
+  testWidgets('首次加载失败：给错误提示与重试，不假装"没有在读的书"', (WidgetTester tester) async {
+    final repository = FakeLibraryRepository(
+      series: demoShelf(),
+      libraries: demoLibraries(),
+      ondeck: demoOndeck(),
+      ondeckFailure: const NetworkFailure(),
+    );
+    await pumpPage(tester, repository: repository);
+
+    expect(find.byKey(const Key('reading-now-error')), findsOneWidget);
+    expect(find.byKey(const Key('reading-now-empty')), findsNothing);
+
+    // 恢复后点重试：拿到真正的继续阅读卡。
+    repository.ondeckFailure = null;
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('reading-now-continue')), findsOneWidget);
+    expect(find.byKey(const Key('reading-now-error')), findsNothing);
+  });
+
+  testWidgets('有内容时刷新失败：保留旧卡片 + 一行提示', (WidgetTester tester) async {
+    final repository = FakeLibraryRepository(
+      series: demoShelf(),
+      libraries: demoLibraries(),
+      ondeck: demoOndeck(),
+    );
+    await pumpPage(tester, repository: repository);
+    expect(find.byKey(const Key('reading-now-continue')), findsOneWidget);
+
+    // 下一次请求失败，再触发一次刷新。
+    repository.ondeckFailure = const NetworkFailure();
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(ReadingNowScreen)),
+    );
+    container.invalidate(ondeckProvider);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('reading-now-continue')),
+      findsOneWidget,
+      reason: '刷新失败不能把已有内容清掉',
+    );
+    expect(find.byKey(const Key('reading-now-refresh-failed')), findsOneWidget);
+    expect(find.byKey(const Key('reading-now-error')), findsNothing);
   });
 
   testWidgets('列表失败时货架为空，但页面本身不报错', (WidgetTester tester) async {

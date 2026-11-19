@@ -93,6 +93,9 @@ class FakeLibraryRepository implements LibraryRepository {
   /// 设成非 null 后，`series()` 会等它完成——用来稳定观察 loading 态。
   Completer<void>? gate;
 
+  /// 同上，但卡住的是"继续阅读"（ondeck）：用来观察加载中的骨架（FIX-05）。
+  Completer<void>? ondeckGate;
+
   /// 同上，但卡住的是系列详情 / 书列表：用来观察"首次打开详情页"的占位态
   /// （封面 Hero 已经在，元信息还没到）。
   Completer<void>? detailGate;
@@ -187,6 +190,8 @@ class FakeLibraryRepository implements LibraryRepository {
 
   @override
   Future<PageResult<Book>> ondeck({int size = 20}) async {
+    final pending = ondeckGate;
+    if (pending != null) await pending.future;
     final failure = ondeckFailure;
     if (failure != null) throw failure;
     return PageResult<Book>(

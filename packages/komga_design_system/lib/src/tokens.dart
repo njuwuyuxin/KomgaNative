@@ -109,6 +109,12 @@ abstract final class AppSizes {
 
   /// 设置面板里滑条两端数值的宽度。
   static const double valueColumn = 44;
+
+  /// 骨架里单行文字的占位高度（标签行）。
+  static const double skeletonLineSm = 12;
+
+  /// 骨架里标题文字的占位高度（书名、分组标题）。
+  static const double skeletonLineLg = 20;
 }
 
 /// 布局断点，与 `komga_platform` 的形态判断保持同一套数值。

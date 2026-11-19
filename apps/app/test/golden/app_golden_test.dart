@@ -400,21 +400,30 @@ void main() {
     required String name,
     required Size size,
     required ThemeData theme,
+    bool loading = false,
   }) async {
     final repository = FakeLibraryRepository(
       series: demoShelf(),
       libraries: demoLibraries(),
       ondeck: demoOndeck(),
     );
+    if (loading) {
+      // 卡住 ondeck 与货架，把页面停在"骨架"这一态（FIX-05）。
+      repository
+        ..ondeckGate = Completer<void>()
+        ..gate = Completer<void>();
+    }
     // 封面预热：与页面里同一份 bytes 实例，ImageCache 才能命中。
     final covers = <Uint8List>[];
-    for (final book in demoOndeck()) {
-      final bytes = await repository.bookCover(book.id);
-      if (bytes != null) covers.add(bytes);
-    }
-    for (final series in demoShelf()) {
-      final bytes = await repository.seriesCover(series.id);
-      if (bytes != null) covers.add(bytes);
+    if (!loading) {
+      for (final book in demoOndeck()) {
+        final bytes = await repository.bookCover(book.id);
+        if (bytes != null) covers.add(bytes);
+      }
+      for (final series in demoShelf()) {
+        final bytes = await repository.seriesCover(series.id);
+        if (bytes != null) covers.add(bytes);
+      }
     }
     await pumpGoldenScreen(
       tester,
@@ -425,7 +434,9 @@ void main() {
         libraryRepositoryProvider.overrideWithValue(repository),
       ],
       precacheImages: covers,
-      realTimeSettle: true,
+      // 骨架的微光是无限循环动画，settle 会把 pumpAndSettle 拖到超时。
+      settle: !loading,
+      realTimeSettle: !loading,
     );
     await expectGolden(tester, name);
   }
@@ -719,6 +730,17 @@ void main() {
       name: 'reading_now@eink',
       size: GoldenSizes.eink,
       theme: AppTheme.eink(),
+    );
+  });
+
+  testWidgets('reading_now_loading@phone_light', (WidgetTester tester) async {
+    // FIX-05：加载中必须是骨架，不能先画"还没有在读的书"。
+    await pumpReadingNowGolden(
+      tester,
+      name: 'reading_now_loading@phone_light',
+      size: GoldenSizes.phone,
+      theme: AppTheme.light(),
+      loading: true,
     );
   });
 

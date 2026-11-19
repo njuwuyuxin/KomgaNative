@@ -371,6 +371,9 @@
   "navCollections": "Saved",
   "readingNowEmpty": "Nothing in progress",
   "readingNowEmptyHint": "Start a book from your library and it will show up here",
+  "readingNowLoadFailed": "Couldn't load what you're reading",
+  "readingNowLoadFailedHint": "Check the connection and try again.",
+  "readingNowRefreshFailed": "Couldn't refresh · showing the last result",
   "recentlyAdded": "Recently added",
   "pickUpWhereYouLeftOff": "Pick up where you left off"
 }

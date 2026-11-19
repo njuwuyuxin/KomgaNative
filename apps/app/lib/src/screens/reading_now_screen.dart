@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,10 +6,8 @@ import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
-import 'package:komga_native/src/screens/reader_screen.dart';
 import 'package:komga_native/src/screens/series_detail_args.dart';
-import 'package:komga_native/src/widgets/book_hero_tag.dart';
-import 'package:komga_native/src/widgets/cover_image.dart';
+import 'package:komga_native/src/widgets/reading_now_continue.dart';
 import 'package:komga_native/src/widgets/series_hero_tag.dart';
 import 'package:komga_native/src/widgets/series_shelf_tile.dart';
 import 'package:material_ui/material_ui.dart';
@@ -25,16 +22,25 @@ import 'package:material_ui/material_ui.dart';
 /// 为什么是系列而不是书：`/api/v1/series?sort=createdDate,desc` 是验证过的端点，
 /// "按添加时间列书"的那个没有 fixture（见 `docs/series-queries.md`），不猜。
 ///
-/// 空/失败都**不占位**：这一页是"锦上添花"的入口，断网时应该只看到书架入口
-/// 还能用，而不是整页报错。
+/// 三块各自是独立请求，加载/失败要分开处理（FIX-05）：
+/// - 加载中画骨架，**不**先渲染"还没有在读的书"再跳成卡片；
+/// - 某一块的失败不牵连其他块：货架失败就少一行，继续卡失败给一句提示；
+/// - 已有内容时刷新失败只在原处补一行小提示，不清空。
 class ReadingNowScreen extends ConsumerWidget {
   const ReadingNowScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    final ondeck = ref.watch(ondeckProvider).value?.items ?? const <Book>[];
-    final libraries = ref.watch(librariesProvider).value ?? const <Library>[];
+    final ondeck = ref.watch(ondeckProvider);
+    final recent = ref.watch(recentSeriesProvider);
+    final librariesAsync = ref.watch(librariesProvider);
+    final libraries = librariesAsync.value ?? const <Library>[];
+
+    Future<void> retryOndeck() async {
+      ref.invalidate(ondeckProvider);
+      await ref.read(ondeckProvider.future);
+    }
 
     return Scaffold(
       body: GlassPageBackground(
@@ -61,9 +67,13 @@ class ReadingNowScreen extends ConsumerWidget {
                     padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.md,
                     ),
-                    child: ondeck.isEmpty
-                        ? const _EmptyContinueCard()
-                        : _ContinueCard(book: ondeck.first),
+                    child: ReadingNowContinue(
+                      // `?.items` 读的是分页结果；不写类型名是为了守住
+                      // "界面层不 import komga_api" 这条分层约束。
+                      books: ondeck.value?.items,
+                      hasError: ondeck.hasError,
+                      onRetry: retryOndeck,
+                    ),
                   ),
                 ),
                 SliverToBoxAdapter(
@@ -83,32 +93,10 @@ class ReadingNowScreen extends ConsumerWidget {
                 _SeriesShelf(
                   key: const Key('reading-now-recent'),
                   heroScope: 'reading-now-recent',
-                  series:
-                      ref.watch(recentSeriesProvider).value ?? const <Series>[],
+                  series: recent.value,
+                  hasError: recent.hasError,
                 ),
-                for (final library in libraries) ...<Widget>[
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.md,
-                        AppSpacing.lg,
-                        AppSpacing.md,
-                        AppSpacing.xs,
-                      ),
-                      child: Text(
-                        library.name,
-                        style: AppTypography.of(context).title,
-                      ),
-                    ),
-                  ),
-                  _SeriesShelf(
-                    key: Key('reading-now-library-${library.id}'),
-                    heroScope: 'reading-now-library-${library.id}',
-                    series:
-                        ref.watch(libraryShelfProvider(library.id)).value ??
-                        const <Series>[],
-                  ),
-                ],
+                ..._libraryShelves(context, ref, libraries),
                 const SliverToBoxAdapter(
                   child: SizedBox(height: AppSizes.navBarClearance),
                 ),
@@ -119,145 +107,39 @@ class ReadingNowScreen extends ConsumerWidget {
       ),
     );
   }
-}
 
-/// 继续阅读的大卡片：封面 + 书名 + 进度 + 主按钮。
-class _ContinueCard extends ConsumerWidget {
-  const _ContinueCard({required this.book});
-
-  final Book book;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    final Uint8List? bytes = ref.watch(bookCoverProvider(book.id)).value;
-    // 阅读方向存在系列元数据里，不在书上；这里多一次按系列的查询（有 family 缓存）。
-    // 不查的话，日漫从"正在读"进来会按 LTR 打开（老"继续阅读"行就有这一步）。
-    final direction =
-        ref
-            .watch(seriesDetailProvider(book.seriesId))
-            .value
-            ?.readingDirection ??
-        ReadingDirection.unknown;
-    final progress = book.readProgress;
-    final label = progress == null
-        ? l10n.bookPages(book.pagesCount)
-        : l10n.continueReadingProgress(progress.page, book.pagesCount);
-    final shape = AppShapes.of(context, AppShapes.panel);
-    // 墨水屏 / 减少动态效果不做 Hero；其余情况把 tag 一路带到阅读器开场。
-    final heroTag =
-        AppTheme.isEink(theme) ||
-            (MediaQuery.maybeDisableAnimationsOf(context) ?? false)
-        ? null
-        : bookHeroTag(book.id);
-    final cover = ClipPath(
-      clipper: ShapeBorderClipper(shape: shape),
-      child: SizedBox(
-        width: AppSizes.shelfCover.width,
-        height: AppSizes.shelfCover.height,
-        child: bytes == null
-            ? const ColoredBox(color: Colors.black12)
-            : CoverImage(bytes: bytes),
-      ),
-    );
-
-    return Semantics(
-      key: const Key('reading-now-continue'),
-      container: true,
-      button: true,
-      // 整张卡片是一个按钮：读屏只念"书名 + 进度"，不逐条念封面/标签/页码。
-      label: '${book.name}, $label',
-      onTap: () => unawaited(_open(context, book, direction, heroTag)),
-      child: ExcludeSemantics(
-        child: PressableScale(
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => unawaited(_open(context, book, direction, heroTag)),
-            child: GlassSurface(
-              shape: shape,
-              shadows: AppShadows.card,
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                child: Row(
-                  children: <Widget>[
-                    heroTag == null ? cover : Hero(tag: heroTag, child: cover),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: <Widget>[
-                          Text(
-                            l10n.pickUpWhereYouLeftOff,
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.xxs),
-                          Text(
-                            book.name,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTypography.of(context).headline,
-                          ),
-                          const SizedBox(height: AppSpacing.xxs),
-                          Text(
-                            label,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.sm),
-                          GlassPillButton(
-                            icon: Icons.play_arrow,
-                            label: l10n.continueReading,
-                            onPressed: () => unawaited(
-                              _open(context, book, direction, heroTag),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+  /// 每个库一条：标题 + 货架。库列表本身没到就整段不出现（下面的骨架已经占位）。
+  List<Widget> _libraryShelves(
+    BuildContext context,
+    WidgetRef ref,
+    List<Library> libraries,
+  ) {
+    final slivers = <Widget>[];
+    for (final library in libraries) {
+      final shelf = ref.watch(libraryShelfProvider(library.id));
+      slivers.add(
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.lg,
+              AppSpacing.md,
+              AppSpacing.xs,
             ),
+            child: Text(library.name, style: AppTypography.of(context).title),
           ),
         ),
-      ),
-    );
-  }
-
-  Future<void> _open(
-    BuildContext context,
-    Book book,
-    ReadingDirection direction,
-    String? heroTag,
-  ) async {
-    await context.push(
-      '/reader/${book.id}',
-      extra: ReaderArgs(book: book, direction: direction, heroTag: heroTag),
-    );
-  }
-}
-
-/// 没有在读的书：给一句说明，不摆一个大空壳。
-class _EmptyContinueCard extends StatelessWidget {
-  const _EmptyContinueCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
-      child: StatusView(
-        key: const Key('reading-now-empty'),
-        icon: Icons.auto_stories_outlined,
-        title: l10n.readingNowEmpty,
-        message: l10n.readingNowEmptyHint,
-      ),
-    );
+      );
+      slivers.add(
+        _SeriesShelf(
+          key: Key('reading-now-library-${library.id}'),
+          heroScope: 'reading-now-library-${library.id}',
+          series: shelf.value,
+          hasError: shelf.hasError,
+        ),
+      );
+    }
+    return slivers;
   }
 }
 
@@ -266,32 +148,54 @@ class _EmptyContinueCard extends StatelessWidget {
 /// [heroScope] 区分同一页面上同一个系列的多份副本（"最近添加"与按库货架会重叠）。
 /// 每条货架一个 scope，详情页通过 `SeriesDetailArgs` 记住被点的那一份，
 /// 封面才会从手指下的卡片飞出去、退出时也飞回同一张。
-class _SeriesShelf extends StatelessWidget {
+class _SeriesShelf extends StatefulWidget {
   const _SeriesShelf({
     required this.series,
+    required this.hasError,
     required this.heroScope,
     super.key,
   });
 
-  final List<Series> series;
+  /// null = 还没有可用结果（加载中或已失败）。
+  final List<Series>? series;
+
+  final bool hasError;
   final String heroScope;
 
   @override
+  State<_SeriesShelf> createState() => _SeriesShelfState();
+}
+
+class _SeriesShelfState extends State<_SeriesShelf> {
+  /// 同上：刷新失败时 Riverpod 会丢掉旧值，这一行不能因此整条消失。
+  List<Series>? _lastGood;
+
+  @override
   Widget build(BuildContext context) {
-    if (series.isEmpty)
+    final fresh = widget.series;
+    if (fresh != null) _lastGood = fresh;
+    final items = fresh ?? _lastGood;
+    // 加载中：占住一条货架的高度，数据回来时标题不会整体跳一下。
+    if (items == null) {
+      return widget.hasError
+          ? const SliverToBoxAdapter(child: SizedBox.shrink())
+          : const SliverToBoxAdapter(child: ShelfRowSkeleton());
+    }
+    if (items.isEmpty) {
       return const SliverToBoxAdapter(child: SizedBox.shrink());
+    }
     return SliverToBoxAdapter(
       child: SizedBox(
         height: AppSizes.shelfRowHeight + AppSpacing.md,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-          itemCount: series.length,
+          itemCount: items.length,
           separatorBuilder: (BuildContext context, int index) =>
               const SizedBox(width: AppSpacing.sm),
           itemBuilder: (BuildContext context, int index) {
-            final item = series[index];
-            final heroTag = seriesHeroTag(item.id, scope: heroScope);
+            final item = items[index];
+            final heroTag = seriesHeroTag(item.id, scope: widget.heroScope);
             return SizedBox(
               width: AppSizes.shelfCover.width + AppSpacing.xl,
               child: SeriesShelfTile(
