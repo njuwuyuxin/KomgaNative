@@ -163,4 +163,13 @@ class ReaderLayout {
     }
     return l10n.currentPage(page);
   }
+
+  /// 当前这一屏之后还剩多少页（双页跨页按跨页的最后一页算）。
+  ///
+  /// 底栏滑杆旁边用它报"还剩多少"——比"第几页"更能回答"还要读多久"（RDR-01）。
+  int get remaining {
+    final current = spread;
+    final lastOnScreen = current.isEmpty ? page : current.last + 1;
+    return (total - lastOnScreen).clamp(0, total);
+  }
 }

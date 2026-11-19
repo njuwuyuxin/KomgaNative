@@ -193,6 +193,8 @@
   "downloadCancelAll": "Cancel all",
   "showingItems": "Showing {shown} of {total}",
   "showingSeries": "Showing {shown} of {total} series",
+  "readerPagesRemaining": "{count, plural, =0{Last page} =1{1 page left} other{{count} pages left}}",
+  "readerSliderLabel": "Page {page} of {total}",
   "cancelDownload": "Cancel download",
   "downloadRetryTooltip": "{error} · tap to retry",
   "@downloadRetryTooltip": {

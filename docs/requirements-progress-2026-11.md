@@ -25,7 +25,7 @@
 | ID | 需求 | P | 状态 | commit |
 |---|---|---|---|---|
 | QUA-01 | 拆 `reader_screen` + 清理死代码 | P1 | TODO | — |
-| RDR-01 | 阅读器页码滑杆 + 剩余页 | P1 | TODO | — |
+| RDR-01 | 阅读器页码滑杆 + 剩余页 | P1 | DONE | `feat(reader): 页码滑杆与剩余页` |
 | RDR-02 | 阅读器目录/章节列表 | P1 | TODO | — |
 | RDR-03 | 顶栏 IA + AA 快捷设置 | P1 | TODO | — |
 | RDR-04 | 阅读设置分组/重置/适配预览 | P1 | TODO | — |
@@ -210,6 +210,20 @@
 - 测试：`settings_version_test.dart`（有/无构建号）、`series_header_test.dart`
   新增短简介无按钮、6 个标签显示 `+3` 并可展开；更新 `settings@eink` 黄金图。
 - 设备走查：设置页"版本"显示 `0.1.0 (1)`（连的是 APK 真实的 versionCode）。
+
+## W1 实施记录
+
+### RDR-01 阅读器页码滑杆 + 剩余页
+
+- 底部新增 `ReaderPageSlider`：1..total 拖动跳页，只在跨页时触发跳转 + 触感
+  （逐像素回调会让进度写入和触感都爆炸）；拖动中用本地值，父级重建不会抖动。
+- RTL 时滑杆整体 `Directionality.rtl`：日漫的最小页在右边，拖动方向与阅读方向一致。
+- 底栏不再重复"第 x 页"（顶栏已有 `x / y`），改成"剩 N 页"（ICU plural：
+  0 → "Last page"、1 → "1 page left"）。`ReaderLayout.remaining` 按"当前屏之后"算，
+  双页跨页时不会把同屏的第二页算进剩余。
+- 测试：`reader_screen_test` 新增/改写 4 条（剩余页文案随翻页变化、双页到书末、
+  拖滑杆跳到最后一页、RTL 时 Directionality 翻转）；更新全部 `reader@*` 黄金图。
+- 设备走查：227 页的书，滑杆从第 1 页拖到第 114 页，页标与"剩 113 页"同步更新。
 
 ## W0 出口（P0 全绿）
 

@@ -3,6 +3,7 @@ import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/widgets/reader_chrome.dart';
 import 'package:komga_native/src/widgets/reader_finished_card.dart';
 import 'package:komga_native/src/widgets/reader_layout.dart';
+import 'package:komga_native/src/widgets/reader_page_slider.dart';
 import 'package:komga_native/src/widgets/reader_palette.dart';
 import 'package:komga_native/src/widgets/reader_thumbnail_strip.dart';
 import 'package:material_ui/material_ui.dart';
@@ -75,8 +76,18 @@ class ReaderBottomChrome extends StatelessWidget {
           onGroupFrom: onGroupFrom,
           onSharePage: onSharePage,
         ),
+        // 页码滑杆（RDR-01）：拖到任意位置；RTL 时方向跟着阅读方向翻。
+        ReaderPageSlider(
+          page: layout.page,
+          total: layout.total,
+          palette: palette,
+          rightToLeft: rightToLeft,
+          onJump: onJump,
+        ),
         ReaderControls(
-          pageLabel: layout.positionLabel(l10n),
+          // 底栏不再重复"第 x 页"（顶栏已经有 `x / y`），改成"还剩多少页"。
+          // 0 页时文案是"最后一页"（plural 的 =0 分支），不是空字符串。
+          pageLabel: l10n.readerPagesRemaining(layout.remaining),
           palette: palette,
           // 点击区与底部箭头共用这一个判断：RTL 时左侧（点/箭头）
           // 都是"下一页"。后续加"阅读方向"设置时只改这里的来源。

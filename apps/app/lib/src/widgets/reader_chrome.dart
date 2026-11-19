@@ -303,7 +303,8 @@ class ReaderControls extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: <Widget>[
           leftButton,
-          Text(pageLabel, style: TextStyle(color: palette.muted)),
+          if (pageLabel.isNotEmpty)
+            Text(pageLabel, style: TextStyle(color: palette.muted)),
           rightButton,
         ],
       ),

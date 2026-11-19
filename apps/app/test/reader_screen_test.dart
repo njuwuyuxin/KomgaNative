@@ -463,23 +463,55 @@ void main() {
   });
 
   group('底栏页码与翻页箭头', () {
-    testWidgets('底栏显示当前页码，翻页后跟着变（不是总页数）', (WidgetTester tester) async {
+    testWidgets('底栏显示"还剩多少页"，翻页后跟着变（RDR-01）', (WidgetTester tester) async {
       await pumpReader(tester, book: demoReaderBook());
 
-      expect(find.text('Page 1'), findsOneWidget);
-      expect(find.text('3 pages'), findsNothing, reason: '底栏不该再显示总页数');
+      // 3 页的书停在第 1 页 → 还剩 2 页。
+      expect(find.text('2 pages left'), findsOneWidget);
+      expect(find.text('3 pages'), findsNothing, reason: '底栏不该显示总页数');
 
       await tapRight(tester);
-      expect(find.text('Page 2'), findsOneWidget);
-      expect(find.text('Page 1'), findsNothing);
+      expect(find.text('1 page left'), findsOneWidget);
+      expect(find.text('2 pages left'), findsNothing);
+
+      await tapRight(tester);
+      expect(find.text('Last page'), findsOneWidget);
     });
 
-    testWidgets('双页模式底栏显示当前跨页', (WidgetTester tester) async {
+    testWidgets('双页模式跨页到书末：底栏显示"最后一页"', (WidgetTester tester) async {
       await pumpReader(tester, book: demoReaderBook());
       await pickMode(tester, ReaderModeChoice.double);
 
       await tapRight(tester);
-      expect(find.text('Pages 2–3'), findsOneWidget);
+      expect(find.text('Last page'), findsOneWidget);
+    });
+
+    testWidgets('页码滑杆：拖到右端跳到最后一页（RDR-01）', (WidgetTester tester) async {
+      await pumpReader(tester, book: demoReaderBook());
+
+      final slider = find.byKey(const Key('reader-page-slider'));
+      expect(slider, findsOneWidget);
+      final rect = tester.getRect(slider);
+      // 拖到轨道最右端：LTR 下就是最后一页。
+      await tester.dragFrom(rect.center, Offset(rect.width, 0));
+      await tester.pumpAndSettle();
+
+      expect(find.text('3 / 3'), findsOneWidget);
+      expect(find.text('Last page'), findsOneWidget);
+    });
+
+    testWidgets('RTL 时滑杆方向也翻转（最小值在右侧）', (WidgetTester tester) async {
+      await pumpReader(
+        tester,
+        book: demoReaderBook(),
+        direction: ReadingDirection.rightToLeft,
+      );
+
+      final slider = find.byKey(const Key('reader-page-slider'));
+      final direction = tester.widget<Directionality>(
+        find.ancestor(of: slider, matching: find.byType(Directionality)).first,
+      );
+      expect(direction.textDirection, TextDirection.rtl);
     });
 
     testWidgets('LTR：左侧是上一页，右侧是下一页（与点击区一致）', (WidgetTester tester) async {
