@@ -21,6 +21,13 @@ enum SeriesSort {
 
   /// 最近阅读。
   recentlyRead,
+
+  /// 书籍数量多的在前（2026-11-19 对真实 1.30.1 验证：`booksCount,desc`）。
+  booksCountDesc,
+
+  /// 发行日期新的在前（2026-11-19 对真实 1.30.1 验证：
+  /// `booksMetadata.releaseDate,desc`；无日期的排最后）。
+  releaseDateDesc,
 }
 
 /// 阅读状态筛选；`null` 表示不筛选。

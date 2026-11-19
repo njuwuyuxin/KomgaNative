@@ -284,7 +284,7 @@
   "coverMedium": "Medium",
   "coverLarge": "Large",
   "sortBooksCount": "Most books",
-  "sortReleaseDate": "Release date",
+  "sortReleaseDate": "Newest release",
   "startReading": "Start reading",
   "continueReadingNumber": "Continue · #{number}",
   "@continueReadingNumber": {

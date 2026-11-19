@@ -113,6 +113,9 @@ String sortWireValue(SeriesSort sort) => switch (sort) {
   SeriesSort.titleDesc => 'metadata.titleSort,desc',
   SeriesSort.recentlyAdded => 'createdDate,desc',
   SeriesSort.recentlyRead => 'readProgress.lastModified,desc',
+  // 2026-11-19 对真实 Komga 1.30.1 验证，见 docs/series-queries.md。
+  SeriesSort.booksCountDesc => 'booksCount,desc',
+  SeriesSort.releaseDateDesc => 'booksMetadata.releaseDate,desc',
 };
 
 /// `SeriesReadStatus` → Komga `read_status` 参数值。

@@ -12,6 +12,7 @@ import 'package:komga_native/src/session/session_controller.dart';
 import 'package:komga_native/src/widgets/offline_banner.dart';
 import 'package:komga_native/src/widgets/phase_fade.dart';
 import 'package:komga_native/src/widgets/shelf_query_buttons.dart';
+import 'package:komga_native/src/widgets/shelf_pinch_detector.dart';
 import 'package:komga_native/src/widgets/shelf_views.dart';
 import 'package:komga_native/src/widgets/series_shelf_tile.dart';
 import 'package:material_ui/material_ui.dart';
@@ -58,6 +59,17 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     return ref.read(shelfProvider.notifier).refresh();
   }
 
+  /// 双指捏合换封面档位（UI-P2-7）。只在网格视图生效；到顶/到底不循环。
+  void _pinchCover(int delta) {
+    final state = ref.read(shelfProvider);
+    const values = ShelfCoverSize.values;
+    final current = values.indexOf(state.coverSize);
+    final next = (current + delta).clamp(0, values.length - 1);
+    if (next == current) return;
+    unawaited(AppHaptics.selection());
+    ref.read(shelfProvider.notifier).setCoverSize(values[next]);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -75,72 +87,76 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             }
             return false;
           },
-          child: CustomScrollView(
-            key: const Key('shelf-scroll'),
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: <Widget>[
-              // 大标题：滚动时收缩成普通标题栏（UI-P2-3）。
-              SliverAppBar.large(
-                title: Text(l10n.libraryTitle),
-                actions: <Widget>[
-                  const ShelfSortButton(),
-                  const ShelfFilterButton(),
-                  const ShelfViewButton(),
-                  IconButton(
-                    onPressed: _toggleSearch,
-                    icon: Icon(_searching ? Icons.close : Icons.search),
-                    tooltip: _searching ? l10n.closeSearch : l10n.search,
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                ],
-              ),
-              // 断网时提示"看的是缓存"，并给一次重新联网的机会。
-              SliverToBoxAdapter(
-                child: OfflineBanner(onRetry: () => unawaited(_refresh())),
-              ),
-              if (_searching)
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.md,
-                      0,
-                      AppSpacing.md,
-                      AppSpacing.sm,
+          child: ShelfPinchDetector(
+            enabled: state.view == ShelfView.grid && state.series.isNotEmpty,
+            onPinch: _pinchCover,
+            child: CustomScrollView(
+              key: const Key('shelf-scroll'),
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: <Widget>[
+                // 大标题：滚动时收缩成普通标题栏（UI-P2-3）。
+                SliverAppBar.large(
+                  title: Text(l10n.libraryTitle),
+                  actions: <Widget>[
+                    const ShelfSortButton(),
+                    const ShelfFilterButton(),
+                    const ShelfViewButton(),
+                    IconButton(
+                      onPressed: _toggleSearch,
+                      icon: Icon(_searching ? Icons.close : Icons.search),
+                      tooltip: _searching ? l10n.closeSearch : l10n.search,
                     ),
-                    child: TextField(
-                      key: const Key('shelf-search-field'),
-                      controller: _searchController,
-                      autofocus: true,
-                      textInputAction: TextInputAction.search,
-                      onChanged: controller.search,
-                      decoration: InputDecoration(
-                        hintText: l10n.searchSeriesHint,
-                        prefixIcon: const Icon(Icons.search),
-                        isDense: true,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(AppRadii.md),
+                    const SizedBox(width: AppSpacing.sm),
+                  ],
+                ),
+                // 断网时提示"看的是缓存"，并给一次重新联网的机会。
+                SliverToBoxAdapter(
+                  child: OfflineBanner(onRetry: () => unawaited(_refresh())),
+                ),
+                if (_searching)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.md,
+                        0,
+                        AppSpacing.md,
+                        AppSpacing.sm,
+                      ),
+                      child: TextField(
+                        key: const Key('shelf-search-field'),
+                        controller: _searchController,
+                        autofocus: true,
+                        textInputAction: TextInputAction.search,
+                        onChanged: controller.search,
+                        decoration: InputDecoration(
+                          hintText: l10n.searchSeriesHint,
+                          prefixIcon: const Icon(Icons.search),
+                          isDense: true,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppRadii.md),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              SliverToBoxAdapter(
-                child: LibraryFilterBar(
-                  selected: state.libraryId,
-                  onSelected: controller.selectLibrary,
-                ),
-              ),
-              PhaseFade(
-                phase: _phaseOf(state),
-                slivers: <Widget>[
-                  ..._shelfSlivers(l10n, state, controller),
-                  // 底部留白，避免最后一行贴住屏幕底边。
-                  const SliverToBoxAdapter(
-                    child: SizedBox(height: AppSpacing.xl),
+                SliverToBoxAdapter(
+                  child: LibraryFilterBar(
+                    selected: state.libraryId,
+                    onSelected: controller.selectLibrary,
                   ),
-                ],
-              ),
-            ],
+                ),
+                PhaseFade(
+                  phase: _phaseOf(state),
+                  slivers: <Widget>[
+                    ..._shelfSlivers(l10n, state, controller),
+                    // 底部留白，避免最后一行贴住屏幕底边。
+                    const SliverToBoxAdapter(
+                      child: SizedBox(height: AppSpacing.xl),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),

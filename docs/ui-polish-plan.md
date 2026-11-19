@@ -305,11 +305,13 @@ Panels 的高级感主要来自三点，和控件本身关系不大：
 | P2-5 | 长按上下文菜单（`showContextMenu`，锚在被按的控件旁）；系列：标记全部已读/全部未读/查看详情；书行：标记已读/标记未读；补上**单本书标记已读**（`LibraryRepository.setBookRead` 走已有的 `PATCH`/`DELETE /books/{id}/read-progress`，并同步本地 outbox）；新增 `bookReadProvider`；书行包 `PressableScale` |
 | P2-7 | 网格/列表切换 + 封面小/中/大三档（`ShelfView` / `ShelfCoverSize`，档位只影响"一格最宽多少"，仍然不判断平板）；`ShelfViewButton` 用 `CheckedPopupMenuItem` 标当前项；**不重新请求**，只换 sliver 类型；列表行 `SeriesShelfRow` 与网格卡片共用 Hero 与长按菜单；`komga_api` 补"排序 wire 值符合 `property,asc\|desc`"的契约测试 |
 
-**P2-7 的偏差**：
-- 排序**没有**新增"按书籍数量 / 按发行日期"：OpenAPI 不给可排序属性清单，且排序属性
-  不等于 DTO 字段名（已验证的 `createdDate` 对应 DTO 的 `created`），没有运行中的
-  Komga 就无法验证。理由与补测方法写在 `docs/series-queries.md`。
-- 平板双指捏合调封面大小没做：会和网格滚动/下拉刷新抢手势，收益不如菜单直接选。
+**进度（2026-11-19）：P2-7 排序与捏合补齐。**
+
+| 落地 |
+|---|
+| `SeriesSort` 新增 `booksCountDesc` / `releaseDateDesc`，wire 值是 `booksCount,desc` / `booksMetadata.releaseDate,desc`；两者都对本机真实 Komga 1.30.1 验证过（发行日期先 `PATCH` 三本书的 metadata 再排序），证据见 `docs/series-queries.md`；书架排序菜单多了"书籍数量（多→少）""发行日期（新→旧）"两项 |
+| 双指捏合：`widgets/shelf_pinch_detector.dart` 用 `Listener` 看原始指针，不参与手势竞技场，所以单指滚动/下拉刷新不受影响；**一次手势只换一档**（双指距离变化 >18%），网格视图生效；换档时 `AppHaptics.selection()` |
+| 测试：`shelf_pinch_detector_test` 覆盖"双指放大/收拢各一档"、"单指拖动不触发"、"enabled=false 不响应"；`komga_api` 的排序格式契约测试会自动覆盖两个新枚举 |
 
 **进度（2026-11-18）：P2-4 系列详情页重做。**
 

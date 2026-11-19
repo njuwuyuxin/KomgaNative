@@ -27,24 +27,34 @@ $hk = @{ 'X-API-Key' = $key }
 | `GET /api/v1/series?size=20&sort=metadata.titleSort,desc` | 与 asc 完全相反 |
 | `GET /api/v1/series?size=5&sort=createdDate,desc` | Frieren → Verify Series #1 → Vagabond v01 → Sunny v01 → Akira v01 |
 | `GET /api/v1/series?size=5&sort=readProgress.lastModified,desc` | Akira v01 → Sunny v01 → Vagabond v01 → Verify Series #1 → Frieren |
+| `GET /api/v1/series?size=20&sort=booksCount,desc` | Frieren（2 本）→ 其余（各 1 本） |
+| `GET /api/v1/series?size=20&sort=booksCount,asc` | 与 desc 相反（1 本的在前，Frieren 最后） |
+| `GET /api/v1/series?size=20&sort=booksMetadata.releaseDate,desc` | Sunny v01（2020）→ Vagabond v01（2010）→ Akira v01（1990）→ 无日期 |
+| `GET /api/v1/series?size=20&sort=booksMetadata.releaseDate,asc` | 无日期 → Akira v01（1990）→ Vagabond v01（2010）→ Sunny v01（2020） |
 
 结论：
 
 - `sort` 是**数组**参数（OpenAPI 里 `type: array`），单个 `property,asc` 写法服务端接受；
-- 上述四个取值都返回 200，且顺序符合语义（标题排序正反序对称，最近阅读与最近添加各成一套顺序）。
+- 上述 8 个取值都返回 200，且顺序符合语义（标题排序正反序对称，最近阅读与最近添加各成一套顺序；
+  `booksCount` 与 `booksMetadata.releaseDate` 正反序也对称）。
+- **发行日期的验证方法**：这个测试库的图书原本没有 `releaseDate`，先对三本书
+  `PATCH /api/v1/books/{bookId}/metadata` 写入 `{"releaseDate":"1990-01-01"}` 等值，
+  再查 `/series` 的 `booksMetadata.releaseDate` 排序；返回的 `booksMetadata.releaseDate`
+  与顺序一致。无日期的系列在 `desc` 时排最后、`asc` 时排最前（服务端空值排序行为，
+  客户端不要依赖这个先后，只保证"有日期的按日期"）。
 
-### 为什么排序项没有继续加（UI-P2-7 的取舍）
+### 已补与仍未补的排序（UI-P2-7）
 
-计划里还想补"按书籍数量 / 按发行日期"。没有加，原因有二：
+2026-11-19 在本机 Komga 1.30.1 上补验了：
 
-1. OpenAPI 只规定 `sort` 的**格式**是 `property(,asc|desc)`，**没有列出可排序属性清单**，
-   没法从规格反推合法属性名；
-2. 排序属性是查询/实体层的名字，**不等于 DTO 字段名**——已验证的 `createdDate` 在
-   `SeriesDto` 里对应的字段叫 `created`。所以"字段在 DTO 里存在"不能证明它能排序。
+| 枚举 | wire 值 | 结果 |
+|---|---|---|
+| `SeriesSort.booksCountDesc` | `booksCount,desc` | 通过（2 本 → 1 本，asc 对称） |
+| `SeriesSort.releaseDateDesc` | `booksMetadata.releaseDate,desc` | 通过（2020 → 2010 → 1990，asc 对称） |
 
-`booksCount` / `booksMetadata.releaseDate` 看起来能排，但没有运行中的 Komga 可以验证：
-写错了用户点下去要么 400、要么顺序诡异。按"API 真值规则"（`AGENTS.md`）不猜。
-有服务器时按上面的表格补两行实测，再往 `SeriesSort` 里加即可。
+仍未补：Panels 有 Manual / File size / Length / Type 等排序，但 Komga 的
+OpenAPI 没有给出对应可排序属性，也没有真实响应可验证；`manual` 更依赖客户端维护顺序，
+不适合在没有服务端语义的情况下猜。按"API 真值规则"先停在这里。
 
 契约测试目前钉的是**格式**（`komga_api/test/contract_test.dart`：每个排序都能解析成
 `属性[,asc|desc]`、方向只有 asc/desc）；属性名的正确性靠这张实测表。

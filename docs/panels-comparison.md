@@ -11,7 +11,7 @@
 
 ## 0. 结论先行
 
-1. **UI 细化计划本身已经做完大半**：P0 6/6、P1 7/7、P2 8/8 已落地；P2 有 1 处缩水；
+1. **UI 细化计划本身已经做完大半**：P0 6/6、P1 7/7、P2 8/8 已全部落地；
    **P3 的 14 项一项没做**。所以"还差哪些"的第一个答案就是 P3 清单（§4），
    而不是从零再列一遍。
 2. **阅读器核心体验已经和 Panels 对齐**：浮层毛玻璃 chrome、卷页（双页还铰接书脊）、
@@ -35,14 +35,14 @@
 |---|---|---|---|
 | P0 设计系统地基 | 拆 `reader_screen`、动效/材质/形状/字体 token、`PressableScale` / `AppHaptics` | 6/6 | [design-system.md](design-system.md) |
 | P1 阅读器体验 | chrome 动画 + 沉浸、缩略图滑条、适配、方向、动态背景、双击、书末卡片 | 7/7 | [reader.md](reader.md) |
-| P2 书架/详情 | 封面质感、Hero、iOS 转场与大标题、详情重做、长按菜单、Reading Now、视图选项、骨架 | 8/8（1 处缩水） | [ui-polish-plan.md](ui-polish-plan.md) |
+| P2 书架/详情 | 封面质感、Hero、iOS 转场与大标题、详情重做、长按菜单、Reading Now、视图选项、骨架 | 8/8 | [ui-polish-plan.md](ui-polish-plan.md) |
 | P3 长尾 | 预设、按系列记忆、自动双页、锁定缩放、双页修正、分享页、渐变背景、收藏集/阅读列表、全局搜索、滤镜、键盘/遥控、隐身、下载管理、墨水屏探测 | **0/14** | §4 |
 
-### 1.2 P2 的 1 处缩水
+### 1.2 P2 缩水已清零
 
-| 编号 | 计划 | 现状 | 原因 / 影响 |
-|---|---|---|---|
-| P2-7 | 补"按书籍数量 / 发行日期"排序；平板捏合调封面 | 未做 | OpenAPI 不列可排序字段，且排序属性 ≠ DTO 字段；捏合会和网格滚动/下拉刷新抢手势。见 [series-queries.md](series-queries.md) |
+P2-2（继续阅读 → 阅读器 Hero）、P2-3（边缘右滑返回）、P2-7（书籍数量/发行日期排序 +
+双指捏合调封面）已在 2026-11-19 补齐，落地记录见 `ui-polish-plan.md`。
+其中 P2-3 的返回手势是"边缘手势 + 主题侧滑转场"，不是手指跟手的交互式返回。
 
 ### 1.3 P3 未开始
 
@@ -96,7 +96,7 @@ P3 是"长尾功能"，不是"没想好"：14 项都在 `ui-polish-plan.md` 里�
 | 阅读列表 | 未证实 | ❌（Komga OpenAPI 有 `/readlists`，但没有真实响应 fixture） | ❌ P3-8 |
 | 网格 / 列表 | ✅ ⌘1 / ⌘2 [9] | ✅ 网格 / 列表 | ✅ |
 | 封面大小 | ✅ ⌘+ / ⌘- [9] | ✅ 小 / 中 / 大三档 | ✅ |
-| 排序 | 8 种：Manual / Alphabetically / Creation / File size / Length / Type / Reading progress / Last read [9] | 4 种：标题升 / 标题降 / 最近添加 / 最近阅读 [queries.dart](../packages/komga_domain/lib/src/queries.dart) | 🟡 缺手工/文件大小/类型/长度等；需先确认 Komga 支持 |
+| 排序 | 8 种：Manual / Alphabetically / Creation / File size / Length / Type / Reading progress / Last read [9] | 6 种：标题升 / 标题降 / 最近添加 / 最近阅读 / 书籍数量 / 发行日期 [queries.dart](../packages/komga_domain/lib/src/queries.dart) | 🟡 缺手工/文件大小/类型/长度等；需先确认 Komga 支持 |
 | 筛选 | 未证实 | ✅ 阅读状态 3 档 + 按库 | 不比较 |
 | 搜索 | 库内免费；跨多库付费；独立 Search tab [9][10] | 🟡 书架内 series 搜索（350ms 防抖）；不搜书/作者/标签；无独立入口 | ❌ P3-9 |
 | 多选 / 批量 | ✅ 全选、标记、删除、移动、分享 [9] | ❌ | ❌ 新-3 |
