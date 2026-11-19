@@ -87,6 +87,14 @@ class KomgaUrls {
         'size': '$size',
       });
 
+  /// 新建收藏集（`POST /api/v1/collections`）。实测 1.30.1：要求 name/ordered/seriesIds，
+  /// 且 seriesIds 至少一个（空收藏集会被拒 400）。
+  String collectionsCreate() => '$_base/api/v1/collections';
+
+  /// 单个收藏集（`PATCH` 改名 / `DELETE` 删除）。
+  String collection(String collectionId) =>
+      '$_base/api/v1/collections/$collectionId';
+
   /// 阅读列表（`GET /api/v1/readlists`）。
   String readLists({int page = 0, int size = 20}) =>
       _withQuery('$_base/api/v1/readlists', {'page': '$page', 'size': '$size'});

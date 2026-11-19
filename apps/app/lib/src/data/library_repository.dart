@@ -43,6 +43,19 @@ abstract interface class LibraryRepository {
     int size = 20,
   });
 
+  /// 新建收藏集（SER-04）：必须至少带一个系列（Komga 实测会拒空集合）。
+  Future<KomgaCollection> createCollection({
+    required String name,
+    required List<String> seriesIds,
+    bool ordered = false,
+  });
+
+  /// 收藏集改名。
+  Future<void> renameCollection(String collectionId, String name);
+
+  /// 删除收藏集。
+  Future<void> deleteCollection(String collectionId);
+
   /// 收藏集里的系列。
   Future<PageResult<Series>> collectionSeries(
     String collectionId, {
@@ -183,6 +196,41 @@ class KomgaLibraryRepository implements LibraryRepository {
   }) async {
     try {
       return await _session.fetchCollections(page: page, size: size);
+    } on KomgaError catch (error) {
+      throw shelfFailureOf(error);
+    }
+  }
+
+  @override
+  Future<KomgaCollection> createCollection({
+    required String name,
+    required List<String> seriesIds,
+    bool ordered = false,
+  }) async {
+    try {
+      return await _session.createCollection(
+        name: name,
+        seriesIds: seriesIds,
+        ordered: ordered,
+      );
+    } on KomgaError catch (error) {
+      throw shelfFailureOf(error);
+    }
+  }
+
+  @override
+  Future<void> renameCollection(String collectionId, String name) async {
+    try {
+      await _session.renameCollection(collectionId, name);
+    } on KomgaError catch (error) {
+      throw shelfFailureOf(error);
+    }
+  }
+
+  @override
+  Future<void> deleteCollection(String collectionId) async {
+    try {
+      await _session.deleteCollection(collectionId);
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);
     }

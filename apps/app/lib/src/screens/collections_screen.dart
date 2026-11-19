@@ -6,6 +6,7 @@ import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/l10n/failure_text.dart';
+import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/widgets/collection_covers.dart';
 import 'package:komga_native/src/widgets/load_more_footer.dart';
@@ -228,6 +229,10 @@ class _CollectionsTabState extends ConsumerState<_CollectionsTab> {
                                 '/collections/${collection.id}',
                                 extra: collection.name,
                               ),
+                              // 长按管理（SER-04）：改名 / 删除。
+                              onLongPress: () => unawaited(
+                                _manageCollection(context, collection),
+                              ),
                             ),
                         ],
                       ),
@@ -243,6 +248,135 @@ class _CollectionsTabState extends ConsumerState<_CollectionsTab> {
         ),
       ],
     );
+  }
+
+  /// 收藏集管理（SER-04）：长按弹出改名 / 删除。
+  ///
+  /// 为什么放长按而不是每行一个菜单按钮：收藏集是低频管理对象，
+  /// 常驻按钮会把行尾的 chevron 挤掉、也更容易误触。
+  Future<void> _manageCollection(
+    BuildContext context,
+    KomgaCollection collection,
+  ) async {
+    final l10n = AppLocalizations.of(context);
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (BuildContext context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            ListTile(
+              key: const Key('collection-rename'),
+              leading: const Icon(Icons.edit_outlined),
+              title: Text(l10n.collectionRename),
+              onTap: () => Navigator.of(context).pop('rename'),
+            ),
+            ListTile(
+              key: const Key('collection-delete'),
+              leading: const Icon(Icons.delete_outline),
+              title: Text(l10n.collectionDelete),
+              onTap: () => Navigator.of(context).pop('delete'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (action == null || !context.mounted) return;
+    if (action == 'rename') {
+      await _renameCollection(context, collection);
+    } else {
+      await _deleteCollection(context, collection);
+    }
+  }
+
+  Future<void> _renameCollection(
+    BuildContext context,
+    KomgaCollection collection,
+  ) async {
+    final l10n = AppLocalizations.of(context);
+    final controller = TextEditingController(text: collection.name);
+    final name = await showDialog<String>(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        key: const Key('collection-rename-dialog'),
+        title: Text(l10n.collectionRename),
+        content: TextField(
+          key: const Key('collection-rename-field'),
+          controller: controller,
+          autofocus: true,
+          decoration: InputDecoration(hintText: l10n.collectionNameHint),
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(l10n.cancel),
+          ),
+          TextButton(
+            key: const Key('collection-rename-ok'),
+            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+            child: Text(l10n.save),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (name == null || name.isEmpty || name == collection.name) return;
+    if (!context.mounted) return;
+    await _runWrite(
+      context,
+      () => ref
+          .read(libraryRepositoryProvider)
+          .renameCollection(collection.id, name),
+    );
+  }
+
+  Future<void> _deleteCollection(
+    BuildContext context,
+    KomgaCollection collection,
+  ) async {
+    final l10n = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        key: const Key('collection-delete-confirm'),
+        title: Text(l10n.collectionDeleteTitle),
+        content: Text(l10n.collectionDeleteBody(collection.name)),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(l10n.cancel),
+          ),
+          TextButton(
+            key: const Key('collection-delete-ok'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(l10n.delete),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    await _runWrite(
+      context,
+      () => ref.read(libraryRepositoryProvider).deleteCollection(collection.id),
+    );
+  }
+
+  /// 写操作的统一收尾：成功刷新列表、失败给本地化提示。
+  Future<void> _runWrite(
+    BuildContext context,
+    Future<void> Function() action,
+  ) async {
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await action();
+      ref.invalidate(collectionsProvider(_size));
+      messenger.showSnackBar(SnackBar(content: Text(l10n.collectionSaved)));
+    } on ShelfFailure catch (failure) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.failureTitle(failure.kind))),
+      );
+    }
   }
 
   /// 搜索/排序菜单（UI-02）：本地对已加载的收藏集排序。

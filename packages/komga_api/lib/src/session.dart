@@ -189,6 +189,68 @@ class KomgaSession {
     return pageResultFromJson(data, bookFromJson);
   }
 
+  /// 新建收藏集（SER-04）。
+  ///
+  /// **实测 1.30.1**：`name` / `ordered` / `seriesIds` 三个字段都必填，
+  /// 且 `seriesIds` 至少一个——空收藏集会被 400 拒掉（OpenAPI 里 `minItems: 1`
+  /// 与真实行为一致）。所以 UI 不能提供"先建空集再往里加"的路径。
+  Future<KomgaCollection> createCollection({
+    required String name,
+    required List<String> seriesIds,
+    bool ordered = false,
+  }) async {
+    final data = _requireMap(
+      await _writeJson('POST', _urls.collectionsCreate(), <String, Object?>{
+        'name': name,
+        'ordered': ordered,
+        'seriesIds': seriesIds,
+      }),
+      '新建收藏集',
+    );
+    return collectionFromJson(data);
+  }
+
+  /// 收藏集改名（SER-04）。只传 name：实测 PATCH 允许部分字段。
+  Future<void> renameCollection(String collectionId, String name) async {
+    await _writeJson('PATCH', _urls.collection(collectionId), <String, Object?>{
+      'name': name,
+    }, expectBody: false);
+  }
+
+  /// 删除收藏集（SER-04）。实测删两次第二次是 404。
+  Future<void> deleteCollection(String collectionId) async {
+    await _writeJson(
+      'DELETE',
+      _urls.collection(collectionId),
+      null,
+      expectBody: false,
+    );
+  }
+
+  /// 写请求（POST/PATCH/DELETE）：**不写缓存、不读缓存**。
+  ///
+  /// 缓存只对 GET 有意义；把写请求的结果塞进 JSON 缓存，下次 GET 会读到
+  /// 一个"创建时"的旧快照。
+  Future<Object?> _writeJson(
+    String method,
+    String url,
+    Object? body, {
+    bool expectBody = true,
+  }) async {
+    try {
+      final response = await _dio.request<Object?>(
+        url,
+        data: body,
+        options: _jsonOptions.copyWith(method: method),
+      );
+      _cache?.reportOnline(_scope);
+      if (!expectBody) return null;
+      return response.data;
+    } on DioException catch (e) {
+      throw mapDioException(e);
+    }
+  }
+
   /// 收藏集列表（UI-P3-8）。
   Future<PageResult<KomgaCollection>> fetchCollections({
     int page = 0,

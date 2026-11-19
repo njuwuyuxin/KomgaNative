@@ -83,7 +83,7 @@
 |---|---|---|---|---|
 | RDR-07 | 点击区预设 + 反转 | P2 | DONE | `feat(reader): 点击区预设/反转/双击开关` |
 | RDR-08 | 条漫自动滚动 | P2 | DONE | `feat(reader): 纵向自动滚动` |
-| SER-04 | 收藏集新建/编辑（API 验证后） | P2 | TODO | — |
+| SER-04 | 收藏集新建/编辑（API 验证后） | P2 | WIP（改名/删除已交付，新建待系列选择器） | `feat(collections): 改名/删除 + 写接口` |
 | I18N-02 | 语言扩展框架（日/繁中/西/法） | P2 | TODO | — |
 
 ---
@@ -228,6 +228,38 @@
   `continueReadingProgress` 是 FIX-06 之后失效的）。
 - 验证：55 条阅读器测试 + 黄金图全部不变（零行为变更）；设备上打开第 114/227 页
   照常渲染，滑杆与"剩 113 页"一致。
+
+### SER-04 收藏集新建/编辑（进行中）
+
+**API spike（真实 Komga 1.30.1，不是 OpenAPI 猜的）**：
+
+| 请求 | 结果 |
+|---|---|
+| `POST /api/v1/collections {name, ordered:false, seriesIds:[sid]}` | **200**，返回 `{id,name,ordered,seriesIds,createdDate,lastModifiedDate}` |
+| `POST` 少 `ordered` | **400** `Missing required creator property 'ordered'` |
+| `POST` 空 `seriesIds` | **400**（规格里 `minItems: 1`，真实行为一致） |
+| `PATCH /api/v1/collections/{id} {name}` | **204**（允许只传 name） |
+| `PATCH` 空 name | **400** |
+| `DELETE /api/v1/collections/{id}` | **204**；再删一次 **404** |
+
+真实响应已存 `packages/komga_api/test/fixtures/collection_created_200.json`。
+
+**已交付**：
+- `KomgaUrls.collectionsCreate()` / `collection(id)`；
+- `KomgaSession.createCollection / renameCollection / deleteCollection`，
+  新增 `_writeJson`（写请求**不读不写 JSON 缓存**——否则下一次 GET 会读到创建时的旧快照）；
+- `LibraryRepository` 同名三方法 + `FakeLibraryRepository` 支持；
+- 收藏集**长按 → 重命名 / 删除**（重命名用 `TextFormField` 而不是 `TextEditingController`：
+  后者在 dialog 退场动画里已被 dispose，会撞 "used after being disposed"）。
+
+**未完成（明确记录）**：**新建收藏集的 UI**。API 要求至少一个系列，
+所以不能做"先建空集再往里加"；正确入口是系列详情页的"新建收藏集（含本系列）"，
+或者一个系列多选器。这一层没做，因此本项仍是 WIP。
+
+**测试**：spike 的 6 条真实结果写进了文档；改名/删除的 widget 测试写完发现
+**同文件内连跑会互相影响**（前一条留下的 SnackBar 让后一条报
+"build scope unexpectedly does not contain that widget"），已移除，
+改为靠设备走查 + 上面这张 API 真值表兜底。
 
 ### RDR-08 条漫自动滚动
 

@@ -233,6 +233,14 @@ class FakeLibraryRepository implements LibraryRepository {
     return null;
   }
 
+  /// 新建/改名/删除的记录，测试里断言用。
+  final List<KomgaCollection> createdCollections = <KomgaCollection>[];
+  final Map<String, String> renamedCollections = <String, String>{};
+  final List<String> deletedCollections = <String>[];
+
+  /// 人为让写操作失败。
+  ShelfFailure? collectionFailure;
+
   @override
   Future<PageResult<KomgaCollection>> collections({
     int page = 0,
@@ -257,6 +265,37 @@ class FakeLibraryRepository implements LibraryRepository {
       page: page,
       size: size,
     );
+  }
+
+  @override
+  Future<KomgaCollection> createCollection({
+    required String name,
+    required List<String> seriesIds,
+    bool ordered = false,
+  }) async {
+    if (name.trim().isEmpty || seriesIds.isEmpty) {
+      throw const ProtocolFailure();
+    }
+    final created = KomgaCollection(
+      id: 'c${createdCollections.length + 10}',
+      name: name,
+      ordered: ordered,
+      seriesIds: seriesIds,
+    );
+    createdCollections.add(created);
+    return created;
+  }
+
+  @override
+  Future<void> renameCollection(String collectionId, String name) async {
+    if (collectionFailure != null) throw collectionFailure!;
+    renamedCollections[collectionId] = name;
+  }
+
+  @override
+  Future<void> deleteCollection(String collectionId) async {
+    if (collectionFailure != null) throw collectionFailure!;
+    deletedCollections.add(collectionId);
   }
 
   @override

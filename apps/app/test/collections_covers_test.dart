@@ -13,7 +13,10 @@ import 'support/fake_library.dart';
 
 /// UI-02：收藏集封面拼贴 + 搜索 + 排序。
 void main() {
-  Future<void> pumpCollections(WidgetTester tester) async {
+  Future<void> pumpCollections(
+    WidgetTester tester, {
+    FakeLibraryRepository? repository,
+  }) async {
     tester.view.physicalSize = const Size(390 * 3, 844 * 3);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
@@ -21,7 +24,7 @@ void main() {
       ProviderScope(
         overrides: <Override>[
           libraryRepositoryProvider.overrideWithValue(
-            FakeLibraryRepository(series: demoShelf()),
+            repository ?? FakeLibraryRepository(series: demoShelf()),
           ),
         ],
         child: MaterialApp(
