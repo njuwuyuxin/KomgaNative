@@ -9,6 +9,7 @@ import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/data/shelf_view_options.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/screens/reader_args.dart';
+import 'package:komga_native/src/widgets/load_more_footer.dart';
 import 'package:komga_native/src/widgets/series_book_row.dart';
 import 'package:komga_native/src/widgets/series_shelf_tile.dart';
 import 'package:material_ui/material_ui.dart';
@@ -81,16 +82,32 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 }
 
-class _SearchResults extends ConsumerWidget {
+class _SearchResults extends ConsumerStatefulWidget {
   const _SearchResults({required this.query});
 
   final String query;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_SearchResults> createState() => _SearchResultsState();
+}
+
+class _SearchResultsState extends ConsumerState<_SearchResults> {
+  /// 已请求的条数（FIX-08）：搜索以前固定取 20 条，第 21 条起静默消失。
+  int _size = kListPageSize;
+
+  @override
+  void didUpdateWidget(_SearchResults oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 换了搜索词就从一页重新开始，别把上一次的"加载更多"带过去。
+    if (oldWidget.query != widget.query) _size = kListPageSize;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final series = ref.watch(searchSeriesProvider(query));
-    final books = ref.watch(searchBooksProvider(query));
+    final search = (query: widget.query, size: _size);
+    final series = ref.watch(searchSeriesProvider(search));
+    final books = ref.watch(searchBooksProvider(search));
     final seriesItems = series.value?.items ?? const <Series>[];
     final bookItems = books.value?.items ?? const <Book>[];
     final loading = series.value == null || books.value == null;
@@ -115,9 +132,10 @@ class _SearchResults extends ConsumerWidget {
     if (seriesItems.isEmpty && bookItems.isEmpty) {
       return SliverFillRemaining(
         hasScrollBody: false,
-        child: _SearchHint(text: l10n.searchNoResults(query)),
+        child: _SearchHint(text: l10n.searchNoResults(widget.query)),
       );
     }
+    final more = () => setState(() => _size += kListPageSize);
 
     return SliverList.list(
       // 悬浮导航条浮在内容上：结果列表末尾让开它。
@@ -129,6 +147,13 @@ class _SearchResults extends ConsumerWidget {
               series: series,
               coverSize: ShelfCoverSize.small,
               onTap: () => context.push('/series/${series.id}'),
+            ),
+          if (series.value != null)
+            LoadMoreFooter(
+              loaded: seriesItems.length,
+              total: series.value!.totalElements,
+              unit: LoadMoreUnit.series,
+              onLoadMore: more,
             ),
         ],
         if (bookItems.isNotEmpty) ...<Widget>[
@@ -144,6 +169,13 @@ class _SearchResults extends ConsumerWidget {
                   extra: ReaderArgs(book: book),
                 );
               },
+            ),
+          if (books.value != null)
+            LoadMoreFooter(
+              loaded: bookItems.length,
+              total: books.value!.totalElements,
+              unit: LoadMoreUnit.books,
+              onLoadMore: more,
             ),
         ],
         const SizedBox(height: AppSizes.navBarClearance),

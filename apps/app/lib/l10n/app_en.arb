@@ -191,7 +191,8 @@
   "unknownDate": "unknown",
 
   "downloadCancelAll": "Cancel all",
-  "downloadCancelAll": "Cancel all",
+  "showingItems": "Showing {shown} of {total}",
+  "showingSeries": "Showing {shown} of {total} series",
   "cancelDownload": "Cancel download",
   "downloadRetryTooltip": "{error} · tap to retry",
   "@downloadRetryTooltip": {

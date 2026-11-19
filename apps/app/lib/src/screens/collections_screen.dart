@@ -4,6 +4,7 @@ import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
+import 'package:komga_native/src/widgets/load_more_footer.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 收藏集 / 阅读列表入口（UI-P3-8）。
@@ -85,42 +86,51 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen>
   }
 }
 
-class _CollectionsTab extends ConsumerWidget {
+class _CollectionsTab extends ConsumerStatefulWidget {
   const _CollectionsTab({required this.topPadding});
 
   final double topPadding;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_CollectionsTab> createState() => _CollectionsTabState();
+}
+
+class _CollectionsTabState extends ConsumerState<_CollectionsTab> {
+  /// 已请求的条数；点"加载更多"加一页（FIX-08）。
+  int _size = kListPageSize;
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final async = ref.watch(collectionsProvider);
+    final provider = collectionsProvider(_size);
+    final async = ref.watch(provider);
     if (async.hasError && !async.hasValue) {
       return _Error(
-        topPadding: topPadding,
+        topPadding: widget.topPadding,
         message: async.error is ShelfFailure
             ? (async.error! as ShelfFailure).message
             : l10n.errorGeneric,
-        onRetry: () => ref.invalidate(collectionsProvider),
+        onRetry: () => ref.invalidate(provider),
       );
     }
     final value = async.value;
     if (value == null) {
-      return _Loading(topPadding: topPadding);
+      return _Loading(topPadding: widget.topPadding);
     }
     if (value.items.isEmpty) {
       return _Empty(
-        topPadding: topPadding,
+        topPadding: widget.topPadding,
         icon: Icons.collections_bookmark_outlined,
         text: l10n.collectionsEmpty,
       );
     }
     return RefreshIndicator(
-      edgeOffset: topPadding,
-      onRefresh: () async => ref.invalidate(collectionsProvider),
+      edgeOffset: widget.topPadding,
+      onRefresh: () async => ref.invalidate(provider),
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.only(
-          top: topPadding + AppSpacing.xs,
+          top: widget.topPadding + AppSpacing.xs,
           bottom: AppSizes.navBarClearance,
         ),
         children: <Widget>[
@@ -140,46 +150,59 @@ class _CollectionsTab extends ConsumerWidget {
                 ),
             ],
           ),
+          LoadMoreFooter(
+            loaded: value.items.length,
+            total: value.totalElements,
+            onLoadMore: () => setState(() => _size += kListPageSize),
+          ),
         ],
       ),
     );
   }
 }
 
-class _ReadListsTab extends ConsumerWidget {
+class _ReadListsTab extends ConsumerStatefulWidget {
   const _ReadListsTab({required this.topPadding});
 
   final double topPadding;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ReadListsTab> createState() => _ReadListsTabState();
+}
+
+class _ReadListsTabState extends ConsumerState<_ReadListsTab> {
+  int _size = kListPageSize;
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final async = ref.watch(readListsProvider);
+    final provider = readListsProvider(_size);
+    final async = ref.watch(provider);
     if (async.hasError && !async.hasValue) {
       return _Error(
-        topPadding: topPadding,
+        topPadding: widget.topPadding,
         message: async.error is ShelfFailure
             ? (async.error! as ShelfFailure).message
             : l10n.errorGeneric,
-        onRetry: () => ref.invalidate(readListsProvider),
+        onRetry: () => ref.invalidate(provider),
       );
     }
     final value = async.value;
-    if (value == null) return _Loading(topPadding: topPadding);
+    if (value == null) return _Loading(topPadding: widget.topPadding);
     if (value.items.isEmpty) {
       return _Empty(
-        topPadding: topPadding,
+        topPadding: widget.topPadding,
         icon: Icons.list_alt_outlined,
         text: l10n.readListsEmpty,
       );
     }
     return RefreshIndicator(
-      edgeOffset: topPadding,
-      onRefresh: () async => ref.invalidate(readListsProvider),
+      edgeOffset: widget.topPadding,
+      onRefresh: () async => ref.invalidate(provider),
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.only(
-          top: topPadding + AppSpacing.xs,
+          top: widget.topPadding + AppSpacing.xs,
           bottom: AppSizes.navBarClearance,
         ),
         children: <Widget>[
@@ -202,6 +225,11 @@ class _ReadListsTab extends ConsumerWidget {
                       context.push('/readlists/${list.id}', extra: list.name),
                 ),
             ],
+          ),
+          LoadMoreFooter(
+            loaded: value.items.length,
+            total: value.totalElements,
+            onLoadMore: () => setState(() => _size += kListPageSize),
           ),
         ],
       ),

@@ -78,51 +78,77 @@ final seriesBooksProvider =
     });
 
 /// 收藏集列表（UI-P3-8）。
-final FutureProvider<PageResult<KomgaCollection>> collectionsProvider =
-    FutureProvider<PageResult<KomgaCollection>>((Ref ref) {
-      return ref.watch(libraryRepositoryProvider).collections();
+///
+/// 参数是"要多少条"而不是页号：与系列书列表同一条思路——`size` 变了就是一次
+/// 新查询，客户端不拼列表。超过时页面显示"加载更多"（FIX-08）。
+final collectionsProvider =
+    FutureProvider.family<PageResult<KomgaCollection>, int>((
+      Ref ref,
+      int size,
+    ) {
+      return ref.watch(libraryRepositoryProvider).collections(size: size);
     });
 
 /// 阅读列表。
-final FutureProvider<PageResult<ReadList>> readListsProvider =
-    FutureProvider<PageResult<ReadList>>((Ref ref) {
-      return ref.watch(libraryRepositoryProvider).readLists();
-    });
+final readListsProvider = FutureProvider.family<PageResult<ReadList>, int>((
+  Ref ref,
+  int size,
+) {
+  return ref.watch(libraryRepositoryProvider).readLists(size: size);
+});
+
+/// 一次"加载更多"多要多少条收藏集/阅读列表/搜索结果。
+const int kListPageSize = 30;
+
+typedef CollectionSeriesQuery = ({String collectionId, int size});
 
 /// 收藏集里的系列。
 final collectionSeriesProvider =
-    FutureProvider.family<PageResult<Series>, String>((
+    FutureProvider.family<PageResult<Series>, CollectionSeriesQuery>((
       Ref ref,
-      String collectionId,
+      CollectionSeriesQuery query,
     ) {
       return ref
           .watch(libraryRepositoryProvider)
-          .collectionSeries(collectionId);
+          .collectionSeries(query.collectionId, size: query.size);
     });
 
-/// 阅读列表里的书。
-final readListBooksProvider = FutureProvider.family<PageResult<Book>, String>((
-  Ref ref,
-  String readListId,
-) {
-  return ref.watch(libraryRepositoryProvider).readListBooks(readListId);
-});
+typedef ReadListBooksQuery = ({String readListId, int size});
 
-/// 全局书搜索（UI-P3-9）；`query` 变化就是一次新查询。
-final searchBooksProvider = FutureProvider.family<PageResult<Book>, String>((
-  Ref ref,
-  String query,
-) {
-  return ref.watch(libraryRepositoryProvider).searchBooks(query);
-});
+/// 阅读列表里的书。
+final readListBooksProvider =
+    FutureProvider.family<PageResult<Book>, ReadListBooksQuery>((
+      Ref ref,
+      ReadListBooksQuery query,
+    ) {
+      return ref
+          .watch(libraryRepositoryProvider)
+          .readListBooks(query.readListId, size: query.size);
+    });
+
+typedef SearchQuery = ({String query, int size});
+
+/// 全局书搜索（UI-P3-9）；`query` 或 `size` 变化就是一次新查询。
+final searchBooksProvider =
+    FutureProvider.family<PageResult<Book>, SearchQuery>((
+      Ref ref,
+      SearchQuery search,
+    ) {
+      return ref
+          .watch(libraryRepositoryProvider)
+          .searchBooks(search.query, size: search.size);
+    });
 
 /// 全局系列搜索（复用书架查询的 `search` 参数）。
-final searchSeriesProvider = FutureProvider.family<PageResult<Series>, String>((
-  Ref ref,
-  String query,
-) {
-  return ref.watch(libraryRepositoryProvider).series(query: query);
-});
+final searchSeriesProvider =
+    FutureProvider.family<PageResult<Series>, SearchQuery>((
+      Ref ref,
+      SearchQuery search,
+    ) {
+      return ref
+          .watch(libraryRepositoryProvider)
+          .series(query: search.query, size: search.size);
+    });
 
 /// 单本书的封面。
 final bookCoverProvider = FutureProvider.family<Uint8List?, String>((
