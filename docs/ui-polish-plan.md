@@ -513,6 +513,15 @@ Panels 的高级感主要来自三点，和控件本身关系不大：
 | 测试：`search_test` 覆盖输入→防抖→书结果；`search@phone_light/tablet_dark/eink` 三张黄金图 |
 | 未做：搜索历史/建议、按标签/作者筛选 chip（服务端已匹配这些字段，客户端暂不单独过滤） |
 
+**进度（2026-11-19）：P3-10 图像滤镜（自动去白边）。**
+
+| 落地 |
+|---|
+| 引擎 `detectBorderCrop`：四角定背景色、逐行/列扫描连续纯色边，单边上限 40%，整页纯色/四角不同/空图不裁；`borders_test` 覆盖白边、黑边、不对称、无边框、整页纯色、空图 |
+| 页图解码到 48px 做检测（`pageBorderCrop`），provider 跟页图回收；`ReaderPage` 用 `MemoryImage` ImageStream + `drawImageRect` 精确裁剪，保留 contain 比例 |
+| `ReaderPrefs.trimBorders` + 设置开关 `reader-trim-borders`；预设/系列覆盖/JSON 都带上；修复了相等性漏字段导致恢复被 Riverpod 吞掉的问题 |
+| 测试：`reader_trim_test` 覆盖"白边页图开启后走裁剪绘制"；`reader_trim@phone_dark` 黄金图（合成白边页） |
+
 ## 不做
 
 | 需求 | 理由 |

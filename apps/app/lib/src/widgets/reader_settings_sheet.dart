@@ -271,6 +271,24 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
                 ],
               ),
               SwitchListTile(
+                key: const Key('reader-trim-borders'),
+                contentPadding: EdgeInsets.zero,
+                value: prefs.trimBorders,
+                onChanged: (bool value) =>
+                    controller.setTrimBorders(value, seriesId: writeSeriesId),
+                activeThumbColor: palette.foreground,
+                title: Text(
+                  l10n.readerTrimBorders,
+                  style: textStyle.bodyMedium?.copyWith(
+                    color: palette.foreground,
+                  ),
+                ),
+                subtitle: Text(
+                  l10n.readerTrimBordersHint,
+                  style: textStyle.bodySmall?.copyWith(color: palette.muted),
+                ),
+              ),
+              SwitchListTile(
                 key: const Key('reader-lock-zoom'),
                 contentPadding: EdgeInsets.zero,
                 value: prefs.lockZoom,

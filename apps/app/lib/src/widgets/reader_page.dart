@@ -1,9 +1,11 @@
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_native/src/providers/reader_providers.dart';
 import 'package:komga_native/src/widgets/reader_chrome.dart';
 import 'package:komga_native/src/widgets/reader_palette.dart';
+import 'package:komga_reader_engine/komga_reader_engine.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 服务端没返回尺寸时的兜底页面尺寸（比例接近实体漫画单页）。
@@ -25,6 +27,7 @@ class ReaderPage extends ConsumerWidget {
     required this.pageIndex,
     required this.palette,
     this.decodedImage,
+    this.trimBorders = false,
     super.key,
   });
 
@@ -34,6 +37,9 @@ class ReaderPage extends ConsumerWidget {
   final int pageIndex;
 
   final ReaderPalette palette;
+
+  /// 是否按检测到的边框裁剪页图（UI-P3-10）。
+  final bool trimBorders;
 
   /// 同一页已经解好的卷页位图，由 CurlSheets 持有；这里只借用，不释放。
   /// 字节缓存命中不等于 MemoryImage 的首帧已解码，交接时用它填补解码空窗。
@@ -60,6 +66,16 @@ class ReaderPage extends ConsumerWidget {
     final error = async.error;
 
     if (bytes != null) {
+      final crop = trimBorders
+          ? ref.watch(pageBorderCropProvider(request)).value
+          : null;
+      if (crop != null && !crop.isEmpty) {
+        return _CroppedPage(
+          key: Key('reader-image-$pageIndex'),
+          bytes: bytes,
+          crop: crop,
+        );
+      }
       return Image.memory(
         bytes,
         key: Key('reader-image-$pageIndex'),
@@ -95,4 +111,93 @@ class ReaderPage extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// 按检测到的边框只画页图的中间区域（UI-P3-10）。
+///
+/// 用 `MemoryImage` 的 ImageStream 拿到已解码位图，再 `drawImageRect`：
+/// 这样既能精确裁源矩形，又复用 Flutter 的图片缓存，不需要自己解一遍。
+class _CroppedPage extends StatefulWidget {
+  const _CroppedPage({required this.bytes, required this.crop, super.key});
+
+  final Uint8List bytes;
+  final BorderCrop crop;
+
+  @override
+  State<_CroppedPage> createState() => _CroppedPageState();
+}
+
+class _CroppedPageState extends State<_CroppedPage> {
+  ImageStream? _stream;
+  ImageStreamListener? _listener;
+  ui.Image? _image;
+  bool _resolved = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_resolved) return;
+    _resolved = true;
+    _stream = MemoryImage(widget.bytes)
+        .resolve(createLocalImageConfiguration(context));
+    _listener = ImageStreamListener((ImageInfo info, bool _) {
+      if (!mounted) return;
+      setState(() => _image = info.image);
+    });
+    _stream!.addListener(_listener!);
+  }
+
+  @override
+  void dispose() {
+    if (_stream != null && _listener != null) {
+      _stream!.removeListener(_listener!);
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final image = _image;
+    if (image == null) {
+      return Image.memory(widget.bytes, fit: BoxFit.contain);
+    }
+    return SizedBox.expand(
+      child: CustomPaint(
+        painter: _CropPainter(image: image, crop: widget.crop),
+      ),
+    );
+  }
+}
+
+class _CropPainter extends CustomPainter {
+  const _CropPainter({required this.image, required this.crop});
+
+  final ui.Image image;
+  final BorderCrop crop;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final src = Rect.fromLTRB(
+      image.width * crop.left,
+      image.height * crop.top,
+      image.width * (1 - crop.right),
+      image.height * (1 - crop.bottom),
+    );
+    if (src.isEmpty || size.isEmpty) return;
+    final fitted = applyBoxFit(BoxFit.contain, src.size, size);
+    final dst = Alignment.center.inscribe(
+      fitted.destination,
+      Offset.zero & size,
+    );
+    canvas.drawImageRect(
+      image,
+      src,
+      dst,
+      Paint()..filterQuality = FilterQuality.medium,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_CropPainter oldDelegate) =>
+      oldDelegate.image != image || oldDelegate.crop != crop;
 }

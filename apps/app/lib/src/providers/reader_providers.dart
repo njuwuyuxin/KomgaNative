@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_api/komga_api.dart';
 import 'package:komga_domain/komga_domain.dart';
+import 'package:komga_native/src/data/page_border_crop.dart';
 import 'package:komga_native/src/data/page_edge_color.dart';
 import 'package:komga_native/src/data/reader_repository.dart';
 import 'package:komga_native/src/providers/cache_providers.dart';
@@ -80,6 +81,15 @@ final pageEdgeGradientProvider =
       final bytes = await ref.watch(readerPageImageProvider(req).future);
       return pageEdgeGradient(bytes);
     }, isAutoDispose: true);
+
+/// 一页的边框裁剪比例（UI-P3-10）；只在用户开启"去白边"时才被读。
+final pageBorderCropProvider = FutureProvider.family<BorderCrop?, PageRequest>((
+  Ref ref,
+  PageRequest req,
+) async {
+  final bytes = await ref.watch(readerPageImageProvider(req).future);
+  return pageBorderCrop(bytes);
+}, isAutoDispose: true);
 
 /// 查"下一本"的键：书 id + 所属系列。
 typedef NextBookQuery = ({String seriesId, String bookId});

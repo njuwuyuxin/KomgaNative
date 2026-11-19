@@ -751,6 +751,20 @@ void main() {
     );
   });
 
+  testWidgets('reader_trim@phone_dark', (WidgetTester tester) async {
+    await pumpReaderGolden(
+      tester,
+      name: 'reader_trim@phone_dark',
+      size: GoldenSizes.phone,
+      theme: AppTheme.dark(),
+      repository: FakeReaderRepository(
+        pageNames: const <String>['trim_border'],
+      ),
+      prefs: const ReaderPrefs(trimBorders: true),
+      settleAfterActWithRealTime: true,
+    );
+  });
+
   testWidgets('reader_finished@phone_dark', (WidgetTester tester) async {
     // 书末卡片要展示下一本的封面，所以这一张接管了书列表：书 id 必须是
     // 系列里真实存在的（`nextBookProvider` 按 id 找下一条）。

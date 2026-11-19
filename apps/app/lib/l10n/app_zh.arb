@@ -203,6 +203,8 @@
   "readerSeriesRememberHint": "只对这个系列生效；关闭后回到全局设置。",
   "readerLockZoom": "锁定缩放",
   "readerLockZoomHint": "翻页后保持当前缩放比例；放大状态下也可以翻页。",
+  "readerTrimBorders": "自动去白边",
+  "readerTrimBordersHint": "自动裁掉页图四周纯白/纯黑的边。",
   "readerGroupFrom": "从第 {page} 页开始分组",
   "readerGroupAutomatic": "恢复自动分组",
   "incognitoOff": "隐身模式：关",

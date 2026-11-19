@@ -322,6 +322,8 @@
   "readerSeriesRememberHint": "Changes apply to this series only; turn off to use the global settings again.",
   "readerLockZoom": "Lock zoom",
   "readerLockZoomHint": "Keep the zoom level when turning pages; page turns are allowed while zoomed.",
+  "readerTrimBorders": "Remove page borders",
+  "readerTrimBordersHint": "Automatically crop uniform white/black margins",
   "readerGroupFrom": "Grouping from page {page}",
   "@readerGroupFrom": {
     "placeholders": {

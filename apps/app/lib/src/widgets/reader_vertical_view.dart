@@ -19,6 +19,7 @@ class ReaderVerticalView extends StatefulWidget {
     required this.onToggleChrome,
     this.jumpToken = 0,
     this.jumpPage = 1,
+    this.trimBorders = false,
     super.key,
   });
 
@@ -41,6 +42,9 @@ class ReaderVerticalView extends StatefulWidget {
   /// 那样会变成"滚动 → 通知 → 再跳回去"的死循环。
   final int jumpToken;
   final int jumpPage;
+
+  /// 自动裁掉页图白边（UI-P3-10）。
+  final bool trimBorders;
 
   @override
   State<ReaderVerticalView> createState() => _ReaderVerticalViewState();
@@ -145,6 +149,7 @@ class _ReaderVerticalViewState extends State<ReaderVerticalView> {
                 bookId: widget.bookId,
                 pageIndex: index,
                 palette: widget.palette,
+                trimBorders: widget.trimBorders,
               ),
             ),
           ),

@@ -48,6 +48,7 @@ class ReaderPagedView extends ConsumerStatefulWidget {
     this.previousSpread,
     this.style = const PageTurnStyle(),
     this.lockZoom = false,
+    this.trimBorders = false,
     super.key,
   });
 
@@ -81,6 +82,9 @@ class ReaderPagedView extends ConsumerStatefulWidget {
 
   /// 翻页后保持缩放比例（UI-P3-4）。
   final bool lockZoom;
+
+  /// 自动裁掉页图白边（UI-P3-10）。
+  final bool trimBorders;
 
   @override
   ReaderPagedViewState createState() => ReaderPagedViewState();
@@ -212,6 +216,7 @@ class ReaderPagedViewState extends ConsumerState<ReaderPagedView>
             pageIndex: index,
             palette: widget.palette,
             decodedImage: _sheets.imageFor(index),
+            trimBorders: widget.trimBorders,
           ),
         ),
     ],

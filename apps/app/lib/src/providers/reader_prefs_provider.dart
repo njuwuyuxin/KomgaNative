@@ -61,6 +61,11 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
   void setLockZoom(bool enabled, {String? seriesId}) =>
       _updateConfig(seriesId, (ReaderPrefs p) => p.copyWith(lockZoom: enabled));
 
+  void setTrimBorders(bool enabled, {String? seriesId}) => _updateConfig(
+    seriesId,
+    (ReaderPrefs p) => p.copyWith(trimBorders: enabled),
+  );
+
   /// 打开/关闭"按系列记住"（UI-P3-2）。
   ///
   /// 打开时把**当前生效值**快照成这个系列的覆盖；关闭时删掉覆盖、回到全局。

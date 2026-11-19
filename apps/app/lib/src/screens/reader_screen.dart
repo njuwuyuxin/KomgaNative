@@ -424,6 +424,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         jumpToken: _jumpToken,
         jumpPage: _jumpPage,
         palette: palette,
+        trimBorders: prefs.trimBorders,
         onPageChanged: (int p) => _setPage(p, total),
         onToggleChrome: _toggleChrome,
       ),
@@ -437,6 +438,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         fit: prefs.fit.fit,
         doublePage: mode == ReadingMode.doublePage,
         lockZoom: prefs.lockZoom,
+        trimBorders: prefs.trimBorders,
         nextSpread: layout.neighbour(1),
         previousSpread: layout.neighbour(-1),
         style: PageTurnStyle.resolve(

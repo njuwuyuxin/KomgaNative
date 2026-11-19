@@ -177,6 +177,24 @@ void main() {
       expect(parsed.lockZoom, isTrue);
       expect(parsed.forSeries('s1').lockZoom, isTrue);
     });
+
+    test('去白边默认关、JSON 往返、系列覆盖可带', () {
+      expect(const ReaderPrefs().trimBorders, isFalse);
+      expect(
+        ReaderPrefs.fromJson(<String, Object?>{'trimBorders': true})
+            .trimBorders,
+        isTrue,
+      );
+      const prefs = ReaderPrefs(
+        trimBorders: true,
+        seriesOverrides: <String, ReaderPrefs>{
+          's1': ReaderPrefs(trimBorders: true),
+        },
+      );
+      final parsed = ReaderPrefs.fromJson(prefs.toJson());
+      expect(parsed.trimBorders, isTrue);
+      expect(parsed.forSeries('s1').trimBorders, isTrue);
+    });
   });
 
   group('ReaderFitChoice → FitMode', () {

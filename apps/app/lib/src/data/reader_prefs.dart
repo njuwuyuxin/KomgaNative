@@ -122,6 +122,7 @@ class ReaderPrefs {
     this.direction = ReaderDirectionChoice.auto,
     this.background = ReaderBackgroundChoice.black,
     this.lockZoom = false,
+    this.trimBorders = false,
     this.presets = const <ReaderPreset>[],
     this.seriesOverrides = const <String, ReaderPrefs>{},
   });
@@ -143,6 +144,9 @@ class ReaderPrefs {
   /// 翻页后保持缩放比例（UI-P3-4）。
   final bool lockZoom;
 
+  /// 自动裁掉页图四周的纯色白边/黑边（UI-P3-10）。
+  final bool trimBorders;
+
   /// 用户保存的阅读预设（UI-P3-1）；按保存顺序排列。
   final List<ReaderPreset> presets;
 
@@ -160,6 +164,7 @@ class ReaderPrefs {
     direction: direction,
     background: background,
     lockZoom: lockZoom,
+    trimBorders: trimBorders,
   );
 
   /// 某个系列实际生效的设置：有覆盖就用覆盖，否则用全局。
@@ -177,6 +182,7 @@ class ReaderPrefs {
       direction: override.direction,
       background: override.background,
       lockZoom: override.lockZoom,
+      trimBorders: override.trimBorders,
       presets: presets,
       seriesOverrides: seriesOverrides,
     );
@@ -204,6 +210,7 @@ class ReaderPrefs {
     ReaderDirectionChoice? direction,
     ReaderBackgroundChoice? background,
     bool? lockZoom,
+    bool? trimBorders,
     List<ReaderPreset>? presets,
     Map<String, ReaderPrefs>? seriesOverrides,
   }) => ReaderPrefs(
@@ -214,6 +221,7 @@ class ReaderPrefs {
     direction: direction ?? this.direction,
     background: background ?? this.background,
     lockZoom: lockZoom ?? this.lockZoom,
+    trimBorders: trimBorders ?? this.trimBorders,
     presets: presets ?? this.presets,
     seriesOverrides: seriesOverrides ?? this.seriesOverrides,
   );
@@ -227,6 +235,7 @@ class ReaderPrefs {
         'direction': direction.name,
         'background': background.name,
         'lockZoom': lockZoom,
+        'trimBorders': trimBorders,
         if (includePresets && presets.isNotEmpty)
           'presets': <Object?>[for (final preset in presets) preset.toJson()],
         if (includePresets && seriesOverrides.isNotEmpty)
@@ -281,6 +290,7 @@ class ReaderPrefs {
         ReaderBackgroundChoice.black,
       ),
       lockZoom: json['lockZoom'] == true,
+      trimBorders: json['trimBorders'] == true,
       presets: presets,
       seriesOverrides: overrides,
     );
@@ -305,6 +315,7 @@ class ReaderPrefs {
       other.direction == direction &&
       other.background == background &&
       other.lockZoom == lockZoom &&
+      other.trimBorders == trimBorders &&
       _samePresets(other.presets, presets) &&
       _sameOverrides(other.seriesOverrides, seriesOverrides);
 
@@ -337,6 +348,7 @@ class ReaderPrefs {
     direction,
     background,
     lockZoom,
+    trimBorders,
     Object.hashAll(presets),
     Object.hashAll(
       seriesOverrides.entries.map(

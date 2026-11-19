@@ -283,6 +283,7 @@ mixin _PageTurn
               pageIndex: page,
               palette: widget.palette,
               decodedImage: _sheets.imageFor(page),
+              trimBorders: widget.trimBorders,
             ),
           ),
         _curlLayer(plan),
