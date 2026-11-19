@@ -9,18 +9,21 @@ import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/cache/drift_http_cache.dart';
 import 'package:komga_native/src/data/cache/http_cache_database.dart';
+import 'package:komga_native/src/data/download/download_service.dart';
 import 'package:komga_native/src/data/progress/progress_store.dart';
 import 'package:komga_native/src/data/progress/progress_sync_service.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
 import 'package:komga_native/src/data/reader_prefs_store.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/cache_providers.dart';
+import 'package:komga_native/src/providers/download_providers.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/providers/progress_providers.dart';
 import 'package:komga_native/src/providers/reader_prefs_provider.dart';
 import 'package:komga_native/src/providers/reader_providers.dart';
 import 'package:komga_native/src/providers/settings_provider.dart';
 import 'package:komga_native/src/screens/connection_screen.dart';
+import 'package:komga_native/src/screens/downloads_screen.dart';
 import 'package:komga_native/src/screens/library_screen.dart';
 import 'package:komga_native/src/screens/reader_screen.dart';
 import 'package:komga_native/src/screens/reading_now_screen.dart';
@@ -390,6 +393,64 @@ void main() {
     );
     await expectGolden(tester, name);
   }
+
+  Future<void> pumpDownloadsGolden(
+    WidgetTester tester, {
+    required String name,
+    required Size size,
+    required ThemeData theme,
+  }) async {
+    final db = HttpCacheDatabase(NativeDatabase.memory());
+    await db.markDownloaded(
+      bookId: 's1-b1',
+      seriesId: 's1',
+      pageCount: 12,
+      bytes: 2 * 1024 * 1024,
+    );
+    final library = FakeLibraryRepository(ondeck: demoOndeck());
+    final cover = await library.bookCover('s1-b1');
+    await pumpGoldenScreen(
+      tester,
+      screen: const DownloadsScreen(),
+      size: size,
+      theme: theme,
+      overrides: <Override>[
+        httpCacheDatabaseProvider.overrideWithValue(db),
+        downloadServiceProvider.overrideWithValue(_GoldenDownloadService()),
+        libraryRepositoryProvider.overrideWithValue(library),
+      ],
+      precacheImages: <Uint8List>[if (cover != null) cover],
+      realTimeSettle: true,
+    );
+    await expectGolden(tester, name);
+  }
+
+  testWidgets('downloads@phone_light', (WidgetTester tester) async {
+    await pumpDownloadsGolden(
+      tester,
+      name: 'downloads@phone_light',
+      size: GoldenSizes.phone,
+      theme: AppTheme.light(),
+    );
+  });
+
+  testWidgets('downloads@tablet_dark', (WidgetTester tester) async {
+    await pumpDownloadsGolden(
+      tester,
+      name: 'downloads@tablet_dark',
+      size: GoldenSizes.tablet,
+      theme: AppTheme.dark(),
+    );
+  });
+
+  testWidgets('downloads@eink', (WidgetTester tester) async {
+    await pumpDownloadsGolden(
+      tester,
+      name: 'downloads@eink',
+      size: GoldenSizes.eink,
+      theme: AppTheme.eink(),
+    );
+  });
 
   testWidgets('reading_now@phone_light', (WidgetTester tester) async {
     await pumpReadingNowGolden(
@@ -820,4 +881,22 @@ void main() {
       textScale: 1.3,
     );
   });
+}
+
+/// 黄金图用的下载服务：不会真的跑下载，只负责让"已下载"查询返回 null。
+class _GoldenDownloadService implements DownloadService {
+  @override
+  Future<DownloadedBook?> downloaded(String bookId) async => null;
+
+  @override
+  Future<bool> download(
+    Book book, {
+    required void Function(DownloadProgress progress) onProgress,
+  }) async => false;
+
+  @override
+  void cancel(String bookId) {}
+
+  @override
+  Future<void> delete(Book book) async {}
 }

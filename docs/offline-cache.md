@@ -13,6 +13,7 @@
 | 断网打开读过的书 | 页图从缓存出，翻页正常；**没读过的页会显示页内错误**，可重试 |
 | 网络恢复 | 任意一次成功请求（GET 或进度 PATCH）后离线提示自动消失 |
 | 设置 → Storage | 显示缓存占用与条数、已下载书籍数量与体积，可一键清空缓存（不影响阅读进度） |
+| 设置 → Downloaded books | 下载管理页（UI-P3-13）：进行中/排队/已下载，显示进度、书名、页数与体积，可取消、删除 |
 | 系列详情 → 每本书的下载按钮 | 整本下载（显示进度、可取消、可删除），下载完的书断网可整本阅读 |
 
 ## 整本下载
@@ -24,6 +25,12 @@
 - **取消**：在页与页之间生效（不中断已在途的单页请求），已下载的页保留；
 - **完成**：写入 `downloaded_books`（书、页数、字节数），图标变成 ✓；
 - **删除**：确认后同时删掉下载记录与该书已缓存的页图，其他书的缓存不动。
+- **队列**（UI-P3-13）：一次只跑一本；后面的显示"排队中"，前一本完成/取消后自动开始。
+  并发下载只会互相抢带宽，进度也更难解释。
+
+下载管理页（`screens/downloads_screen.dart`）从设置页进入：列出进行中、排队、
+已下载三类；进行中显示线性进度与取消，已下载显示页数/体积与删除。书名按
+`bookId` 查一次（`bookByIdProvider`），查不到就退化成 id，不阻塞列表。
 
 为什么不"靠缓存里有没有这些页"反推已下载：页图缓存会被字节预算 LRU 淘汰，
 而"用户明确下载过"是意图，不能被自动淘汰悄悄改写。两者必须显式管理。
@@ -41,7 +48,9 @@
 | `apps/app/lib/src/data/cache/drift_http_cache.dart` | 接口实现 + `ValueNotifier<bool> offline` 广播 |
 | `apps/app/lib/src/providers/cache_providers.dart` | 缓存库/实例/占用/离线状态 provider |
 | `apps/app/lib/src/widgets/offline_banner.dart` | 离线提示条（带 Retry） |
-| `apps/app/lib/src/screens/settings_screen.dart` | Storage 区：占用展示 + 清空 |
+| `apps/app/lib/src/screens/settings_screen.dart` | Storage 区：占用展示 + 清空 + 下载管理入口 |
+| `apps/app/lib/src/screens/downloads_screen.dart` | 下载管理页（UI-P3-13） |
+| `apps/app/test/downloads_queue_test.dart` | 下载队列串行单测 |
 
 决策与理由见 [ADR 0003](adr/0003-http-response-cache.md)。
 

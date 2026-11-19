@@ -4,6 +4,7 @@ import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/providers/cache_providers.dart';
 import 'package:komga_native/src/providers/download_providers.dart';
 import 'package:komga_native/src/providers/settings_provider.dart';
+import 'package:komga_native/src/screens/downloads_screen.dart';
 import 'package:komga_native/src/session/server_store.dart';
 import 'package:komga_native/src/session/session_controller.dart';
 import 'package:material_ui/material_ui.dart';
@@ -158,6 +159,7 @@ class SettingsScreen extends ConsumerWidget {
                   ),
                 ),
                 ListTile(
+                  key: const Key('settings-downloads'),
                   title: Text(l10n.downloadedBooks),
                   subtitle: Text(
                     downloads == null
@@ -168,6 +170,12 @@ class SettingsScreen extends ConsumerWidget {
                           ),
                   ),
                   leading: const Icon(Icons.download_done_outlined),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (BuildContext context) =>
+                          const DownloadsScreen(),
+                    ),
+                  ),
                 ),
                 const Divider(),
                 _SectionHeader(l10n.about),

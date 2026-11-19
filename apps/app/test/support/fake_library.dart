@@ -218,6 +218,20 @@ class FakeLibraryRepository implements LibraryRepository {
   }
 
   @override
+  Future<Book?> book(String bookId) async {
+    for (final book in ondeckData) {
+      if (book.id == bookId) return book;
+    }
+    // 下载管理页的测试：不在 ondeck 里的书给一个稳定标题即可。
+    return Book(
+      id: bookId,
+      seriesId: 's1',
+      name: 'Book $bookId',
+      pagesCount: 3,
+    );
+  }
+
+  @override
   Future<PageResult<Book>> books(
     String seriesId, {
     int page = 0,

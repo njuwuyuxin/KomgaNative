@@ -5,6 +5,7 @@ import 'package:komga_native/src/data/cache/http_cache_database.dart';
 import 'package:komga_native/src/data/download/download_service.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/cache_providers.dart';
+import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/session/session_controller.dart';
 
 /// 下载服务：跟着会话走（换服务器/重新登录就重建）。
@@ -49,6 +50,19 @@ final downloadsUsageProvider = FutureProvider<CacheUsage>((Ref ref) {
   return ref.watch(httpCacheDatabaseProvider).downloadsUsage();
 });
 
+/// 已下载书籍列表（下载管理页，UI-P3-13）。
+final downloadedBooksProvider = FutureProvider<List<DownloadedBook>>((Ref ref) {
+  return ref.watch(httpCacheDatabaseProvider).downloads();
+});
+
+/// 下载管理页要显示书名：按 bookId 取一次（失败返回 null，不打断列表）。
+final bookByIdProvider = FutureProvider.family<Book?, String>((
+  Ref ref,
+  String bookId,
+) {
+  return ref.watch(libraryRepositoryProvider).book(bookId);
+});
+
 /// 某本书是否已整本下载（返回记录，含页数与字节数）。
 final downloadedProvider = FutureProvider.family<DownloadedBook?, String>((
   Ref ref,
@@ -59,10 +73,13 @@ final downloadedProvider = FutureProvider.family<DownloadedBook?, String>((
 
 /// 单本书的下载状态：进行中（带进度）或失败信息。
 class DownloadStatus {
-  const DownloadStatus({this.progress, this.error});
+  const DownloadStatus({this.progress, this.error, this.queued = false});
 
   final DownloadProgress? progress;
   final String? error;
+
+  /// 在队列里等前面那本下完（UI-P3-13）。
+  final bool queued;
 
   bool get isRunning => progress != null;
 }
@@ -74,6 +91,10 @@ class DownloadStatus {
 class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
   bool _disposed = false;
 
+  /// 一次只跑一本：并发下载只会互相抢带宽，进度也更难解释。
+  final List<Book> _queue = <Book>[];
+  String? _active;
+
   @override
   Map<String, DownloadStatus> build() {
     ref.onDispose(() => _disposed = true);
@@ -84,31 +105,55 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
 
   Future<void> start(Book book) async {
     if (state[book.id]?.isRunning ?? false) return;
-    _set(
-      book.id,
-      const DownloadStatus(progress: DownloadProgress(done: 0, total: 0)),
-    );
-    try {
-      await _service.download(
-        book,
-        onProgress: (DownloadProgress progress) {
-          _set(book.id, DownloadStatus(progress: progress));
-        },
-      );
-    } on ShelfFailure catch (failure) {
-      _set(book.id, DownloadStatus(error: failure.message));
-      return;
-    } finally {
-      // 成功/取消/失败都要让"已下载"标记重新查一次。
-      if (!_disposed) ref.invalidate(downloadedProvider(book.id));
+    if (_queue.any((Book queued) => queued.id == book.id)) return;
+    if (_active == book.id) return;
+
+    _queue.add(book);
+    if (state[book.id] == null) {
+      _set(book.id, const DownloadStatus(queued: true));
     }
-    _clear(book.id);
+    await _pump();
+  }
+
+  Future<void> _pump() async {
+    if (_active != null) return;
+    while (_queue.isNotEmpty) {
+      final book = _queue.removeAt(0);
+      _active = book.id;
+      _set(
+        book.id,
+        const DownloadStatus(progress: DownloadProgress(done: 0, total: 0)),
+      );
+      try {
+        await _service.download(
+          book,
+          onProgress: (DownloadProgress progress) {
+            _set(book.id, DownloadStatus(progress: progress));
+          },
+        );
+      } on ShelfFailure catch (failure) {
+        _set(book.id, DownloadStatus(error: failure.message));
+      } finally {
+        _active = null;
+        // 成功/取消/失败都要让"已下载"标记重新查一次。
+        if (!_disposed) {
+          ref.invalidate(downloadedProvider(book.id));
+          ref.invalidate(downloadedBooksProvider);
+          ref.invalidate(downloadsUsageProvider);
+        }
+      }
+      _clear(book.id);
+    }
   }
 
   void cancel(String bookId) {
+    _queue.removeWhere((Book book) => book.id == bookId);
     _service.cancel(bookId);
     _clear(bookId);
-    if (!_disposed) ref.invalidate(downloadedProvider(bookId));
+    if (!_disposed) {
+      ref.invalidate(downloadedProvider(bookId));
+      ref.invalidate(downloadedBooksProvider);
+    }
   }
 
   Future<void> delete(Book book) async {
@@ -116,6 +161,7 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
     _clear(book.id);
     if (_disposed) return;
     ref.invalidate(downloadedProvider(book.id));
+    ref.invalidate(downloadedBooksProvider);
     ref.invalidate(cacheUsageProvider);
   }
 

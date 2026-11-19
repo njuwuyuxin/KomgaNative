@@ -26,6 +26,9 @@ abstract interface class LibraryRepository {
   /// 单个系列；已被删除时返回 null。
   Future<Series?> seriesById(String seriesId);
 
+  /// 单本书（下载管理页用；不存在时返回 null）。
+  Future<Book?> book(String bookId);
+
   /// 系列下的书。默认一次抓 100 本（多数系列够用，超出部分 UI 会明说）。
   Future<PageResult<Book>> books(
     String seriesId, {
@@ -111,6 +114,15 @@ class KomgaLibraryRepository implements LibraryRepository {
   Future<Series?> seriesById(String seriesId) async {
     try {
       return await _session.fetchSeriesById(seriesId);
+    } on KomgaError catch (error) {
+      throw shelfFailureOf(error);
+    }
+  }
+
+  @override
+  Future<Book?> book(String bookId) async {
+    try {
+      return await _session.fetchBook(bookId);
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);
     }

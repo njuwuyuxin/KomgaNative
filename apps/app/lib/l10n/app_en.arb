@@ -233,6 +233,15 @@
   "clear": "Clear",
   "downloadedBooks": "Downloaded books",
   "downloadedUsage": "{count} books · {size}",
+  "downloadsEmpty": "No downloads yet.",
+  "downloadQueued": "Queued",
+  "downloadPagesBytes": "{pages} pages · {size}",
+  "@downloadPagesBytes": {
+    "placeholders": {
+      "pages": {"type": "int"},
+      "size": {"type": "String"}
+    }
+  },
   "@downloadedUsage": {
     "placeholders": {
       "count": {"type": "int"},
