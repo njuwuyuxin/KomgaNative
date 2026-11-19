@@ -48,6 +48,7 @@ String readerBackgroundLabel(
   ReaderBackgroundChoice.black => l10n.readerBackgroundBlack,
   ReaderBackgroundChoice.white => l10n.readerBackgroundWhite,
   ReaderBackgroundChoice.dynamic => l10n.readerBackgroundDynamic,
+  ReaderBackgroundChoice.immersive => l10n.readerBackgroundImmersive,
 };
 
 String readerBackgroundHint(
@@ -57,6 +58,7 @@ String readerBackgroundHint(
   ReaderBackgroundChoice.black => l10n.readerBackgroundBlackHint,
   ReaderBackgroundChoice.white => l10n.readerBackgroundWhiteHint,
   ReaderBackgroundChoice.dynamic => l10n.readerBackgroundDynamicHint,
+  ReaderBackgroundChoice.immersive => l10n.readerBackgroundImmersiveHint,
 };
 
 /// 面板里的一个"单选一组"区块：小标题 + 若干行。

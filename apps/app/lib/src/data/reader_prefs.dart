@@ -57,7 +57,7 @@ extension ReaderDirectionChoiceX on ReaderDirectionChoice {
 /// 阅读区背景（UI-P1-5）。
 ///
 /// `dynamic` 从当前页边缘提色，双页取两页的平均；墨水屏不提供这一项（固定白底）。
-enum ReaderBackgroundChoice { black, white, dynamic }
+enum ReaderBackgroundChoice { black, white, dynamic, immersive }
 
 /// 一组命名的阅读设置（UI-P3-1）。
 ///

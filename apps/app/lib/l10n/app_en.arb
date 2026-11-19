@@ -273,6 +273,8 @@
   "readerBackgroundWhiteHint": "Bright pages blend into the screen",
   "readerBackgroundDynamic": "Match the page",
   "readerBackgroundDynamicHint": "Takes the colour from the page edges",
+  "readerBackgroundImmersive": "Immersive",
+  "readerBackgroundImmersiveHint": "Blends the colours from both page edges into a gradient",
   "readerPresets": "Presets",
   "readerPresetsHint": "Save a set of settings and switch with one tap.",
   "readerPresetSave": "Save current",

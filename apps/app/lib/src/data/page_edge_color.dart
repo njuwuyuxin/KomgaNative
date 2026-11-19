@@ -13,6 +13,16 @@ import 'package:komga_reader_engine/komga_reader_engine.dart';
 /// 任何失败（坏图、不支持的格式）都返回 null：提色是装饰，
 /// 绝不能因为一张图取色失败影响阅读。
 Future<RgbColor?> pageEdgeColor(Uint8List bytes, {int targetWidth = 32}) async {
+  final colors = await pageEdgeGradient(bytes, targetWidth: targetWidth);
+  if (colors.isEmpty) return null;
+  return averageColors(colors);
+}
+
+/// 左右两侧页边色（UI-P3-7 沉浸式背景）；失败/全透明返回空列表。
+Future<List<RgbColor>> pageEdgeGradient(
+  Uint8List bytes, {
+  int targetWidth = 32,
+}) async {
   ui.Codec? codec;
   ui.Image? image;
   try {
@@ -20,14 +30,14 @@ Future<RgbColor?> pageEdgeColor(Uint8List bytes, {int targetWidth = 32}) async {
     final frame = await codec.getNextFrame();
     image = frame.image;
     final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
-    if (data == null) return null;
-    return edgeColor(
+    if (data == null) return const <RgbColor>[];
+    return edgeColors(
       rgba: data.buffer.asUint8List(),
       width: image.width,
       height: image.height,
     );
   } on Object {
-    return null;
+    return const <RgbColor>[];
   } finally {
     image?.dispose();
     codec?.dispose();

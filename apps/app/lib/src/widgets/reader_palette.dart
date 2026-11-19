@@ -21,6 +21,7 @@ class ReaderPalette {
     required this.muted,
     required this.outline,
     required this.isEink,
+    this.gradient,
   });
 
   /// 普通设备：黑底。
@@ -57,6 +58,9 @@ class ReaderPalette {
   final Color muted;
   final Color outline;
 
+  /// 沉浸式背景的渐变（UI-P3-7）；null 时用 [background] 纯色。
+  final List<Color>? gradient;
+
   /// 是否走墨水屏配色。**不读主题**：阅读器的深浅由设置项的"强制墨水屏"决定，
   /// 与本机主题可以不一致。
   final bool isEink;
@@ -71,6 +75,7 @@ class ReaderPalette {
     required bool isEink,
     required ReaderBackgroundChoice choice,
     RgbColor? dynamic,
+    List<RgbColor>? immersive,
   }) {
     if (isEink) return eink;
     return switch (choice) {
@@ -82,6 +87,10 @@ class ReaderPalette {
             : ReaderPalette._withBackground(
                 Color.fromARGB(255, dynamic.r, dynamic.g, dynamic.b),
               ),
+      ReaderBackgroundChoice.immersive =>
+        immersive == null || immersive.isEmpty
+            ? dark
+            : ReaderPalette._withGradient(immersive),
     };
   }
 
@@ -90,7 +99,26 @@ class ReaderPalette {
     : foreground = const Color(0xFFFFFFFF),
       muted = const Color(0xB3FFFFFF),
       outline = const Color(0x33FFFFFF),
-      isEink = false;
+      isEink = false,
+      gradient = null;
+
+  /// 沉浸式：底色取左右色的平均，渐变用两侧原色（起点左上、终点右下）。
+  factory ReaderPalette._withGradient(List<RgbColor> colors) {
+    final rgb = colors
+        .map((RgbColor c) => Color.fromARGB(255, c.r, c.g, c.b))
+        .toList(growable: false);
+    final avg = averageColors(colors);
+    return ReaderPalette(
+      background: avg == null
+          ? const Color(0xFF000000)
+          : Color.fromARGB(255, avg.r, avg.g, avg.b),
+      foreground: const Color(0xFFFFFFFF),
+      muted: const Color(0xB3FFFFFF),
+      outline: const Color(0x33FFFFFF),
+      isEink: false,
+      gradient: rgb.length >= 2 ? rgb : <Color>[rgb.first, rgb.first],
+    );
+  }
 
   bool get isLight => background.computeLuminance() > 0.5;
 

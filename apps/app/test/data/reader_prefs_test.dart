@@ -97,6 +97,14 @@ void main() {
       expect(prefs.background, ReaderBackgroundChoice.black);
     });
 
+    test('沉浸式背景 JSON 往返', () {
+      const prefs = ReaderPrefs(background: ReaderBackgroundChoice.immersive);
+      expect(
+        ReaderPrefs.fromJson(prefs.toJson()).background,
+        ReaderBackgroundChoice.immersive,
+      );
+    });
+
     test('预设 JSON 往返：预设里的 prefs 不再带预设（不递归）', () {
       const preset = ReaderPreset(
         id: 'p1',

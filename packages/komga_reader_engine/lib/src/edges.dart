@@ -85,6 +85,64 @@ RgbColor? edgeColor({
   return RgbColor(sumR ~/ count, sumG ~/ count, sumB ~/ count);
 }
 
+/// 左右两侧页边的主色（UI-P3-7 沉浸式动态背景）。
+///
+/// 返回顺序是 `[左, 右]`（某侧没有可用像素就省略）；颜色算法与 [edgeColor]
+/// 同样只统计边框带、跳过透明像素。Widget 层用它做双色渐变。
+List<RgbColor> edgeColors({
+  required Uint8List rgba,
+  required int width,
+  required int height,
+  int band = 2,
+}) {
+  if (width <= 0 || height <= 0) return const <RgbColor>[];
+  if (rgba.length < width * height * 4) return const <RgbColor>[];
+
+  final shortest = width < height ? width : height;
+  final half = shortest ~/ 2;
+  final maxBand = half < 1 ? 1 : half;
+  final inset = band.clamp(1, maxBand);
+
+  var leftR = 0, leftG = 0, leftB = 0, leftCount = 0;
+  var rightR = 0, rightG = 0, rightB = 0, rightCount = 0;
+
+  void sample(int x, int y, {required bool left}) {
+    final offset = (y * width + x) * 4;
+    if (rgba[offset + 3] == 0) return;
+    if (left) {
+      leftR += rgba[offset];
+      leftG += rgba[offset + 1];
+      leftB += rgba[offset + 2];
+      leftCount++;
+    } else {
+      rightR += rgba[offset];
+      rightG += rgba[offset + 1];
+      rightB += rgba[offset + 2];
+      rightCount++;
+    }
+  }
+
+  for (var y = 0; y < height; y++) {
+    for (var x = 0; x < inset; x++) {
+      sample(x, y, left: true);
+    }
+    for (var x = width - inset; x < width; x++) {
+      if (x >= 0) sample(x, y, left: false);
+    }
+  }
+
+  return <RgbColor>[
+    if (leftCount > 0)
+      RgbColor(leftR ~/ leftCount, leftG ~/ leftCount, leftB ~/ leftCount),
+    if (rightCount > 0)
+      RgbColor(
+        rightR ~/ rightCount,
+        rightG ~/ rightCount,
+        rightB ~/ rightCount,
+      ),
+  ];
+}
+
 /// 一屏里多页（双页跨页）的页边色取平均；全为空时返回 null。
 ///
 /// 不做"哪一页占主导"的判定：跨页时两页的底色本来就该融合，

@@ -116,6 +116,44 @@ void main() {
     });
   });
 
+  group('edgeColors', () {
+    test('左右两侧分别取色，返回 [左, 右]', () {
+      final bytes = rgbaImage(
+        10,
+        6,
+        (int x, int y) => x < 5 ? solid(200, 30, 40) : solid(20, 60, 220),
+      );
+      expect(edgeColors(rgba: bytes, width: 10, height: 6), const <RgbColor>[
+        RgbColor(200, 30, 40),
+        RgbColor(20, 60, 220),
+      ]);
+    });
+
+    test('单侧透明时省略该侧；全透明返回空', () {
+      final leftOnly = rgbaImage(
+        8,
+        6,
+        (int x, int y) => x < 4 ? solid(10, 20, 30) : solid(0, 0, 0, 0),
+      );
+      expect(edgeColors(rgba: leftOnly, width: 8, height: 6), const [
+        RgbColor(10, 20, 30),
+      ]);
+      expect(
+        edgeColors(
+          rgba: rgbaImage(4, 4, (int x, int y) => solid(0, 0, 0, 0)),
+          width: 4,
+          height: 4,
+        ),
+        isEmpty,
+      );
+    });
+
+    test('尺寸不合法返回空，不抛异常', () {
+      expect(edgeColors(rgba: Uint8List(0), width: 0, height: 0), isEmpty);
+      expect(edgeColors(rgba: Uint8List(8), width: 4, height: 4), isEmpty);
+    });
+  });
+
   group('averageColors', () {
     test('双页取平均；空值跳过；全空返回 null', () {
       expect(

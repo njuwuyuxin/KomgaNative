@@ -458,6 +458,15 @@ Panels 的高级感主要来自三点，和控件本身关系不大：
 | 分享失败（页图/平台异常）只弹 SnackBar；`ReaderScreen.onSharePage` 为测试接缝，生产走插件 |
 | 测试：`reader_screen_test` 覆盖长按 → 菜单 → 回调拿到页码；模拟器上分享面板可打开（见设备走查） |
 
+**进度（2026-11-19）：P3-7 沉浸式多色动态背景。**
+
+| 落地 |
+|---|
+| 引擎 `edgeColors`：左右两侧分别取页边色（同样跳过透明像素、O(周长)）；单测覆盖左右分色、单侧透明、非法尺寸 |
+| `ReaderBackgroundChoice.immersive`；`pageEdgeGradientProvider` 跟着页图回收；双页跨页按左右位置分别平均 |
+| `ReaderPalette` 增加 `gradient`；`ReaderFrame` 的底色层从 `TweenAnimationBuilder<Color>` 换成 `AnimatedContainer` 的 `BoxDecoration`，可插值渐变；墨水屏仍只给纸色 |
+| 设置面板多一档"沉浸式"；新增 `reader_immersive@phone_dark` 黄金图（合成左右红/蓝页边） |
+
 ## 不做
 
 | 需求 | 理由 |

@@ -18,7 +18,34 @@ ReaderPalette resolveReaderPalette({
   required WidgetRef ref,
   required String bookId,
 }) {
-  if (isEink || prefs.background != ReaderBackgroundChoice.dynamic) {
+  if (isEink) {
+    return ReaderPalette.resolve(isEink: true, choice: prefs.background);
+  }
+  if (prefs.background == ReaderBackgroundChoice.immersive) {
+    final gradients = <List<RgbColor>>[
+      for (final index in layout.spread)
+        ref
+                .watch(
+                  pageEdgeGradientProvider((bookId: bookId, page: index + 1)),
+                )
+                .value ??
+            const <RgbColor>[],
+    ];
+    final merged = <RgbColor>[];
+    for (var side = 0; side < 2; side++) {
+      final color = averageColors(<RgbColor?>[
+        for (final gradient in gradients)
+          side < gradient.length ? gradient[side] : null,
+      ]);
+      if (color != null) merged.add(color);
+    }
+    return ReaderPalette.resolve(
+      isEink: false,
+      choice: ReaderBackgroundChoice.immersive,
+      immersive: merged,
+    );
+  }
+  if (prefs.background != ReaderBackgroundChoice.dynamic) {
     return ReaderPalette.resolve(isEink: isEink, choice: prefs.background);
   }
   final colors = <RgbColor?>[

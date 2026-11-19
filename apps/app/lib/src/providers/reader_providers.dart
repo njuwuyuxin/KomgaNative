@@ -71,6 +71,16 @@ final pageEdgeColorProvider = FutureProvider.family<RgbColor?, PageRequest>((
   return pageEdgeColor(bytes);
 }, isAutoDispose: true);
 
+/// 一页左右两侧的页边色（沉浸式背景，UI-P3-7）；同样跟着页图回收。
+final pageEdgeGradientProvider =
+    FutureProvider.family<List<RgbColor>, PageRequest>((
+      Ref ref,
+      PageRequest req,
+    ) async {
+      final bytes = await ref.watch(readerPageImageProvider(req).future);
+      return pageEdgeGradient(bytes);
+    }, isAutoDispose: true);
+
 /// 查"下一本"的键：书 id + 所属系列。
 typedef NextBookQuery = ({String seriesId, String bookId});
 

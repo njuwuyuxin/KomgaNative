@@ -10,15 +10,20 @@ import 'support/reader_harness.dart';
 /// UI-P1-5 动态背景：取页边主色、白色背景、以及"墨水屏不给动态选项"。
 void main() {
   Color backgroundOf(WidgetTester tester) {
-    final box = tester.widget<ColoredBox>(
+    // 读**渲染中**的 DecoratedBox：AnimatedContainer 自己的 decoration 是目标值，
+    // 过渡到一半时它已经是白色了，看不到中间色。
+    final box = tester.widget<DecoratedBox>(
       find
           .descendant(
             of: find.byKey(const Key('reader-background')),
-            matching: find.byType(ColoredBox),
+            matching: find.byType(DecoratedBox),
           )
           .first,
     );
-    return box.color;
+    final decoration = box.decoration as BoxDecoration?;
+    return decoration?.color ??
+        decoration?.gradient?.colors.first ??
+        Colors.transparent;
   }
 
   /// 提色是**真实异步解码**，假时钟推不动它。
@@ -32,6 +37,30 @@ void main() {
   testWidgets('默认黑色背景', (WidgetTester tester) async {
     await pumpReader(tester, book: demoReaderBook());
     expect(backgroundOf(tester), ReaderPalette.dark.background);
+  });
+
+  testWidgets('沉浸式：左右页边色成渐变（P3-7）', (WidgetTester tester) async {
+    await pumpReader(
+      tester,
+      repository: FakeReaderRepository(pageNames: const <String>['edge_split']),
+      book: demoReaderBook(),
+      initialPrefs: const ReaderPrefs(
+        background: ReaderBackgroundChoice.immersive,
+      ),
+    );
+    await settleEdgeColor(tester);
+
+    final box = tester.widget<AnimatedContainer>(
+      find.byKey(const Key('reader-background')),
+    );
+    final gradient = (box.decoration as BoxDecoration).gradient!;
+    expect(gradient.colors, hasLength(2));
+    expect(
+      gradient.colors.first.r,
+      greaterThan(gradient.colors.last.r),
+      reason: '左红右蓝',
+    );
+    expect(gradient.colors.last.b, greaterThan(gradient.colors.first.b));
   });
 
   testWidgets('白色背景：阅读区变白，chrome 文字仍是白色', (WidgetTester tester) async {
