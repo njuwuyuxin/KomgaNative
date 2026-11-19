@@ -113,6 +113,23 @@ void main() {
     expect(view.spread, <int>[1, 2]);
   });
 
+  testWidgets('长按缩略图分享此页', (WidgetTester tester) async {
+    final shared = <int>[];
+    await pumpReader(
+      tester,
+      book: demoReaderBook(),
+      onSharePage: (int page) async => shared.add(page),
+    );
+
+    await tester.longPress(find.byKey(const Key('reader-thumb-1')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('reader-page-share')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('reader-page-share')));
+    await tester.pumpAndSettle();
+
+    expect(shared, <int>[1]);
+  });
+
   testWidgets('离线时顶栏出现缓存提示（阅读区不挤占）', (WidgetTester tester) async {
     await pumpReader(tester, book: demoReaderBook(), offline: true);
 

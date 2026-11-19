@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:komga_design_system/komga_design_system.dart';
+import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/widgets/page_thumbnail.dart';
 import 'package:komga_native/src/widgets/reader_layout.dart';
 import 'package:komga_native/src/widgets/reader_palette.dart';
@@ -23,6 +24,7 @@ class ReaderThumbnailStrip extends StatefulWidget {
     required this.palette,
     required this.onJump,
     this.onGroupFrom,
+    this.onSharePage,
     this.rightToLeft = false,
     super.key,
   });
@@ -36,6 +38,9 @@ class ReaderThumbnailStrip extends StatefulWidget {
 
   /// 双页模式长按某一屏："从这一页开始重新配对"（UI-P3-5）。
   final ValueChanged<int>? onGroupFrom;
+
+  /// 长按某一屏分享该页（UI-P3-6）。
+  final Future<void> Function(int page)? onSharePage;
 
   final bool rightToLeft;
 
@@ -129,6 +134,54 @@ class _ReaderThumbnailStripState extends State<ReaderThumbnailStrip> {
       ? '${pages.first + 1}–${pages.last + 1}'
       : '${pages.first + 1}';
 
+  Future<void> _showActions(BuildContext context, int page) async {
+    final l10n = AppLocalizations.of(context);
+    final action = await showModalBottomSheet<_PageAction>(
+      context: context,
+      backgroundColor: widget.palette.background,
+      builder: (BuildContext context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            if (widget.onSharePage != null)
+              ListTile(
+                key: const Key('reader-page-share'),
+                leading: Icon(
+                  Icons.ios_share,
+                  color: widget.palette.foreground,
+                ),
+                title: Text(
+                  l10n.sharePage,
+                  style: TextStyle(color: widget.palette.foreground),
+                ),
+                onTap: () => Navigator.of(context).pop(_PageAction.share),
+              ),
+            if (widget.onGroupFrom != null)
+              ListTile(
+                key: const Key('reader-page-group'),
+                leading: Icon(
+                  Icons.grid_view_outlined,
+                  color: widget.palette.foreground,
+                ),
+                title: Text(
+                  l10n.groupFromPage,
+                  style: TextStyle(color: widget.palette.foreground),
+                ),
+                onTap: () => Navigator.of(context).pop(_PageAction.group),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case _PageAction.share:
+        await widget.onSharePage?.call(page);
+      case _PageAction.group:
+        widget.onGroupFrom?.call(page);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final layout = widget.layout;
@@ -161,9 +214,10 @@ class _ReaderThumbnailStripState extends State<ReaderThumbnailStrip> {
                   palette: widget.palette,
                   cacheWidth: cacheWidth,
                   onTap: () => widget.onJump(pages.first + 1),
-                  onLongPress: widget.onGroupFrom == null
+                  onLongPress:
+                      widget.onSharePage == null && widget.onGroupFrom == null
                       ? null
-                      : () => widget.onGroupFrom!(pages.first + 1),
+                      : () => _showActions(context, pages.first + 1),
                 );
               },
             ),
@@ -173,6 +227,8 @@ class _ReaderThumbnailStripState extends State<ReaderThumbnailStrip> {
     );
   }
 }
+
+enum _PageAction { share, group }
 
 class _StripThumb extends StatelessWidget {
   const _StripThumb({

@@ -39,6 +39,7 @@ Komga 的跨平台客户端（iOS / Android / Android 墨水屏），阅读体�
 | [docs/a11y-and-input.md](docs/a11y-and-input.md) | 无障碍与输入：音量键翻页、读屏语义、48 点击区、平板两栏、墨水屏边界 |
 | [docs/adr/0003-http-response-cache.md](docs/adr/0003-http-response-cache.md) | ADR：为什么把缓存钩在传输层、为什么与进度库分文件 |
 | [docs/adr/0005-per-series-reader-settings.md](docs/adr/0005-per-series-reader-settings.md) | ADR：按系列阅读设置存哪里（secure storage JSON，不新增 Drift 表） |
+| [docs/adr/0006-share-page-with-share-plus.md](docs/adr/0006-share-page-with-share-plus.md) | ADR：分享单页为什么用 share_plus，而不是自写原生通道 |
 | [docs/roadmap.md](docs/roadmap.md) | 剩余功能分阶段计划（C–I）与验收口径 |
 | [docs/ui-polish-plan.md](docs/ui-polish-plan.md) | UI 精致化计划（对标 Panels）的 P0–P3 清单与落地记录 |
 | [docs/panels-comparison.md](docs/panels-comparison.md) | 2026-11 的功能/UI 细节对比、剩余差距与建议批次 |

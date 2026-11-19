@@ -20,6 +20,7 @@ class ReaderBottomChrome extends StatelessWidget {
     required this.onJump,
     required this.onBack,
     this.onGroupFrom,
+    this.onSharePage,
     this.nextBook,
     this.onOpenNext,
     this.onPrevious,
@@ -37,6 +38,9 @@ class ReaderBottomChrome extends StatelessWidget {
 
   /// 双页模式长按缩略图："从这一页开始分组"（UI-P3-5）；其他模式为空。
   final ValueChanged<int>? onGroupFrom;
+
+  /// 长按缩略图分享某页（UI-P3-6）。
+  final Future<void> Function(int page)? onSharePage;
 
   /// 书末卡片的"返回系列"。
   final VoidCallback onBack;
@@ -69,6 +73,7 @@ class ReaderBottomChrome extends StatelessWidget {
           rightToLeft: rightToLeft,
           onJump: onJump,
           onGroupFrom: onGroupFrom,
+          onSharePage: onSharePage,
         ),
         ReaderControls(
           pageLabel: layout.positionLabel(l10n),

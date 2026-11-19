@@ -1,11 +1,14 @@
 import 'dart:async';
 
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
+import 'package:komga_native/src/data/page_share.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
+import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/screens/reader_args.dart';
 import 'package:komga_native/src/providers/progress_providers.dart';
 import 'package:komga_native/src/providers/reader_prefs_provider.dart';
@@ -51,6 +54,7 @@ class ReaderScreen extends ConsumerStatefulWidget {
     this.direction = ReadingDirection.unknown,
     this.heroTag,
     this.onOpenNext,
+    this.onSharePage,
     super.key,
   });
 
@@ -69,6 +73,9 @@ class ReaderScreen extends ConsumerStatefulWidget {
   /// 生产环境不传：阅读器自己用 go_router 替换当前页（返回仍是系列详情）。
   /// 测试传回调，避免为了一个按钮把整棵路由搬进 widget 测试。
   final void Function(Book next)? onOpenNext;
+
+  /// 分享某页的测试接缝；生产环境不传，走系统分享面板（UI-P3-6）。
+  final Future<void> Function(int page)? onSharePage;
 
   @override
   ConsumerState<ReaderScreen> createState() => _ReaderScreenState();
@@ -234,6 +241,34 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       _jumpToken++;
     });
     _progress.schedule(target);
+  }
+
+  /// 分享当前页（UI-P3-6）：取页图字节 → 写临时文件 → 系统分享面板。
+  Future<void> _sharePage(int page) async {
+    final handler = widget.onSharePage;
+    if (handler != null) {
+      await handler(page);
+      return;
+    }
+    try {
+      final bytes = await ref
+          .read(readerRepositoryProvider)
+          .pageImage(widget.bookId, page);
+      await sharePageImage(
+        bytes,
+        fileName: 'komganative-${widget.bookId}-page-$page.png',
+      );
+    } on ShelfFailure catch (failure) {
+      _showShareError(failure.message);
+    } on PlatformException catch (_) {
+      _showShareError(AppLocalizations.of(context).sharePageFailed);
+    }
+  }
+
+  void _showShareError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   /// 长按缩略图：从这一页开始重新配对（UI-P3-5）；再长按同一页恢复自动。
@@ -411,6 +446,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
             onGroupFrom: mode == ReadingMode.doublePage
                 ? (int p) => _groupFromPage(p, total)
                 : null,
+            onSharePage: _sharePage,
             onOpenNext: nextBook == null ? null : () => _openNext(nextBook),
             onBack: () => context.pop(),
             onPrevious: layout.canGoBack ? () => _requestTurn(-1, mode) : null,

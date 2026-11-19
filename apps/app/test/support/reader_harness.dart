@@ -45,6 +45,7 @@ Future<InMemoryReaderPrefsStore> pumpReader(
   bool settle = true,
   Size? viewSize,
   void Function(Book next)? onOpenNext,
+  Future<void> Function(int page)? onSharePage,
   List<Override> extraOverrides = const <Override>[],
 }) async {
   tester.view.physicalSize = viewSize ?? const Size(390 * 3, 844 * 3);
@@ -93,6 +94,7 @@ Future<InMemoryReaderPrefsStore> pumpReader(
           direction: direction,
           heroTag: heroTag,
           onOpenNext: onOpenNext,
+          onSharePage: onSharePage,
         ),
       ),
     ),

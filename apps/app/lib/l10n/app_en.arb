@@ -290,6 +290,9 @@
     }
   },
   "readerGroupAutomatic": "Back to automatic grouping",
+  "sharePage": "Share page",
+  "sharePageFailed": "Could not share this page",
+  "groupFromPage": "Group from this page",
   "readerPresetDefaultName": "Preset {number}",
   "@readerPresetDefaultName": {
     "placeholders": {

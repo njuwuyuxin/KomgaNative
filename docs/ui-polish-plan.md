@@ -449,6 +449,15 @@ Panels 的高级感主要来自三点，和控件本身关系不大：
 | `ReaderScreen._spreadFrom` 会话内有效，不落盘；`ReaderTopBar` / `PageNavigatorSheet` 传 `onGroupFrom`；`ReaderThumbnailStrip` 同样支持 |
 | 测试：`spreads_test` 覆盖 groupFrom 的三种边界；`reader_screen_test` 覆盖"跳到第 3 页 → 长按第 3 页 → spread 从 [1,2] 变 [2,3] → 再长按回 [1,2]"；触感 + SnackBar 反馈 |
 
+**进度（2026-11-19）：P3-6 缩略图长按分享/保存页。**
+
+| 落地 |
+|---|
+| 引入 `share_plus` 13.3.1（ADR 0006）；`data/page_share.dart` 把页图写到临时目录 PNG，再调系统分享面板；用户可选"存储到文件" |
+| 长按底部缩略图弹动作面板：分享此页；双页模式同时有"从这一页开始分组"（P3-5 入口从直接长按改成菜单，两个动作不再抢手势） |
+| 分享失败（页图/平台异常）只弹 SnackBar；`ReaderScreen.onSharePage` 为测试接缝，生产走插件 |
+| 测试：`reader_screen_test` 覆盖长按 → 菜单 → 回调拿到页码；模拟器上分享面板可打开（见设备走查） |
+
 ## 不做
 
 | 需求 | 理由 |
