@@ -1,6 +1,7 @@
 import 'dart:async';
 
-import 'package:flutter/services.dart' show PlatformException;
+import 'package:flutter/services.dart'
+    show KeyDownEvent, LogicalKeyboardKey, PlatformException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:komga_design_system/komga_design_system.dart';
@@ -125,15 +126,23 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   final GlobalKey<ReaderPagedViewState> _pagedKey =
       GlobalKey<ReaderPagedViewState>();
 
+  /// 键盘/翻页器焦点。显式 request 一次：只靠 autofocus 在部分真机上
+  /// 会被路由的焦点作用域抢走，方向键就落不到阅读器。
+  final FocusNode _keyboardFocus = FocusNode(debugLabel: 'reader-keyboard');
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _keyboardFocus.requestFocus();
+    });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _keyboardFocus.dispose();
     _progress.dispose();
     super.dispose();
   }
@@ -425,35 +434,77 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       ),
     };
 
-    return WakeLockScope(
-      enabled: prefs.keepAwake,
-      // chrome 显隐同时驱动两件事：浮层动画（ReaderFrame）与系统栏（ReaderSystemUi）。
-      child: ReaderSystemUi(
-        immersive: !_chromeVisible,
-        child: ReaderFrame(
-          palette: palette,
-          chromeVisible: _chromeVisible,
-          dimOpacity: prefs.dimOpacity,
-          topBar: readerBar,
-          content: content,
-          bottomBar: ReaderBottomChrome(
-            bookId: widget.bookId,
-            layout: layout,
+    return Focus(
+      focusNode: _keyboardFocus,
+      autofocus: true,
+      onKeyEvent: _onKeyEvent,
+      child: WakeLockScope(
+        enabled: prefs.keepAwake,
+        // chrome 显隐同时驱动两件事：浮层动画（ReaderFrame）与系统栏（ReaderSystemUi）。
+        child: ReaderSystemUi(
+          immersive: !_chromeVisible,
+          child: ReaderFrame(
             palette: palette,
-            rightToLeft: rightToLeft,
-            nextBook: nextBook,
-            onJump: (int p) => _jumpToPage(p, total),
-            onGroupFrom: mode == ReadingMode.doublePage
-                ? (int p) => _groupFromPage(p, total)
-                : null,
-            onSharePage: _sharePage,
-            onOpenNext: nextBook == null ? null : () => _openNext(nextBook),
-            onBack: () => context.pop(),
-            onPrevious: layout.canGoBack ? () => _requestTurn(-1, mode) : null,
-            onNext: layout.canGoForward ? () => _requestTurn(1, mode) : null,
+            chromeVisible: _chromeVisible,
+            dimOpacity: prefs.dimOpacity,
+            topBar: readerBar,
+            content: content,
+            bottomBar: ReaderBottomChrome(
+              bookId: widget.bookId,
+              layout: layout,
+              palette: palette,
+              rightToLeft: rightToLeft,
+              nextBook: nextBook,
+              onJump: (int p) => _jumpToPage(p, total),
+              onGroupFrom: mode == ReadingMode.doublePage
+                  ? (int p) => _groupFromPage(p, total)
+                  : null,
+              onSharePage: _sharePage,
+              onOpenNext: nextBook == null ? null : () => _openNext(nextBook),
+              onBack: () => context.pop(),
+              onPrevious: layout.canGoBack
+                  ? () => _requestTurn(-1, mode)
+                  : null,
+              onNext: layout.canGoForward ? () => _requestTurn(1, mode) : null,
+            ),
           ),
         ),
       ),
     );
+  }
+
+  /// 键盘 / 蓝牙翻页器 / 遥控器（UI-P3-11）。
+  ///
+  /// 方向键与 PageUp/PageDown 走和点击区同一套 `_requestTurn`，
+  /// 所以 RTL 下"右"仍然是视觉上的下一页；Esc 退出阅读器。
+  KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    final pages = ref.read(readerPagesProvider(widget.bookId)).value;
+    if (pages == null || pages.isEmpty) return KeyEventResult.ignored;
+    final prefs = _effectivePrefs(ref.read(readerPrefsProvider));
+    final mode = _modeFor(prefs);
+    final rightToLeft = prefs.direction.resolveRightToLeft(widget.direction);
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.arrowRight) {
+      _requestTurn(rightToLeft ? -1 : 1, mode);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      _requestTurn(rightToLeft ? 1 : -1, mode);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.pageDown || key == LogicalKeyboardKey.space) {
+      _requestTurn(1, mode);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.pageUp) {
+      _requestTurn(-1, mode);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.escape) {
+      unawaited(Navigator.of(context).maybePop());
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 }

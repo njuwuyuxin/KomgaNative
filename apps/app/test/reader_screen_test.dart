@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:komga_design_system/komga_design_system.dart';
@@ -128,6 +129,26 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(shared, <int>[1]);
+  });
+
+  testWidgets('键盘方向键 / PageDown / 空格翻页', (WidgetTester tester) async {
+    await pumpReader(tester, book: demoReaderBook());
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+    expect(find.text('2 / 3'), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pumpAndSettle();
+    expect(find.text('1 / 3'), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+    await tester.pumpAndSettle();
+    expect(find.text('2 / 3'), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pumpAndSettle();
+    expect(find.text('3 / 3'), findsOneWidget);
   });
 
   testWidgets('离线时顶栏出现缓存提示（阅读区不挤占）', (WidgetTester tester) async {

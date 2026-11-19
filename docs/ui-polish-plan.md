@@ -476,6 +476,14 @@ Panels 的高级感主要来自三点，和控件本身关系不大：
 | 测试：`eink_probe_test` 覆盖正常返回、MissingPlugin、PlatformException、null；iOS/测试环境仍 unknown |
 | 未做：真实墨水屏设备上的探测命中率验证（模拟器无法伪造 Build 厂商）；需要 Boox/Kindle 真机走查 |
 
+**进度（2026-11-19）：P3-11 键盘 / 蓝牙翻页器。**
+
+| 落地 |
+|---|
+| 阅读器根节点 `Focus(autofocus: true, onKeyEvent:)`：右/左方向键按 RTL 语义翻页，PageDown/PageUp、空格翻页，Esc 退出 |
+| 与点击区/音量键共用 `_requestTurn`，所以页码、进度、预取、RTL 完全一致；蓝牙翻页器/遥控器映射成方向键或 PageUp/Down 即可 |
+| 测试：`reader_screen_test` 覆盖右箭头→第 2 页、左箭头→第 1 页、PageDown→第 2 页、空格→第 3 页 |
+
 ## 不做
 
 | 需求 | 理由 |
