@@ -1,5 +1,7 @@
 package dev.komganative.komga_native
 
+import android.os.Build
+import android.os.Bundle
 import android.view.KeyEvent
 import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
@@ -7,7 +9,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 /**
- * 屏幕常亮 + 音量键翻页。
+ * 屏幕常亮 + 音量键翻页 + 申请高刷新率。
  *
  * 用 Window flag 而不是第三方插件：需求就是一个 flag，加插件只会多一层原生构建面。
  * 通道名与 `packages/komga_platform/lib/src/wakelock.dart`、
@@ -22,6 +24,42 @@ class MainActivity : FlutterActivity() {
 
     /** 只有阅读器在前台时才消费音量键（由 Dart 侧 setActive 切换）。 */
     private var volumeKeysEnabled = false
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        requestHighestRefreshRate()
+    }
+
+    /**
+     * 主动申请设备支持的最高刷新率。
+     *
+     * 不申请时，不少 ROM（小米/OPPO/一加/vivo 等）会把 Flutter 的 SurfaceView 限制在 60Hz，
+     * 120Hz 屏上滑动明显不如其它应用顺（真机上撞到过：手动在系统设置里给本应用开 120Hz 后立刻顺滑）。
+     *
+     * 只在**分辨率与当前模式相同**的模式里挑最高刷新率，避免顺带切换分辨率；
+     * 墨水屏通常只有一个模式，这里等于什么都不做。最终是否生效由系统决定（省电模式等仍可降频）。
+     */
+    private fun requestHighestRefreshRate() {
+        @Suppress("DEPRECATION")
+        val screen = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            this.display
+        } else {
+            windowManager.defaultDisplay
+        } ?: return
+        val current = screen.mode
+        val best = screen.supportedModes
+            .filter {
+                it.physicalWidth == current.physicalWidth &&
+                    it.physicalHeight == current.physicalHeight
+            }
+            .maxByOrNull { it.refreshRate } ?: return
+        // 即使当前已是最高档也照样声明：不声明的话系统空闲时仍可能把本应用降回 60Hz。
+        val params = window.attributes
+        params.preferredDisplayModeId = best.modeId
+        // 部分 ROM 只认 preferredRefreshRate，两者一起设。
+        params.preferredRefreshRate = best.refreshRate
+        window.attributes = params
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)

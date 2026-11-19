@@ -94,6 +94,22 @@
 - 没有在真实墨水屏设备（Boox / Kindle）上做残影、刷新模式的主观验收；
 - 没有做"可关闭阴影"的运行时开关（e-ink 主题本身就是零阴影）。
 
+## 高刷新率（仅 Android）
+
+`MainActivity.onCreate` 里调用 `requestHighestRefreshRate()`：在分辨率与当前模式相同的
+`Display.Mode` 中挑刷新率最高的，写入 `WindowManager.LayoutParams.preferredDisplayModeId`，同时设置
+`preferredRefreshRate`，因为有的 ROM 只认这个字段。
+
+为什么要做：不少 ROM 会把**没有主动申请**高刷的 Flutter 应用（SurfaceView）锁在 60Hz。
+用户在 120Hz 真机上反馈书架滑动"不够丝滑"，在系统设置里手动给本应用开启 120Hz 后立刻顺滑，
+可以确认瓶颈在帧率档位，不在渲染耗时。
+
+- 只申请、不强制：省电模式、温控、系统策略仍可降频；
+- 不换分辨率：只在同分辨率的模式里挑；
+- 墨水屏 / 单模式设备：只有一个模式，等于没设；
+- iOS：ProMotion 需要在 `Info.plist` 里声明 `CADisableMinimumFrameDurationOnPhone`，**本次没做**
+  （没有 macOS 环境验证）。
+
 ## 验证与未验证
 
 已由门禁覆盖：
