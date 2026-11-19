@@ -11,8 +11,9 @@ class ReaderLayout {
     required List<PageInfo> pages,
     required ReadingMode mode,
     required int page,
+    int? groupFrom,
   }) {
-    final spreads = spreadsFor(pages, mode);
+    final spreads = spreadsFor(pages, mode, groupFrom: groupFrom);
     final spreadIndex = spreads.isEmpty ? -1 : spreadIndexOf(spreads, page - 1);
     return ReaderLayout._(
       mode: mode,
@@ -44,12 +45,18 @@ class ReaderLayout {
   final int spreadIndex;
 
   /// 双页模式按"封面单独、宽页单独、其余两两"分组；其他模式返回空。
-  static List<List<int>> spreadsFor(List<PageInfo> pages, ReadingMode mode) {
+  /// [groupFrom] 是手动修正的起点（0 基，UI-P3-5）。
+  static List<List<int>> spreadsFor(
+    List<PageInfo> pages,
+    ReadingMode mode, {
+    int? groupFrom,
+  }) {
     if (mode != ReadingMode.doublePage) {
       return const <List<int>>[];
     }
     return buildSpreads(
       pageCount: pages.length,
+      groupFrom: groupFrom,
       aspectAt: (int index) {
         final info = pages[index];
         return PageAspect(

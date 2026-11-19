@@ -25,6 +25,7 @@ class ReaderTopBar extends ConsumerWidget {
     required this.page,
     required this.total,
     required this.onJump,
+    this.onGroupFrom,
     super.key,
   });
 
@@ -44,6 +45,9 @@ class ReaderTopBar extends ConsumerWidget {
   /// 缩略图 / 设置面板选中某页（1 基）。
   final void Function(int page) onJump;
 
+  /// 双页模式长按页缩略图：从这一页开始重新分组（UI-P3-5）。
+  final void Function(int page)? onGroupFrom;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return ValueListenableBuilder<bool>(
@@ -62,6 +66,7 @@ class ReaderTopBar extends ConsumerWidget {
             currentPage: page,
             palette: palette,
             onJump: onJump,
+            onGroupFrom: onGroupFrom,
           ),
         ),
         onOpenSettings: () => showReaderSettingsSheet(

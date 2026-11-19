@@ -55,6 +55,51 @@ void main() {
     test('0 页返回空', () {
       expect(buildSpreads(pageCount: 0, aspectAt: (_) => normal()), isEmpty);
     });
+
+    test('groupFrom 从指定页重新配对（UI-P3-5）', () {
+      // 默认 [0],[1,2],[3,4],[5]；从第 3 页（0 基 2）开始 → [0],[1],[2,3],[4,5]。
+      final spreads = buildSpreads(
+        pageCount: 6,
+        aspectAt: (_) => normal(),
+        groupFrom: 2,
+      );
+      expect(spreads, [
+        [0],
+        [1],
+        [2, 3],
+        [4, 5],
+      ]);
+    });
+
+    test('groupFrom 落在默认跨页中间时，前一页单独留下', () {
+      final spreads = buildSpreads(
+        pageCount: 7,
+        aspectAt: (_) => normal(),
+        groupFrom: 4,
+      );
+      expect(spreads, [
+        [0],
+        [1, 2],
+        [3],
+        [4, 5],
+        [6],
+      ]);
+    });
+
+    test('groupFrom 遇到宽页仍然单独成屏', () {
+      final spreads = buildSpreads(
+        pageCount: 6,
+        aspectAt: (i) => i == 4 ? wide() : normal(),
+        groupFrom: 2,
+      );
+      expect(spreads, [
+        [0],
+        [1],
+        [2, 3],
+        [4],
+        [5],
+      ]);
+    });
   });
 
   group('visualOrder', () {

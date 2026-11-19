@@ -440,6 +440,15 @@ Panels 的高级感主要来自三点，和控件本身关系不大：
 | 放大状态下 `turn()` 默认仍忽略误触；`lockZoom` 开时放行，否则这个开关永远翻不了页 |
 | 测试：`reader_lock_zoom_test` 覆盖"放大→翻页比例保持"与"未锁定时不翻页"；`data/reader_prefs_test` 覆盖默认值/JSON/系列覆盖；`reader_settings@*` 基线更新 |
 
+**进度（2026-11-19）：P3-5 手动修正双页分组。**
+
+| 落地 |
+|---|
+| 引擎 `buildSpreads(groupFrom:)`：起点前保持自动、起点起重新配对；落在默认跨页中间时前一页单独留下；宽页仍单独成屏。`ReaderLayout.spreadsFor` 透传 |
+| 入口在缩略图网格（顶栏网格按钮）长按某一页；再长按恢复自动。底部滑条也支持长按，但按"屏"分组，语义是从该屏第一页开始 |
+| `ReaderScreen._spreadFrom` 会话内有效，不落盘；`ReaderTopBar` / `PageNavigatorSheet` 传 `onGroupFrom`；`ReaderThumbnailStrip` 同样支持 |
+| 测试：`spreads_test` 覆盖 groupFrom 的三种边界；`reader_screen_test` 覆盖"跳到第 3 页 → 长按第 3 页 → spread 从 [1,2] 变 [2,3] → 再长按回 [1,2]"；触感 + SnackBar 反馈 |
+
 ## 不做
 
 | 需求 | 理由 |

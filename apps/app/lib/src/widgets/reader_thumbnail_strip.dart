@@ -22,6 +22,7 @@ class ReaderThumbnailStrip extends StatefulWidget {
     required this.layout,
     required this.palette,
     required this.onJump,
+    this.onGroupFrom,
     this.rightToLeft = false,
     super.key,
   });
@@ -32,6 +33,9 @@ class ReaderThumbnailStrip extends StatefulWidget {
 
   /// 点了某一屏：回调 1 基页码。
   final ValueChanged<int> onJump;
+
+  /// 双页模式长按某一屏："从这一页开始重新配对"（UI-P3-5）。
+  final ValueChanged<int>? onGroupFrom;
 
   final bool rightToLeft;
 
@@ -157,6 +161,9 @@ class _ReaderThumbnailStripState extends State<ReaderThumbnailStrip> {
                   palette: widget.palette,
                   cacheWidth: cacheWidth,
                   onTap: () => widget.onJump(pages.first + 1),
+                  onLongPress: widget.onGroupFrom == null
+                      ? null
+                      : () => widget.onGroupFrom!(pages.first + 1),
                 );
               },
             ),
@@ -176,6 +183,7 @@ class _StripThumb extends StatelessWidget {
     required this.palette,
     required this.cacheWidth,
     required this.onTap,
+    this.onLongPress,
     super.key,
   });
 
@@ -186,6 +194,7 @@ class _StripThumb extends StatelessWidget {
   final ReaderPalette palette;
   final int cacheWidth;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -196,12 +205,14 @@ class _StripThumb extends StatelessWidget {
       selected: current,
       label: label,
       onTap: onTap,
+      onLongPress: onLongPress,
       child: ExcludeSemantics(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: onTap,
+            onLongPress: onLongPress,
             child: Center(
               child: SizedBox(
                 width: AppSizes.thumb.width,

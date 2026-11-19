@@ -19,6 +19,7 @@ class ReaderBottomChrome extends StatelessWidget {
     required this.rightToLeft,
     required this.onJump,
     required this.onBack,
+    this.onGroupFrom,
     this.nextBook,
     this.onOpenNext,
     this.onPrevious,
@@ -33,6 +34,9 @@ class ReaderBottomChrome extends StatelessWidget {
 
   /// 点缩略图 / 书末卡片的"继续阅读"。
   final ValueChanged<int> onJump;
+
+  /// 双页模式长按缩略图："从这一页开始分组"（UI-P3-5）；其他模式为空。
+  final ValueChanged<int>? onGroupFrom;
 
   /// 书末卡片的"返回系列"。
   final VoidCallback onBack;
@@ -64,6 +68,7 @@ class ReaderBottomChrome extends StatelessWidget {
           palette: palette,
           rightToLeft: rightToLeft,
           onJump: onJump,
+          onGroupFrom: onGroupFrom,
         ),
         ReaderControls(
           pageLabel: layout.positionLabel(l10n),

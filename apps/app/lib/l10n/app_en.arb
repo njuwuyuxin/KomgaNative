@@ -283,6 +283,13 @@
   "readerSeriesRememberHint": "Changes apply to this series only; turn off to use the global settings again.",
   "readerLockZoom": "Lock zoom",
   "readerLockZoomHint": "Keep the zoom level when turning pages; page turns are allowed while zoomed.",
+  "readerGroupFrom": "Grouping from page {page}",
+  "@readerGroupFrom": {
+    "placeholders": {
+      "page": {"type": "int"}
+    }
+  },
+  "readerGroupAutomatic": "Back to automatic grouping",
   "readerPresetDefaultName": "Preset {number}",
   "@readerPresetDefaultName": {
     "placeholders": {

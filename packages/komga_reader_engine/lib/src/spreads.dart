@@ -34,36 +34,70 @@ class PageAspect {
 /// 把连续的页序切成"每屏一组"。
 ///
 /// [pageCount] 为总页数（不含索引），[aspectAt] 返回第 i 页的尺寸（可未知）。
+/// [groupFrom] 是"从这一页（0 基）开始重新配对"：它之前的页保持自动分组，
+/// 从它开始按同样的宽页规则重新两两配对（UI-P3-5）。封面仍单独一屏。
 List<List<int>> buildSpreads({
   required int pageCount,
   required PageAspect Function(int index) aspectAt,
   bool coverSolo = true,
+  int? groupFrom,
 }) {
   if (pageCount <= 0) return const [];
-  final result = <List<int>>[];
-  var i = 0;
+  final from = groupFrom?.clamp(1, pageCount) ?? pageCount;
+  if (from >= pageCount) {
+    return _buildRange(
+      start: 0,
+      end: pageCount,
+      aspectAt: aspectAt,
+      coverSolo: coverSolo,
+    );
+  }
+  return <List<int>>[
+    ..._buildRange(
+      start: 0,
+      end: from,
+      aspectAt: aspectAt,
+      coverSolo: coverSolo,
+    ),
+    ..._buildRange(
+      start: from,
+      end: pageCount,
+      aspectAt: aspectAt,
+      coverSolo: false,
+    ),
+  ];
+}
 
-  if (coverSolo) {
-    result.add([0]);
+List<List<int>> _buildRange({
+  required int start,
+  required int end,
+  required PageAspect Function(int index) aspectAt,
+  required bool coverSolo,
+}) {
+  final result = <List<int>>[];
+  var i = start;
+
+  if (coverSolo && i == 0) {
+    result.add(<int>[0]);
     i = 1;
   }
 
-  while (i < pageCount) {
+  while (i < end) {
     final current = aspectAt(i);
     if (current.isWide()) {
-      result.add([i]);
+      result.add(<int>[i]);
       i += 1;
       continue;
     }
-    if (i + 1 < pageCount) {
+    if (i + 1 < end) {
       final next = aspectAt(i + 1);
       if (!next.isWide()) {
-        result.add([i, i + 1]);
+        result.add(<int>[i, i + 1]);
         i += 2;
         continue;
       }
     }
-    result.add([i]);
+    result.add(<int>[i]);
     i += 1;
   }
   return result;

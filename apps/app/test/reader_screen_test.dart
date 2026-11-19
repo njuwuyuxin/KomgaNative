@@ -80,6 +80,39 @@ void main() {
     expect(view.doublePage, isTrue);
   });
 
+  testWidgets('长按缩略图从这一页重新分组，再长按恢复自动', (WidgetTester tester) async {
+    await pumpReader(
+      tester,
+      repository: FakeReaderRepository(pageCount: 6),
+      book: demoReaderBook(),
+      initialPrefs: const ReaderPrefs(mode: ReaderModeChoice.double),
+    );
+
+    // 先跳到第 3 页：默认它在 [1,2] 这一屏里。
+    await tester.tap(find.byKey(const Key('reader-pages-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('page-thumb-3')));
+    await tester.pumpAndSettle();
+    var view = tester.widget<ReaderPagedView>(find.byType(ReaderPagedView));
+    expect(view.spread, <int>[1, 2]);
+
+    // 从第 3 页开始重新配对：第 3 页变成新一屏的第一页。
+    await tester.tap(find.byKey(const Key('reader-pages-button')));
+    await tester.pumpAndSettle();
+    await tester.longPress(find.byKey(const Key('page-thumb-3')));
+    await tester.pumpAndSettle();
+    view = tester.widget<ReaderPagedView>(find.byType(ReaderPagedView));
+    expect(view.spread, <int>[2, 3]);
+
+    // 再长按同一页：恢复自动分组。
+    await tester.tap(find.byKey(const Key('reader-pages-button')));
+    await tester.pumpAndSettle();
+    await tester.longPress(find.byKey(const Key('page-thumb-3')));
+    await tester.pumpAndSettle();
+    view = tester.widget<ReaderPagedView>(find.byType(ReaderPagedView));
+    expect(view.spread, <int>[1, 2]);
+  });
+
   testWidgets('离线时顶栏出现缓存提示（阅读区不挤占）', (WidgetTester tester) async {
     await pumpReader(tester, book: demoReaderBook(), offline: true);
 

@@ -5,11 +5,17 @@ import 'package:komga_native/src/widgets/page_thumbnail.dart';
 import 'package:komga_native/src/widgets/reader_palette.dart';
 import 'package:material_ui/material_ui.dart';
 
+/// 页缩略图面板的选择结果。
+typedef PageNavigatorChoice = ({int page, bool groupFrom});
+
 /// 缩略图跳页面板。
 ///
 /// 为什么不用 Komga 的页缩略图接口：**它没有**。`/books/{id}/thumbnail` 是整本书的封面，
 /// 页级只有 `/pages/{n}` 全尺寸图。所以这里用页面图 + `cacheWidth` 解码降采样；
 /// 网格是懒构建的，只有滚到的页才会真正下载。
+///
+/// 双页模式下长按某一页 = "从这一页开始重新分组"（UI-P3-5），通过
+/// [onGroupFrom] 回传；不传时没有长按行为。
 Future<void> showPageNavigator(
   BuildContext context, {
   required String bookId,
@@ -17,8 +23,9 @@ Future<void> showPageNavigator(
   required int currentPage,
   required ReaderPalette palette,
   required ValueChanged<int> onJump,
+  ValueChanged<int>? onGroupFrom,
 }) async {
-  final page = await showModalBottomSheet<int>(
+  final choice = await showModalBottomSheet<PageNavigatorChoice>(
     context: context,
     isScrollControlled: true,
     backgroundColor: palette.background,
@@ -29,10 +36,16 @@ Future<void> showPageNavigator(
         total: total,
         currentPage: currentPage,
         palette: palette,
+        allowGroup: onGroupFrom != null,
       ),
     ),
   );
-  if (page != null) onJump(page);
+  if (choice == null) return;
+  if (choice.groupFrom && onGroupFrom != null) {
+    onGroupFrom(choice.page);
+  } else {
+    onJump(choice.page);
+  }
 }
 
 class PageNavigatorSheet extends StatelessWidget {
@@ -41,6 +54,7 @@ class PageNavigatorSheet extends StatelessWidget {
     required this.total,
     required this.currentPage,
     required this.palette,
+    this.allowGroup = false,
     super.key,
   });
 
@@ -48,6 +62,9 @@ class PageNavigatorSheet extends StatelessWidget {
   final int total;
   final int currentPage;
   final ReaderPalette palette;
+
+  /// 双页模式才允许长按重新分组。
+  final bool allowGroup;
 
   @override
   Widget build(BuildContext context) {
@@ -103,6 +120,11 @@ class PageNavigatorSheet extends StatelessWidget {
                   page: page,
                   current: page == currentPage,
                   palette: palette,
+                  onLongPress: allowGroup
+                      ? () =>
+                            Navigator.of(context)
+                                .pop((page: page, groupFrom: true))
+                      : null,
                 );
               },
             ),
@@ -119,6 +141,7 @@ class _PageThumbnail extends ConsumerWidget {
     required this.page,
     required this.current,
     required this.palette,
+    this.onLongPress,
     super.key,
   });
 
@@ -126,11 +149,13 @@ class _PageThumbnail extends ConsumerWidget {
   final int page;
   final bool current;
   final ReaderPalette palette;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return InkWell(
-      onTap: () => Navigator.of(context).pop(page),
+      onTap: () => Navigator.of(context).pop((page: page, groupFrom: false)),
+      onLongPress: onLongPress,
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: palette.background,

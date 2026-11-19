@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
@@ -106,6 +107,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   /// 横屏自动双页用；由 `_buildPages` 每次布局时更新（UI-P3-3）。
   bool _landscape = false;
 
+  /// 手动修正双页分组的起点（0 基；null = 自动，UI-P3-5）。
+  int? _spreadFrom;
+
   /// 设置面板里的"跳页"：纵向模式靠 token 变化触发滚动跳转。
   int _jumpToken = 0;
   int _jumpPage = 1;
@@ -172,6 +176,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       pages: pages,
       mode: _modeFor(_effectivePrefs(ref.read(readerPrefsProvider))),
       page: _resolvePage(pages.length),
+      groupFrom: _spreadFrom,
     );
   }
 
@@ -231,6 +236,29 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     _progress.schedule(target);
   }
 
+  /// 长按缩略图：从这一页开始重新配对（UI-P3-5）；再长按同一页恢复自动。
+  void _groupFromPage(int page, int total) {
+    final index = page.clamp(1, total) - 1;
+    final next = _spreadFrom == index ? null : index;
+    setState(() {
+      _spreadFrom = next;
+      if (next != null) _page = page.clamp(1, total);
+    });
+    if (next != null) _progress.schedule(page.clamp(1, total));
+    unawaited(AppHaptics.selection());
+    final l10n = AppLocalizations.of(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          next == null
+              ? l10n.readerGroupAutomatic
+              : l10n.readerGroupFrom(page.clamp(1, total)),
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   /// 只在完成态查"下一本"：没读完时多一次列表请求纯属浪费。
   Book? _nextBookFor(ReaderLayout layout, Book? book) {
     if (!layout.completed || book == null) return null;
@@ -287,6 +315,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       pages: pages,
       mode: _modeFor(prefs),
       page: _resolvePage(total),
+      groupFrom: _spreadFrom,
     );
     // 配色在这一屏才算得出来：动态背景要读当前屏各页的页边主色（UI-P1-5）。
     final palette = resolveReaderPalette(
@@ -315,6 +344,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       page: page,
       total: total,
       onJump: (int t) => _jumpToPage(t, total),
+      onGroupFrom: mode == ReadingMode.doublePage
+          ? (int p) => _groupFromPage(p, total)
+          : null,
     );
     final content = switch (mode) {
       ReadingMode.verticalScroll => ReaderVerticalView(
@@ -376,6 +408,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
             rightToLeft: rightToLeft,
             nextBook: nextBook,
             onJump: (int p) => _jumpToPage(p, total),
+            onGroupFrom: mode == ReadingMode.doublePage
+                ? (int p) => _groupFromPage(p, total)
+                : null,
             onOpenNext: nextBook == null ? null : () => _openNext(nextBook),
             onBack: () => context.pop(),
             onPrevious: layout.canGoBack ? () => _requestTurn(-1, mode) : null,
