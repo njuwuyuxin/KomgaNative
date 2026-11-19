@@ -42,6 +42,7 @@
   "searchEmptyHint": "Series, books, authors and tags — all in one place.",
   "searchTryThese": "Try these",
   "searchFilter": "Filter",
+  "searchRefreshFailed": "Could not refresh — showing the previous results.",
   "downloadSeries": "Download",
   "downloadAll": "Download all",
   "downloadUnreadCount": "Download {count} unread",

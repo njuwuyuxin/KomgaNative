@@ -37,6 +37,7 @@
   "searchEmptyHint": "系列、书名、作者、标签，一次都查到。",
   "searchTryThese": "试试这些",
   "searchFilter": "筛选",
+  "searchRefreshFailed": "刷新失败，显示的是上一次的结果。",
   "downloadSeries": "下载",
   "downloadAll": "下载全部",
   "downloadUnreadCount": "下载 {count} 本未读",

@@ -203,11 +203,24 @@ class _SearchResultsState extends ConsumerState<_SearchResults> {
   /// 已请求的条数（FIX-08）：搜索以前固定取 20 条，第 21 条起静默消失。
   int _size = kListPageSize;
 
+  /// 上一次成功的系列 / 书结果（SCH-03）。
+  ///
+  /// 用途只有一个：**"加载更多"失败时不要把已有结果清空**。翻页失败就整页变错误，
+  /// 用户刚才翻到的那一屏会凭空消失，比"没加载出来"更让人困惑。
+  List<Series>? _lastSeries;
+  List<Book>? _lastBooks;
+
   @override
   void didUpdateWidget(_SearchResults oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // 换了搜索词就从一页重新开始，别把上一次的"加载更多"带过去。
-    if (oldWidget.query != widget.query) _size = kListPageSize;
+    // 换了搜索词 / 筛选就重新开始：条数复位，旧结果也不再代表这次查询。
+    if (oldWidget.query != widget.query ||
+        oldWidget.readStatus != widget.readStatus ||
+        oldWidget.tag != widget.tag) {
+      _size = kListPageSize;
+      _lastSeries = null;
+      _lastBooks = null;
+    }
   }
 
   @override
@@ -221,26 +234,31 @@ class _SearchResultsState extends ConsumerState<_SearchResults> {
     );
     final series = ref.watch(searchSeriesProvider(search));
     final books = ref.watch(searchBooksProvider(search));
-    final seriesItems = series.value?.items ?? const <Series>[];
-    final bookItems = books.value?.items ?? const <Book>[];
-    final loading = series.value == null || books.value == null;
+    // 成功一次就记下来：之后翻页失败时这些就是"别清空"的兜底。
+    if (series.value != null) _lastSeries = series.value!.items;
+    if (books.value != null) _lastBooks = books.value!.items;
+    final seriesItems = series.value?.items ?? _lastSeries ?? const <Series>[];
+    final bookItems = books.value?.items ?? _lastBooks ?? const <Book>[];
+    final failed = series.hasError || books.hasError;
 
-    if (loading) {
-      return const SliverFillRemaining(
-        hasScrollBody: false,
-        child: Center(child: CircularProgressIndicator()),
-      );
-    }
-    if (series.hasError && books.hasError) {
-      final error = series.error;
-      return SliverFillRemaining(
-        hasScrollBody: false,
-        child: Center(
-          child: Text(
-            error is ShelfFailure ? error.message : l10n.errorGeneric,
+    if (seriesItems.isEmpty && bookItems.isEmpty) {
+      if (failed) {
+        final error = series.error ?? books.error;
+        return SliverFillRemaining(
+          hasScrollBody: false,
+          child: Center(
+            child: Text(
+              error is ShelfFailure ? error.message : l10n.errorGeneric,
+            ),
           ),
-        ),
-      );
+        );
+      }
+      if (series.value == null || books.value == null) {
+        return const SliverFillRemaining(
+          hasScrollBody: false,
+          child: Center(child: CircularProgressIndicator()),
+        );
+      }
     }
     if (seriesItems.isEmpty && bookItems.isEmpty) {
       return SliverFillRemaining(
@@ -253,6 +271,35 @@ class _SearchResultsState extends ConsumerState<_SearchResults> {
     return SliverList.list(
       // 悬浮导航条浮在内容上：结果列表末尾让开它。
       children: <Widget>[
+        // 翻页失败时保留已有结果，只在顶部提示一句（SCH-03）。
+        if (failed)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.sm,
+              AppSpacing.md,
+              0,
+            ),
+            child: Row(
+              key: const Key('search-refresh-failure'),
+              children: <Widget>[
+                Icon(
+                  Icons.cloud_off_outlined,
+                  size: AppSizes.iconSm,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    l10n.searchRefreshFailed,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         SearchFacets(
           query: widget.query,
           readStatus: widget.readStatus,
