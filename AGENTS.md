@@ -14,6 +14,7 @@ dart run tool/ci.dart check      # 全量门禁：格式 + 分析 + 分层 + 全
 dart run tool/ci.dart fix        # 自动格式化 + dart fix
 dart run tool/ci.dart test       # 只跑测试
 dart run tool/ci.dart golden     # 重新生成黄金图基线（Windows）
+dart run tool/ci.dart install    # 构建 release 装到模拟器（提交前必须跑，见"标准交付流程"）
 dart run tool/emulator.dart      # 启动本地 Android 模拟器（可选，见 docs/environment-setup.md §11）
 dart run tool/komga.dart start   # 启停本地 Komga 服务器（可选，联调用；stop / status，见 §12）
 ```
@@ -58,11 +59,24 @@ docs/                         选型、环境、spec、ADR
 - [ ] 涉及 API 的变更：新端点先加进 `KomgaUrls`（contract_test 会自动覆盖），解析层用 `test/fixtures/` 里的**真实响应**驱动
 - [ ] `dart run tool/ci.dart check` 全绿
 - [ ] 相关 `docs/` 段落已更新
-- [ ] 代码提交后已装到模拟器：`dart run tool/ci.dart install`（见下节）
+- [ ] **提交前**已装到模拟器并实际操作验证：`dart run tool/ci.dart install`（见"装到模拟器"）
 
-## 提交后：装到模拟器（强制）
+## 标准交付流程（本地绿 → 设备验证 → 提交推送）
 
-每次**代码提交后**都要把 release 包装到正在运行的模拟器上，确认不是"测试绿、启动崩"：
+功能开发完成后按这个顺序走，**不要跳步、不要换序**：
+
+1. **本地门禁**：`dart run tool/ci.dart check` 全绿（格式 + 分析 + 分层 + 全部测试 + 黄金图）。
+2. **设备验证**：`dart run tool/ci.dart install` 装 release 到模拟器，**实际操作本次改动的路径**。
+   验证的是"将要提交的那份代码"——装完又改了代码，必须重跑第 1、2 步。
+3. **提交**：`git add` 只加与本次任务相关的文件；工作区里无关的未提交改动不要顺手带上，
+   确实有依赖就先单独提交并在回复里说明。
+4. **推送**：`git push origin main`，触发 GitHub Actions（CI / Android / iOS）。
+5. **不等 CI**：推送成功即可结束本轮，汇报"已推送 + 本地/设备验证结论"。CI 是最后的保险，
+   红了再单独修（平台/版本差异只有 CI 能暴露），**不要为了等绿而空转**。
+
+## 装到模拟器（提交前，强制）
+
+第 2 步的细节。每次**代码提交前**都要把 release 包装到正在运行的模拟器上，确认不是"测试绿、启动崩"：
 
 ```bash
 dart run tool/emulator.dart                    # 没启动先启动（见 docs/environment-setup.md §11）
@@ -71,8 +85,9 @@ dart run tool/ci.dart install emulator-5554    # 多设备时显式指定
 ```
 
 - 装的是 **release**（debug 签名）；命令用 `flutter run --release --no-resident`，
-  **保留应用数据**（`flutter install` 会先卸载，每次提交都清掉登录态/缓存，别用）；
-- 命令会自动启动 App，至少确认能启动、书架能出内容；
+  **保留应用数据**（`flutter install` 会先卸载，每次都清掉登录态/缓存，别用）；
+- 至少确认能启动、书架能出内容，并**实际操作本次改动的路径**；转场 / 动画 / 骨架这类
+  只看启动看不出来，必要时用 `adb shell screencap` 抓帧确认；
 - 纯文档提交可以跳过，但要在最终回复里说明"本次未跑设备"；
 - 命令实现在 `tool/ci.dart` 的 `installApp`：不要自己拼 `adb install`（adb 的路径由 Flutter 管理）。
 
@@ -104,7 +119,8 @@ Komga 的真实行为记录在 `docs/komga-api-verification.md`，已知与 Open
 
 三条 workflow 在 `.github/workflows/`，说明见 `docs/ci.md`：
 
-- `ci.yml`（Windows）：每次 push/PR 跑全量门禁，**本地绿不算绿，CI 绿才算**；
+- `ci.yml`（Windows）：每次 push/PR 跑全量门禁。**本地绿 ≠ CI 绿**（平台 / Flutter 版本差异只会在 CI 暴露），
+  但它**不阻塞交付**：本地检查 + 设备验证通过就提交推送，**不必等结果**；CI 红了再单独修。
 - `build-android.yml`（Ubuntu）：main 分支 / 手动，产出 release APK；
 - `build-ios.yml`（macOS）：push / PR / tag / 手动，编译验证（public 仓库 macOS 免费；转私有需去掉 push/PR 触发）。
 

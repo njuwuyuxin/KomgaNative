@@ -73,6 +73,9 @@
 **为什么 iOS 现在也跟 push**：仓库是 public，macOS runner 免费。三条流水线都跑，PR 能同时看到"Android 能编、iOS 能编"。
 **如果转私有**：删掉 `build-ios.yml` 的 `pull_request` 与 `push` 触发，只留 `workflow_dispatch` 和 tag。
 
+> **日常不必等 CI**：本地 `dart run tool/ci.dart check` + 模拟器验证通过即可提交推送；
+> CI 结果是异步反馈（红了再单独修），见 `AGENTS.md`「标准交付流程」。
+
 **为什么两条构建流水线在 `flutter build` 前都要跑 `codegen`**：`*.g.dart`（drift）与
 `app_localizations*.dart` 都在 `.gitignore` 里，而 CI 是全新 clone。`flutter pub get` 只会顺带生成 l10n
 （`flutter.generate: true`），**不会**跑 `build_runner`。跳过这一步，`flutter build` 会在 AOT 编译阶段直接失败：

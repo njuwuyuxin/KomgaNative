@@ -406,8 +406,8 @@ Panels 的高级感主要来自三点，和控件本身关系不大：
 
 每批的出口与路线图（`docs/roadmap.md`）一致：
 - `ci.dart check` 全绿；
-- 单独提交并推送；
-- 运行 `dart run tool/ci.dart install` 装到模拟器上走查。
+- 运行 `dart run tool/ci.dart install` 装到模拟器上实际操作走查；
+- 单独提交并推送（**不等 CI 结果**；红了再修）。
 
 ## 4. 每个需求的统一检查单
 
