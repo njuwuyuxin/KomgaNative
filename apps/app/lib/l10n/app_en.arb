@@ -4,6 +4,7 @@
   "settingsTitle": "Settings",
   "retry": "Retry",
   "cancel": "Cancel",
+  "save": "Save",
   "remove": "Remove",
   "close": "Close",
   "all": "All",
@@ -272,6 +273,18 @@
   "readerBackgroundWhiteHint": "Bright pages blend into the screen",
   "readerBackgroundDynamic": "Match the page",
   "readerBackgroundDynamicHint": "Takes the colour from the page edges",
+  "readerPresets": "Presets",
+  "readerPresetsHint": "Save a set of settings and switch with one tap.",
+  "readerPresetSave": "Save current",
+  "readerPresetEmpty": "No presets yet.",
+  "readerPresetName": "Preset name",
+  "readerPresetDelete": "Delete preset",
+  "readerPresetDefaultName": "Preset {number}",
+  "@readerPresetDefaultName": {
+    "placeholders": {
+      "number": {"type": "int"}
+    }
+  },
   "bookMarkRead": "Mark read",
   "bookMarkUnread": "Mark unread",
   "readFromStart": "Read from the start",

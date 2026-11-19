@@ -404,6 +404,16 @@ Panels 的高级感主要来自三点，和控件本身关系不大：
 | UI-P3-13 | 下载管理页、后台下载队列 | |
 | UI-P3-14 | 墨水屏自动探测接入（`device_profile.dart` 里已有实现，app 没有调用） | |
 
+**进度（2026-11-19）：P3-1 阅读预设。**
+
+| 落地 |
+|---|
+| `ReaderPreset`（id / name / prefs 快照）挂在 `ReaderPrefs.presets` 上，继续用同一个 secure storage JSON；预设里的 `prefs` 用 `toJson(includePresets: false)`，不会递归 |
+| `ReaderPrefsController.savePreset / applyPreset / deletePreset`；应用预设只覆盖模式/适配/方向/背景/亮度/常亮，保留预设列表；坏条目逐条跳过 |
+| 面板顶部 `ReaderPresetSection`：`Save current` 弹命名框（默认 "Preset N"）、chip 点一下应用、× 删除；键 `reader-preset-save` / `reader-preset-<id>` |
+| 测试：`reader_presets_test` 覆盖保存→改设置→应用回来、删除；`data/reader_prefs_test` 覆盖预设 JSON 往返与坏条目；新增 `reader_settings_presets@phone_dark` 基线（chip 视觉），`reader_settings@phone_light` 也补上（浅色主题下面板仍是深色，见下） |
+| 设备走查时发现：浅色主题下 `FrostedSurface` 的 `sheet` 会跟随 Theme.brightness 变成浅灰底 + 白字，面板不可读。已在 `showReaderSettingsSheet` 显式传深色 sheet 材质（墨水屏仍走纸色），`reader_settings@phone_light` 基线钉住 |
+
 ## 不做
 
 | 需求 | 理由 |

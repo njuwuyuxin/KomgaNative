@@ -96,6 +96,48 @@ void main() {
       expect(prefs.direction, ReaderDirectionChoice.auto);
       expect(prefs.background, ReaderBackgroundChoice.black);
     });
+
+    test('预设 JSON 往返：预设里的 prefs 不再带预设（不递归）', () {
+      const preset = ReaderPreset(
+        id: 'p1',
+        name: 'Manga',
+        prefs: ReaderPrefs(
+          mode: ReaderModeChoice.double,
+          fit: ReaderFitChoice.cover,
+        ),
+      );
+      const prefs = ReaderPrefs(presets: <ReaderPreset>[preset]);
+      final parsed = ReaderPrefs.fromJson(prefs.toJson());
+      expect(parsed, prefs);
+      expect(parsed.presets, hasLength(1));
+      expect(parsed.presets.single.name, 'Manga');
+      expect(parsed.presets.single.prefs.mode, ReaderModeChoice.double);
+      expect(parsed.presets.single.prefs.presets, isEmpty);
+    });
+
+    test('坏预设条目跳过，好的保留', () {
+      final parsed = ReaderPrefs.fromJson(<String, Object?>{
+        'presets': <Object?>[
+          <String, Object?>{
+            'id': '',
+            'name': 'x',
+            'prefs': <String, Object?>{},
+          },
+          <String, Object?>{
+            'id': 'p2',
+            'name': '  ',
+            'prefs': <String, Object?>{},
+          },
+          <String, Object?>{'id': 'p3', 'name': 'Q', 'prefs': 'bad'},
+          <String, Object?>{
+            'id': 'p4',
+            'name': 'Good',
+            'prefs': <String, Object?>{},
+          },
+        ],
+      });
+      expect(parsed.presets.map((ReaderPreset p) => p.name), <String>['Good']);
+    });
   });
 
   group('ReaderFitChoice → FitMode', () {

@@ -52,6 +52,56 @@ extension ReaderDirectionChoiceX on ReaderDirectionChoice {
 /// `dynamic` 从当前页边缘提色，双页取两页的平均；墨水屏不提供这一项（固定白底）。
 enum ReaderBackgroundChoice { black, white, dynamic }
 
+/// 一组命名的阅读设置（UI-P3-1）。
+///
+/// 预设是一个**快照**：保存时的模式/适配/方向/背景/亮度/常亮，之后应用就整体覆盖。
+/// `prefs` 本身不再带预设（避免递归），见 [ReaderPreset.fromJson]。
+class ReaderPreset {
+  const ReaderPreset({
+    required this.id,
+    required this.name,
+    required this.prefs,
+  });
+
+  final String id;
+  final String name;
+  final ReaderPrefs prefs;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'id': id,
+    'name': name,
+    'prefs': prefs.toJson(includePresets: false),
+  };
+
+  /// 坏条目返回 null（旧存档/手工改坏），调用方直接跳过，不让整份偏好失效。
+  static ReaderPreset? fromJson(Object? raw) {
+    if (raw is! Map) return null;
+    final id = raw['id'];
+    final name = raw['name'];
+    final config = raw['prefs'];
+    if (id is! String || id.isEmpty || name is! String || name.trim().isEmpty) {
+      return null;
+    }
+    if (config is! Map) return null;
+    final prefs = ReaderPrefs.fromJson(Map<String, Object?>.from(config))
+        .copyWith(presets: const <ReaderPreset>[]);
+    return ReaderPreset(id: id, name: name.trim(), prefs: prefs);
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is ReaderPreset &&
+      other.id == id &&
+      other.name == name &&
+      other.prefs == prefs;
+
+  @override
+  int get hashCode => Object.hash(id, name, prefs);
+
+  @override
+  String toString() => 'ReaderPreset($id, $name)';
+}
+
 /// 阅读器偏好（全局，不分书）。
 ///
 /// 为什么不分书：漫画是"一次读很多卷"的场景，每本都要重设模式反而烦；
@@ -64,6 +114,7 @@ class ReaderPrefs {
     this.fit = ReaderFitChoice.contain,
     this.direction = ReaderDirectionChoice.auto,
     this.background = ReaderBackgroundChoice.black,
+    this.presets = const <ReaderPreset>[],
   });
 
   /// 亮度下限：再暗也要能看见字，所以不允许 0。
@@ -80,6 +131,12 @@ class ReaderPrefs {
   final ReaderDirectionChoice direction;
   final ReaderBackgroundChoice background;
 
+  /// 用户保存的阅读预设（UI-P3-1）；按保存顺序排列。
+  final List<ReaderPreset> presets;
+
+  /// 去掉预设后的"纯配置"，用于把当前设置存成预设（避免递归）。
+  ReaderPrefs withoutPresets() => copyWith(presets: const <ReaderPreset>[]);
+
   /// 遮罩的不透明度（亮度越低盖得越黑）。
   double get dimOpacity => (1 - brightness).clamp(0.0, 1 - minBrightness);
 
@@ -90,6 +147,7 @@ class ReaderPrefs {
     ReaderFitChoice? fit,
     ReaderDirectionChoice? direction,
     ReaderBackgroundChoice? background,
+    List<ReaderPreset>? presets,
   }) => ReaderPrefs(
     mode: mode ?? this.mode,
     brightness: brightness ?? this.brightness,
@@ -97,16 +155,20 @@ class ReaderPrefs {
     fit: fit ?? this.fit,
     direction: direction ?? this.direction,
     background: background ?? this.background,
+    presets: presets ?? this.presets,
   );
 
-  Map<String, Object?> toJson() => <String, Object?>{
-    'mode': mode.name,
-    'brightness': brightness,
-    'keepAwake': keepAwake,
-    'fit': fit.name,
-    'direction': direction.name,
-    'background': background.name,
-  };
+  Map<String, Object?> toJson({bool includePresets = true}) =>
+      <String, Object?>{
+        'mode': mode.name,
+        'brightness': brightness,
+        'keepAwake': keepAwake,
+        'fit': fit.name,
+        'direction': direction.name,
+        'background': background.name,
+        if (includePresets && presets.isNotEmpty)
+          'presets': <Object?>[for (final preset in presets) preset.toJson()],
+      };
 
   /// 存档可能被旧版本/手工改过，所有字段先判类型再取值，坏值一律回默认，
   /// 绝不让一条脏数据把阅读器变成黑屏或抛异常。
@@ -115,6 +177,14 @@ class ReaderPrefs {
     final brightness = rawBrightness is num
         ? rawBrightness.toDouble().clamp(minBrightness, 1.0)
         : 1.0;
+    final rawPresets = json['presets'];
+    final presets = <ReaderPreset>[];
+    if (rawPresets is List) {
+      for (final raw in rawPresets) {
+        final preset = ReaderPreset.fromJson(raw);
+        if (preset != null) presets.add(preset);
+      }
+    }
     return ReaderPrefs(
       mode: _parse(
         json['mode'],
@@ -134,6 +204,7 @@ class ReaderPrefs {
         ReaderBackgroundChoice.values,
         ReaderBackgroundChoice.black,
       ),
+      presets: presets,
     );
   }
 
@@ -154,14 +225,30 @@ class ReaderPrefs {
       other.keepAwake == keepAwake &&
       other.fit == fit &&
       other.direction == direction &&
-      other.background == background;
+      other.background == background &&
+      _samePresets(other.presets, presets);
+
+  static bool _samePresets(List<ReaderPreset> a, List<ReaderPreset> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
 
   @override
-  int get hashCode =>
-      Object.hash(mode, brightness, keepAwake, fit, direction, background);
+  int get hashCode => Object.hash(
+    mode,
+    brightness,
+    keepAwake,
+    fit,
+    direction,
+    background,
+    Object.hashAll(presets),
+  );
 
   @override
   String toString() =>
       'ReaderPrefs(${mode.name}, $brightness, $keepAwake, ${fit.name}, '
-      '${direction.name}, ${background.name})';
+      '${direction.name}, ${background.name}, presets: ${presets.length})';
 }

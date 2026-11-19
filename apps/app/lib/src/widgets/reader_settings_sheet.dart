@@ -5,6 +5,7 @@ import 'package:komga_native/src/data/reader_prefs.dart';
 import 'package:komga_native/src/providers/reader_prefs_provider.dart';
 import 'package:komga_native/src/widgets/reader_mode_text.dart';
 import 'package:komga_native/src/widgets/reader_palette.dart';
+import 'package:komga_native/src/widgets/reader_preset_section.dart';
 import 'package:komga_native/src/widgets/reader_settings_rows.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -28,6 +29,13 @@ Future<void> showReaderSettingsSheet(
     elevation: 0,
     builder: (BuildContext context) => FrostedSurface(
       kind: AppMaterialKind.sheet,
+      // 阅读器面板压在漫画上，普通设备固定用深色材质：浅色主题下若跟随
+      // Theme.brightness，会得到浅灰底 + 白字（真机上实测不可读）。
+      material: AppMaterial.resolve(
+        AppMaterialKind.sheet,
+        eink: palette.isEink,
+        dark: !palette.isEink,
+      ),
       shape: AppShapes.sheet(eink: palette.isEink),
       // 透明 Material：面板里的 InkWell / SwitchListTile 要在这里画水波纹，
       // 否则它们会穿到毛玻璃后面（Flutter 会直接断言"水波纹可能看不见"）。
@@ -132,6 +140,14 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
                 l10n.readingSettings,
                 style: AppTypography.of(context).title
                     .copyWith(color: palette.foreground),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              ReaderPresetSection(
+                prefs: prefs,
+                palette: palette,
+                onApply: controller.applyPreset,
+                onDelete: controller.deletePreset,
+                onSave: controller.savePreset,
               ),
               const SizedBox(height: AppSpacing.md),
               ReaderOptionSection<ReaderModeChoice>(

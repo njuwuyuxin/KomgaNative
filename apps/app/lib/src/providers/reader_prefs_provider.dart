@@ -46,6 +46,49 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
   void setBackground(ReaderBackgroundChoice background) =>
       _update(state.copyWith(background: background));
 
+  /// 把当前设置存成一个命名预设（UI-P3-1）。
+  ///
+  /// 空名字/只有空格忽略。ID 用微秒时间戳：本地单用户、不需要全局唯一，
+  /// 也避免引入 uuid 依赖；同一微秒内连点两次的概率可以忽略。
+  void savePreset(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return;
+    final preset = ReaderPreset(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      name: trimmed,
+      prefs: state.withoutPresets(),
+    );
+    _update(state.copyWith(presets: <ReaderPreset>[...state.presets, preset]));
+  }
+
+  /// 应用一个预设：整体覆盖配置，但保留预设列表本身。
+  void applyPreset(String id) {
+    for (final preset in state.presets) {
+      if (preset.id != id) continue;
+      final config = preset.prefs;
+      _update(
+        state.copyWith(
+          mode: config.mode,
+          brightness: config.brightness,
+          keepAwake: config.keepAwake,
+          fit: config.fit,
+          direction: config.direction,
+          background: config.background,
+        ),
+      );
+      return;
+    }
+  }
+
+  void deletePreset(String id) {
+    final next = <ReaderPreset>[
+      for (final preset in state.presets)
+        if (preset.id != id) preset,
+    ];
+    if (next.length == state.presets.length) return;
+    _update(state.copyWith(presets: next));
+  }
+
   void _update(ReaderPrefs next) {
     if (next == state) return;
     _touched = true;

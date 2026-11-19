@@ -644,6 +644,46 @@ void main() {
     );
   });
 
+  testWidgets('reader_settings_presets@phone_dark', (
+    WidgetTester tester,
+  ) async {
+    await pumpReaderGolden(
+      tester,
+      name: 'reader_settings_presets@phone_dark',
+      size: GoldenSizes.phone,
+      theme: AppTheme.dark(),
+      prefs: const ReaderPrefs(
+        presets: <ReaderPreset>[
+          ReaderPreset(
+            id: 'p1',
+            name: 'Manga',
+            prefs: ReaderPrefs(mode: ReaderModeChoice.double),
+          ),
+          ReaderPreset(
+            id: 'p2',
+            name: 'Webtoon',
+            prefs: ReaderPrefs(mode: ReaderModeChoice.vertical),
+          ),
+        ],
+      ),
+      act: (WidgetTester t) async {
+        await t.tap(find.byKey(const Key('reader-settings-button')));
+      },
+    );
+  });
+
+  testWidgets('reader_settings@phone_light', (WidgetTester tester) async {
+    await pumpReaderGolden(
+      tester,
+      name: 'reader_settings@phone_light',
+      size: GoldenSizes.phone,
+      theme: AppTheme.light(),
+      act: (WidgetTester t) async {
+        await t.tap(find.byKey(const Key('reader-settings-button')));
+      },
+    );
+  });
+
   testWidgets('reader_settings@eink', (WidgetTester tester) async {
     await pumpReaderGolden(
       tester,
