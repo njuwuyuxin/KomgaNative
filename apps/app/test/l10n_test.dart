@@ -6,6 +6,7 @@ import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/l10n/l10n.dart';
 import 'package:komga_native/src/app.dart';
+import 'package:komga_native/src/data/app_settings.dart';
 import 'package:komga_native/src/data/cache/http_cache_database.dart';
 import 'package:komga_native/src/data/progress/progress_store.dart';
 import 'package:komga_native/src/data/settings_store.dart';
@@ -71,7 +72,7 @@ void main() {
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
 
-    final store = InMemorySettingsStore('zh');
+    final store = InMemorySettingsStore(const AppSettings(language: 'zh'));
     await tester.pumpWidget(
       ProviderScope(
         overrides: <Override>[
@@ -104,11 +105,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Settings'), findsWidgets);
     expect(find.text('设置'), findsNothing);
-    expect(store.language, 'en');
+    expect(store.settings.language, 'en');
   });
 
   test('未知语言存档回 system（跟随系统）', () async {
-    final store = InMemorySettingsStore('klingon');
+    final store = InMemorySettingsStore(const AppSettings(language: 'klingon'));
     final container = ProviderContainer(
       overrides: <Override>[settingsStoreProvider.overrideWithValue(store)],
     );

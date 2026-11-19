@@ -4,11 +4,14 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_api/komga_api.dart';
 import 'package:komga_domain/komga_domain.dart';
+import 'package:komga_native/src/data/app_settings.dart';
 import 'package:komga_native/src/data/library_repository.dart';
+import 'package:komga_native/src/data/settings_store.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/data/shelf_view_options.dart';
 import 'package:komga_native/src/providers/cache_providers.dart';
 import 'package:komga_native/src/providers/progress_providers.dart';
+import 'package:komga_native/src/providers/settings_provider.dart';
 import 'package:komga_native/src/session/session_controller.dart';
 
 /// 书架仓库：由当前会话构造，会话变了就重建（并关掉旧的 dio 连接）。
@@ -268,6 +271,12 @@ class ShelfController extends Notifier<ShelfState> {
   int _generation = 0;
   Timer? _debounce;
 
+  /// 本次会话里用户已经手动改过的偏好。
+  ///
+  /// 恢复是异步的（读钥匙串）：如果用户在恢复落地前就点了排序/筛选，
+  /// 不能再用存档把他刚做的选择盖回去。按项记，互不牵连。
+  final Set<String> _touched = <String>{};
+
   @override
   ShelfState build() {
     // 订阅：会话/仓库变了要重新拉一遍（例如重新登录换了服务器）。
@@ -275,11 +284,88 @@ class ShelfController extends Notifier<ShelfState> {
     ref.onDispose(() => _debounce?.cancel());
     // build() 还没返回时 state 尚未初始化，读它会抛 "uninitialized provider"，
     // 所以首屏加载必须推到下一个微任务。
+    //
+    // 首屏**不**等偏好恢复：读钥匙串要走平台通道，真机上虽快但没必要挡首帧，
+    // 测试环境里更是根本没有回包。恢复落地后如果需要换查询条件，再重新拉一次。
     unawaited(Future<void>.microtask(() => _load(reset: true)));
+    unawaited(_restore());
     return const ShelfState();
   }
 
   LibraryRepository get _repository => ref.read(libraryRepositoryProvider);
+
+  SettingsStore get _store => ref.read(settingsStoreProvider);
+
+  /// 当前服务器身份（每台服务器单独记住上次选的库）。
+  String? get _serverKey {
+    final session = ref.read(sessionProvider);
+    return session is SessionConnected ? session.server.id : null;
+  }
+
+  /// 恢复上次的视图/封面档位/排序/筛选/库。
+  ///
+  /// 与首屏加载并发进行：恢复只改"呈现方式"时不用重新请求；改了查询条件
+  /// （排序 / 筛选 / 库）才补一次，否则用户看到的是默认排序的画面前提错了。
+  /// 这次补发的请求由 [_generation] 竞态保护兜住，不会盖掉更新的结果。
+  Future<void> _restore() async {
+    final saved = await _store.load();
+    if (!ref.mounted) return;
+    final libraryId = _touched.contains('library')
+        ? state.libraryId
+        : await _storedLibraryId(saved);
+    if (!ref.mounted) return;
+
+    final next = state.copyWith(
+      view: _touched.contains('view') ? state.view : saved.view,
+      coverSize: _touched.contains('coverSize')
+          ? state.coverSize
+          : saved.coverSize,
+      sort: _touched.contains('sort') ? state.sort : saved.sort,
+      readStatus: _touched.contains('readStatus')
+          ? state.readStatus
+          : saved.readStatus,
+      libraryId: libraryId,
+    );
+    // 恢复前后查询条件变没变，决定要不要补一次请求。
+    final needsReload =
+        next.sort != state.sort ||
+        next.readStatus != state.readStatus ||
+        next.libraryId != state.libraryId;
+    state = next;
+
+    // 存档里那颗 id 在这台服务器上已经不存在：顺手清掉，免得下次还要再查一遍。
+    final serverKey = _serverKey;
+    if (libraryId == null &&
+        serverKey != null &&
+        saved.libraryFilterFor(serverKey) != null) {
+      _persist((AppSettings s) => s.withLibraryFilter(serverKey, null));
+    }
+    if (needsReload) await _load(reset: true);
+  }
+
+  /// 存档里的库 id 要在这台服务器上真的存在才用。
+  ///
+  /// 换了服务器/库被删掉时，旧 id 会让书架变成"空书架"——比回到"全部库"更糟。
+  /// 库列表暂时取不到（离线、鉴权失败）时保留原选择：这时候也拉不到新数据，
+  /// 保持原筛选至少能让缓存回退按上次的条件展示。
+  Future<String?> _storedLibraryId(AppSettings saved) async {
+    final stored = saved.libraryFilterFor(_serverKey);
+    if (stored == null) return null;
+    try {
+      final libraries = await ref.read(librariesProvider.future);
+      if (libraries.any((Library library) => library.id == stored)) {
+        return stored;
+      }
+    } on Object {
+      return stored;
+    }
+    return null;
+  }
+
+  /// 偏好变化落盘：只改自己那几个字段，不会冲掉设置页刚写的外观。
+  void _persist(AppSettings Function(AppSettings current) mutate) {
+    unawaited(_store.update(mutate));
+  }
 
   /// 下拉刷新 / 错误态重试。
   Future<void> refresh() {
@@ -305,6 +391,8 @@ class ShelfController extends Notifier<ShelfState> {
   void selectLibrary(String? libraryId) {
     if (state.libraryId == libraryId) return;
     _debounce?.cancel();
+    _touched.add('library');
+    final serverKey = _serverKey;
     state = state.copyWith(
       libraryId: libraryId,
       series: const <Series>[],
@@ -315,6 +403,9 @@ class ShelfController extends Notifier<ShelfState> {
       clearFailure: true,
       clearLoadMoreFailure: true,
     );
+    if (serverKey != null) {
+      _persist((AppSettings s) => s.withLibraryFilter(serverKey, libraryId));
+    }
     unawaited(_load(reset: true));
   }
 
@@ -330,24 +421,32 @@ class ShelfController extends Notifier<ShelfState> {
   /// 换排序：立刻重新拉第一页（排序结果顺序变了，追加已无意义）。
   void setSort(SeriesSort? sort) {
     if (state.sort == sort) return;
+    _touched.add('sort');
+    _persist((AppSettings s) => s.copyWith(sort: sort));
     _reloadWith(state.copyWith(sort: sort));
   }
 
   /// 换阅读状态筛选。
   void setReadStatus(SeriesReadStatus? status) {
     if (state.readStatus == status) return;
+    _touched.add('readStatus');
+    _persist((AppSettings s) => s.copyWith(readStatus: status));
     _reloadWith(state.copyWith(readStatus: status));
   }
 
   /// 换呈现方式 / 封面档位（UI-P2-7）：**不重新发请求**，只改视图状态。
   void setView(ShelfView view) {
     if (state.view == view) return;
+    _touched.add('view');
     state = state.copyWith(view: view);
+    _persist((AppSettings s) => s.copyWith(view: view));
   }
 
   void setCoverSize(ShelfCoverSize size) {
     if (state.coverSize == size) return;
+    _touched.add('coverSize');
     state = state.copyWith(coverSize: size);
+    _persist((AppSettings s) => s.copyWith(coverSize: size));
   }
 
   /// 换查询条件后重新开始：清空列表、回到第一页，但保留新条件本身。

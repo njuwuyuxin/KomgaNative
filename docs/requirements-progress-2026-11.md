@@ -10,8 +10,8 @@
 
 | ID | 需求 | P | 状态 | commit |
 |---|---|---|---|---|
-| FIX-01 | 墨水屏探测贯通阅读器 | P0 | DONE | `feat(app): 墨水屏探测贯通阅读器` |
-| FIX-02 | 主题/墨水屏/书架视图持久化 | P0 | TODO | — |
+| FIX-01 | 墨水屏探测贯通阅读器 | P0 | DONE | `20cf264` |
+| FIX-02 | 主题/墨水屏/书架视图持久化 | P0 | DONE | `feat(app): 持久化主题/墨水屏/书架视图` |
 | FIX-03 | 阅读方向覆盖所有入口 | P0 | TODO | — |
 | FIX-04 | 预设应用补齐锁定缩放/去白边 | P0 | TODO | — |
 | FIX-05 | 正在读骨架与空态修正 | P0 | TODO | — |
@@ -92,3 +92,28 @@
 
 实施过程中如果某条需求与既有约束冲突（例如 Komga 服务端不支持该查询参数），
 在本节记录"降级成什么"和"为什么"，不要静默砍功能。
+
+## 实施记录
+
+### FIX-01 墨水屏探测贯通阅读器
+
+- 新增 `effectiveEinkProvider`（`forceEink || einkDetected`）作为唯一来源；
+  `KomgaApp`、`ReaderScreen`（配色 / 翻页效果 / 开场 Hero）都读它。
+- 新增黄金图 `reader_auto_eink`（只覆盖探测为真、不打开强制开关）与
+  `test/providers/effective_eink_test.dart`。
+- 顺手把 `ReaderScreen` 里重复的 `settingsProvider` 读取去掉，避免再次出现
+  "主题变了、阅读器没变"。
+
+### FIX-02 主题 / 墨水屏 / 书架视图持久化
+
+- 存储从"一个字段一个方法"改成**一份快照** `AppSettings`：
+  `themeMode`、`forceEink`、`language`、`haptics`、`view`、`coverSize`、
+  `sort`、`readStatus`，外加 `libraryFilters`（每台服务器上次选的库）。
+- `SettingsStore.update(mutate)` 做"读出最新 → 只改这几个字段 → 写回"，并在
+  `SecureSettingsStore` 里串行化：设置页与书架控制器共用同一个 blob，读改写
+  才不会被对方用旧快照覆盖。
+- 书架**先恢复再加载**，避免"先按默认排序画一屏、再跳成上次的排序"。
+- 存档里的库 id 会先跟当前服务器的库列表核对：不存在就回"全部库"并清掉脏记录；
+  库列表取不到（离线）时保留原选择。
+- 解码逐字段容错（未知枚举/类型不对只影响该字段），覆盖旧版本只有 `language`
+  的存档与非法 JSON。

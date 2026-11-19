@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:komga_native/src/data/app_settings.dart';
 import 'package:komga_native/src/data/settings_store.dart';
 import 'package:komga_platform/komga_platform.dart';
 import 'package:material_ui/material_ui.dart';
@@ -67,7 +68,10 @@ class SettingsState {
 }
 
 class SettingsController extends Notifier<SettingsState> {
-  /// 恢复是异步的：如果用户已经手动选过语言，不能被旧存档覆盖回去。
+  /// 恢复是异步的：如果用户已经手动改过某一项，不能被旧存档覆盖回去。
+  /// 每项单独记，避免"先改了主题"把还没恢复的墨水屏开关一起挡掉。
+  bool _themeTouched = false;
+  bool _einkTouched = false;
   bool _languageTouched = false;
   bool _hapticsTouched = false;
 
@@ -80,34 +84,43 @@ class SettingsController extends Notifier<SettingsState> {
   SettingsStore get _store => ref.read(settingsStoreProvider);
 
   Future<void> _restore() async {
-    try {
-      final saved = await _store.loadLanguage();
-      final haptics = await _store.loadHaptics();
-      state = state.copyWith(
-        language: _languageTouched ? null : appLanguageFromCode(saved),
-        haptics: _hapticsTouched ? null : haptics,
-      );
-    } on Object {
-      // 设置存储读失败就用默认值：不能让钥匙串问题挡住启动。
-    }
+    final saved = await _store.load();
+    state = state.copyWith(
+      themeMode: _themeTouched ? null : saved.themeMode,
+      forceEink: _einkTouched ? null : saved.forceEink,
+      language: _languageTouched ? null : appLanguageFromCode(saved.language),
+      haptics: _hapticsTouched ? null : saved.haptics,
+    );
   }
 
-  void setThemeMode(ThemeMode mode) => state = state.copyWith(themeMode: mode);
+  void setThemeMode(ThemeMode mode) {
+    if (mode == state.themeMode) return;
+    _themeTouched = true;
+    state = state.copyWith(themeMode: mode);
+    unawaited(_store.update((AppSettings s) => s.copyWith(themeMode: mode)));
+  }
 
-  void setForceEink(bool value) => state = state.copyWith(forceEink: value);
+  void setForceEink(bool value) {
+    if (value == state.forceEink) return;
+    _einkTouched = true;
+    state = state.copyWith(forceEink: value);
+    unawaited(_store.update((AppSettings s) => s.copyWith(forceEink: value)));
+  }
 
   void setLanguage(AppLanguage language) {
     if (language == state.language) return;
     _languageTouched = true;
     state = state.copyWith(language: language);
-    unawaited(_store.saveLanguage(language.code));
+    unawaited(
+      _store.update((AppSettings s) => s.copyWith(language: language.code)),
+    );
   }
 
   void setHaptics(bool enabled) {
     if (enabled == state.haptics) return;
     _hapticsTouched = true;
     state = state.copyWith(haptics: enabled);
-    unawaited(_store.saveHaptics(enabled));
+    unawaited(_store.update((AppSettings s) => s.copyWith(haptics: enabled)));
   }
 }
 
