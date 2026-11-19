@@ -47,7 +47,6 @@ List<_Call> _calls() {
         readStatus: SeriesReadStatus.unread,
       ),
     ),
-    _Call('get', urls.series(sort: SeriesSort.recentlyRead)),
     _Call('get', urls.series(readStatus: SeriesReadStatus.inProgress)),
     _Call('get', urls.seriesBooks('S1')),
     _Call('get', urls.seriesById('S1')),

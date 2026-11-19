@@ -1,4 +1,5 @@
 import 'package:komga_domain/komga_domain.dart';
+import 'package:komga_native/src/data/shelf_filter_preset.dart';
 import 'package:komga_native/src/data/shelf_view_options.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -21,6 +22,7 @@ class AppSettings {
     this.sort,
     this.readStatus,
     this.libraryFilters = const <String, String>{},
+    this.filterPresets = const <String, List<ShelfFilterPreset>>{},
   });
 
   /// 全默认值（没有存档、存档写坏、字段缺失时都用它）。
@@ -49,6 +51,11 @@ class AppSettings {
   /// 书架会变成"空书架"（FIX-02 的验收点之一）。
   final Map<String, String> libraryFilters;
 
+  /// 每台服务器上保存的筛选组合（LIB-04）；key = 服务器 base URL。
+  ///
+  /// 按服务器分区：切服务器时另一台的库 id 在本机根本不成立。
+  final Map<String, List<ShelfFilterPreset>> filterPresets;
+
   AppSettings copyWith({
     ThemeMode? themeMode,
     bool? forceEink,
@@ -59,6 +66,7 @@ class AppSettings {
     Object? sort = _unset,
     Object? readStatus = _unset,
     Map<String, String>? libraryFilters,
+    Map<String, List<ShelfFilterPreset>>? filterPresets,
   }) => AppSettings(
     themeMode: themeMode ?? this.themeMode,
     forceEink: forceEink ?? this.forceEink,
@@ -71,6 +79,7 @@ class AppSettings {
         ? this.readStatus
         : readStatus as SeriesReadStatus?,
     libraryFilters: libraryFilters ?? this.libraryFilters,
+    filterPresets: filterPresets ?? this.filterPresets,
   );
 
   /// 记下某台服务器选的库；[libraryId] 为 null 表示"全部库"。
@@ -88,6 +97,37 @@ class AppSettings {
   String? libraryFilterFor(String? serverKey) =>
       serverKey == null ? null : libraryFilters[serverKey];
 
+  /// 这台服务器保存的筛选组合（没有就是空列表）。
+  List<ShelfFilterPreset> presetsFor(String? serverKey) => serverKey == null
+      ? const <ShelfFilterPreset>[]
+      : (filterPresets[serverKey] ?? const <ShelfFilterPreset>[]);
+
+  /// 保存/覆盖一条筛选组合（按 id 覆盖，最多留 8 条防无限增长）。
+  AppSettings withPreset(String serverKey, ShelfFilterPreset preset) {
+    final next = <String, List<ShelfFilterPreset>>{
+      for (final entry in filterPresets.entries)
+        entry.key: List<ShelfFilterPreset>.of(entry.value),
+    };
+    final list = next.putIfAbsent(serverKey, () => <ShelfFilterPreset>[]);
+    list.removeWhere((ShelfFilterPreset p) => p.id == preset.id);
+    list.insert(0, preset);
+    if (list.length > 8) list.removeRange(8, list.length);
+    return copyWith(filterPresets: next);
+  }
+
+  /// 删掉一条筛选组合。
+  AppSettings withoutPreset(String serverKey, String id) {
+    final next = <String, List<ShelfFilterPreset>>{
+      for (final entry in filterPresets.entries)
+        entry.key: List<ShelfFilterPreset>.of(entry.value),
+    };
+    final list = next[serverKey];
+    if (list == null) return this;
+    list.removeWhere((ShelfFilterPreset p) => p.id == id);
+    if (list.isEmpty) next.remove(serverKey);
+    return copyWith(filterPresets: next);
+  }
+
   Map<String, Object?> toJson() => <String, Object?>{
     'theme': themeMode.name,
     'forceEink': forceEink,
@@ -98,6 +138,13 @@ class AppSettings {
     if (sort != null) 'sort': sort!.name,
     if (readStatus != null) 'readStatus': readStatus!.name,
     if (libraryFilters.isNotEmpty) 'libraryFilters': libraryFilters,
+    if (filterPresets.isNotEmpty)
+      'filterPresets': <String, Object?>{
+        for (final entry in filterPresets.entries)
+          entry.key: <Object?>[
+            for (final preset in entry.value) preset.toJson(),
+          ],
+      },
   };
 
   /// 从存档解析；任何字段坏了都只影响它自己。
@@ -128,7 +175,26 @@ class AppSettings {
                   entry.key as String: entry.value as String,
             }
           : const <String, String>{},
+      filterPresets: _parsePresets(json['filterPresets']),
     );
+  }
+
+  /// 解析"每台服务器的筛选组合"：坏条目逐条丢弃，不影响其它条。
+  static Map<String, List<ShelfFilterPreset>> _parsePresets(Object? raw) {
+    if (raw is! Map) return const <String, List<ShelfFilterPreset>>{};
+    final result = <String, List<ShelfFilterPreset>>{};
+    for (final entry in raw.entries) {
+      final key = entry.key;
+      final value = entry.value;
+      if (key is! String || key.isEmpty || value is! List) continue;
+      final presets = <ShelfFilterPreset>[
+        for (final item in value)
+          if (ShelfFilterPreset.fromJson(item) case final ShelfFilterPreset p)
+            p,
+      ];
+      if (presets.isNotEmpty) result[key] = presets;
+    }
+    return result;
   }
 
   static const Object _unset = Object();

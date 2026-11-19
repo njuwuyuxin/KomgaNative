@@ -100,3 +100,44 @@ OpenAPI 里 `/api/v1/series/{seriesId}/read-progress` 声明了两个操作：
 - `test/contract_test.dart`：把带 `sort` / `read_status` 的 URL 拿去和 OpenAPI 比对参数名
 - `test/fixtures/series-read-status-unread.json`：上表第一条 UNREAD 的**真实响应**，
   由 `fixtures_test.dart` 驱动解析并断言"返回的系列确实都是未读"
+
+## LIB-04 复验（2026-11-20）：哪些"看起来能排"的属性其实是空操作
+
+背景：LIB-04 要加"阅读进度 / 未读数 / 最近打开"三种排序。做法是先在本机 Komga
+**1.30.1**（`http://127.0.0.1:25600`，`komga@example.com`）上复验，再决定上不上线。
+
+### 方法：用"随机属性"当对照组
+
+Komga 对**不存在的** sort 属性不会报错，而是静默忽略、返回默认顺序。所以
+"返回 200"完全不能证明排序生效。对照组：
+
+| 请求 | 返回顺序 |
+|---|---|
+| `sort=bogusField,desc` | Akira → Sunny → Vagabond → Verify → Frieren（= 默认顺序） |
+
+凡是结果与 `bogusField` 完全一致的属性，都判定为**未被支持**。
+
+### 结果
+
+先造数据：把 Frieren 的两本都标为已读（`PATCH /api/v1/books/{id}/read-progress`），
+此时 Frieren 是 0 未读 / 2 已读，任何"按未读/按已读/按最近阅读"的合法排序都应把它排到首位。
+
+| 请求 | 结果 | 判定 |
+|---|---|---|
+| `sort=booksUnreadCount,asc` | Frieren 仍在**最后** | 不支持（= 默认顺序） |
+| `sort=booksReadCount,desc` | Frieren 仍在**最后** | 不支持 |
+| `sort=readProgress.lastModified,desc` | Frieren 仍在**最后** | 不支持 |
+| `sort=readProgress.readDate,desc` | 与默认顺序一致 | 不支持 |
+| `sort=booksCount,desc` | Frieren(2 本) → 其余(1 本) | **生效** |
+| `sort=createdDate,desc` | Frieren → Verify → Vagabond → Sunny → Akira | **生效** |
+| `sort=metadata.titleSort,asc` | Akira → Frieren → Sunny → Vagabond → Verify | **生效** |
+| `sort=booksMetadata.releaseDate,desc` | Sunny → Vagabond → Akira → … | **生效** |
+
+### 结论
+
+- **`SeriesSort.recentlyRead`（"最近阅读"）在本版本上是空操作**，已从枚举与菜单中删除——
+  提供一个点了什么都不会发生的排序项，比没有更糟。（此前文档里那次"验证"无法与默认顺序区分，
+  属于误判，这里更正。）
+- "未读数 / 阅读进度 / 最近打开"三种排序**没有服务端支持**，因此 LIB-04 不新增排序项；
+  想要这些视图只能用 `read_status` 筛选（已验证）配合现有排序。
+- 判定方法以后按本文的**对照组**做法执行：返回 200 不等于参数被接受。

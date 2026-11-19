@@ -19,8 +19,10 @@ enum SeriesSort {
   /// 最近添加。
   recentlyAdded,
 
-  /// 最近阅读。
-  recentlyRead,
+  // "最近阅读"曾用 `readProgress.lastModified,desc`，2026-11-20 复验发现
+  // 该属性被服务端**静默忽略**（返回 200 但顺序与默认一致，且与随机属性
+  // `bogusField` 的结果完全相同）——与其提供一个什么都不做的排序项，不如删掉。
+  // 详见 docs/series-queries.md。
 
   /// 书籍数量多的在前（2026-11-19 对真实 1.30.1 验证：`booksCount,desc`）。
   booksCountDesc,

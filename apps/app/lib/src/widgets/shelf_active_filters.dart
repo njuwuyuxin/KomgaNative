@@ -130,7 +130,6 @@ String _sortLabel(AppLocalizations l10n, SeriesSort sort) => switch (sort) {
   SeriesSort.titleAsc => l10n.sortTitleAsc,
   SeriesSort.titleDesc => l10n.sortTitleDesc,
   SeriesSort.recentlyAdded => l10n.sortRecentlyAdded,
-  SeriesSort.recentlyRead => l10n.sortRecentlyRead,
   SeriesSort.booksCountDesc => l10n.sortBooksCount,
   SeriesSort.releaseDateDesc => l10n.sortReleaseDate,
 };

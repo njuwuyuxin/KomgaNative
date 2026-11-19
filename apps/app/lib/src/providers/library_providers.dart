@@ -8,6 +8,7 @@ import 'package:komga_native/src/data/app_settings.dart';
 import 'package:komga_native/src/data/library_repository.dart';
 import 'package:komga_native/src/data/settings_store.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
+import 'package:komga_native/src/data/shelf_filter_preset.dart';
 import 'package:komga_native/src/data/shelf_view_options.dart';
 import 'package:komga_native/src/providers/cache_providers.dart';
 import 'package:komga_native/src/providers/progress_providers.dart';
@@ -202,6 +203,7 @@ class ShelfState {
     this.readStatus,
     this.view = ShelfView.grid,
     this.coverSize = ShelfCoverSize.medium,
+    this.presets = const <ShelfFilterPreset>[],
     this.loading = true,
     this.loadingMore = false,
     this.failure,
@@ -231,6 +233,9 @@ class ShelfState {
   /// 网格封面档位（UI-P2-7）。
   final ShelfCoverSize coverSize;
 
+  /// 这台服务器上保存的筛选组合（LIB-04）。
+  final List<ShelfFilterPreset> presets;
+
   /// 首屏（或换库/换搜索词后的重新加载）进行中。
   final bool loading;
 
@@ -256,6 +261,7 @@ class ShelfState {
     Object? readStatus = _unset,
     ShelfView? view,
     ShelfCoverSize? coverSize,
+    List<ShelfFilterPreset>? presets,
     bool? loading,
     bool? loadingMore,
     ShelfFailure? failure,
@@ -277,6 +283,7 @@ class ShelfState {
         : readStatus as SeriesReadStatus?,
     view: view ?? this.view,
     coverSize: coverSize ?? this.coverSize,
+    presets: presets ?? this.presets,
     loading: loading ?? this.loading,
     loadingMore: loadingMore ?? this.loadingMore,
     failure: clearFailure ? null : (failure ?? this.failure),
@@ -351,6 +358,7 @@ class ShelfController extends Notifier<ShelfState> {
           ? state.readStatus
           : saved.readStatus,
       libraryId: libraryId,
+      presets: saved.presetsFor(_serverKey),
     );
     // 恢复前后查询条件变没变，决定要不要补一次请求。
     final needsReload =
@@ -458,6 +466,64 @@ class ShelfController extends Notifier<ShelfState> {
     _touched.add('readStatus');
     _persist((AppSettings s) => s.copyWith(readStatus: status));
     _reloadWith(state.copyWith(readStatus: status));
+  }
+
+  /// 把当前三项筛选存成一个命名组合（LIB-04）。
+  ///
+  /// 存的是**当前生效**的 sort/readStatus/libraryId；三项都为空时不存
+  /// （"什么都不筛"没有保存价值）。
+  void savePreset(String name) {
+    // 没有会话时用空串做 key：书架本来就只在连接后可见，
+    // 真要落到这里也只是"暂时记在空 key 下"，不会串到别的服务器。
+    final serverKey = _serverKey ?? '';
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return;
+    final preset = ShelfFilterPreset(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      name: trimmed,
+      sort: state.sort,
+      readStatus: state.readStatus,
+      libraryId: state.libraryId,
+    );
+    if (preset.isEmpty) return;
+    _persist((AppSettings s) => s.withPreset(serverKey, preset));
+    state = state.copyWith(
+      presets: <ShelfFilterPreset>[preset, ...state.presets],
+    );
+  }
+
+  /// 应用一条筛选组合：三个筛选条件一起换，然后重新拉第一页。
+  void applyPreset(ShelfFilterPreset preset) {
+    final serverKey = _serverKey ?? '';
+    _touched.addAll(<String>['sort', 'readStatus', 'libraryId']);
+    _persist(
+      (AppSettings s) =>
+          s.copyWith(sort: preset.sort, readStatus: preset.readStatus),
+    );
+    if (preset.libraryId != null) {
+      _persist(
+        (AppSettings s) => s.withLibraryFilter(serverKey, preset.libraryId),
+      );
+    }
+    _reloadWith(
+      state.copyWith(
+        sort: preset.sort,
+        readStatus: preset.readStatus,
+        libraryId: preset.libraryId,
+      ),
+    );
+  }
+
+  /// 删掉一条筛选组合。
+  void deletePreset(String id) {
+    final serverKey = _serverKey ?? '';
+    _persist((AppSettings s) => s.withoutPreset(serverKey, id));
+    state = state.copyWith(
+      presets: <ShelfFilterPreset>[
+        for (final preset in state.presets)
+          if (preset.id != id) preset,
+      ],
+    );
   }
 
   /// 换呈现方式 / 封面档位（UI-P2-7）：**不重新发请求**，只改视图状态。

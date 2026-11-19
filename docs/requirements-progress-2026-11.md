@@ -39,7 +39,7 @@
 | LIB-01 | 书架标题/计数/筛选状态/toolbar 收敛 | P1 | TODO | — |
 | LIB-02 | 未读角标 + 置顶 | P1 | DONE | `feat(shelf): 未读角标 + 系列置顶` |
 | LIB-03 | 书架多选/批量 | P1 | DONE | `feat(shelf): 多选与批量标记` |
-| LIB-04 | 排序补充 + 保存筛选组合 | P1 | TODO | — |
+| LIB-04 | 排序补充 + 保存筛选组合 | P1 | DONE | `feat(shelf): 保存筛选组合 + 删掉空操作排序` |
 | SER-01 | 系列书列表排序/筛选 | P1 | TODO | — |
 | SER-02 | 系列书多选/批量/标记之前所有 | P1 | TODO | — |
 | SER-03 | 系列下载全部/未读 N 本 | P1 | TODO | — |
@@ -228,6 +228,29 @@
   `continueReadingProgress` 是 FIX-06 之后失效的）。
 - 验证：55 条阅读器测试 + 黄金图全部不变（零行为变更）；设备上打开第 114/227 页
   照常渲染，滑杆与"剩 113 页"一致。
+
+### LIB-04 排序补充 + 保存筛选组合
+
+- **先做 spike，再决定**：在本机 Komga 1.30.1 上用"随机属性当对照组"的方式复验
+  （`sort=bogusField,desc` 返回 200 且是默认顺序 —— 说明"200"不能证明排序生效）：
+  - `booksUnreadCount` / `booksReadCount` / `readProgress.lastModified` / `readProgress.readDate`
+    **全部不支持**（把 Frieren 标成 0 未读 / 2 已读后，它们仍把 Frieren 排在最后）；
+  - `booksCount` / `createdDate` / `metadata.titleSort` / `booksMetadata.releaseDate` 生效。
+  - 记录在 `docs/series-queries.md` 的"LIB-04 复验"一节。
+- 由此：**不新增**"未读数 / 阅读进度 / 最近打开"三种排序（没有服务端支持）；
+  并**删掉 `SeriesSort.recentlyRead`**——它一直是空操作，之前的"验证"无法与默认顺序区分，属误判。
+- 新增**保存筛选组合**：`ShelfFilterPreset { id, name, sort, readStatus, libraryId }`，
+  存在 `AppSettings.filterPresets`（按服务器 baseUrl 分区，最多 8 条，同 id 覆盖）。
+  筛选菜单里"保存当前筛选"（无筛选时置灰）→ 命名 → 菜单里出现"应用/删除"两项。
+- 测试：`shelf_filter_preset_test.dart` 8 条（模型 JSON 与坏条目容错、按服务器分区、
+  同 id 覆盖与 8 条上限、删除、存档往返、控制器保存/应用/删除、空名字与无筛选不存）+
+  `shelf_filter_menu_test.dart` 3 条（无筛选时置灰、保存后应用、删除）。
+- 顺带修一个真 bug：命名对话框在 `showDialog` 返回后立刻 `dispose` 控制器，
+  退场动画里的 `TextField` 再次使用它 → "used after being disposed"。改成由对话框
+  自己的 StatefulWidget 持有控制器。
+- 黄金图：`library_sort_menu@*` 因少了一项重生成（已自查）。
+- 设备走查：筛选菜单里"保存当前筛选"在无筛选时置灰；选"在读"后书架变 8 个系列、
+  顶部出现 `在读 ✕` chip、筛选图标高亮。
 
 ### LIB-03 书架多选 / 批量
 
