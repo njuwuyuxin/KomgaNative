@@ -229,6 +229,23 @@
 - 验证：55 条阅读器测试 + 黄金图全部不变（零行为变更）；设备上打开第 114/227 页
   照常渲染，滑杆与"剩 113 页"一致。
 
+### A11Y-01 无障碍 + Dynamic Type 2.0
+
+- **2.0× 黄金图**两张：`library@phone_light_text2.0`、`settings@phone_light_text2.0`。
+  书架在 2.0× 下自动降成两列、标题换行；设置页副标题多行、卡片自动长高。
+- **语义测试**（`a11y_semantics_test.dart` 4 条）：书架封面能被读屏念出系列名、
+  顶部三颗动作有 tooltip 语义、设置页开关有可读标签、2.0× 下标题不被固定高度裁掉。
+- **点击区**：断言书架图标按钮 ≥44dp（低于这个值手指容易点不中）。
+- **减少动态效果**：已有路径——`AppMotion.of(context)` 读
+  `MediaQuery.maybeDisableAnimationsOf`，为 true 时全部时长归零（与墨水屏同一分支），
+  不需要新增代码；本项只确认它还在。
+- **诚实缺口**：
+  1. 没有真机 TalkBack 走查（本环境只能用语义树 + 黄金图代替）；
+  2. 2.0× 下**底部导航标签会截断成"正…"**、设置页分段控件标签截断成"Syst…/Engli…"。
+     都是省略号而非裁切，但确实违反"不截断"的严格标准，记在这里而不是假装通过。
+- 设备走查：`settings put system font_scale 2.0` 后重开书架，文字放大、无重叠、
+  列表行自动变高；走查后已恢复 `font_scale 1.0`。
+
 ### I18N-01 数据层错误文案本地化
 
 - `ShelfFailure` 增加 `ShelfFailureKind`（auth / network / server / protocol /

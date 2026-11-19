@@ -185,6 +185,16 @@ void main() {
     );
   });
 
+  testWidgets('library@phone_light_text2.0', (WidgetTester tester) async {
+    await pumpShelfGolden(
+      tester,
+      name: 'library@phone_light_text2.0',
+      size: GoldenSizes.phone,
+      theme: AppTheme.light(),
+      textScale: 2.0,
+    );
+  });
+
   testWidgets('library@eink', (WidgetTester tester) async {
     await pumpShelfGolden(
       tester,
@@ -868,6 +878,23 @@ void main() {
       size: GoldenSizes.eink,
       theme: AppTheme.eink(),
     );
+  });
+
+  testWidgets('settings@phone_light_text2.0', (WidgetTester tester) async {
+    await pumpGoldenScreen(
+      tester,
+      screen: const SettingsScreen(),
+      size: GoldenSizes.phone,
+      theme: AppTheme.light(),
+      textScale: 2.0,
+      overrides: <Override>[
+        ...memorySession(connected: true),
+        httpCacheDatabaseProvider.overrideWithValue(
+          HttpCacheDatabase(NativeDatabase.memory()),
+        ),
+      ],
+    );
+    await expectGolden(tester, 'settings@phone_light_text2.0');
   });
 
   testWidgets('settings@eink', (WidgetTester tester) async {
