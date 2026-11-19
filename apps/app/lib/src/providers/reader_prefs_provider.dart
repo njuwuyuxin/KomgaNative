@@ -66,6 +66,9 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
     (ReaderPrefs p) => p.copyWith(trimBorders: enabled),
   );
 
+  void setPageTurn(ReaderPageTurnChoice choice, {String? seriesId}) =>
+      _updateConfig(seriesId, (ReaderPrefs p) => p.copyWith(pageTurn: choice));
+
   /// 把某一组设置恢复默认（RDR-04）：只动这一组，其它组不受影响。
   void resetGroup(ReaderSettingsGroup group, {String? seriesId}) =>
       _updateConfig(seriesId, (ReaderPrefs p) => p.resetGroup(group));

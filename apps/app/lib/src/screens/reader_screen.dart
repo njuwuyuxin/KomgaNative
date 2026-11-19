@@ -112,6 +112,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     final isEink = ref.watch(effectiveEinkProvider);
     // 方向每次 build 重新解析（系列详情可能晚到），事件回调读这个缓存。
     _direction = _resolveDirection();
+    // 偏好与书都在**本 build** 里 watch：写在 gate 的 builder 里时，
+    // 偏好恢复/换书不一定会让这一层重建（RDR-05 踩到过）。
+    final prefs = _effectivePrefs(ref.watch(readerPrefsProvider));
+    final book =
+        widget.book ?? ref.watch(readerBookProvider(widget.bookId)).value;
     final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     final openingHero = widget.heroTag;
     return EdgeSwipeBack(
@@ -125,7 +130,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
               palette: ReaderPalette.of(isEink: isEink),
               onRetry: () => ref.invalidate(readerPagesProvider(widget.bookId)),
               builder: (List<PageInfo> pages) =>
-                  _buildPages(context, isEink, pages),
+                  _buildPages(context, isEink, pages, prefs, book),
             ),
             // 继续阅读卡片的封面先飞进来，落地后再由页图接管（UI-P2-2）。
             // 没有源卡片、墨水屏、系统"减少动态效果"时都不建。
@@ -143,11 +148,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     );
   }
 
-  Widget _buildPages(BuildContext context, bool isEink, List<PageInfo> pages) {
+  Widget _buildPages(
+    BuildContext context,
+    bool isEink,
+    List<PageInfo> pages,
+    ReaderPrefs prefs,
+    Book? book,
+  ) {
     final l10n = AppLocalizations.of(context);
-    final prefs = _effectivePrefs(ref.watch(readerPrefsProvider));
-    final book =
-        widget.book ?? ref.watch(readerBookProvider(widget.bookId)).value;
     final total = pages.length;
     _landscape = MediaQuery.orientationOf(context) == Orientation.landscape;
     final layout = ReaderLayout(
@@ -217,9 +225,12 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         nextSpread: layout.neighbour(1),
         previousSpread: layout.neighbour(-1),
         style: PageTurnStyle.resolve(
+          choice: prefs.pageTurn,
           eink: isEink,
           disableAnimations:
               MediaQuery.maybeDisableAnimationsOf(context) ?? false,
+          // 时长走 token（墨水屏 / 减少动态效果时 token 自己会压成 0）。
+          duration: AppMotion.of(context).emphasized,
         ),
         onTurn: (int delta) {
           final target = layout.turnTarget(delta);

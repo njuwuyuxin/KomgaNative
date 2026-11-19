@@ -33,6 +33,7 @@ void main() {
     background: ReaderBackgroundChoice.white,
     lockZoom: true,
     trimBorders: true,
+    pageTurn: ReaderPageTurnChoice.fade,
   );
 
   test('「页面」组只重置模式，其它组不动', () async {
@@ -91,6 +92,7 @@ void main() {
     final prefs = container.read(readerPrefsProvider);
     expect(prefs.lockZoom, isFalse);
     expect(prefs.keepAwake, isFalse);
+    expect(prefs.pageTurn, ReaderPageTurnChoice.curl);
     expect(prefs.mode, ReaderModeChoice.double);
     expect(prefs.trimBorders, isTrue);
   });

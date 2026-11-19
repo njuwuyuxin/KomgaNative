@@ -29,7 +29,7 @@
 | RDR-02 | 阅读器目录/章节列表 | P1 | DONE | `feat(reader): 目录面板` |
 | RDR-03 | 顶栏 IA + AA 快捷设置 | P1 | DONE | `feat(reader): 顶栏四槽 + AA 快捷设置` |
 | RDR-04 | 阅读设置分组/重置/适配预览 | P1 | DONE | `feat(reader): 设置分四组、可单组重置` |
-| RDR-05 | 翻页动画选择 | P1 | TODO | — |
+| RDR-05 | 翻页动画选择 | P1 | DONE | `feat(reader): 翻页动画可选` |
 | RDR-06 | 双页分组持久化 | P1 | TODO | — |
 
 ## W2 书架/系列
@@ -228,6 +228,29 @@
   `continueReadingProgress` 是 FIX-06 之后失效的）。
 - 验证：55 条阅读器测试 + 黄金图全部不变（零行为变更）；设备上打开第 114/227 页
   照常渲染，滑杆与"剩 113 页"一致。
+
+### RDR-05 翻页动画选择
+
+- `ReaderPageTurnChoice { curl, slide, fade, none }` 落进 `ReaderPrefs`（含 JSON、
+  `copyWith`、`==`/`hashCode`、交互组重置），设置面板"交互"组多一项"翻页动画"。
+- `PageTurnStyle.resolve` 改成"用户选择 + 环境"：墨水屏、系统"减少动态效果"、
+  或 token 时长被压成 0 时一律瞬切——用户选了卷页也不该在墨水屏上播动画。
+  时长不再写死 400ms，由调用方传 `AppMotion.of(context).emphasized`（450ms）。
+- 新增 `PageTurnEffect.fade`：当前屏整体淡出露出相邻屏；卷页计划只在选了 curl 时
+  才准备（平移/淡入不需要纸面位图）。
+- **修掉一个会静默吞掉设置的 bug**：`ReaderPrefs.==` 漏了 `pageTurn`（`hashCode`
+  里有、`==` 里没有）。后果是只改翻页动画时 `_update` 判定"没变"直接 return——
+  状态不落盘、界面也不刷新。是写测试时"设置改了但 store 还是 null"暴露出来的。
+- 顺带把 `readerPrefsProvider` / `readerBookProvider` 的 watch 从 `ReaderPagesGate`
+  的 builder 里提到 `ReaderScreen.build`：写在 builder 里时，偏好恢复不一定会
+  让这一层重建（同一个 bug 的另一半症状）。
+- 测试：`page_turn_style_test.dart` 8 条（四档映射、墨水屏/减少动效/零时长强制瞬切、
+  时长来自 token、控制器落盘、选择传到绘制层、墨水屏即使选卷页也瞬切）、
+  `reader_settings_sheet_test.dart` 加一条"交互组里选淡入会落盘"。
+- 黄金图：`reader_settings@*` 因新增分组项更新；`reader_curl*` 的帧时刻按新的
+  450ms 等比换算（`cold_under_reveal` 一张基线随之更新，原因是时长变了，
+  不是卷页本身变了）。
+- 设备走查：交互组里四项齐全，选"平移"后高亮与说明同步。
 
 ### RDR-04 阅读设置分组 / 重置 / 适配预览
 

@@ -61,6 +61,25 @@ String readerBackgroundHint(
   ReaderBackgroundChoice.immersive => l10n.readerBackgroundImmersiveHint,
 };
 
+/// 翻页动画的界面文案（RDR-05）。
+String readerPageTurnLabel(
+  AppLocalizations l10n,
+  ReaderPageTurnChoice choice,
+) => switch (choice) {
+  ReaderPageTurnChoice.curl => l10n.readerPageTurnCurl,
+  ReaderPageTurnChoice.slide => l10n.readerPageTurnSlide,
+  ReaderPageTurnChoice.fade => l10n.readerPageTurnFade,
+  ReaderPageTurnChoice.none => l10n.readerPageTurnNone,
+};
+
+String readerPageTurnHint(AppLocalizations l10n, ReaderPageTurnChoice choice) =>
+    switch (choice) {
+      ReaderPageTurnChoice.curl => l10n.readerPageTurnCurlHint,
+      ReaderPageTurnChoice.slide => l10n.readerPageTurnSlideHint,
+      ReaderPageTurnChoice.fade => l10n.readerPageTurnFadeHint,
+      ReaderPageTurnChoice.none => l10n.readerPageTurnNoneHint,
+    };
+
 /// 面板里的一个"单选一组"区块：小标题 + 若干行。
 ///
 /// 四种设置（模式 / 适配 / 方向 / 背景）的结构完全一样，抽成一个泛型区块，

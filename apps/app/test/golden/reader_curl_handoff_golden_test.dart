@@ -83,9 +83,9 @@ void main() {
         key.currentState!.turn(forward ? 1 : -1);
         await tester.pump();
         expect(key.currentState!.debugHinged, isTrue);
-        await tester.pump(const Duration(milliseconds: 384));
+        await tester.pump(const Duration(milliseconds: 432));
         await _capture(tester, captureKey, 'before', rtl, forward);
-        await tester.pump(const Duration(milliseconds: 32));
+        await tester.pump(const Duration(milliseconds: 36));
         expect(spread, forward ? <int>[4, 5] : <int>[0, 1]);
         // Image.memory 的首次解码可能还没返回，此时仍要有当前目标页的像素。
         final bytes = await _capture(
@@ -164,7 +164,7 @@ void main() {
     key.currentState!.turn(1);
     await tester.pump();
     expect(key.currentState!.debugCurling, isFalse, reason: '有纸背但底层还冷，不能卷出黑半页');
-    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 560));
     gate.complete();
     for (var i = 0; i < 12; i++) {
       await tester.runAsync(

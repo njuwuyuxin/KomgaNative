@@ -1,23 +1,26 @@
 import 'dart:ui' as ui;
 
+import 'package:komga_native/src/data/reader_prefs.dart';
 import 'package:komga_reader_engine/komga_reader_engine.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 翻页动画的绘制层。
 ///
-/// 三种效果，从"最真"到"最省"：
+/// 四种效果，从"最真"到"最省"：
 /// - [PageTurnEffect.curl]：片元着色器把纸面沿圆柱卷起来（需要页面位图，见 [CurlSheets]）；
-/// - [PageTurnEffect.slide]：整张纸平移出去（双页模式、着色器不可用时用）；
-/// - [PageTurnEffect.none]：不做动画（墨水屏），直接换页。
-enum PageTurnEffect { curl, slide, none }
+/// - [PageTurnEffect.slide]：整张纸平移出去；
+/// - [PageTurnEffect.fade]：当前屏淡出、露出相邻屏（老设备最省的一种）；
+/// - [PageTurnEffect.none]：不做动画（墨水屏 / 减少动态效果），直接换页。
+enum PageTurnEffect { curl, slide, fade, none }
 
 /// 一次翻页的手感参数。
 ///
-/// 时长先写死 400ms（用户要求 0.3–0.5s），后续做进 `ReaderPrefs` 变成可配置。
+/// 时长来自设计 token（`AppMotion.emphasized`），由调用方传进来：
+/// `PageTurnStyle` 本身不认识 `BuildContext`，纯单测里也能构造。
 class PageTurnStyle {
   const PageTurnStyle({
     this.effect = PageTurnEffect.curl,
-    this.duration = const Duration(milliseconds: 400),
+    this.duration = const Duration(milliseconds: 450),
   });
 
   final PageTurnEffect effect;
@@ -25,13 +28,29 @@ class PageTurnStyle {
 
   bool get animates => effect != PageTurnEffect.none;
 
-  /// 按当前环境选风格：墨水屏和系统"减少动态效果"直接瞬切。
+  /// 按"用户选择 + 当前环境"选风格（RDR-05）。
+  ///
+  /// 墨水屏、系统"减少动态效果"、或时长被 token 压成 0 时一律瞬切：
+  /// 用户选了卷页也不该在墨水屏上播动画（整屏全刷 + 拖影）。
   static PageTurnStyle resolve({
+    required ReaderPageTurnChoice choice,
     required bool eink,
     required bool disableAnimations,
-  }) => (eink || disableAnimations)
-      ? const PageTurnStyle(effect: PageTurnEffect.none)
-      : const PageTurnStyle();
+    required Duration duration,
+  }) {
+    if (eink || disableAnimations || duration == Duration.zero) {
+      return const PageTurnStyle(effect: PageTurnEffect.none);
+    }
+    return PageTurnStyle(
+      effect: switch (choice) {
+        ReaderPageTurnChoice.curl => PageTurnEffect.curl,
+        ReaderPageTurnChoice.slide => PageTurnEffect.slide,
+        ReaderPageTurnChoice.fade => PageTurnEffect.fade,
+        ReaderPageTurnChoice.none => PageTurnEffect.none,
+      },
+      duration: duration,
+    );
+  }
 }
 
 /// 加载并缓存 `shaders/page_curl.frag`。

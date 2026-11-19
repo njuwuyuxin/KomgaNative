@@ -75,13 +75,13 @@ void main() {
     await tester.pump();
     expect(key.currentState!.debugCurling, isTrue, reason: '纸面就绪就该卷页，不等底层');
 
-    await tester.pump(const Duration(milliseconds: 190));
+    await tester.pump(const Duration(milliseconds: 214));
     await expectLater(
       find.byKey(captureKey),
       matchesGoldenFile('goldens/reader_curl@tablet_dark_cold_under_mid.png'),
     );
 
-    await tester.pump(const Duration(milliseconds: 70));
+    await tester.pump(const Duration(milliseconds: 79));
     expect(
       find.byKey(const Key('reader-page-loading-1')),
       findsOneWidget,

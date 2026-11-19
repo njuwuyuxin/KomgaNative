@@ -290,7 +290,7 @@ class ReaderSettingsSheet extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: AppSpacing.md),
-              // ---- 交互：锁定缩放 + 常亮 ----
+              // ---- 交互：翻页动画 + 锁定缩放 + 常亮 ----
               ReaderSettingsGroupHeader(
                 group: 'interaction',
                 title: l10n.readerGroupInteraction,
@@ -301,6 +301,18 @@ class ReaderSettingsSheet extends ConsumerWidget {
                   seriesId: writeSeriesId,
                 ),
               ),
+              ReaderOptionSection<ReaderPageTurnChoice>(
+                title: l10n.readerPageTurn,
+                values: ReaderPageTurnChoice.values,
+                selected: prefs.pageTurn,
+                label: readerPageTurnLabel,
+                hint: readerPageTurnHint,
+                keyPrefix: 'reader-turn',
+                palette: palette,
+                onSelect: (ReaderPageTurnChoice value) =>
+                    controller.setPageTurn(value, seriesId: writeSeriesId),
+              ),
+              const SizedBox(height: AppSpacing.sm),
               ReaderSettingsSwitch(
                 switchKey: const Key('reader-lock-zoom'),
                 value: prefs.lockZoom,

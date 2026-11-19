@@ -108,6 +108,15 @@ void main() {
     );
   });
 
+  testWidgets('交互组里有翻页动画，选"淡入"会落盘（RDR-05）', (WidgetTester tester) async {
+    final store = await pumpReader(tester, book: demoReaderBook());
+
+    // 走公共 pickOption：打开面板 → 滚到该行 → 点 → 关面板。
+    await pickOption(tester, 'reader-turn-fade');
+
+    expect(store.prefs?.pageTurn, ReaderPageTurnChoice.fade);
+  });
+
   testWidgets('墨水屏：示意图拿到线框调色板，且没有背景组', (WidgetTester tester) async {
     await pumpReader(tester, book: demoReaderBook(), forceEink: true);
     await openSettings(tester);

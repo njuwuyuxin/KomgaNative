@@ -59,6 +59,12 @@ extension ReaderDirectionChoiceX on ReaderDirectionChoice {
 /// `dynamic` 从当前页边缘提色，双页取两页的平均；墨水屏不提供这一项（固定白底）。
 enum ReaderBackgroundChoice { black, white, dynamic, immersive }
 
+/// 翻页动画（RDR-05）。
+///
+/// 四个档位对应"最真 → 最省"：卷页（着色器）→ 平移 → 淡入 → 瞬切。
+/// 墨水屏与系统"减少动态效果"一律按瞬切处理，不看这个设置。
+enum ReaderPageTurnChoice { curl, slide, fade, none }
+
 /// 阅读设置的分组（RDR-04）。
 ///
 /// 完整面板按这四组排，并且**每组可以单独重置**：用户调坏了"颜色"，
@@ -129,6 +135,7 @@ class ReaderPrefs {
     this.background = ReaderBackgroundChoice.black,
     this.lockZoom = false,
     this.trimBorders = false,
+    this.pageTurn = ReaderPageTurnChoice.curl,
     this.presets = const <ReaderPreset>[],
     this.seriesOverrides = const <String, ReaderPrefs>{},
   });
@@ -153,6 +160,9 @@ class ReaderPrefs {
   /// 自动裁掉页图四周的纯色白边/黑边（UI-P3-10）。
   final bool trimBorders;
 
+  /// 翻页动画（RDR-05）。
+  final ReaderPageTurnChoice pageTurn;
+
   /// 用户保存的阅读预设（UI-P3-1）；按保存顺序排列。
   final List<ReaderPreset> presets;
 
@@ -176,6 +186,7 @@ class ReaderPrefs {
     ReaderSettingsGroup.interaction => copyWith(
       lockZoom: false,
       keepAwake: false,
+      pageTurn: ReaderPageTurnChoice.curl,
     ),
   };
 
@@ -188,7 +199,8 @@ class ReaderPrefs {
           !trimBorders,
     ReaderSettingsGroup.color =>
       background == ReaderBackgroundChoice.black && brightness == 1,
-    ReaderSettingsGroup.interaction => !lockZoom && !keepAwake,
+    ReaderSettingsGroup.interaction =>
+      !lockZoom && !keepAwake && pageTurn == ReaderPageTurnChoice.curl,
   };
 
   /// 去掉预设与系列覆盖后的"纯配置"（保存预设/系列覆盖时用）。
@@ -201,6 +213,7 @@ class ReaderPrefs {
     background: background,
     lockZoom: lockZoom,
     trimBorders: trimBorders,
+    pageTurn: pageTurn,
   );
 
   /// 某个系列实际生效的设置：有覆盖就用覆盖，否则用全局。
@@ -219,6 +232,7 @@ class ReaderPrefs {
       background: override.background,
       lockZoom: override.lockZoom,
       trimBorders: override.trimBorders,
+      pageTurn: override.pageTurn,
       presets: presets,
       seriesOverrides: seriesOverrides,
     );
@@ -262,6 +276,7 @@ class ReaderPrefs {
     ReaderBackgroundChoice? background,
     bool? lockZoom,
     bool? trimBorders,
+    ReaderPageTurnChoice? pageTurn,
     List<ReaderPreset>? presets,
     Map<String, ReaderPrefs>? seriesOverrides,
   }) => ReaderPrefs(
@@ -273,6 +288,7 @@ class ReaderPrefs {
     background: background ?? this.background,
     lockZoom: lockZoom ?? this.lockZoom,
     trimBorders: trimBorders ?? this.trimBorders,
+    pageTurn: pageTurn ?? this.pageTurn,
     presets: presets ?? this.presets,
     seriesOverrides: seriesOverrides ?? this.seriesOverrides,
   );
@@ -287,6 +303,7 @@ class ReaderPrefs {
         'background': background.name,
         'lockZoom': lockZoom,
         'trimBorders': trimBorders,
+        'pageTurn': pageTurn.name,
         if (includePresets && presets.isNotEmpty)
           'presets': <Object?>[for (final preset in presets) preset.toJson()],
         if (includePresets && seriesOverrides.isNotEmpty)
@@ -342,6 +359,11 @@ class ReaderPrefs {
       ),
       lockZoom: json['lockZoom'] == true,
       trimBorders: json['trimBorders'] == true,
+      pageTurn: _parse(
+        json['pageTurn'],
+        ReaderPageTurnChoice.values,
+        ReaderPageTurnChoice.curl,
+      ),
       presets: presets,
       seriesOverrides: overrides,
     );
@@ -367,6 +389,7 @@ class ReaderPrefs {
       other.background == background &&
       other.lockZoom == lockZoom &&
       other.trimBorders == trimBorders &&
+      other.pageTurn == pageTurn &&
       _samePresets(other.presets, presets) &&
       _sameOverrides(other.seriesOverrides, seriesOverrides);
 
@@ -400,6 +423,7 @@ class ReaderPrefs {
     background,
     lockZoom,
     trimBorders,
+    pageTurn,
     Object.hashAll(presets),
     Object.hashAll(
       seriesOverrides.entries.map(
