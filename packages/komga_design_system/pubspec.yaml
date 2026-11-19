@@ -18,3 +18,8 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+
+flutter:
+  shaders:
+    # 液态玻璃（Impeller 真机）：外缘折射 + 色散 + 方向性高光。见 docs/design-system.md。
+    - shaders/liquid_glass.frag

@@ -23,8 +23,12 @@ class GlassOptics {
     required this.specular,
     required this.specularWidth,
     required this.selectionFill,
+    required this.shader,
     this.contour,
   });
+
+  /// 着色器版（Impeller 真机）的参数；合成版不用。
+  final LiquidShaderParams shader;
 
   /// 玻璃里"选中项"那块嵌入胶囊的底色（中性灰/白，不染主色——
   /// iOS 26 的 tab bar 选中项是玻璃里再嵌一块亮玻璃，不是一块彩色塑料）。
@@ -81,6 +85,7 @@ class GlassOptics {
     ],
     specularWidth: 1.2,
     selectionFill: Color(0x14000000),
+    shader: LiquidShaderParams.light,
     contour: Color(0x14000000),
   );
 
@@ -104,6 +109,7 @@ class GlassOptics {
     ],
     specularWidth: 1.2,
     selectionFill: Color(0x24FFFFFF),
+    shader: LiquidShaderParams.dark,
     contour: Color(0x52000000),
   );
 
@@ -122,4 +128,80 @@ class GlassOptics {
       0, 0, 0, 1, 0,
     ];
   }
+}
+
+/// 着色器版液态玻璃（`shaders/liquid_glass.frag`）的参数，长度单位是逻辑像素。
+///
+/// 与合成版最大的区别：iOS 的液态玻璃**几乎不模糊**——背后的内容清晰可辨，
+/// "玻璃感"来自外缘斜面把背景弯折（[refraction] / [bezel]）、边缘的彩色色散
+/// （[chromaticAberration]）和沿轮廓随光向变化的高光（[specular]）。
+@immutable
+class LiquidShaderParams {
+  const LiquidShaderParams({
+    required this.blurSigma,
+    required this.bezel,
+    required this.refraction,
+    required this.chromaticAberration,
+    required this.saturation,
+    required this.brightness,
+    required this.tint,
+    required this.specular,
+    required this.rimWidth,
+    required this.glow,
+  });
+
+  /// 着色器里的轻模糊半径（iOS 的 regular glass 只糊一点，让文字不跟背景打架）。
+  final double blurSigma;
+
+  /// 斜面宽度：折射只发生在外缘这一圈，中间是平的、不变形。
+  final double bezel;
+
+  /// 外缘处最大的折射位移。
+  final double refraction;
+
+  /// RGB 色散：红/蓝通道相对位移多走 / 少走的比例。
+  final double chromaticAberration;
+
+  final double saturation;
+
+  /// 整体提亮（加到 0..1 的颜色上）。
+  final double brightness;
+
+  /// 底色：rgb + 混合比例（alpha）。
+  final Color tint;
+
+  /// 镜面高光强度（0..1）。
+  final double specular;
+
+  /// 镜面高光线宽。
+  final double rimWidth;
+
+  /// 斜面柔光强度（0..1）。
+  final double glow;
+
+  static const LiquidShaderParams light = LiquidShaderParams(
+    blurSigma: 4,
+    bezel: 18,
+    refraction: 22,
+    chromaticAberration: 0.12,
+    saturation: 1.5,
+    brightness: 0.04,
+    tint: Color(0x85F7F7FA),
+    specular: 0.85,
+    rimWidth: 1.6,
+    glow: 0.22,
+  );
+
+  static const LiquidShaderParams dark = LiquidShaderParams(
+    blurSigma: 4,
+    bezel: 18,
+    refraction: 22,
+    chromaticAberration: 0.12,
+    saturation: 1.4,
+    brightness: -0.02,
+    tint: Color(0x6B141416),
+    specular: 0.55,
+    rimWidth: 1.6,
+    glow: 0.12,
+  );
 }

@@ -44,7 +44,8 @@ chrome 永远压在漫画画面上：浅色模式下用浅色毛玻璃，白底�
 |---|---|---|
 | `FrostedSurface` | 裁剪 →（液态玻璃档）外缘折射 → `BackdropFilter` 模糊（+ 提饱和）→ 半透明底色 → 体内反光 →（液态玻璃档）内缘聚光 + 方向性镜面高光边 + 轮廓（可传 `shape`） | 墨水屏不建 `BackdropFilter`、不画反光与光学层 |
 | `GlassSurface` | `FrostedSurface` + 浮层阴影，默认胶囊形（导航条 / 搜索圆球） | 墨水屏不模糊、不反光、无阴影，只剩纸底 + 墨边 |
-| `GlassRefraction` / `GlassLightPainter` | 液态玻璃的两块光学零件（`glass_optics_layers.dart`），只由 `FrostedSurface` 组装，页面不要直接用 | 墨水屏不会建出来 |
+| `GlassRefraction` / `GlassLightPainter` | 液态玻璃合成版（fallback）的两块光学零件（`glass_optics_layers.dart`），只由 `FrostedSurface` 组装，页面不要直接用 | 墨水屏不会建出来 |
+| `LiquidGlassShaderSurface` | 液态玻璃着色器版（`liquid_glass_shader.dart` + `shaders/liquid_glass.frag`），Impeller 真机上由 `FrostedSurface` 自动选用 | 墨水屏 / 非 Impeller / 加载失败 → 合成版 |
 | `PressableScale` | 按下缩到 0.97、松开用 `snappy` 弹簧回弹；用 `Listener` 监听原始指针，不抢子组件的点击/长按/滚动 | 墨水屏 / 减少动态效果时完全透传 |
 | `SkeletonBox` / `Shimmer` | 加载骨架色块 / 给骨架加一条扫过的高光（周期取 `AppMotion.shimmer`） | 墨水屏不画微光；`SkeletonBox` 改用 12% 墨色填充（墨水屏的 `surfaceContainerHighest` 会兜底成纸白，骨架会看不见） |
 | `AppHaptics` | `selection` / `light` / `success` 三种语义 + 总开关 | 墨水屏保留（不影响刷新）；设置页"触感反馈"关闭时全部静默 |
@@ -78,11 +79,26 @@ chrome 永远压在漫画画面上：浅色模式下用浅色毛玻璃，白底�
 （背后铺高对比条纹，才看得出透了多少）；`library_nav@phone_light` 是"书架 + 导航条"
 的真实首页形态，专门钉住玻璃压在封面上的观感。
 
-### 液态玻璃怎么合成（不用着色器）
+### 液态玻璃怎么合成
 
-iOS 26 Liquid Glass 的观感拆成五层，全部用 Flutter 自带的滤镜 / 画笔合成，
-Skia 与 Impeller 都成立、黄金图能钉住（片元着色器版的真折射 + 色散只在 Impeller
-生效，黄金图看不到，留作后续叠加）：
+两条路径，由 `FrostedSurface` 自动选：
+
+- **着色器版（真机 Impeller）**：`packages/komga_design_system/shaders/liquid_glass.frag`，
+  `main()` 启动时 `LiquidGlassProgram.ensureLoaded()`。单层 `BackdropFilterLayer(ImageFilter.shader)`：
+  圆角矩形 SDF 求外法线 → 外缘斜面（`bezel` 18）向内采样折射（外缘最大位移 `refraction` 22）
+  → RGB 分通道不同位移做色散（`chromaticAberration` 0.12）→ 着色器内 12 点圆盘轻模糊（半径 4）
+  → 提饱和 / 提亮 / 底色 → 斜面柔光 → 沿轮廓、随光向（左上主光、右下内反射）变化的镜面高光。
+  参数在 `LiquidShaderParams.light / dark`。
+  - 实测坐标约定（模拟器 Impeller/GLES，探针：位置编码背景 + 把 `FlutterFragCoord` / `u_size` 编进颜色）：
+    `FlutterFragCoord()` 是**屏幕物理像素**，与所在图层无关；输入纹理按 `FlutterFragCoord()/u_size`
+    采样与屏幕对齐，且能采到裁剪框外的背景（折射需要）。
+  - **不要**把着色器和 `ImageFilter.blur` 用 `compose` 组合：实测组合后 `u_size` 变成带模糊外扩的尺寸、
+    采样坐标偏移，画面整块错位。模糊放在着色器里做。
+  - 玻璃的屏幕矩形每帧 paint 时取（`getTransformTo(null)`），并在帧尾比对屏幕位置，祖先平移
+    （转场 / 外层图层 offset）时补画一帧。
+  - 着色器版在黄金图里**看不到**（测试渲染器不是 Impeller），视觉验收只能在真机 / 模拟器上做。
+- **合成版（fallback：测试渲染器 / Skia / 着色器加载失败）**：iOS 26 Liquid Glass 的观感拆成五层，
+  全部用 Flutter 自带的滤镜 / 画笔合成，黄金图钉住的是这一版：
 
 | 层 | 实现 | 参数 |
 |---|---|---|

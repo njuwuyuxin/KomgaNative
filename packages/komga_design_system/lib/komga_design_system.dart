@@ -9,6 +9,7 @@ export 'src/breakpoints.dart';
 export 'src/components/frosted_surface.dart';
 export 'src/components/glass_optics_layers.dart';
 export 'src/components/glass_surface.dart';
+export 'src/components/liquid_glass_shader.dart' show LiquidGlassProgram;
 export 'src/components/pressable_scale.dart';
 export 'src/components/series_tile.dart';
 export 'src/components/skeleton.dart';

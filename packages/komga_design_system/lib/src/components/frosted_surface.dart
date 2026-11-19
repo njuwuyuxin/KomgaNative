@@ -1,9 +1,14 @@
 import 'package:komga_design_system/src/components/glass_optics_layers.dart';
+import 'package:komga_design_system/src/components/liquid_glass_shader.dart';
 import 'package:komga_design_system/src/materials.dart';
 import 'package:material_ui/material_ui.dart';
 
-/// 毛玻璃表面：裁剪 →（液态玻璃档）边缘折射 → 背景模糊（+ 提饱和）
-/// → 半透明底色 → 体内反光 →（液态玻璃档）内缘聚光 + 镜面高光边 + 轮廓 → 描边。
+/// 毛玻璃表面。两条路径：
+/// - **着色器版**（液态玻璃档 + Impeller 真机，[LiquidGlassProgram.available]）：
+///   轻模糊 → `liquid_glass.frag`（外缘斜面折射 + RGB 色散 + 提饱和 + 柔光 + 方向性高光）；
+/// - **合成版**（测试渲染器 / Skia / 着色器加载失败，以及非玻璃档）：
+///   裁剪 →（液态玻璃档）外缘折射 → 背景模糊（+ 提饱和）
+///   → 半透明底色 → 体内反光 →（液态玻璃档）内缘聚光 + 镜面高光边 + 轮廓 → 描边。
 ///
 /// - 反光来自 [AppMaterial.highlight]，光学层来自 [AppMaterial.optics]：
 ///   都只给彩色主题的 [AppMaterialKind.bar]（液态玻璃档），压在底色之上、
@@ -39,6 +44,15 @@ class FrostedSurface extends StatelessWidget {
     final border = resolved.border;
     final outline = shape ?? const RoundedRectangleBorder();
     final optics = resolved.optics;
+
+    // 真机（Impeller）：着色器版液态玻璃——底色、折射、色散、高光都在着色器里。
+    if (optics != null && LiquidGlassProgram.available) {
+      return LiquidGlassShaderSurface(
+        params: optics.shader,
+        shape: outline,
+        child: child,
+      );
+    }
 
     Widget surface = DecoratedBox(
       decoration: ShapeDecoration(
