@@ -18,10 +18,10 @@ void main() {
         overrides: <Override>[
           libraryRepositoryProvider.overrideWithValue(repository),
         ],
-        child: MaterialApp(
+        child: const MaterialApp(
           localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          home: const SearchScreen(),
+          home: SearchScreen(),
         ),
       ),
     );

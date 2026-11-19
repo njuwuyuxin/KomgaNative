@@ -230,11 +230,11 @@ class FakeLibraryRepository implements LibraryRepository {
           ordered: true,
           seriesIds: seriesData.take(2).map((Series s) => s.id).toList(),
         ),
-        KomgaCollection(
+        const KomgaCollection(
           id: 'c2',
           name: 'Empty shelf',
           ordered: false,
-          seriesIds: const <String>[],
+          seriesIds: <String>[],
         ),
       ],
       totalElements: 2,
