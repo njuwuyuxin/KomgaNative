@@ -206,6 +206,7 @@ class Book {
     required this.seriesId,
     required this.name,
     required this.pagesCount,
+    this.seriesTitle,
     this.number = '',
     this.mediaProfile = MediaProfile.divina,
     this.sizeBytes = 0,
@@ -215,6 +216,13 @@ class Book {
   final String id;
   final String seriesId;
   final String name;
+
+  /// 所属系列的标题（Komga `BookDto.seriesTitle`）。
+  ///
+  /// 书自己的 `name` 往往只是 "Vol. 1"，离开系列页就没有上下文；
+  /// 搜索、阅读列表、继续阅读卡都要靠它把书名补全（FIX-06）。
+  /// 老存档/部分端点的 JSON 没有这个字段，所以是可空的。
+  final String? seriesTitle;
 
   /// 卷号/章节号，字符串（Komga 里可能是 "1", "1.5", ""）。
   final String number;
@@ -235,6 +243,7 @@ class Book {
     id: id,
     seriesId: seriesId,
     name: name,
+    seriesTitle: seriesTitle,
     number: number,
     pagesCount: pagesCount,
     mediaProfile: mediaProfile,

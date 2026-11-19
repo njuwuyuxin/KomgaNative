@@ -104,9 +104,15 @@ class ContinueCard extends ConsumerWidget {
             ?.readingDirection ??
         ReadingDirection.unknown;
     final progress = book.readProgress;
-    final label = progress == null
+    final seriesTitle = book.seriesTitle;
+    // 第一行是系列名（"Vol. 1" 单独出现没有信息量）；没有系列名时退回书名。
+    final headline = seriesTitle ?? book.name;
+    final progressLabel = progress == null
         ? l10n.bookPages(book.pagesCount)
-        : l10n.continueReadingProgress(progress.page, book.pagesCount);
+        : l10n.bookPageProgress(progress.page, book.pagesCount);
+    final detail = seriesTitle == null
+        ? progressLabel
+        : '${book.name} · $progressLabel';
     final shape = AppShapes.of(context, AppShapes.panel);
     // 墨水屏 / 减少动态效果不做 Hero；其余情况把 tag 一路带到阅读器开场。
     final heroTag =
@@ -130,7 +136,7 @@ class ContinueCard extends ConsumerWidget {
       container: true,
       button: true,
       // 整张卡片是一个按钮：读屏只念"书名 + 进度"，不逐条念封面/标签/页码。
-      label: '${book.name}, $label',
+      label: '$headline, $detail',
       onTap: () => unawaited(_open(context, book, direction, heroTag)),
       child: ExcludeSemantics(
         child: PressableScale(
@@ -159,14 +165,16 @@ class ContinueCard extends ConsumerWidget {
                           ),
                           const SizedBox(height: AppSpacing.xxs),
                           Text(
-                            book.name,
+                            headline,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: AppTypography.of(context).headline,
                           ),
                           const SizedBox(height: AppSpacing.xxs),
                           Text(
-                            label,
+                            detail,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                             ),

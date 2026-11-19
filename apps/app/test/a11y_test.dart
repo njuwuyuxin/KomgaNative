@@ -88,7 +88,7 @@ void main() {
     handle.dispose();
   });
 
-  testWidgets('继续阅读卡片：标签是"书名 + 进度"，点击区够大', (WidgetTester tester) async {
+  testWidgets('继续阅读卡片：标签是"系列名 + 卷号 + 进度"，点击区够大', (WidgetTester tester) async {
     final handle = tester.ensureSemantics();
 
     // 「继续阅读」从书架搬到了"正在读"首页（UI-P2-6）。
@@ -100,7 +100,7 @@ void main() {
 
     final finder = find.byKey(const Key('reading-now-continue'));
     final node = tester.getSemantics(finder);
-    expect(node.label, 'Vol. 1, p. 5 / 12');
+    expect(node.label, 'Frieren, Vol. 1 · p. 5/12');
     expect(node.flagsCollection.isButton, isTrue);
     expectTapTarget(tester, finder);
     handle.dispose();

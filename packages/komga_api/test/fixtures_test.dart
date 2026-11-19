@@ -205,6 +205,16 @@ void main() {
       expect(progress?.completed, isFalse);
       expect(progress?.lastModified.year, 2026);
       expect(book.isUnread, isFalse);
+      // `seriesTitle` 来自真实响应（FIX-06）：离开系列页后要靠它补上下文。
+      expect(book.seriesTitle, 'library');
+    });
+
+    test('搜索结果里的书也带 seriesTitle', () async {
+      final session = _sessionWith(_replay(fixture('books-search.json')));
+      final page = await session.searchBooks('verify');
+
+      expect(page.items, isNotEmpty);
+      expect(page.items.first.seriesTitle, isNotEmpty);
     });
 
     test('页列表：宽高/字节数可用，供双页排版算宽高比', () async {

@@ -48,6 +48,7 @@
   "readsVertical": "纵向（条漫）",
   "readsWebtoon": "条漫",
   "bookPages": "{count} 页",
+  "bookPageProgress": "第 {page}/{total} 页",
   "bookReadPages": "已读 · {count} 页",
 
   "readerTitle": "阅读器",

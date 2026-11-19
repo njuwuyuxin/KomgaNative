@@ -15,7 +15,7 @@
 | FIX-03 | 阅读方向覆盖所有入口 | P0 | DONE | `feat(app): 方向未知时按系列兜底` |
 | FIX-04 | 预设应用补齐锁定缩放/去白边 | P0 | DONE | `feat(app): 预设应用共用 withConfig` |
 | FIX-05 | 正在读骨架与空态修正 | P0 | DONE | `488e19d` |
-| FIX-06 | 列表层进度与系列名 | P0 | TODO | — |
+| FIX-06 | 列表层进度与系列名 | P0 | DONE | `feat: 书行页码与继续卡的系列名` |
 | FIX-07 | 下载队列持久化 | P0 | TODO | — |
 | FIX-08 | 搜索/收藏集/阅读列表分页 | P0 | TODO | — |
 | FIX-09 | 版本号/简介按钮/标签溢出 | P0 | TODO | — |
@@ -154,3 +154,14 @@
 - 新增 `reading_now_loading@phone_light` 黄金图（骨架态）与 4 条 widget 测试
   （延迟 provider、首次失败 + 重试、刷新失败保留内容、货架失败不炸整页）。
 - 设备走查：冷启动 0.9s 截图确认是骨架（不是"还没有在读的书"），4s 后正常出内容。
+
+### FIX-06 列表层进度与系列名
+
+- 领域层 `Book` 增加可选 `seriesTitle`，按真实响应的 `BookDto.seriesTitle` 解析
+  （fixture `book_in_progress.json` / `books-search.json` 都有），`withProgress` 保留。
+- 书行副标题三档：在读 `p. 5/19 · 19 pages`、读完 `Read · 20 pages`、未读 `21 pages`。
+- 继续阅读卡：第一行系列名，第二行 `Vol. 1 · p. 5/12`；没有系列名时退回书名（老数据）。
+- 搜索结果的书行补系列名（`Frieren · Vol. 1`），否则一屏都是 "Vol. 1" 分不清。
+- 测试：domain 的 `withProgress` 保留系列名、API fixture 解析 `seriesTitle`、
+  书行三档文案、搜索结果的系列名、继续卡文案与 a11y 标签；更新
+  `reading_now@*` 与 `readlist_detail@eink` 黄金图。

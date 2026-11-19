@@ -136,6 +136,8 @@ class _SearchResults extends ConsumerWidget {
           for (final book in bookItems)
             SeriesBookRow(
               book: book,
+              // 搜索结果脱离系列上下文：标题补上系列名（FIX-06）。
+              showSeriesTitle: true,
               onOpen: () async {
                 await context.push(
                   '/reader/${book.id}',

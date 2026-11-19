@@ -128,6 +128,9 @@ Book bookFromJson(Map<Object?, Object?> json) {
     id: _str(json['id']),
     seriesId: _str(json['seriesId']),
     name: _str(json['name']),
+    // 真实响应里有这个字段（`BookDto.seriesTitle`，见 test/fixtures 的
+    // book_in_progress.json / books-search.json），缺了也不影响打开。
+    seriesTitle: _strOrNull(json['seriesTitle']),
     pagesCount: _int(media?['pagesCount']),
     number: _numberString(json['number']),
     mediaProfile: MediaProfile.parse(_strOrNull(media?['mediaProfile'])),

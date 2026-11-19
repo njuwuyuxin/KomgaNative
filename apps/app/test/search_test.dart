@@ -33,4 +33,30 @@ void main() {
     expect(find.textContaining('Search result 0'), findsOneWidget);
     expect(find.text('Books'), findsOneWidget);
   });
+
+  testWidgets('搜索结果的书行补上系列名（否则一屏都是 Vol. 1）', (WidgetTester tester) async {
+    // 搜索来源里有一本 Frieren 的 "Vol. 1"（来自 ondeck 假数据）。
+    final repository = FakeLibraryRepository(
+      series: demoShelf(),
+      ondeck: demoOndeck(),
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          libraryRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: const MaterialApp(
+          localizationsDelegates: appLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: SearchScreen(),
+        ),
+      ),
+    );
+
+    await tester.enterText(find.byKey(const Key('search-field')), 'Vol');
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Frieren · Vol. 1'), findsOneWidget);
+  });
 }

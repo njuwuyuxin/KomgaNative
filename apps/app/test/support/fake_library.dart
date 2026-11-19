@@ -477,10 +477,14 @@ List<Series> demoShelf() => const <Series>[
 ];
 
 /// 黄金图/UI 测试用的"继续阅读"：两本在读的书（系列都在 [demoShelf] 里）。
+///
+/// 带 `seriesTitle`：真实 Komga 的 `BookDto` 就有这个字段，继续阅读卡要显示
+/// 系列名而不是 "Vol. 1"（FIX-06）。
 List<Book> demoOndeck() => <Book>[
   Book(
     id: 's1-b1',
     seriesId: 's1',
+    seriesTitle: 'Frieren',
     name: 'Vol. 1',
     number: '1',
     pagesCount: 12,
@@ -493,6 +497,7 @@ List<Book> demoOndeck() => <Book>[
   Book(
     id: 's5-b2',
     seriesId: 's5',
+    seriesTitle: 'Sunny',
     name: 'Vol. 2',
     number: '2',
     pagesCount: 8,

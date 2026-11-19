@@ -16,10 +16,19 @@ import 'package:material_ui/material_ui.dart';
 ///
 /// 整行是一个按钮；读屏只播报「标题 + 页数/已读」，下载按钮仍是独立控件。
 class SeriesBookRow extends ConsumerWidget {
-  const SeriesBookRow({required this.book, required this.onOpen, super.key});
+  const SeriesBookRow({
+    required this.book,
+    required this.onOpen,
+    this.showSeriesTitle = false,
+    super.key,
+  });
 
   final Book book;
   final Future<void> Function() onOpen;
+
+  /// 搜索结果里书是**脱离系列**出现的：标题前要补系列名，
+  /// 否则一屏都是 "Vol. 1 / Vol. 2"，分不清是哪套书（FIX-06）。
+  final bool showSeriesTitle;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -31,12 +40,21 @@ class SeriesBookRow extends ConsumerWidget {
       _ => null,
     };
     final completed = book.isCompleted;
-    final title = book.number.isEmpty
+    final progress = book.readProgress;
+    final baseTitle = book.number.isEmpty
         ? book.name
         : '#${book.number} · ${book.name}';
+    final seriesTitle = book.seriesTitle;
+    final title = showSeriesTitle && seriesTitle != null
+        ? '$seriesTitle · ${book.name}'
+        : baseTitle;
+    // 三档：读完 → "Read · 24 pages"；在读过 → "p. 5/12 · 24 pages"；未读 → "24 pages"。
     final status = completed
         ? l10n.bookReadPages(book.pagesCount)
-        : l10n.bookPages(book.pagesCount);
+        : progress == null
+        ? l10n.bookPages(book.pagesCount)
+        : '${l10n.bookPageProgress(progress.page, book.pagesCount)} · '
+              '${l10n.bookPages(book.pagesCount)}';
 
     return Semantics(
       key: Key('book-${book.id}'),

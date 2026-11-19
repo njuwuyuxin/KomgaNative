@@ -49,10 +49,11 @@ void main() {
   });
 
   group('Book', () {
-    Book book({ReadProgress? progress}) => Book(
+    Book book({ReadProgress? progress, String? seriesTitle}) => Book(
       id: 'b',
       seriesId: 's',
       name: 'Vol. 1',
+      seriesTitle: seriesTitle,
       number: '1',
       pagesCount: 10,
       readProgress: progress,
@@ -70,6 +71,18 @@ void main() {
       expect(withProgress.id, 'b', reason: '其它字段原样保留');
 
       expect(book(progress: progress).withProgress(null).readProgress, isNull);
+    });
+
+    test('withProgress 保留 seriesTitle（本地叠加进度不该丢系列名）', () {
+      final progress = ReadProgress(
+        page: 3,
+        completed: false,
+        lastModified: DateTime.utc(2026, 1, 1),
+      );
+      final updated = book(seriesTitle: 'Frieren').withProgress(progress);
+      expect(updated.seriesTitle, 'Frieren');
+      // 没有系列名时保持 null，不要变成空串。
+      expect(book().withProgress(progress).seriesTitle, isNull);
     });
 
     test('未读/读完的判断', () {

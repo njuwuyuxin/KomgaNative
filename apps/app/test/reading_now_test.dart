@@ -59,13 +59,21 @@ void main() {
     return library;
   }
 
-  testWidgets('大号继续阅读卡片显示 ondeck 第一本与进度', (WidgetTester tester) async {
+  testWidgets('大号继续阅读卡片：第一行系列名，第二行"卷号 · 页码"', (WidgetTester tester) async {
     await pumpPage(tester);
 
     expect(find.byKey(const Key('reading-now-continue')), findsOneWidget);
-    expect(find.text('Vol. 1'), findsOneWidget);
-    // demoOndeck 第一本读到第 5 页，共 12 页。
-    expect(find.text('p. 5 / 12'), findsOneWidget);
+    // demoOndeck 第一本属于 Frieren、读到第 5 页共 12 页（FIX-06）。
+    // 用 descendant 限定在卡片内：货架里也有一张 "Frieren"。
+    final card = find.byKey(const Key('reading-now-continue'));
+    expect(
+      find.descendant(of: card, matching: find.text('Frieren')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: card, matching: find.text('Vol. 1 · p. 5/12')),
+      findsOneWidget,
+    );
     expect(find.text('Continue reading'), findsOneWidget);
     // 封面是阅读器开场 Hero 的起点（UI-P2-2）。
     expect(

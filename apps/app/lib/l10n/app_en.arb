@@ -69,6 +69,7 @@
       "count": {"type": "int"}
     }
   },
+  "bookPageProgress": "p. {page}/{total}",
   "bookReadPages": "Read · {count} pages",
   "@bookReadPages": {
     "placeholders": {
