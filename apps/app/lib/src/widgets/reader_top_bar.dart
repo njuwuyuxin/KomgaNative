@@ -2,11 +2,13 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/providers/cache_providers.dart';
 import 'package:komga_native/src/widgets/page_navigator_sheet.dart';
 import 'package:komga_native/src/widgets/reader_chrome.dart';
 import 'package:komga_native/src/widgets/reader_palette.dart';
 import 'package:komga_native/src/widgets/reader_settings_sheet.dart';
+import 'package:komga_native/src/widgets/reader_toc_sheet.dart';
 import 'package:komga_reader_engine/komga_reader_engine.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -25,6 +27,7 @@ class ReaderTopBar extends ConsumerWidget {
     required this.page,
     required this.total,
     required this.onJump,
+    this.direction = ReadingDirection.unknown,
     this.onGroupFrom,
     this.incognito = false,
     this.onToggleIncognito,
@@ -39,6 +42,9 @@ class ReaderTopBar extends ConsumerWidget {
   final String pageLabel;
   final ReaderPalette palette;
   final ReadingMode mode;
+
+  /// 换书时沿用同一个阅读方向（RDR-02）。
+  final ReadingDirection direction;
 
   /// 1 基当前页。
   final int page;
@@ -76,6 +82,16 @@ class ReaderTopBar extends ConsumerWidget {
             onGroupFrom: onGroupFrom,
           ),
         ),
+        // 目录（RDR-02）：本系列的书列表，点一本替换当前页。
+        onOpenToc: seriesId == null
+            ? null
+            : () => showReaderTocSheet(
+                context,
+                seriesId: seriesId!,
+                currentBookId: bookId,
+                palette: palette,
+                direction: direction,
+              ),
         onOpenSettings: () => showReaderSettingsSheet(
           context,
           palette: palette,

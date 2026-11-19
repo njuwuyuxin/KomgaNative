@@ -113,6 +113,7 @@ class ReaderBar extends StatelessWidget {
     required this.mode,
     required this.onOpenSettings,
     required this.onOpenPages,
+    this.onOpenToc,
     this.incognito = false,
     this.onToggleIncognito,
     this.offline = false,
@@ -133,6 +134,9 @@ class ReaderBar extends StatelessWidget {
 
   /// 打开缩略图跳页面板。
   final VoidCallback onOpenPages;
+
+  /// 打开目录（RDR-02）；系列未知时为空。
+  final VoidCallback? onOpenToc;
 
   /// 本次阅读是否不回写进度（UI-P3-12）。
   final bool incognito;
@@ -193,6 +197,15 @@ class ReaderBar extends StatelessWidget {
               ),
               color: incognito ? palette.foreground : palette.muted,
               tooltip: incognito ? l10n.incognitoOn : l10n.incognitoOff,
+            ),
+          // 目录（RDR-02）：本系列的书列表，点一本替换当前页。
+          if (onOpenToc != null)
+            IconButton(
+              key: const Key('reader-toc-button'),
+              onPressed: onOpenToc,
+              icon: const Icon(Icons.toc_outlined),
+              color: palette.foreground,
+              tooltip: l10n.readerToc,
             ),
           IconButton(
             key: const Key('reader-pages-button'),

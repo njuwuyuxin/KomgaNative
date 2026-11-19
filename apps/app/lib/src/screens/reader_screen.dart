@@ -182,6 +182,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       mode: mode,
       page: page,
       total: total,
+      direction: _direction,
       onJump: (int t) => _jumpToPage(t, total),
       onGroupFrom: mode == ReadingMode.doublePage
           ? (int p) => _groupFromPage(p, total)
