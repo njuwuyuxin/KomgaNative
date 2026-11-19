@@ -338,7 +338,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   /// 音量键在整个阅读器期间都归阅读器（包括页列表还在加载时）。
   @override
   Widget build(BuildContext context) {
-    final isEink = ref.watch(settingsProvider).forceEink;
+    final isEink = ref.watch(effectiveEinkProvider);
     final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     final openingHero = widget.heroTag;
     return EdgeSwipeBack(
@@ -442,7 +442,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         nextSpread: layout.neighbour(1),
         previousSpread: layout.neighbour(-1),
         style: PageTurnStyle.resolve(
-          eink: ref.watch(settingsProvider).forceEink,
+          eink: isEink,
           disableAnimations:
               MediaQuery.maybeDisableAnimationsOf(context) ?? false,
         ),

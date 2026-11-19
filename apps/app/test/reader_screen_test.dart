@@ -8,7 +8,9 @@ import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
+import 'package:komga_native/src/providers/settings_provider.dart';
 import 'package:komga_native/src/widgets/book_hero_tag.dart';
+import 'package:komga_native/src/widgets/page_curl.dart';
 import 'package:komga_native/src/widgets/reader_paged_view.dart';
 import 'package:komga_platform/komga_platform.dart';
 import 'package:material_ui/material_ui.dart';
@@ -651,6 +653,29 @@ void main() {
 
       final title = tester.widget<Text>(find.text('Vol. 1'));
       expect(title.style?.color, AppTheme.einkInk);
+    });
+
+    testWidgets('自动探测到墨水屏（没开强制开关）同样白底', (WidgetTester tester) async {
+      await pumpReader(
+        tester,
+        book: demoReaderBook(),
+        // 与真机一致：探测结果来自平台通道，这里直接给"是墨水屏"。
+        // 主题仍是深色（模拟"全局主题还没来得及换"），阅读区也必须自己变白。
+        extraOverrides: <Override>[
+          einkDetectedProvider.overrideWith((ref) async => true),
+        ],
+      );
+
+      final scaffold = tester.widget<Scaffold>(find.byType(Scaffold).first);
+      expect(scaffold.backgroundColor, AppTheme.einkPaper);
+      // 自动探测时卷页必须退化成瞬切：墨水屏上播卷页会疯狂全刷。
+      expect(
+        tester
+            .widget<ReaderPagedView>(find.byType(ReaderPagedView))
+            .style
+            .effect,
+        PageTurnEffect.none,
+      );
     });
 
     testWidgets('墨水屏纵向模式同样是白底', (WidgetTester tester) async {

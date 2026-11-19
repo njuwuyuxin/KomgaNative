@@ -128,3 +128,19 @@ final FutureProvider<bool> einkDetectedProvider = FutureProvider<bool>((
   final info = await EinkProbe().detect();
   return info.isEink;
 });
+
+/// 本机是否按墨水屏渲染：手动强制 **或** 自动探测。
+///
+/// 这是"是不是墨水屏"的**唯一**来源：全局主题、阅读器配色、翻页动画、
+/// 动态背景、开场 Hero 都读它。
+///
+/// 之前各页面分别读 `settings.forceEink`，自动探测出来的机型只换了主题，
+/// 阅读器仍是黑底/卷页/动态背景（FIX-01）。把判断收成一个 provider 后，
+/// 新增墨水屏相关行为只需要 watch 一次，不会再漏。
+///
+/// 探测是异步的：首帧拿不到结果时按彩色处理，绝不能为了等探测卡住启动。
+final Provider<bool> effectiveEinkProvider = Provider<bool>((Ref ref) {
+  final forced = ref.watch(settingsProvider.select((s) => s.forceEink));
+  final detected = ref.watch(einkDetectedProvider).value ?? false;
+  return forced || detected;
+});

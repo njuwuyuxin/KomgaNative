@@ -476,6 +476,11 @@ Panels 的高级感主要来自三点，和控件本身关系不大：
 | 测试：`eink_probe_test` 覆盖正常返回、MissingPlugin、PlatformException、null；iOS/测试环境仍 unknown |
 | 未做：真实墨水屏设备上的探测命中率验证（模拟器无法伪造 Build 厂商）；需要 Boox/Kindle 真机走查 |
 
+**修正（2026-11-19，FIX-01）**：上面的探测原先只作用于全局主题，阅读器仍只读
+`settings.forceEink`，自动探测到的机型进阅读器还是黑底/卷页/动态背景。现在
+`effectiveEinkProvider`（`forceEink || detected`）是唯一来源，主题、`ReaderPalette`、
+翻页动画、开场 Hero 都读它；新增 `reader_auto_eink` 黄金图钉住"只探测、不强制"也走白底。
+
 **进度（2026-11-19）：P3-11 键盘 / 蓝牙翻页器。**
 
 | 落地 |

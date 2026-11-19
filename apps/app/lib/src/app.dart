@@ -22,10 +22,8 @@ class KomgaApp extends ConsumerWidget {
     final settings = ref.watch(settingsProvider);
     final router = ref.watch(routerProvider);
     final einkTheme = AppTheme.eink();
-    // 自动探测 + 手动强制；探测是异步的，首帧可能还是彩色主题，
-    // 但绝不能为了等探测卡住启动。
-    final detectedEink = ref.watch(einkDetectedProvider).value ?? false;
-    final useEink = settings.forceEink || detectedEink;
+    // 自动探测 + 手动强制统一由 `effectiveEinkProvider` 决定，阅读器等页面读同一个值。
+    final useEink = ref.watch(effectiveEinkProvider);
     // 触感反馈的总开关只在这里同步一次，页面统一走 AppHaptics。
     AppHaptics.enabled = settings.haptics;
 

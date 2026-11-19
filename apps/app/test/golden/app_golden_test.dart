@@ -832,6 +832,20 @@ void main() {
     );
   });
 
+  testWidgets('reader_auto_eink', (WidgetTester tester) async {
+    // 只靠自动探测（不打开"强制墨水屏"）也必须整屏走墨水屏：
+    // 白底、瞬切、无动态背景。FIX-01 之前这里画出来是黑底。
+    await pumpReaderGolden(
+      tester,
+      name: 'reader_auto_eink',
+      size: GoldenSizes.eink,
+      theme: AppTheme.eink(),
+      extraOverrides: <Override>[
+        einkDetectedProvider.overrideWith((ref) async => true),
+      ],
+    );
+  });
+
   testWidgets('reader_double@phone_dark', (WidgetTester tester) async {
     await pumpReaderGolden(
       tester,
