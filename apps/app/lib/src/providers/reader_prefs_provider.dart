@@ -69,6 +69,10 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
   void setPageTurn(ReaderPageTurnChoice choice, {String? seriesId}) =>
       _updateConfig(seriesId, (ReaderPrefs p) => p.copyWith(pageTurn: choice));
 
+  /// 平板默认排版（PLT-02）：全局设置，不进系列覆盖。
+  void setTabletLayout(TabletLayoutChoice choice) =>
+      _update(state.copyWith(tabletLayout: choice));
+
   /// chrome 是否显示本次阅读时长（HIS-04）：跟着书走，不是全局开关。
   void setShowSessionTime(bool enabled, {String? seriesId}) => _updateConfig(
     seriesId,

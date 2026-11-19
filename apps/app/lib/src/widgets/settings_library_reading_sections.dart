@@ -70,6 +70,38 @@ class SettingsReadingSection extends ConsumerWidget {
             ),
           ),
         ),
+        ListTile(
+          key: const Key('settings-tablet-layout'),
+          title: Text(l10n.settingsTabletLayout),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: AppSpacing.sm),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Wrap(
+                  spacing: AppSpacing.xs,
+                  runSpacing: AppSpacing.xs,
+                  children: <Widget>[
+                    for (final choice in TabletLayoutChoice.values)
+                      ChoiceChip(
+                        key: Key('settings-tablet-layout-${choice.name}'),
+                        label: Text(_tabletLabel(l10n, choice)),
+                        selected: prefs.tabletLayout == choice,
+                        onSelected: (bool selected) {
+                          if (selected) controller.setTabletLayout(choice);
+                        },
+                      ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.xxs),
+                Text(
+                  l10n.settingsTabletLayoutHint,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+        ),
         SwitchListTile(
           key: const Key('settings-show-session-time'),
           value: prefs.showSessionTime,
@@ -80,6 +112,15 @@ class SettingsReadingSection extends ConsumerWidget {
       ],
     );
   }
+
+  static String _tabletLabel(
+    AppLocalizations l10n,
+    TabletLayoutChoice choice,
+  ) => switch (choice) {
+    TabletLayoutChoice.auto => l10n.tabletLayoutAuto,
+    TabletLayoutChoice.single => l10n.tabletLayoutSingle,
+    TabletLayoutChoice.double => l10n.tabletLayoutDouble,
+  };
 
   static String _modeLabel(AppLocalizations l10n, ReaderModeChoice mode) =>
       switch (mode) {

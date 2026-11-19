@@ -169,6 +169,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     final l10n = AppLocalizations.of(context);
     final total = pages.length;
     _landscape = MediaQuery.orientationOf(context) == Orientation.landscape;
+    // 平板默认排版（PLT-02）只看窗口宽度类，和书架两栏同一个断点。
+    _tablet =
+        WindowSizeClass.of(MediaQuery.sizeOf(context).width) ==
+        WindowSizeClass.expanded;
     final layout = ReaderLayout(
       pages: pages,
       mode: _modeFor(prefs),

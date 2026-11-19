@@ -102,6 +102,9 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
   /// 横屏自动双页用；由 `_buildPages` 每次布局时更新（UI-P3-3）。
   bool _landscape = false;
 
+  /// 是否平板（PLT-02）：只有平板才应用「平板默认排版」。
+  bool _tablet = false;
+
   /// 手动修正双页分组的起点（0 基；null = 自动）。
   ///
   /// 从偏好里按**书**读（RDR-06）：以前是会话内字段，退出阅读器就丢了。
@@ -173,7 +176,13 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
   }
 
   ReadingMode _modeFor(ReaderPrefs prefs, {bool? landscape}) =>
-      prefs.mode.resolve(_direction, landscape: landscape ?? _landscape);
+      resolveReaderMode(
+        mode: prefs.mode,
+        tabletLayout: prefs.tabletLayout,
+        direction: _direction,
+        landscape: landscape ?? _landscape,
+        tablet: _tablet,
+      );
 
   /// 解析本次阅读的方向：显式传入优先，否则跟随系列。
   ///

@@ -25,6 +25,37 @@ extension ReaderModeChoiceX on ReaderModeChoice {
       };
 }
 
+/// 平板上的默认排版（PLT-02）。
+///
+/// `auto` = 横屏双页、竖屏单页（也就是现有行为）；`single`/`double` 强制一种。
+/// **只在平板上生效**：手机上保持"跟随书籍方向 + 横屏自动双页"的老规矩，
+/// 否则用户在设置里选过双页，回到手机就再也看不到单页了。
+enum TabletLayoutChoice { auto, single, double }
+
+/// 解析本次阅读真正用的模式（纯函数，单测直接钉住）。
+///
+/// 优先级（从高到低）：
+/// 1. 用户显式选过阅读模式（单页/双页/纵向）——不管在哪、横竖屏都不改；
+/// 2. 平板默认排版（`tabletLayout != auto`）；
+/// 3. `auto`：跟随方向，横屏双页。
+ReadingMode resolveReaderMode({
+  required ReaderModeChoice mode,
+  required TabletLayoutChoice tabletLayout,
+  required ReadingDirection direction,
+  required bool landscape,
+  required bool tablet,
+}) {
+  if (mode != ReaderModeChoice.auto) {
+    return mode.resolve(direction, landscape: landscape);
+  }
+  if (tablet && tabletLayout != TabletLayoutChoice.auto) {
+    return tabletLayout == TabletLayoutChoice.double
+        ? ReadingMode.doublePage
+        : ReadingMode.paged;
+  }
+  return mode.resolve(direction, landscape: landscape);
+}
+
 /// 适配方式（UI-P1-3）。
 ///
 /// 直接对应引擎的 `FitMode`：`cover`（填满屏幕）会在溢出的方向允许平移，
@@ -138,6 +169,7 @@ class ReaderPrefs {
     this.pageTurn = ReaderPageTurnChoice.curl,
     this.spreadFrom = const <String, int>{},
     this.showSessionTime = true,
+    this.tabletLayout = TabletLayoutChoice.auto,
     this.presets = const <ReaderPreset>[],
     this.seriesOverrides = const <String, ReaderPrefs>{},
   });
@@ -174,6 +206,9 @@ class ReaderPrefs {
 
   /// 阅读器 chrome 是否显示本次阅读时长（HIS-04）。
   final bool showSessionTime;
+
+  /// 平板上的默认排版（PLT-02）：只在平板上生效，手机不受影响。
+  final TabletLayoutChoice tabletLayout;
 
   /// 用户保存的阅读预设（UI-P3-1）；按保存顺序排列。
   final List<ReaderPreset> presets;
@@ -247,6 +282,7 @@ class ReaderPrefs {
       pageTurn: override.pageTurn,
       spreadFrom: spreadFrom,
       showSessionTime: showSessionTime,
+      tabletLayout: tabletLayout,
       presets: presets,
       seriesOverrides: seriesOverrides,
     );
@@ -304,6 +340,7 @@ class ReaderPrefs {
     ReaderPageTurnChoice? pageTurn,
     Map<String, int>? spreadFrom,
     bool? showSessionTime,
+    TabletLayoutChoice? tabletLayout,
     List<ReaderPreset>? presets,
     Map<String, ReaderPrefs>? seriesOverrides,
   }) => ReaderPrefs(
@@ -318,6 +355,7 @@ class ReaderPrefs {
     pageTurn: pageTurn ?? this.pageTurn,
     spreadFrom: spreadFrom ?? this.spreadFrom,
     showSessionTime: showSessionTime ?? this.showSessionTime,
+    tabletLayout: tabletLayout ?? this.tabletLayout,
     presets: presets ?? this.presets,
     seriesOverrides: seriesOverrides ?? this.seriesOverrides,
   );
@@ -335,6 +373,7 @@ class ReaderPrefs {
         'pageTurn': pageTurn.name,
         if (spreadFrom.isNotEmpty) 'spreadFrom': spreadFrom,
         'showSessionTime': showSessionTime,
+        'tabletLayout': tabletLayout.name,
         if (includePresets && presets.isNotEmpty)
           'presets': <Object?>[for (final preset in presets) preset.toJson()],
         if (includePresets && seriesOverrides.isNotEmpty)
@@ -397,6 +436,11 @@ class ReaderPrefs {
       ),
       spreadFrom: _parseSpreadFrom(json['spreadFrom']),
       showSessionTime: json['showSessionTime'] != false,
+      tabletLayout: _parse(
+        json['tabletLayout'],
+        TabletLayoutChoice.values,
+        TabletLayoutChoice.auto,
+      ),
       presets: presets,
       seriesOverrides: overrides,
     );
@@ -439,6 +483,7 @@ class ReaderPrefs {
       other.pageTurn == pageTurn &&
       _sameSpreadFrom(other.spreadFrom, spreadFrom) &&
       other.showSessionTime == showSessionTime &&
+      other.tabletLayout == tabletLayout &&
       _samePresets(other.presets, presets) &&
       _sameOverrides(other.seriesOverrides, seriesOverrides);
 

@@ -72,7 +72,7 @@
 |---|---|---|---|---|
 | HIS-03 | Insights（连续天数/热力图/统计） | P2 | TODO | — |
 | HIS-04 | 阅读器内阅读时长 | P2 | DONE | `feat(reader): chrome 显示本次阅读时长` |
-| PLT-02 | iPad 默认双页/阅读布局 | P2 | TODO | — |
+| PLT-02 | iPad 默认双页/阅读布局 | P2 | DONE | `feat(reader): 平板默认排版（自动/单页/双页）` |
 | I18N-01 | 数据层错误文案本地化 | P2 | TODO | — |
 | A11Y-01 | TalkBack/VoiceOver + Dynamic Type 2.0 | P2 | TODO | — |
 | UI-03 | 黄金图覆盖补齐 | P2 | TODO | — |
@@ -228,6 +228,22 @@
   `continueReadingProgress` 是 FIX-06 之后失效的）。
 - 验证：55 条阅读器测试 + 黄金图全部不变（零行为变更）；设备上打开第 114/227 页
   照常渲染，滑杆与"剩 113 页"一致。
+
+### PLT-02 平板默认排版
+
+- `ReaderPrefs.tabletLayout`（`auto` / `single` / `double`，默认 auto），设置页"阅读"组
+  有对应的一组 chip，提示写清"只在平板上生效"。
+- 解析抽成**纯函数** `resolveReaderMode`，优先级从高到低：
+  1. 用户显式选过阅读模式（单页/双页/纵向）——系列/书覆盖会落到这里，**永远优先**；
+  2. 平板默认排版（非 auto，且设备是平板）；
+  3. auto：跟随方向，横屏双页、竖屏单页。
+- "不影响手机"是硬条件：桌面断点用 `WindowSizeClass.expanded`（与书架两栏同一个），
+  手机即使设了"双页"也不改行为。
+- 测试：`tablet_layout_test.dart` 9 条（auto 横竖屏、强制单/双页、手机不受影响 ×2、
+  显式模式压过平板设置 ×2、条漫方向、偏好往返、坏值回 auto）。
+- 黄金图：`settings@eink` 因新增控件重生成。
+- 设备走查：`wm size 1280x800 + density 160` 下打开设置，"阅读"组里
+  **平板默认排版**（自动/单页/双页 + 说明）渲染正确；走查后已 `wm size reset`。
 
 ### PLT-01 平板书架两栏
 
