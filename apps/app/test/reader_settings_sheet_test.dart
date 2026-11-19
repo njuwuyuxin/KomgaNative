@@ -1,0 +1,126 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:komga_native/src/data/reader_prefs.dart';
+import 'package:komga_native/src/widgets/reader_fit_preview.dart';
+import 'package:material_ui/material_ui.dart';
+
+import 'support/fake_reader.dart';
+import 'support/reader_harness.dart';
+
+/// RDR-04：完整设置面板按四组分、每组可单独重置、适配有示意图、顶部有摘要。
+void main() {
+  testWidgets('顶部摘要显示当前组合', (WidgetTester tester) async {
+    await pumpReader(
+      tester,
+      book: demoReaderBook(),
+      initialPrefs: const ReaderPrefs(
+        mode: ReaderModeChoice.double,
+        fit: ReaderFitChoice.cover,
+        direction: ReaderDirectionChoice.rightToLeft,
+        background: ReaderBackgroundChoice.white,
+      ),
+    );
+    await openSettings(tester);
+
+    final summary = tester.widget<Text>(
+      find.byKey(const Key('reader-settings-summary')),
+    );
+    expect(summary.data, contains('Double page'));
+    expect(summary.data, contains('Fill screen'));
+    expect(summary.data, contains('Right to left'));
+    expect(summary.data, contains('White'));
+  });
+
+  testWidgets('四组都有重置；默认时置灰，改过后可用', (WidgetTester tester) async {
+    final store = await pumpReader(tester, book: demoReaderBook());
+    await openSettings(tester);
+
+    for (final group in <String>['pages', 'layout', 'color', 'interaction']) {
+      final finder = find.byKey(Key('reader-reset-$group'));
+      expect(finder, findsOneWidget, reason: '$group 组要有重置');
+      expect(
+        tester.widget<TextButton>(finder).onPressed,
+        isNull,
+        reason: '$group 初始是默认值，重置按钮应置灰',
+      );
+    }
+
+    // 改颜色组的背景 → 只有这一组的重置变可用。
+    await tester.ensureVisible(
+      find.byKey(const Key('reader-background-white')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('reader-background-white')));
+    await tester.pumpAndSettle();
+    expect(store.prefs?.background, ReaderBackgroundChoice.white);
+
+    await tester.ensureVisible(find.byKey(const Key('reader-reset-color')));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<TextButton>(find.byKey(const Key('reader-reset-color')))
+          .onPressed,
+      isNotNull,
+    );
+    expect(
+      tester
+          .widget<TextButton>(find.byKey(const Key('reader-reset-layout')))
+          .onPressed,
+      isNull,
+      reason: '布局组没动过，不该跟着变可用',
+    );
+  });
+
+  testWidgets('点"颜色"重置：背景回默认，其它组保持不变', (WidgetTester tester) async {
+    final store = await pumpReader(
+      tester,
+      book: demoReaderBook(),
+      initialPrefs: const ReaderPrefs(
+        mode: ReaderModeChoice.double,
+        background: ReaderBackgroundChoice.white,
+        brightness: 0.6,
+      ),
+    );
+    await openSettings(tester);
+
+    await tester.ensureVisible(find.byKey(const Key('reader-reset-color')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('reader-reset-color')));
+    await tester.pumpAndSettle();
+
+    expect(store.prefs?.background, ReaderBackgroundChoice.black);
+    expect(store.prefs?.brightness, 1);
+    expect(store.prefs?.mode, ReaderModeChoice.double, reason: '页面组不该被重置');
+  });
+
+  testWidgets('适配方式是 4 个小示意图', (WidgetTester tester) async {
+    await pumpReader(tester, book: demoReaderBook());
+    await openSettings(tester);
+    await tester.ensureVisible(find.byKey(const Key('reader-fit-cover')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ReaderFitPreview), findsNWidgets(4));
+    expect(
+      tester
+          .widget<ReaderFitPreview>(find.byType(ReaderFitPreview).first)
+          .palette
+          .isEink,
+      isFalse,
+    );
+  });
+
+  testWidgets('墨水屏：示意图拿到线框调色板，且没有背景组', (WidgetTester tester) async {
+    await pumpReader(tester, book: demoReaderBook(), forceEink: true);
+    await openSettings(tester);
+    await tester.ensureVisible(find.byKey(const Key('reader-fit-cover')));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .widget<ReaderFitPreview>(find.byType(ReaderFitPreview).first)
+          .palette
+          .isEink,
+      isTrue,
+    );
+    expect(find.byKey(const Key('reader-background-black')), findsNothing);
+  });
+}

@@ -182,6 +182,12 @@
   "readerTocCurrent": "Current · {progress}",
   "readerQuickSettings": "Quick settings",
   "readerMore": "More",
+  "readerGroupPages": "Pages",
+  "readerGroupLayout": "Layout",
+  "readerGroupColor": "Color",
+  "readerGroupInteraction": "Interaction",
+  "readerResetGroup": "Reset",
+  "readerCurrentSummary": "Current",
   "cancelDownload": "Cancel download",
   "downloadRetryTooltip": "{error} · tap to retry",
   "@downloadRetryTooltip": {

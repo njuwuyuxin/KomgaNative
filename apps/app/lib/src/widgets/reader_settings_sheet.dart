@@ -3,15 +3,17 @@ import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
 import 'package:komga_native/src/providers/reader_prefs_provider.dart';
+import 'package:komga_native/src/widgets/reader_fit_preview.dart';
 import 'package:komga_native/src/widgets/reader_mode_text.dart';
 import 'package:komga_native/src/widgets/reader_palette.dart';
 import 'package:komga_native/src/widgets/reader_preset_section.dart';
+import 'package:komga_native/src/widgets/reader_settings_group.dart';
 import 'package:komga_native/src/widgets/reader_settings_rows.dart';
 import 'package:material_ui/material_ui.dart';
 
-/// 阅读设置面板：模式 / 适配 / 方向 / 背景 / 亮度 / 常亮 / 跳页。
+/// 阅读设置面板：按"页面 / 布局 / 颜色 / 交互"四组排（RDR-04）。
 ///
-/// 为什么放在底部面板而不是顶栏一排图标：这些设置里有"连续值"（亮度、页码），
+/// 为什么放底部面板而不是顶栏一排图标：这些设置里有"连续值"（亮度、页码），
 /// 只有面板放得下；而且它盖住内容的同时还能看到页面在变，调亮度时有参照。
 Future<void> showReaderSettingsSheet(
   BuildContext context, {
@@ -54,7 +56,7 @@ Future<void> showReaderSettingsSheet(
   );
 }
 
-class ReaderSettingsSheet extends ConsumerStatefulWidget {
+class ReaderSettingsSheet extends ConsumerWidget {
   const ReaderSettingsSheet({
     required this.palette,
     required this.page,
@@ -73,46 +75,14 @@ class ReaderSettingsSheet extends ConsumerStatefulWidget {
   final String? seriesId;
 
   @override
-  ConsumerState<ReaderSettingsSheet> createState() =>
-      _ReaderSettingsSheetState();
-}
-
-class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
-  /// 拖动中的页码（松手才跳，避免拖动时每帧都改阅读位置）。
-  double? _dragging;
-
-  /// 松手后停住的页码。
-  ///
-  /// 不能在松手时直接丢掉局部状态：`widget.page` 是**打开面板那一刻**的快照，
-  /// `onJump` 只会改阅读器、不会重建这个面板。回到 `widget.page` 会让滑条
-  /// "弹回原位"，看起来像拖动失败（其实页面已经跳过去了）。
-  late int _page;
-
-  @override
-  void initState() {
-    super.initState();
-    _page = widget.page.clamp(1, widget.total < 1 ? 1 : widget.total);
-  }
-
-  void _onSlideEnd(double value) {
-    final target = value.round().clamp(1, widget.total);
-    // 先落本地页码再通知外部：两者顺序反了会有一帧仍显示旧值。
-    setState(() {
-      _dragging = null;
-      _page = target;
-    });
-    widget.onJump(target);
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final global = ref.watch(readerPrefsProvider);
     final controller = ref.read(readerPrefsProvider.notifier);
-    final palette = widget.palette;
+    final palette = this.palette;
     final theme = Theme.of(context);
     final textStyle = theme.textTheme;
-    final seriesId = widget.seriesId;
+    final seriesId = this.seriesId;
     final seriesOverridden =
         seriesId != null && global.seriesOverrides.containsKey(seriesId);
     // 开关关着时改的是全局；开着时才写这个系列的覆盖。
@@ -153,25 +123,23 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
                 style: AppTypography.of(context).title
                     .copyWith(color: palette.foreground),
               ),
+              const SizedBox(height: AppSpacing.xs),
+              // 顶部摘要（RDR-04）：不开面板里的任何一组也知道现在是什么组合。
+              Text(
+                key: const Key('reader-settings-summary'),
+                '${l10n.readerCurrentSummary} · ${_summary(l10n, prefs, palette)}',
+                style: textStyle.bodySmall?.copyWith(color: palette.muted),
+              ),
               const SizedBox(height: AppSpacing.md),
               if (seriesId != null) ...<Widget>[
-                SwitchListTile(
-                  key: const Key('reader-series-remember'),
-                  contentPadding: EdgeInsets.zero,
+                ReaderSettingsSwitch(
+                  switchKey: const Key('reader-series-remember'),
                   value: seriesOverridden,
+                  title: l10n.readerSeriesRemember,
+                  hint: l10n.readerSeriesRememberHint,
+                  palette: palette,
                   onChanged: (bool value) =>
                       controller.setSeriesOverride(seriesId, value),
-                  activeThumbColor: palette.foreground,
-                  title: Text(
-                    l10n.readerSeriesRemember,
-                    style: textStyle.bodyMedium?.copyWith(
-                      color: palette.foreground,
-                    ),
-                  ),
-                  subtitle: Text(
-                    l10n.readerSeriesRememberHint,
-                    style: textStyle.bodySmall?.copyWith(color: palette.muted),
-                  ),
                 ),
                 const SizedBox(height: AppSpacing.sm),
               ],
@@ -185,6 +153,17 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
                     controller.savePreset(name, seriesId: writeSeriesId),
               ),
               const SizedBox(height: AppSpacing.md),
+              // ---- 页面：模式 + 跳页 ----
+              ReaderSettingsGroupHeader(
+                group: 'pages',
+                title: l10n.readerGroupPages,
+                palette: palette,
+                enabled: !prefs.isGroupDefault(ReaderSettingsGroup.pages),
+                onReset: () => controller.resetGroup(
+                  ReaderSettingsGroup.pages,
+                  seriesId: writeSeriesId,
+                ),
+              ),
               ReaderOptionSection<ReaderModeChoice>(
                 title: l10n.readingMode,
                 values: ReaderModeChoice.values,
@@ -196,7 +175,25 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
                 onSelect: (ReaderModeChoice value) =>
                     controller.setMode(value, seriesId: writeSeriesId),
               ),
+              const SizedBox(height: AppSpacing.sm),
+              ReaderJumpSlider(
+                page: page,
+                total: total,
+                palette: palette,
+                onJump: onJump,
+              ),
               const SizedBox(height: AppSpacing.md),
+              // ---- 布局：适配 + 方向 + 去白边 ----
+              ReaderSettingsGroupHeader(
+                group: 'layout',
+                title: l10n.readerGroupLayout,
+                palette: palette,
+                enabled: !prefs.isGroupDefault(ReaderSettingsGroup.layout),
+                onReset: () => controller.resetGroup(
+                  ReaderSettingsGroup.layout,
+                  seriesId: writeSeriesId,
+                ),
+              ),
               ReaderOptionSection<ReaderFitChoice>(
                 title: l10n.readerFit,
                 values: ReaderFitChoice.values,
@@ -205,6 +202,8 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
                 hint: readerFitHint,
                 keyPrefix: 'reader-fit',
                 palette: palette,
+                preview: (BuildContext context, ReaderFitChoice value) =>
+                    ReaderFitPreview(fit: value, palette: palette),
                 onSelect: (ReaderFitChoice value) =>
                     controller.setFit(value, seriesId: writeSeriesId),
               ),
@@ -220,9 +219,29 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
                 onSelect: (ReaderDirectionChoice value) =>
                     controller.setDirection(value, seriesId: writeSeriesId),
               ),
-              // 墨水屏不给背景选项：它固定白底黑字（黑底会触发整屏全刷）。
+              const SizedBox(height: AppSpacing.sm),
+              ReaderSettingsSwitch(
+                switchKey: const Key('reader-trim-borders'),
+                value: prefs.trimBorders,
+                title: l10n.readerTrimBorders,
+                hint: l10n.readerTrimBordersHint,
+                palette: palette,
+                onChanged: (bool value) =>
+                    controller.setTrimBorders(value, seriesId: writeSeriesId),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              // ---- 颜色：背景 + 亮度（墨水屏只有亮度） ----
+              ReaderSettingsGroupHeader(
+                group: 'color',
+                title: l10n.readerGroupColor,
+                palette: palette,
+                enabled: !prefs.isGroupDefault(ReaderSettingsGroup.color),
+                onReset: () => controller.resetGroup(
+                  ReaderSettingsGroup.color,
+                  seriesId: writeSeriesId,
+                ),
+              ),
               if (!palette.isEink) ...<Widget>[
-                const SizedBox(height: AppSpacing.md),
                 ReaderOptionSection<ReaderBackgroundChoice>(
                   title: l10n.readerBackground,
                   values: ReaderBackgroundChoice.values,
@@ -234,8 +253,8 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
                   onSelect: (ReaderBackgroundChoice value) =>
                       controller.setBackground(value, seriesId: writeSeriesId),
                 ),
+                const SizedBox(height: AppSpacing.sm),
               ],
-              const SizedBox(height: AppSpacing.md),
               ReaderSectionLabel(l10n.brightness, palette: palette),
               Row(
                 children: <Widget>[
@@ -270,97 +289,54 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
                   ),
                 ],
               ),
-              SwitchListTile(
-                key: const Key('reader-trim-borders'),
-                contentPadding: EdgeInsets.zero,
-                value: prefs.trimBorders,
-                onChanged: (bool value) =>
-                    controller.setTrimBorders(value, seriesId: writeSeriesId),
-                activeThumbColor: palette.foreground,
-                title: Text(
-                  l10n.readerTrimBorders,
-                  style: textStyle.bodyMedium?.copyWith(
-                    color: palette.foreground,
-                  ),
-                ),
-                subtitle: Text(
-                  l10n.readerTrimBordersHint,
-                  style: textStyle.bodySmall?.copyWith(color: palette.muted),
+              const SizedBox(height: AppSpacing.md),
+              // ---- 交互：锁定缩放 + 常亮 ----
+              ReaderSettingsGroupHeader(
+                group: 'interaction',
+                title: l10n.readerGroupInteraction,
+                palette: palette,
+                enabled: !prefs.isGroupDefault(ReaderSettingsGroup.interaction),
+                onReset: () => controller.resetGroup(
+                  ReaderSettingsGroup.interaction,
+                  seriesId: writeSeriesId,
                 ),
               ),
-              SwitchListTile(
-                key: const Key('reader-lock-zoom'),
-                contentPadding: EdgeInsets.zero,
+              ReaderSettingsSwitch(
+                switchKey: const Key('reader-lock-zoom'),
                 value: prefs.lockZoom,
+                title: l10n.readerLockZoom,
+                hint: l10n.readerLockZoomHint,
+                palette: palette,
                 onChanged: (bool value) =>
                     controller.setLockZoom(value, seriesId: writeSeriesId),
-                activeThumbColor: palette.foreground,
-                title: Text(
-                  l10n.readerLockZoom,
-                  style: textStyle.bodyMedium?.copyWith(
-                    color: palette.foreground,
-                  ),
-                ),
-                subtitle: Text(
-                  l10n.readerLockZoomHint,
-                  style: textStyle.bodySmall?.copyWith(color: palette.muted),
-                ),
               ),
-              SwitchListTile(
-                key: const Key('reader-keep-awake'),
-                contentPadding: EdgeInsets.zero,
+              ReaderSettingsSwitch(
+                switchKey: const Key('reader-keep-awake'),
                 value: prefs.keepAwake,
+                title: l10n.keepScreenAwake,
+                hint: l10n.keepScreenAwakeHint,
+                palette: palette,
                 onChanged: (bool value) =>
                     controller.setKeepAwake(value, seriesId: writeSeriesId),
-                activeThumbColor: palette.foreground,
-                title: Text(
-                  l10n.keepScreenAwake,
-                  style: textStyle.bodyMedium?.copyWith(
-                    color: palette.foreground,
-                  ),
-                ),
-                subtitle: Text(
-                  l10n.keepScreenAwakeHint,
-                  style: textStyle.bodySmall?.copyWith(color: palette.muted),
-                ),
               ),
-              if (widget.total > 1) ...<Widget>[
-                const SizedBox(height: AppSpacing.sm),
-                Row(
-                  children: <Widget>[
-                    ReaderSectionLabel(l10n.goToPage, palette: palette),
-                    const Spacer(),
-                    Text(
-                      l10n.readerPageOf(
-                        _dragging?.round() ?? _page,
-                        widget.total,
-                      ),
-                      style: textStyle.bodySmall?.copyWith(
-                        color: palette.muted,
-                      ),
-                    ),
-                  ],
-                ),
-                Slider(
-                  key: const Key('reader-jump-slider'),
-                  value: (_dragging ?? _page.toDouble()).clamp(
-                    1,
-                    widget.total.toDouble(),
-                  ),
-                  min: 1,
-                  max: widget.total.toDouble(),
-                  divisions: widget.total > 1 ? widget.total - 1 : null,
-                  activeColor: palette.foreground,
-                  inactiveColor: palette.outline,
-                  onChanged: (double value) =>
-                      setState(() => _dragging = value),
-                  onChangeEnd: _onSlideEnd,
-                ),
-              ],
             ],
           ),
         ),
       ),
     );
+  }
+
+  /// 顶部摘要：模式 · 适配 · 方向（+ 非墨水屏时的背景）。
+  String _summary(
+    AppLocalizations l10n,
+    ReaderPrefs prefs,
+    ReaderPalette palette,
+  ) {
+    return <String>[
+      readerModeLabel(l10n, prefs.mode),
+      readerFitLabel(l10n, prefs.fit),
+      readerDirectionLabel(l10n, prefs.direction),
+      if (!palette.isEink) readerBackgroundLabel(l10n, prefs.background),
+    ].join(' · ');
   }
 }

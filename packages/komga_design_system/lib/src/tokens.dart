@@ -115,6 +115,10 @@ abstract final class AppSizes {
 
   /// 骨架里标题文字的占位高度（书名、分组标题）。
   static const double skeletonLineLg = 20;
+
+  /// 阅读设置里"适配方式"示意图的宽高（RDR-04）。
+  static const double fitPreviewWidth = 30;
+  static const double fitPreviewHeight = 38;
 }
 
 /// 布局断点，与 `komga_platform` 的形态判断保持同一套数值。

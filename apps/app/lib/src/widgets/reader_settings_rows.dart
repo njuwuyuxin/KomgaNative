@@ -75,6 +75,7 @@ class ReaderOptionSection<T> extends StatelessWidget {
     required this.keyPrefix,
     required this.palette,
     required this.onSelect,
+    this.preview,
     super.key,
   });
 
@@ -89,6 +90,9 @@ class ReaderOptionSection<T> extends StatelessWidget {
 
   final ReaderPalette palette;
   final ValueChanged<T> onSelect;
+
+  /// 行首的小示意图（适配方式用，RDR-04）；为空时就是普通单选行。
+  final Widget Function(BuildContext context, T value)? preview;
 
   @override
   Widget build(BuildContext context) {
@@ -107,6 +111,10 @@ class ReaderOptionSection<T> extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
+                  if (preview != null) ...<Widget>[
+                    preview!(context, value),
+                    const SizedBox(width: AppSpacing.sm),
+                  ],
                   Icon(
                     value == selected
                         ? Icons.radio_button_checked

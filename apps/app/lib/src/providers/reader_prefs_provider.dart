@@ -66,6 +66,10 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
     (ReaderPrefs p) => p.copyWith(trimBorders: enabled),
   );
 
+  /// 把某一组设置恢复默认（RDR-04）：只动这一组，其它组不受影响。
+  void resetGroup(ReaderSettingsGroup group, {String? seriesId}) =>
+      _updateConfig(seriesId, (ReaderPrefs p) => p.resetGroup(group));
+
   /// 打开/关闭"按系列记住"（UI-P3-2）。
   ///
   /// 打开时把**当前生效值**快照成这个系列的覆盖；关闭时删掉覆盖、回到全局。

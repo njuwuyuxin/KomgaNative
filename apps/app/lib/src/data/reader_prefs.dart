@@ -59,6 +59,12 @@ extension ReaderDirectionChoiceX on ReaderDirectionChoice {
 /// `dynamic` 从当前页边缘提色，双页取两页的平均；墨水屏不提供这一项（固定白底）。
 enum ReaderBackgroundChoice { black, white, dynamic, immersive }
 
+/// 阅读设置的分组（RDR-04）。
+///
+/// 完整面板按这四组排，并且**每组可以单独重置**：用户调坏了"颜色"，
+/// 不该把"布局"一起打回默认。
+enum ReaderSettingsGroup { pages, layout, color, interaction }
+
 /// 一组命名的阅读设置（UI-P3-1）。
 ///
 /// 预设是一个**快照**：保存时的模式/适配/方向/背景/亮度/常亮，之后应用就整体覆盖。
@@ -154,6 +160,36 @@ class ReaderPrefs {
   ///
   /// 值里不能带预设/覆盖（用 [configOnly] 生成），否则 JSON 会递归。
   final Map<String, ReaderPrefs> seriesOverrides;
+
+  /// 把某一组设置恢复默认（RDR-04），其它组原样保留。
+  ReaderPrefs resetGroup(ReaderSettingsGroup group) => switch (group) {
+    ReaderSettingsGroup.pages => copyWith(mode: ReaderModeChoice.auto),
+    ReaderSettingsGroup.layout => copyWith(
+      fit: ReaderFitChoice.contain,
+      direction: ReaderDirectionChoice.auto,
+      trimBorders: false,
+    ),
+    ReaderSettingsGroup.color => copyWith(
+      background: ReaderBackgroundChoice.black,
+      brightness: 1,
+    ),
+    ReaderSettingsGroup.interaction => copyWith(
+      lockZoom: false,
+      keepAwake: false,
+    ),
+  };
+
+  /// 这一组是不是已经是默认值（决定"重置"按钮要不要亮）。
+  bool isGroupDefault(ReaderSettingsGroup group) => switch (group) {
+    ReaderSettingsGroup.pages => mode == ReaderModeChoice.auto,
+    ReaderSettingsGroup.layout =>
+      fit == ReaderFitChoice.contain &&
+          direction == ReaderDirectionChoice.auto &&
+          !trimBorders,
+    ReaderSettingsGroup.color =>
+      background == ReaderBackgroundChoice.black && brightness == 1,
+    ReaderSettingsGroup.interaction => !lockZoom && !keepAwake,
+  };
 
   /// 去掉预设与系列覆盖后的"纯配置"（保存预设/系列覆盖时用）。
   ReaderPrefs configOnly() => ReaderPrefs(
