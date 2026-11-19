@@ -24,6 +24,7 @@
   "seriesCount": "{count} series",
   "searchCollectionsHint": "Search collections",
   "collectionRename": "Rename collection",
+  "collectionCreate": "New collection",
   "collectionDelete": "Delete collection",
   "collectionNameHint": "Collection name",
   "collectionDeleteTitle": "Delete collection?",

@@ -32,7 +32,16 @@ class CollectionCovers extends StatelessWidget {
       return _InitialBadge(name: name, size: size);
     }
     if (ids.length == 1) {
-      return _Cover(seriesId: ids.first, size: size, flat: false);
+      // 必须自己钉死宽高：`_Cover` 内部是 `SizedBox.expand`，
+      // 直接塞进 ListTile.leading 会横向撑满整行（实测把标题挤没了）。
+      return SizedBox(
+        width: size,
+        height: size,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadii.sm),
+          child: _Cover(seriesId: ids.first, size: size, flat: false),
+        ),
+      );
     }
     // 2–4 张：两列网格。2 张时是上下两格，3 张时右下补一个首字母块。
     return SizedBox(

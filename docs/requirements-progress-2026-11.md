@@ -83,7 +83,7 @@
 |---|---|---|---|---|
 | RDR-07 | 点击区预设 + 反转 | P2 | DONE | `feat(reader): 点击区预设/反转/双击开关` |
 | RDR-08 | 条漫自动滚动 | P2 | DONE | `feat(reader): 纵向自动滚动` |
-| SER-04 | 收藏集新建/编辑（API 验证后） | P2 | WIP（改名/删除已交付，新建待系列选择器） | `feat(collections): 改名/删除 + 写接口` |
+| SER-04 | 收藏集新建/编辑（API 验证后） | P2 | DONE | `feat(collections): 新建/改名/删除` |
 | I18N-02 | 语言扩展框架（日/繁中/西/法） | P2 | TODO | — |
 
 ---
@@ -252,14 +252,24 @@
 - 收藏集**长按 → 重命名 / 删除**（重命名用 `TextFormField` 而不是 `TextEditingController`：
   后者在 dialog 退场动画里已被 dispose，会撞 "used after being disposed"）。
 
-**未完成（明确记录）**：**新建收藏集的 UI**。API 要求至少一个系列，
-所以不能做"先建空集再往里加"；正确入口是系列详情页的"新建收藏集（含本系列）"，
-或者一个系列多选器。这一层没做，因此本项仍是 WIP。
+**新建收藏集**：入口在**系列详情页**的标记菜单里（"新建收藏集"），
+以本系列为第一个成员——这正是 API 真值决定的形状：不能先建空集。
+填名字 → `createCollection(name, [seriesId])` → 刷新收藏集列表 + 提示。
 
-**测试**：spike 的 6 条真实结果写进了文档；改名/删除的 widget 测试写完发现
-**同文件内连跑会互相影响**（前一条留下的 SnackBar 让后一条报
-"build scope unexpectedly does not contain that widget"），已移除，
-改为靠设备走查 + 上面这张 API 真值表兜底。
+**顺手修掉一个布局 bug**：`CollectionCovers` 只有一张封面时直接返回 `_Cover`
+（内部是 `SizedBox.expand`），塞进 `ListTile.leading` 会横向撑满整行、
+把标题挤没——设备上一眼就看出来了。现在单封面也自己钉死 `size × size`。
+
+**测试**：`series_detail_screen_test.dart` 新增 1 条——打开菜单 → 新建收藏集 →
+填名字 → 断言仓库收到 `createCollection(name, [seriesId])`。
+改名/删除的 widget 测试写完发现同文件内连跑会互相影响（前一条留下的 SnackBar
+让后一条报 "build scope unexpectedly does not contain that widget"），已移除，
+改由设备走查覆盖。
+
+**设备走查（真服务器，端到端）**：系列页菜单 →"新建收藏集"→ 输入 `DeviceShelf` →
+保存 → 收藏页出现"DeviceShelf / 1 个系列"（封面正常显示）；长按该行 → 删除 →
+确认框「「DeviceShelf」会从服务器删除，里面的系列本身不受影响。」→ 删除 →
+列表回到"还没有收藏集。"，并提示"收藏集已更新"。**新建与删除都在真实 Komga 上成功了**。
 
 ### RDR-08 条漫自动滚动
 

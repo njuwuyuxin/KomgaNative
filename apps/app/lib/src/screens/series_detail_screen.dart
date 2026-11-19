@@ -133,6 +133,52 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
     );
   }
 
+  /// 新建收藏集并以本系列为第一个成员（SER-04）。
+  ///
+  /// 为什么不是"新建空收藏集"：Komga 实测 `seriesIds` 至少一个，空集直接 400。
+  Future<void> _createCollection() async {
+    final l10n = AppLocalizations.of(context);
+    var draft = '';
+    final name = await showDialog<String>(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        key: const Key('collection-create-dialog'),
+        title: Text(l10n.collectionCreate),
+        content: TextFormField(
+          key: const Key('collection-create-field'),
+          initialValue: draft,
+          autofocus: true,
+          onChanged: (String value) => draft = value,
+          decoration: InputDecoration(hintText: l10n.collectionNameHint),
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(l10n.cancel),
+          ),
+          TextButton(
+            key: const Key('collection-create-ok'),
+            onPressed: () => Navigator.of(context).pop(draft.trim()),
+            child: Text(l10n.save),
+          ),
+        ],
+      ),
+    );
+    if (name == null || name.isEmpty || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(libraryRepositoryProvider)
+          .createCollection(name: name, seriesIds: <String>[seriesId]);
+      ref.invalidate(collectionsProvider);
+      messenger.showSnackBar(SnackBar(content: Text(l10n.collectionSaved)));
+    } on ShelfFailure catch (failure) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.failureTitle(failure.kind))),
+      );
+    }
+  }
+
   /// 标记整系列已读/未读；失败时用 SnackBar 说明，不把详情页变成错误页。
   Future<void> _markSeriesRead({required bool read}) async {
     try {
@@ -234,6 +280,13 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                       key: const Key('series-mark-unread'),
                       label: l10n.markAllUnread,
                       onPressed: () => unawaited(_markSeriesRead(read: false)),
+                    ),
+                    // Komga 实测要求新建收藏集至少带一个系列（空集 400），
+                    // 所以入口放在系列页：以本系列为第一个成员。
+                    GlassMenuItemButton(
+                      key: const Key('series-create-collection'),
+                      label: l10n.collectionCreate,
+                      onPressed: () => unawaited(_createCollection()),
                     ),
                   ],
                 ),

@@ -283,4 +283,24 @@ void main() {
     expect(find.byKey(const Key('series-error')), findsOneWidget);
     expect(find.text('Series'), findsWidgets, reason: '兜底标题（AppBar + 头部）');
   });
+  testWidgets('新建收藏集：填名字后以本系列创建（SER-04）', (WidgetTester tester) async {
+    final repository = FakeLibraryRepository(series: demoShelf());
+    await pumpDetail(tester, repository);
+
+    await tester.tap(find.byKey(const Key('series-mark-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('series-create-collection')));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('collection-create-field')),
+      'My shelf',
+    );
+    await tester.tap(find.byKey(const Key('collection-create-ok')));
+    await tester.pumpAndSettle();
+
+    expect(repository.createdCollections, hasLength(1));
+    expect(repository.createdCollections.single.name, 'My shelf');
+    expect(repository.createdCollections.single.seriesIds, hasLength(1));
+  });
 }
