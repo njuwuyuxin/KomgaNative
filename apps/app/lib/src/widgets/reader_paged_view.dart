@@ -30,7 +30,8 @@ enum _TurnPhase { idle, dragging, settling }
 ///
 /// 翻页动画在 `reader_page_turn.dart`：单页模式卷走当前页 / 卷回上一页；
 /// 双页模式像真书一样，半边页铰接在书脊上翻过去，纸背就是下一屏的那一页。
-/// 位图不全或屏的页数变了（单页↔双页）时退化成平移。
+/// 纸面位图没就绪、或屏的页数变了（单页↔双页）时退化成平移；单页模式下
+/// 底下那一页还在加载**不算**退化——纸掀开后露出的就是它的加载态。
 /// 缩放、平移与双击缩放在 `reader_zoom.dart`。
 class ReaderPagedView extends ConsumerStatefulWidget {
   const ReaderPagedView({

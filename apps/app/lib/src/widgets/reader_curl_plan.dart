@@ -53,12 +53,26 @@ class _CurlPlan {
   /// 垫在卷页下面的页与它们的矩形。
   final List<(int, Rect)> under;
 
-  /// 露出的底层也必须有像素，不能只保证纸面和纸背已解码。
+  /// 空闲时要预解码的范围：纸面 + 纸背 + 露出的底层。
+  ///
+  /// 底层在这里是**预解码**对象、不是卷页条件：翻过去之后它们就是屏幕上的页，
+  /// 早解一步交接才不会空窗。
   Set<int> get pages => <int>{
     sheetPage,
     ?backPage,
     for (final (page, _) in under) page,
   };
+
+  /// 起手判定"这次能不能卷"至少要有的位图。
+  ///
+  /// 单页（[backPage] 为 null）只要求纸面：纸背是白纸 + 透印，着色器只采样
+  /// 这一张（`page_curl.frag` 的 `backAt` 在 `uHasBack = 0` 时完全用 `uSheet`），
+  /// 垫在下面的相邻页是透出来的 widget，不参与合成。所以下层还在转圈也能照常
+  /// 卷页——整屏平移并不会让下层更早有像素，只换来一次没有卷页的翻动。
+  ///
+  /// 双页仍要求 [pages] 全部：纸背就是下一屏落在那半边的那页，露出的底层就是
+  /// 纸要落地的地方，缺了会翻出一张空白纸或黑半页——那不是"还没加载"，是画错。
+  Set<int> get requiredPages => backPage == null ? <int>{sheetPage} : pages;
 
   /// 从屏 [before] 翻到屏 [after] 的卷页计划；页数不配对时为 null。
   ///

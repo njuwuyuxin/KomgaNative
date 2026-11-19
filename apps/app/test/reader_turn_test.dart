@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
@@ -130,6 +132,63 @@ void main() {
     await gesture.up();
     await tester.pumpAndSettle();
     expect(find.text('4–5 / 6'), findsOneWidget);
+  });
+
+  testWidgets('单页：底层相邻页还没加载好，也照常卷页（掀开后露出它的加载态）', (WidgetTester tester) async {
+    final repository = FakeReaderRepository(pageCount: 4);
+    // 第 2 页（下一屏）挂住：它只决定"纸掀开之后露出什么"，不是卷页的条件。
+    repository.pageGates[2] = Completer<void>();
+    await pumpReader(tester, repository: repository, book: demoReaderBook());
+    // 位图在空闲帧里真解码（instantiateImageCodec），要给真实的异步时间。
+    for (var i = 0; i < 5; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
+      await tester.pump();
+    }
+    final state = tester.state<ReaderPagedViewState>(
+      find.byType(ReaderPagedView),
+    );
+    final rect = tester.getRect(find.byKey(const Key('reader-tap-layer')));
+    final gesture = await tester.startGesture(rect.center);
+    await gesture.moveBy(Offset(-rect.width * 0.5, 0));
+    await tester.pump();
+
+    expect(state.debugCurling, isTrue, reason: '当前这一页已就绪就该卷页；等底层只会换来一次没有卷页的平移');
+    expect(find.byKey(const Key('reader-curl-layer')), findsOneWidget);
+    expect(
+      find.byKey(const Key('reader-page-loading-1')),
+      findsOneWidget,
+      reason: '纸掀开后露出的就是下一屏"还没加载好"的老实状态',
+    );
+
+    await gesture.up();
+    // 翻过去的同时它到了：交接后不该再转圈。
+    repository.pageGates[2]!.complete();
+    // 第一个 tick 只是让控制器起表（elapsed = 0），第二个 tick 才播完。
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('2 / 4'), findsOneWidget);
+  });
+
+  testWidgets('单页：当前页自己的纸面位图没好，仍然退化成平移', (WidgetTester tester) async {
+    final repository = FakeReaderRepository(pageCount: 5)..failingPages.add(1);
+    await pumpReader(tester, repository: repository, book: demoReaderBook());
+    final state = tester.state<ReaderPagedViewState>(
+      find.byType(ReaderPagedView),
+    );
+    final rect = tester.getRect(find.byKey(const Key('reader-tap-layer')));
+    final gesture = await tester.startGesture(rect.center);
+    await gesture.moveBy(Offset(-rect.width * 0.5, 0));
+    await tester.pump();
+
+    expect(state.debugCurling, isFalse, reason: '纸面没有像素，卷起来只会是一块空白');
+    expect(find.byKey(const Key('reader-curl-layer')), findsNothing);
+
+    await gesture.up();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('2 / 5'), findsOneWidget);
   });
 
   testWidgets('松手后从"当前已翻进度"补完，不会跳回起点重播', (WidgetTester tester) async {

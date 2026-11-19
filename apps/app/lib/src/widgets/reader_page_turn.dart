@@ -104,10 +104,12 @@ mixin _PageTurn
     _forward = forward;
     _progress = 0;
     final plan = _planFor(forward);
+    // 只看 [requiredPages]：单页是"当前这一张纸"，双页是纸面 + 纸背。
+    // 底层没就绪不再是退化条件（见 `_CurlPlan.requiredPages`）。
     final ready =
         plan != null &&
         PageCurlProgram.program != null &&
-        plan.pages.every((int p) => _sheets.imageFor(p) != null);
+        plan.requiredPages.every((int p) => _sheets.imageFor(p) != null);
     _plan = ready ? plan : null;
     _finger = _plan?.motion.fingerAt(0) ?? (x: 0, y: 0);
   }
