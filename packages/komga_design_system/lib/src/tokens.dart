@@ -120,6 +120,9 @@ abstract final class AppSizes {
   static const double fitPreviewWidth = 30;
   static const double fitPreviewHeight = 38;
 
+  /// Insights 热力图每格的边长（HIS-03）。
+  static const double heatmapCell = 16;
+
   /// 最近阅读横滑条的整条高度与单个封面宽度（HIS-02）。
   static const double recentHistoryHeight = 132;
   static const double recentHistoryTileWidth = 84;

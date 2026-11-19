@@ -72,6 +72,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                         label: l10n.readerMore,
                         menuChildren: <Widget>[
                           GlassMenuItemButton(
+                            key: const Key('history-insights'),
+                            label: l10n.insights,
+                            icon: Icons.insights_outlined,
+                            onPressed: () => context.push('/insights'),
+                          ),
+                          GlassMenuItemButton(
                             key: const Key('history-clear'),
                             label: l10n.historyClear,
                             icon: Icons.delete_sweep_outlined,

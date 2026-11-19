@@ -1,0 +1,100 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:komga_native/src/data/cache/http_cache_database.dart';
+import 'package:komga_native/src/data/reading_stats.dart';
+
+/// HIS-03：Insights 的统计口径（连续天数/最长连续/周月汇总/热力图）。
+void main() {
+  final now = DateTime(2026, 11, 20, 15); // 本地时间，周五
+
+  ReadingSession session({
+    required String bookId,
+    required DateTime startedAt,
+    int minutes = 10,
+  }) => ReadingSession(
+    id: 0,
+    bookId: bookId,
+    seriesId: 's1',
+    bookName: 'Vol. $bookId',
+    startedAt: startedAt,
+    endedAt: startedAt.add(Duration(minutes: minutes)),
+    durationMs: minutes * 60 * 1000,
+    startPage: 1,
+    endPage: 10,
+    completed: false,
+  );
+
+  test('空数据不崩，全是 0', () {
+    final stats = ReadingStats.fromSessions(const <ReadingSession>[], now: now);
+    expect(stats.isEmpty, isTrue);
+    expect(stats.currentStreak, 0);
+    expect(stats.longestStreak, 0);
+    expect(stats.days.length, 84, reason: '12 周 × 7 天');
+    expect(stats.weekMinutes, 0);
+  });
+
+  test('今天读过：连续天数从今天往回数', () {
+    final stats = ReadingStats.fromSessions(<ReadingSession>[
+      session(bookId: 'b1', startedAt: DateTime(2026, 11, 20, 9)),
+      session(bookId: 'b1', startedAt: DateTime(2026, 11, 19, 9)),
+      session(bookId: 'b1', startedAt: DateTime(2026, 11, 18, 9)),
+    ], now: now);
+    expect(stats.currentStreak, 3);
+    expect(stats.longestStreak, 3);
+  });
+
+  test('今天没读、昨天读了：连续天数不清零', () {
+    final stats = ReadingStats.fromSessions(<ReadingSession>[
+      session(bookId: 'b1', startedAt: DateTime(2026, 11, 19, 9)),
+      session(bookId: 'b1', startedAt: DateTime(2026, 11, 18, 9)),
+    ], now: now);
+    expect(stats.currentStreak, 2);
+  });
+
+  test('中断两天就归零；最长连续保留历史最长', () {
+    final stats = ReadingStats.fromSessions(<ReadingSession>[
+      // 一段 4 天的连续（很久以前）。
+      session(bookId: 'b1', startedAt: DateTime(2026, 10, 1, 9)),
+      session(bookId: 'b1', startedAt: DateTime(2026, 10, 2, 9)),
+      session(bookId: 'b1', startedAt: DateTime(2026, 10, 3, 9)),
+      session(bookId: 'b1', startedAt: DateTime(2026, 10, 4, 9)),
+      // 最近读过一次，但之后断了两天。
+      session(bookId: 'b1', startedAt: DateTime(2026, 11, 17, 9)),
+    ], now: now);
+    expect(stats.currentStreak, 0, reason: '昨天和今天都没读');
+    expect(stats.longestStreak, 4);
+  });
+
+  test('同一天多次阅读累加时长、书按去重算', () {
+    final stats = ReadingStats.fromSessions(<ReadingSession>[
+      session(bookId: 'b1', startedAt: DateTime(2026, 11, 20, 9), minutes: 5),
+      session(bookId: 'b2', startedAt: DateTime(2026, 11, 20, 10), minutes: 7),
+      session(bookId: 'b2', startedAt: DateTime(2026, 11, 20, 11), minutes: 3),
+    ], now: now);
+    expect(stats.weekMinutes, 15);
+    expect(stats.weekBooks, 2, reason: 'b2 读了两次也只算一本');
+    expect(stats.monthMinutes, 15);
+    final today = stats.days.last;
+    expect(today.minutes, 15);
+    expect(today.books, 2);
+  });
+
+  test('跨日边界：23:59 与次日 00:01 算两天', () {
+    final stats = ReadingStats.fromSessions(<ReadingSession>[
+      session(bookId: 'b1', startedAt: DateTime(2026, 11, 19, 23, 59)),
+      session(bookId: 'b1', startedAt: DateTime(2026, 11, 20, 0, 1)),
+    ], now: now);
+    expect(stats.currentStreak, 2);
+    expect(stats.days[stats.days.length - 2].minutes, 10);
+    expect(stats.days.last.minutes, 10);
+  });
+
+  test('坏数据（时长为 0 / 未来时间）被跳过', () {
+    final stats = ReadingStats.fromSessions(<ReadingSession>[
+      session(bookId: 'b1', startedAt: DateTime(2026, 11, 20, 9), minutes: 0),
+      session(bookId: 'b2', startedAt: DateTime(2027, 1, 1, 9)),
+      session(bookId: 'b3', startedAt: DateTime(2026, 11, 20, 10), minutes: 4),
+    ], now: now);
+    expect(stats.totalMinutes, 4);
+    expect(stats.currentStreak, 1);
+  });
+}

@@ -28,6 +28,7 @@ import 'package:komga_native/src/screens/collections_screen.dart';
 import 'package:komga_native/src/screens/collection_detail_screen.dart';
 import 'package:komga_native/src/screens/connection_screen.dart';
 import 'package:komga_native/src/screens/downloads_screen.dart';
+import 'package:komga_native/src/screens/insights_screen.dart';
 import 'package:komga_native/src/screens/library_screen.dart';
 import 'package:komga_native/src/screens/readlist_detail_screen.dart';
 import 'package:komga_native/src/screens/reader_screen.dart';
@@ -799,6 +800,73 @@ void main() {
       size: GoldenSizes.phone,
       theme: AppTheme.light(),
       loading: true,
+    );
+  });
+
+  /// Insights（HIS-03）：连续天数 + 周/月 + 12 周热力图。
+  Future<void> pumpInsightsGolden(
+    WidgetTester tester, {
+    required String name,
+    required Size size,
+    required ThemeData theme,
+    bool empty = false,
+  }) async {
+    final db = HttpCacheDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    if (!empty) {
+      final now = DateTime.now();
+      for (var i = 0; i < 21; i++) {
+        // 隔三差五地读：热力图有明显深浅，连续天数不是一条直线。
+        if (i % 4 == 0) continue;
+        final startedAt = now.subtract(Duration(days: i, hours: 3));
+        await db.addReadingSession(
+          bookId: 'b${i % 3}',
+          seriesId: 's1',
+          bookName: 'Vol. ${i % 3}',
+          startedAt: startedAt,
+          endedAt: startedAt.add(const Duration(minutes: 18)),
+          durationMs: 18 * 60 * 1000,
+          startPage: 1,
+          endPage: 20,
+          completed: false,
+        );
+      }
+    }
+    await pumpGoldenScreen(
+      tester,
+      screen: const InsightsScreen(),
+      size: size,
+      theme: theme,
+      overrides: <Override>[httpCacheDatabaseProvider.overrideWithValue(db)],
+      realTimeSettle: true,
+    );
+    await expectGolden(tester, name);
+  }
+
+  testWidgets('insights@phone_light', (WidgetTester tester) async {
+    await pumpInsightsGolden(
+      tester,
+      name: 'insights@phone_light',
+      size: GoldenSizes.phone,
+      theme: AppTheme.light(),
+    );
+  });
+
+  testWidgets('insights@tablet_dark', (WidgetTester tester) async {
+    await pumpInsightsGolden(
+      tester,
+      name: 'insights@tablet_dark',
+      size: GoldenSizes.tablet,
+      theme: AppTheme.dark(),
+    );
+  });
+
+  testWidgets('insights@eink', (WidgetTester tester) async {
+    await pumpInsightsGolden(
+      tester,
+      name: 'insights@eink',
+      size: GoldenSizes.eink,
+      theme: AppTheme.eink(),
     );
   });
 

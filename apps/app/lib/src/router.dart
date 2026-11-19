@@ -7,6 +7,7 @@ import 'package:komga_native/src/screens/connection_screen.dart';
 import 'package:komga_native/src/screens/readlist_detail_screen.dart';
 import 'package:komga_native/src/screens/search_screen.dart';
 import 'package:komga_native/src/screens/history_screen.dart';
+import 'package:komga_native/src/screens/insights_screen.dart';
 import 'package:komga_native/src/screens/library_screen.dart';
 import 'package:komga_native/src/screens/reader_screen.dart';
 import 'package:komga_native/src/screens/reading_now_screen.dart';
@@ -122,6 +123,11 @@ GoRouter createRouter({
             ],
           ),
         ],
+      ),
+      GoRoute(
+        path: '/insights',
+        builder: (BuildContext context, GoRouterState state) =>
+            const InsightsScreen(),
       ),
       // 历史页是**顶层路由**，不能塞进某个 shell branch：
       // 一个 branch 只能有一个根路由，放进去会让设置标签跳到历史页（踩过）。
