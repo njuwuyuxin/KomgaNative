@@ -1,13 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/shelf_view_options.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
-import 'package:komga_native/src/widgets/series_shelf_tile.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 书架网格的列宽自适应：按可用宽度塞尽可能多的列，而不是按断点写死列数。
@@ -23,68 +21,6 @@ SliverGridDelegate shelfGridDelegate([
   mainAxisSpacing: AppSpacing.md,
   childAspectRatio: 0.6,
 );
-
-/// 书架网格 + 下拉刷新 + 滚到底自动预取。
-class ShelfGrid extends ConsumerWidget {
-  const ShelfGrid({
-    required this.state,
-    required this.onRefresh,
-    required this.onLoadMore,
-    super.key,
-  });
-
-  /// 距底部还有多少像素就开始预取下一页。太大浪费流量，太小时用户会感到"卡一下"。
-  static const double _prefetchExtent = 600;
-
-  final ShelfState state;
-  final Future<void> Function() onRefresh;
-  final Future<void> Function() onLoadMore;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return RefreshIndicator(
-      onRefresh: onRefresh,
-      child: NotificationListener<ScrollNotification>(
-        onNotification: (ScrollNotification notification) {
-          if (notification.metrics.extentAfter < _prefetchExtent) {
-            unawaited(onLoadMore());
-          }
-          return false;
-        },
-        child: CustomScrollView(
-          key: const Key('shelf-scroll'),
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: <Widget>[
-            SliverPadding(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              sliver: SliverGrid(
-                gridDelegate: shelfGridDelegate(),
-                delegate: SliverChildBuilderDelegate((
-                  BuildContext context,
-                  int index,
-                ) {
-                  final series = state.series[index];
-                  return SeriesShelfTile(
-                    series: series,
-                    onTap: () async {
-                      await context.push('/series/${series.id}');
-                      // 系列页里可能读完了书：原地刷新进度，别把列表清空跳回顶部。
-                      await ref.read(shelfProvider.notifier).refreshInPlace();
-                    },
-                  );
-                }, childCount: state.series.length),
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: ShelfPagingFooter(state: state, onRetry: onLoadMore),
-            ),
-            const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xl)),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 /// 底部状态：追加中 / 追加失败可重试 / 到底了。
 class ShelfPagingFooter extends StatelessWidget {
@@ -177,38 +113,6 @@ class ShelfSkeleton extends StatelessWidget {
         // 两屏的量足够盖住首屏加载，多了纯属浪费。
         itemCount: 8,
         itemBuilder: (BuildContext context, int index) => const SkeletonBox(),
-      ),
-    );
-  }
-}
-
-/// 空态/错误态也要能下拉刷新：外面包一层"至少一屏高"的滚动容器。
-///
-/// 否则文案写着 "pull to refresh" 却根本拉不动——这种自相矛盾用户一定会撞上。
-class RefreshableStatus extends StatelessWidget {
-  const RefreshableStatus({
-    required this.status,
-    required this.onRefresh,
-    super.key,
-  });
-
-  final Widget status;
-  final Future<void> Function() onRefresh;
-
-  @override
-  Widget build(BuildContext context) {
-    return RefreshIndicator(
-      onRefresh: onRefresh,
-      child: LayoutBuilder(
-        builder: (BuildContext context, BoxConstraints constraints) {
-          return SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: constraints.maxHeight),
-              child: status,
-            ),
-          );
-        },
       ),
     );
   }

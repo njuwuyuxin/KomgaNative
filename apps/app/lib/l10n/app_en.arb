@@ -59,10 +59,6 @@
       "total": {"type": "int"}
     }
   },
-  "readsRightToLeft": "Reads right to left",
-  "readsLeftToRight": "Reads left to right",
-  "readsVertical": "Vertical (webtoon)",
-  "readsWebtoon": "Webtoon",
   "bookPages": "{count} pages",
   "@bookPages": {
     "placeholders": {
@@ -86,12 +82,6 @@
   "pageThumbnailsTooltip": "Page thumbnails",
   "readingSettingsTooltip": "Reading settings",
   "finished": "Finished",
-  "finishedNext": "Finished · next {title}",
-  "@finishedNext": {
-    "placeholders": {
-      "title": {"type": "String"}
-    }
-  },
   "nextBook": "Next book",
   "previousPage": "Previous page",
   "nextPage": "Next page",
@@ -134,13 +124,6 @@
     "placeholders": {
       "from": {"type": "int"},
       "to": {"type": "int"}
-    }
-  },
-  "continueReadingProgress": "p. {page} / {total}",
-  "@continueReadingProgress": {
-    "placeholders": {
-      "page": {"type": "int"},
-      "total": {"type": "int"}
     }
   },
   "readerModeAuto": "Follow the book",
@@ -319,7 +302,6 @@
   "readerBackgroundImmersive": "Immersive",
   "readerBackgroundImmersiveHint": "Blends the colours from both page edges into a gradient",
   "readerPresets": "Presets",
-  "readerPresetsHint": "Save a set of settings and switch with one tap.",
   "readerPresetSave": "Save current",
   "readerPresetEmpty": "No presets yet.",
   "readerPresetName": "Preset name",
@@ -352,7 +334,6 @@
   },
   "bookMarkRead": "Mark read",
   "bookMarkUnread": "Mark unread",
-  "readFromStart": "Read from the start",
   "viewDetails": "View details",
   "shelfViewTooltip": "Layout",
   "viewGrid": "Grid",

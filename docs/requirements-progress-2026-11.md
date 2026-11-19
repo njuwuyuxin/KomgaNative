@@ -24,7 +24,7 @@
 
 | ID | 需求 | P | 状态 | commit |
 |---|---|---|---|---|
-| QUA-01 | 拆 `reader_screen` + 清理死代码 | P1 | TODO | — |
+| QUA-01 | 拆 `reader_screen` + 清理死代码 | P1 | DONE | `refactor(reader): 拆分阅读器状态与命令` |
 | RDR-01 | 阅读器页码滑杆 + 剩余页 | P1 | DONE | `feat(reader): 页码滑杆与剩余页` |
 | RDR-02 | 阅读器目录/章节列表 | P1 | TODO | — |
 | RDR-03 | 顶栏 IA + AA 快捷设置 | P1 | TODO | — |
@@ -212,6 +212,22 @@
 - 设备走查：设置页"版本"显示 `0.1.0 (1)`（连的是 APK 真实的 versionCode）。
 
 ## W1 实施记录
+
+### QUA-01 拆 `reader_screen` + 清理死代码
+
+- `reader_screen.dart` 560 → 275 行：状态字段与命令（翻页/跳页/分享/隐身/分组/
+  键盘/音量键/生命周期回写）搬进 `part` 文件里的 `mixin _ReaderDerive`。
+  用 part 而不是"再拆一个 widget"：这些方法要直接读写页码、分屏起点等私有状态，
+  拆成 widget 只会变成一长串回调参数；part 与宿主同属一个 library，私有成员照常可见
+  （与 `reader_page_turn.dart` 同一套写法）。
+- `mixin` 的 `on` 约束加上 `WidgetsBindingObserver`，生命周期回调的 `@override`
+  才成立。
+- 清掉死代码：`ShelfGrid`（书架页自己建网格，早已不用）与 `RefreshableStatus`
+  （空态/错误态改由各页面自己处理）连同不再需要的 import。
+- 清掉 8 个未被引用的 ARB key（`readsRightToLeft`…`readFromStart`，其中
+  `continueReadingProgress` 是 FIX-06 之后失效的）。
+- 验证：55 条阅读器测试 + 黄金图全部不变（零行为变更）；设备上打开第 114/227 页
+  照常渲染，滑杆与"剩 113 页"一致。
 
 ### RDR-01 阅读器页码滑杆 + 剩余页
 
