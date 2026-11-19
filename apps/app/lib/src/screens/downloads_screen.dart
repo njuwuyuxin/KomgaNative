@@ -6,6 +6,7 @@ import 'package:komga_native/src/data/cache/http_cache_database.dart';
 import 'package:komga_native/src/providers/download_providers.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/widgets/cover_image.dart';
+import 'package:komga_native/src/widgets/download_queue_menu.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 下载管理页（UI-P3-13）：进行中 / 排队 / 已下载，可取消、删除。
@@ -57,15 +58,16 @@ class DownloadsScreen extends ConsumerWidget {
                             style: AppTypography.of(context).title,
                           ),
                         ),
-                        // 有排队/进行中才出现：没有下载时它是个无意义按钮。
-                        if (active.isNotEmpty)
-                          IconButton(
-                            key: const Key('downloads-cancel-all'),
-                            tooltip: l10n.downloadCancelAll,
-                            onPressed: () => ref
-                                .read(downloadsProvider.notifier)
-                                .cancelAll(),
-                            icon: const Icon(Icons.stop_circle_outlined),
+                        // 队列动作收进一个菜单（DLD-02）：暂停/继续、重试失败、
+                        // 取消全部、删除全部——四个按钮平铺会把标题挤没。
+                        if (active.isNotEmpty || ids.isNotEmpty)
+                          QueueMenu(
+                            paused: ref.read(downloadsProvider.notifier).paused,
+                            hasActive: active.isNotEmpty,
+                            hasFailed: active.values.any(
+                              (DownloadStatus s) => s.error != null,
+                            ),
+                            hasRecords: records.value?.isNotEmpty ?? false,
                           ),
                       ],
                     ),
@@ -85,6 +87,22 @@ class DownloadsScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: AppSpacing.md),
                       Text(l10n.downloadsEmpty),
+                      const SizedBox(height: AppSpacing.xs),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.xl,
+                        ),
+                        child: Text(
+                          l10n.downloadsEmptyHint,
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                              ),
+                        ),
+                      ),
                     ],
                   ),
                 )

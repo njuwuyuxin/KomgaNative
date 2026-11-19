@@ -140,6 +140,45 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
   /// 同时下载几本；uild() 里从设置读，缺省 1。
   int _concurrency = 1;
 
+  /// 暂停（DLD-02）：正在下的那几本会自然结束，但不再从队列取新的。
+  bool _paused = false;
+
+  bool get paused => _paused;
+
+  /// 暂停：队列保留，不再启动新的。
+  void pauseAll() {
+    if (_paused) return;
+    _paused = true;
+    // 触发一次重建，让按钮从"暂停"变成"继续"。
+    state = <String, DownloadStatus>{...state};
+  }
+
+  /// 继续：把暂停期间攒下的队列放出来。
+  void resumeAll() {
+    if (!_paused) return;
+    _paused = false;
+    unawaited(_pump());
+    state = <String, DownloadStatus>{...state};
+  }
+
+  /// 重试失败项（DLD-02）：只针对错误态，不碰已下载/正在跑的。
+  Future<int> retryFailed() async {
+    final failed = <String>[
+      for (final entry in state.entries)
+        if (entry.value.error != null) entry.key,
+    ];
+    if (failed.isEmpty) return 0;
+    var queued = 0;
+    for (final id in failed) {
+      final book = await ref.read(bookByIdProvider(id).future);
+      if (book == null) continue;
+      _clear(id);
+      await start(book);
+      queued++;
+    }
+    return queued;
+  }
+
   /// 恢复是否已经做过：`build` 会在每次被订阅时跑一次，恢复只做一次。
   bool _restored = false;
 
@@ -296,6 +335,7 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
   }
 
   Future<void> _pump() async {
+    if (_paused) return;
     // 并发：最多 _concurrency 本同时下（DLD-01）。每本跑在自己的 Future 里，
     // 下完再由 _runOne 回过头来补位。
     while (_queue.isNotEmpty && _running.length < _concurrency) {
@@ -340,7 +380,11 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
         ref.invalidate(downloadsUsageProvider);
       }
     }
-    _clear(book.id);
+    if (_disposed) return;
+    // 只有成功/取消才清掉状态：**失败要留着**，否则"重试失败项"没有对象可重试，
+    // 用户也看不到哪一本没下下来（这里之前是个 bug：finally 之后无条件 _clear）。
+    final error = state[book.id]?.error;
+    if (error == null) _clear(book.id);
     // 空出一个并发位，让排队的顶上。
     unawaited(_pump());
   }
