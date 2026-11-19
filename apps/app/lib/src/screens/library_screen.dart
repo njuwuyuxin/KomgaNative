@@ -98,6 +98,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 SliverAppBar.large(
                   title: Text(l10n.libraryTitle),
                   actions: <Widget>[
+                    IconButton(
+                      key: const Key('library-collections-button'),
+                      onPressed: () => context.push('/collections'),
+                      icon: const Icon(Icons.collections_bookmark_outlined),
+                      tooltip: l10n.collectionsTitle,
+                    ),
                     const ShelfSortButton(),
                     const ShelfFilterButton(),
                     const ShelfViewButton(),

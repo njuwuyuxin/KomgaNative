@@ -218,6 +218,87 @@ class FakeLibraryRepository implements LibraryRepository {
   }
 
   @override
+  Future<PageResult<KomgaCollection>> collections({
+    int page = 0,
+    int size = 20,
+  }) async {
+    return PageResult<KomgaCollection>(
+      items: <KomgaCollection>[
+        KomgaCollection(
+          id: 'c1',
+          name: 'Reading order',
+          ordered: true,
+          seriesIds: seriesData.take(2).map((Series s) => s.id).toList(),
+        ),
+        KomgaCollection(
+          id: 'c2',
+          name: 'Empty shelf',
+          ordered: false,
+          seriesIds: const <String>[],
+        ),
+      ],
+      totalElements: 2,
+      page: page,
+      size: size,
+    );
+  }
+
+  @override
+  Future<PageResult<Series>> collectionSeries(
+    String collectionId, {
+    int page = 0,
+    int size = 20,
+  }) async {
+    final ids = collectionId == 'c1'
+        ? seriesData.take(2).map((Series s) => s.id).toSet()
+        : const <String>{};
+    final items = seriesData
+        .where((Series s) => ids.contains(s.id))
+        .toList(growable: false);
+    return PageResult<Series>(
+      items: items,
+      totalElements: items.length,
+      page: page,
+      size: size,
+    );
+  }
+
+  @override
+  Future<PageResult<ReadList>> readLists({int page = 0, int size = 20}) async {
+    return PageResult<ReadList>(
+      items: <ReadList>[
+        ReadList(
+          id: 'r1',
+          name: 'Weekend reading',
+          summary: 'Two books for the weekend',
+          ordered: false,
+          bookIds: ondeckData.map((Book b) => b.id).toList(),
+        ),
+      ],
+      totalElements: 1,
+      page: page,
+      size: size,
+    );
+  }
+
+  @override
+  Future<PageResult<Book>> readListBooks(
+    String readListId, {
+    int page = 0,
+    int size = 20,
+  }) async {
+    final items = readListId == 'r1'
+        ? List<Book>.of(ondeckData)
+        : const <Book>[];
+    return PageResult<Book>(
+      items: items,
+      totalElements: items.length,
+      page: page,
+      size: size,
+    );
+  }
+
+  @override
   Future<Book?> book(String bookId) async {
     for (final book in ondeckData) {
       if (book.id == bookId) return book;

@@ -29,6 +29,29 @@ abstract interface class LibraryRepository {
   /// 单本书（下载管理页用；不存在时返回 null）。
   Future<Book?> book(String bookId);
 
+  /// 收藏集列表（UI-P3-8）。
+  Future<PageResult<KomgaCollection>> collections({
+    int page = 0,
+    int size = 20,
+  });
+
+  /// 收藏集里的系列。
+  Future<PageResult<Series>> collectionSeries(
+    String collectionId, {
+    int page = 0,
+    int size = 20,
+  });
+
+  /// 阅读列表。
+  Future<PageResult<ReadList>> readLists({int page = 0, int size = 20});
+
+  /// 阅读列表里的书。
+  Future<PageResult<Book>> readListBooks(
+    String readListId, {
+    int page = 0,
+    int size = 20,
+  });
+
   /// 系列下的书。默认一次抓 100 本（多数系列够用，超出部分 UI 会明说）。
   Future<PageResult<Book>> books(
     String seriesId, {
@@ -123,6 +146,61 @@ class KomgaLibraryRepository implements LibraryRepository {
   Future<Book?> book(String bookId) async {
     try {
       return await _session.fetchBook(bookId);
+    } on KomgaError catch (error) {
+      throw shelfFailureOf(error);
+    }
+  }
+
+  @override
+  Future<PageResult<KomgaCollection>> collections({
+    int page = 0,
+    int size = 20,
+  }) async {
+    try {
+      return await _session.fetchCollections(page: page, size: size);
+    } on KomgaError catch (error) {
+      throw shelfFailureOf(error);
+    }
+  }
+
+  @override
+  Future<PageResult<Series>> collectionSeries(
+    String collectionId, {
+    int page = 0,
+    int size = 20,
+  }) async {
+    try {
+      return await _session.fetchCollectionSeries(
+        collectionId,
+        page: page,
+        size: size,
+      );
+    } on KomgaError catch (error) {
+      throw shelfFailureOf(error);
+    }
+  }
+
+  @override
+  Future<PageResult<ReadList>> readLists({int page = 0, int size = 20}) async {
+    try {
+      return await _session.fetchReadLists(page: page, size: size);
+    } on KomgaError catch (error) {
+      throw shelfFailureOf(error);
+    }
+  }
+
+  @override
+  Future<PageResult<Book>> readListBooks(
+    String readListId, {
+    int page = 0,
+    int size = 20,
+  }) async {
+    try {
+      return await _session.fetchReadListBooks(
+        readListId,
+        page: page,
+        size: size,
+      );
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);
     }

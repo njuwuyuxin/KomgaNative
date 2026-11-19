@@ -1,7 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:komga_domain/komga_domain.dart';
+import 'package:komga_native/src/screens/collection_detail_screen.dart';
+import 'package:komga_native/src/screens/collections_screen.dart';
 import 'package:komga_native/src/screens/connection_screen.dart';
+import 'package:komga_native/src/screens/readlist_detail_screen.dart';
 import 'package:komga_native/src/screens/library_screen.dart';
 import 'package:komga_native/src/screens/reader_screen.dart';
 import 'package:komga_native/src/screens/reading_now_screen.dart';
@@ -85,6 +88,27 @@ GoRouter createRouter({
             ],
           ),
         ],
+      ),
+      GoRoute(
+        path: '/collections',
+        builder: (BuildContext context, GoRouterState state) =>
+            const CollectionsScreen(),
+      ),
+      GoRoute(
+        path: '/collections/:collectionId',
+        builder: (BuildContext context, GoRouterState state) =>
+            CollectionDetailScreen(
+              collectionId: state.pathParameters['collectionId'] ?? '',
+              title: state.extra is String ? state.extra! as String : null,
+            ),
+      ),
+      GoRoute(
+        path: '/readlists/:readListId',
+        builder: (BuildContext context, GoRouterState state) =>
+            ReadListDetailScreen(
+              readListId: state.pathParameters['readListId'] ?? '',
+              title: state.extra is String ? state.extra! as String : null,
+            ),
       ),
       GoRoute(
         path: '/series/:seriesId',

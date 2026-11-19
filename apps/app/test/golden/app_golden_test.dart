@@ -22,6 +22,7 @@ import 'package:komga_native/src/providers/progress_providers.dart';
 import 'package:komga_native/src/providers/reader_prefs_provider.dart';
 import 'package:komga_native/src/providers/reader_providers.dart';
 import 'package:komga_native/src/providers/settings_provider.dart';
+import 'package:komga_native/src/screens/collections_screen.dart';
 import 'package:komga_native/src/screens/connection_screen.dart';
 import 'package:komga_native/src/screens/downloads_screen.dart';
 import 'package:komga_native/src/screens/library_screen.dart';
@@ -393,6 +394,53 @@ void main() {
     );
     await expectGolden(tester, name);
   }
+
+  Future<void> pumpCollectionsGolden(
+    WidgetTester tester, {
+    required String name,
+    required Size size,
+    required ThemeData theme,
+  }) async {
+    await pumpGoldenScreen(
+      tester,
+      screen: const CollectionsScreen(),
+      size: size,
+      theme: theme,
+      overrides: <Override>[
+        libraryRepositoryProvider.overrideWithValue(
+          FakeLibraryRepository(series: demoShelf()),
+        ),
+      ],
+    );
+    await expectGolden(tester, name);
+  }
+
+  testWidgets('collections@phone_light', (WidgetTester tester) async {
+    await pumpCollectionsGolden(
+      tester,
+      name: 'collections@phone_light',
+      size: GoldenSizes.phone,
+      theme: AppTheme.light(),
+    );
+  });
+
+  testWidgets('collections@tablet_dark', (WidgetTester tester) async {
+    await pumpCollectionsGolden(
+      tester,
+      name: 'collections@tablet_dark',
+      size: GoldenSizes.tablet,
+      theme: AppTheme.dark(),
+    );
+  });
+
+  testWidgets('collections@eink', (WidgetTester tester) async {
+    await pumpCollectionsGolden(
+      tester,
+      name: 'collections@eink',
+      size: GoldenSizes.eink,
+      theme: AppTheme.eink(),
+    );
+  });
 
   Future<void> pumpDownloadsGolden(
     WidgetTester tester, {

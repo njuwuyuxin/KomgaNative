@@ -177,6 +177,58 @@ class KomgaSession {
     return pageResultFromJson(data, bookFromJson);
   }
 
+  /// 收藏集列表（UI-P3-8）。
+  Future<PageResult<KomgaCollection>> fetchCollections({
+    int page = 0,
+    int size = 20,
+  }) async {
+    final data = _requireMap(
+      await _getJson(_urls.collections(page: page, size: size)),
+      '收藏集列表',
+    );
+    return pageResultFromJson(data, collectionFromJson);
+  }
+
+  /// 收藏集里的系列（有顺序）。
+  Future<PageResult<Series>> fetchCollectionSeries(
+    String collectionId, {
+    int page = 0,
+    int size = 20,
+  }) async {
+    final data = _requireMap(
+      await _getJson(
+        _urls.collectionSeries(collectionId, page: page, size: size),
+      ),
+      '收藏集系列',
+    );
+    return pageResultFromJson(data, seriesFromJson);
+  }
+
+  /// 阅读列表（UI-P3-8）。
+  Future<PageResult<ReadList>> fetchReadLists({
+    int page = 0,
+    int size = 20,
+  }) async {
+    final data = _requireMap(
+      await _getJson(_urls.readLists(page: page, size: size)),
+      '阅读列表',
+    );
+    return pageResultFromJson(data, readListFromJson);
+  }
+
+  /// 阅读列表里的书（有顺序）。
+  Future<PageResult<Book>> fetchReadListBooks(
+    String readListId, {
+    int page = 0,
+    int size = 20,
+  }) async {
+    final data = _requireMap(
+      await _getJson(_urls.readListBooks(readListId, page: page, size: size)),
+      '阅读列表书籍',
+    );
+    return pageResultFromJson(data, bookFromJson);
+  }
+
   /// 单个系列。系列已被删除时返回 `null`（调用方据此提示，而不是报错）。
   Future<Series?> fetchSeriesById(String seriesId) async {
     try {

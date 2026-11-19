@@ -56,6 +56,30 @@ class KomgaUrls {
         'size': '$size',
       });
 
+  /// 收藏集列表（`GET /api/v1/collections`）。
+  String collections({int page = 0, int size = 20}) => _withQuery(
+    '$_base/api/v1/collections',
+    {'page': '$page', 'size': '$size'},
+  );
+
+  /// 收藏集里的系列（`GET /api/v1/collections/{id}/series`）。
+  String collectionSeries(String collectionId, {int page = 0, int size = 20}) =>
+      _withQuery('$_base/api/v1/collections/$collectionId/series', {
+        'page': '$page',
+        'size': '$size',
+      });
+
+  /// 阅读列表（`GET /api/v1/readlists`）。
+  String readLists({int page = 0, int size = 20}) =>
+      _withQuery('$_base/api/v1/readlists', {'page': '$page', 'size': '$size'});
+
+  /// 阅读列表里的书（`GET /api/v1/readlists/{id}/books`）。
+  String readListBooks(String readListId, {int page = 0, int size = 20}) =>
+      _withQuery('$_base/api/v1/readlists/$readListId/books', {
+        'page': '$page',
+        'size': '$size',
+      });
+
   /// 单个系列（`GET /api/v1/series/{seriesId}`）。
   String seriesById(String seriesId) => '$_base/api/v1/series/$seriesId';
 

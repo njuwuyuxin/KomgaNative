@@ -46,6 +46,40 @@ void main() {
       expect(libraries.single.unavailable, isFalse);
     });
 
+    test('收藏集：真实响应带 seriesIds / ordered / 时间', () async {
+      final session = _sessionWith(_replay(fixture('collections.json')));
+      final page = await session.fetchCollections();
+      expect(page.totalElements, 1);
+      final collection = page.items.single;
+      expect(collection.name, 'Test Collection');
+      expect(collection.ordered, isFalse);
+      expect(collection.seriesIds, hasLength(2));
+      expect(collection.createdDate, isNotNull);
+    });
+
+    test('收藏集里的系列按真实响应解析', () async {
+      final session = _sessionWith(_replay(fixture('collection-series.json')));
+      final page = await session.fetchCollectionSeries('C1');
+      expect(page.items, hasLength(2));
+      expect(page.items.first.title, 'Akira v01');
+    });
+
+    test('阅读列表：summary / bookIds', () async {
+      final session = _sessionWith(_replay(fixture('readlists.json')));
+      final page = await session.fetchReadLists();
+      final list = page.items.single;
+      expect(list.name, 'Test ReadList');
+      expect(list.summary, 'Two books for tests');
+      expect(list.bookIds, hasLength(2));
+    });
+
+    test('阅读列表里的书按真实响应解析', () async {
+      final session = _sessionWith(_replay(fixture('readlist-books.json')));
+      final page = await session.fetchReadListBooks('R1');
+      expect(page.items, hasLength(2));
+      expect(page.items.first.name, 'Akira v01');
+    });
+
     test('账号：没有 username 字段，用 email 作展示名', () async {
       final session = _sessionWith(_replay(fixture('users_me.json')));
       final account = await session.fetchAccount();

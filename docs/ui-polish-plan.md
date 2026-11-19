@@ -493,6 +493,16 @@ Panels 的高级感主要来自三点，和控件本身关系不大：
 | 与 Panels 语义不同：Panels 只隐藏 Reading Now，我们是完全不回写 Komga（服务端无 hidden 标记） |
 | 测试：`reader_screen_test` 覆盖"开启后翻页 700ms 无 saved；关闭后恢复 saved" |
 
+**进度（2026-11-19）：P3-8 收藏集 + 阅读列表。**
+
+| 落地 |
+|---|
+| 领域/API：`KomgaCollection` / `ReadList`；`/collections`、`/collections/{id}/series`、`/readlists`、`/readlists/{id}/books` 四个端点；真实响应存 `collections.json` 等四份 fixture，契约测试 + 解析测试驱动 |
+| 仓库/Provider：`collectionsProvider`、`readListsProvider`、`collectionSeriesProvider`、`readListBooksProvider`；错误统一 `ShelfFailure` |
+| UI：书架顶栏收藏集图标 → `CollectionsScreen`（两 tab）；收藏集 → 系列行 → 系列详情；阅读列表 → 书行 → 阅读器。标题经 `extra` 传入，深链有 fallback |
+| 测试：`collections_test` 覆盖两个 tab 的列表；`collections@phone_light/tablet_dark/eink` 三张黄金图；契约 + fixture 解析 4 条 |
+| 未做：创建/编辑收藏集（只读展示服务端策展）；封面缩略图用系列/书封面，不单独拉 collection thumbnail |
+
 ## 不做
 
 | 需求 | 理由 |

@@ -22,8 +22,7 @@
   "noSearchMatchesHint": "Try a different keyword, or clear the search.",
   "continueReading": "Continue reading",
   "seriesCount": "{count} series",
-  "@seriesCount": {
-    "placeholders": {
+  "@seriesCount": {    "placeholders": {
       "count": {"type": "int"}
     }
   },
@@ -242,6 +241,25 @@
       "size": {"type": "String"}
     }
   },
+  "collectionsTitle": "Collections",
+  "bookCount": "{count} books",
+  "@bookCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "@bookCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "errorGeneric": "Something went wrong.",
+  "collectionsTab": "Collections",
+  "readListsTab": "Read lists",
+  "collectionsEmpty": "No collections yet.",
+  "readListsEmpty": "No read lists yet.",
+  "collectionFallback": "Collection",
+  "readListFallback": "Read list",
   "@downloadedUsage": {
     "placeholders": {
       "count": {"type": "int"},

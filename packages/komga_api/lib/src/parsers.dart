@@ -97,6 +97,31 @@ List<String> _stringList(Object? raw) {
   return List<String>.unmodifiable(raw.whereType<String>());
 }
 
+/// 收藏集（`CollectionDto`）。
+KomgaCollection collectionFromJson(Map<Object?, Object?> json) {
+  return KomgaCollection(
+    id: _str(json['id']),
+    name: _str(json['name']),
+    ordered: json['ordered'] == true,
+    seriesIds: _stringList(json['seriesIds']),
+    createdDate: parseServerDate(json['createdDate']),
+    lastModifiedDate: parseServerDate(json['lastModifiedDate']),
+  );
+}
+
+/// 阅读列表（`ReadListDto`）。
+ReadList readListFromJson(Map<Object?, Object?> json) {
+  return ReadList(
+    id: _str(json['id']),
+    name: _str(json['name']),
+    summary: _strOrNull(json['summary']) ?? '',
+    ordered: json['ordered'] == true,
+    bookIds: _stringList(json['bookIds']),
+    createdDate: parseServerDate(json['createdDate']),
+    lastModifiedDate: parseServerDate(json['lastModifiedDate']),
+  );
+}
+
 Book bookFromJson(Map<Object?, Object?> json) {
   final media = asMap(json['media']);
   return Book(

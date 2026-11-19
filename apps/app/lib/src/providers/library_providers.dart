@@ -74,6 +74,37 @@ final seriesBooksProvider =
           .books(query.seriesId, size: query.size);
     });
 
+/// 收藏集列表（UI-P3-8）。
+final FutureProvider<PageResult<KomgaCollection>> collectionsProvider =
+    FutureProvider<PageResult<KomgaCollection>>((Ref ref) {
+      return ref.watch(libraryRepositoryProvider).collections();
+    });
+
+/// 阅读列表。
+final FutureProvider<PageResult<ReadList>> readListsProvider =
+    FutureProvider<PageResult<ReadList>>((Ref ref) {
+      return ref.watch(libraryRepositoryProvider).readLists();
+    });
+
+/// 收藏集里的系列。
+final collectionSeriesProvider =
+    FutureProvider.family<PageResult<Series>, String>((
+      Ref ref,
+      String collectionId,
+    ) {
+      return ref
+          .watch(libraryRepositoryProvider)
+          .collectionSeries(collectionId);
+    });
+
+/// 阅读列表里的书。
+final readListBooksProvider = FutureProvider.family<PageResult<Book>, String>((
+  Ref ref,
+  String readListId,
+) {
+  return ref.watch(libraryRepositoryProvider).readListBooks(readListId);
+});
+
 /// 单本书的封面。
 final bookCoverProvider = FutureProvider.family<Uint8List?, String>((
   Ref ref,
