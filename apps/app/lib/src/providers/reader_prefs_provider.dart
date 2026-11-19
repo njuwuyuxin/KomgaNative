@@ -94,24 +94,17 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
   }
 
   /// 应用一个预设：整体覆盖配置，但保留预设列表本身。
+  ///
+  /// 全局与"按系列"两条路径都只调 [ReaderPrefs.withConfig] /
+  /// [ReaderPrefs.withSeriesOverride]，字段不会各自漏抄一份（FIX-04）。
   void applyPreset(String id, {String? seriesId}) {
     for (final preset in state.presets) {
       if (preset.id != id) continue;
-      final config = preset.prefs;
       if (seriesId != null) {
-        _update(state.withSeriesOverride(seriesId, config));
-        return;
+        _update(state.withSeriesOverride(seriesId, preset.prefs));
+      } else {
+        _update(state.withConfig(preset.prefs));
       }
-      _update(
-        state.copyWith(
-          mode: config.mode,
-          brightness: config.brightness,
-          keepAwake: config.keepAwake,
-          fit: config.fit,
-          direction: config.direction,
-          background: config.background,
-        ),
-      );
       return;
     }
   }

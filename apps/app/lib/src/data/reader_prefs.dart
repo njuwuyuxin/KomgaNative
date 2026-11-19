@@ -188,6 +188,21 @@ class ReaderPrefs {
     );
   }
 
+  /// 用 [config] 的**纯配置**覆盖本对象，预设列表与系列覆盖保持不变。
+  ///
+  /// "应用预设"和"应用系列覆盖"都走这里：字段清单只写一遍，
+  /// 以后新增一个配置项就不可能只改到其中一条路径（FIX-04 曾漏掉锁定缩放/去白边）。
+  ReaderPrefs withConfig(ReaderPrefs config) => copyWith(
+    mode: config.mode,
+    brightness: config.brightness,
+    keepAwake: config.keepAwake,
+    fit: config.fit,
+    direction: config.direction,
+    background: config.background,
+    lockZoom: config.lockZoom,
+    trimBorders: config.trimBorders,
+  );
+
   /// 写入/删除某个系列的覆盖。传入 null 表示删除。
   ReaderPrefs withSeriesOverride(String seriesId, ReaderPrefs? config) {
     final next = Map<String, ReaderPrefs>.from(seriesOverrides);
