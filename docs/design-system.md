@@ -70,14 +70,20 @@ chrome 永远压在漫画画面上：浅色模式下用浅色毛玻璃，白底�
 3. **选中态**：彩色主题按 iOS 26——玻璃里再嵌一块**中性**胶囊（`GlassOptics.selectionFill`，
    浅色压一层灰、深色提一层白），只有图标/文字用主色；整块铺主色会把玻璃染成塑料。
    墨水屏反过来（墨底纸白），灰阶上一眼能认出来。
+   内嵌胶囊四周按 `navIndicatorInset`（4）**等宽**内缩：外层也是胶囊，半径是
+   `navBarHeight / 2`，内层半径（内层高 / 2）正好等于 `外层半径 − 内缩`，两层才同心；
+   端头两个 tab 的半圆与上下直线段的间隙才会一样宽。外层胶囊**不要**再加横向
+   padding（加了左右内缩就比上下大，端头弧线会错开）——`floating_nav_bar_test` 钉了
+   四个方向的间隙与半径差。
 4. **标签比页面标题短一档**：英文 tab 是 "Reading"（页面标题仍是 "Reading now"），
    因为 "Reading now" 在 1.3 倍字号下会被截成 "Reading n…"。新增 tab 时先用
    `nav_bar@phone_light_text1.3` 这双眼睛看一下。
 5. **只有搜索没有文字**：圆球靠 `Tooltip` + `Semantics(label:)` 表达，读屏念"搜索"。
 
 基线：`nav_bar@{phone_light,phone_dark,eink,phone_light_text1.3}` 是导航条本身
-（背后铺高对比条纹，才看得出透了多少）；`library_nav@phone_light` 是"书架 + 导航条"
-的真实首页形态，专门钉住玻璃压在封面上的观感。
+（背后铺高对比条纹，才看得出透了多少）；`nav_bar@phone_light_edge` 选中首个 tab，
+专门看端头半圆与内嵌胶囊的间隙是否等宽（选中中间那格看不到端头弧线）；
+`library_nav@phone_light` 是"书架 + 导航条"的真实首页形态，专门钉住玻璃压在封面上的观感。
 
 ### 液态玻璃怎么合成
 
@@ -125,9 +131,10 @@ chrome 永远压在漫画画面上：浅色模式下用浅色毛玻璃，白底�
   `PressableScale` 的按下回弹、不抢点击、墨水屏透传，`FrostedSurface` / `GlassSurface` 的墨水屏退化
   （不模糊、不反光、无阴影），`AppHaptics` 的映射与开关。
 - `apps/app/test/widgets/floating_nav_bar_test.dart`：导航条的点击派发、48 点按区、
-  `selected` 语义、搜索圆球的读屏标签、墨水屏反白、1.3 倍字号不溢出。
+  `selected` 语义、搜索圆球的读屏标签、墨水屏反白、1.3 倍字号不溢出，以及选中胶囊
+  四边等宽内缩 / 内外半径差 = 内缩（端头半圆同心）。
 - 黄金图 `design_tokens@{phone_light,tablet_dark,eink}`：彩色条纹上的三种毛玻璃、三档阴影与形状、字体层级。
   改 token 时先看这三张图变没变，再看页面。
-- 黄金图 `nav_bar@{phone_light,phone_dark,eink,phone_light_text1.3}` 与 `library_nav@phone_light`：
-  导航条本身 + 真实首页形态（见上一节）。
+- 黄金图 `nav_bar@{phone_light,phone_dark,eink,phone_light_text1.3}`、`nav_bar@phone_light_edge`
+  （端头间隙）与 `library_nav@phone_light`：导航条本身 + 真实首页形态（见上一节）。
 - 中文：见 ADR 0004。

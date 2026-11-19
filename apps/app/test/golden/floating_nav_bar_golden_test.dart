@@ -17,10 +17,11 @@ void main() {
     required String name,
     required ThemeData theme,
     double textScale = 1.0,
+    int selectedTab = 1,
   }) async {
     await pumpGoldenScreen(
       tester,
-      screen: const _NavBarProbe(),
+      screen: _NavBarProbe(selectedTab: selectedTab),
       size: GoldenSizes.phone,
       theme: theme,
       textScale: textScale,
@@ -52,11 +53,25 @@ void main() {
       textScale: 1.3,
     );
   });
+
+  // 选中首/尾 tab 时，内层胶囊的端头半圆紧贴外层胶囊的半圆：
+  // 这一张专门盯"内外同心、间隙等宽"（选中中间那格看不到端头弧线）。
+  testWidgets('nav_bar@phone_light_edge', (WidgetTester tester) async {
+    await pumpProbe(
+      tester,
+      name: 'nav_bar@phone_light_edge',
+      theme: AppTheme.light(),
+      selectedTab: 0,
+    );
+  });
 }
 
 /// 满屏彩色条纹 + 底部导航条。
 class _NavBarProbe extends StatelessWidget {
-  const _NavBarProbe();
+  const _NavBarProbe({this.selectedTab = 1});
+
+  /// 选中第几个 tab；0 / 末尾能看端头半圆的间隙。
+  final int selectedTab;
 
   @override
   Widget build(BuildContext context) {
@@ -85,7 +100,7 @@ class _NavBarProbe extends StatelessWidget {
                   label: 'Settings',
                 ),
               ],
-              selectedTab: 1,
+              selectedTab: selectedTab,
               onTabSelected: (_) {},
               search: const GlassNavDestination(
                 icon: Icons.search,

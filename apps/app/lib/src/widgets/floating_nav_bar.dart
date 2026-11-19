@@ -110,25 +110,32 @@ class _GlassPill extends StatelessWidget {
       shape: AppShapes.of(context, AppShapes.bar),
       child: SizedBox(
         height: AppSizes.navBarHeight,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
-          child: Row(
-            // 拉满 64 高：整块 item 都是点击区，而不是只有图标那一小块。
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              for (var index = 0; index < tabs.length; index++)
-                _NavItem(
-                  destination: tabs[index],
-                  selected: selectedTab == index,
-                  onTap: () => onSelected(index),
-                ),
-            ],
-          ),
+        // 这里**不要**再加横向 padding：外层胶囊的半径是 高度/2，
+        // 内层选中胶囊要和外层同心，四周的缩进就必须一样宽（见 navIndicatorInset）。
+        // 多一层横向 padding 会让左右缩进比上下大，端头两个 tab 的半圆就不同心了。
+        child: Row(
+          // 拉满 64 高：整块 item 都是点击区，而不是只有图标那一小块。
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            for (var index = 0; index < tabs.length; index++)
+              _NavItem(
+                destination: tabs[index],
+                selected: selectedTab == index,
+                onTap: () => onSelected(index),
+              ),
+          ],
         ),
       ),
     );
   }
 }
+
+/// 选中胶囊相对外层玻璃胶囊的内缩（四个方向一样宽）。
+///
+/// 外层是胶囊（半径 = `navBarHeight / 2`），内层也是胶囊；四周都缩这么多，
+/// 内层半径正好等于 `外层半径 - navIndicatorInset`，两段半圆就同心，
+/// 上下直线段与两端弧线的间隙才会一样宽。`floating_nav_bar_test` 钉了这个等式。
+const double navIndicatorInset = AppSpacing.xs;
 
 /// 胶囊里的单个 tab：图标在上、标签在下，选中时套一层胶囊底色。
 class _NavItem extends StatelessWidget {
@@ -168,12 +175,9 @@ class _NavItem extends StatelessWidget {
               behavior: HitTestBehavior.opaque,
               onTap: handleTap,
               child: Padding(
-                // 选中胶囊铺满整个 item 槽位（iOS 26 是"整格高亮"，而不是只包住文字），
-                // 槽位之间留 4px，胶囊端头不会贴住相邻项。
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.xs,
-                  vertical: AppSpacing.xs,
-                ),
+                // 选中胶囊铺满整个 item 槽位（iOS 26 是"整格高亮"，而不是只包住文字）。
+                // 四边同宽是关键：横向多留一点，端头的半圆和外层不同心（曾经就是 8/4）。
+                padding: const EdgeInsets.all(navIndicatorInset),
                 child: AnimatedContainer(
                   // 墨水屏 / 减少动态效果时时长为 0（token 负责退化）。
                   duration: motion.quick,

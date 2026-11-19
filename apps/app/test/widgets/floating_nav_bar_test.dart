@@ -139,4 +139,58 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('Reading now'), findsOneWidget);
   });
+
+  testWidgets('选中胶囊四边等宽内缩，端头半圆与外层同心', (WidgetTester tester) async {
+    await pumpBar(tester, selectedTab: 0);
+
+    final pill = tester.getRect(find.byType(GlassSurface).first);
+
+    for (var i = 0; i < tabs.length; i++) {
+      final item = tester.getRect(find.byKey(Key('nav-tab-$i')));
+      final indicator = tester.getRect(
+        find.descendant(
+          of: find.byKey(Key('nav-tab-$i')),
+          matching: find.byType(AnimatedContainer),
+        ),
+      );
+
+      // 四个方向的内缩必须一样：横向多 4 时，端头的半圆会和外层错开。
+      expect(
+        indicator.left - item.left,
+        moreOrLessEquals(navIndicatorInset, epsilon: 0.01),
+      );
+      expect(
+        item.right - indicator.right,
+        moreOrLessEquals(navIndicatorInset, epsilon: 0.01),
+      );
+      expect(
+        indicator.top - item.top,
+        moreOrLessEquals(navIndicatorInset, epsilon: 0.01),
+      );
+      expect(
+        item.bottom - indicator.bottom,
+        moreOrLessEquals(navIndicatorInset, epsilon: 0.01),
+      );
+
+      // 外层是胶囊（半径 = 高/2），内层也是胶囊：半径差恰好等于间隙，
+      // 这才是"同心圆"；只有高度差对了还不够。
+      final outerRadius = pill.height / 2;
+      final innerRadius = indicator.height / 2;
+      expect(
+        outerRadius - innerRadius,
+        moreOrLessEquals(navIndicatorInset, epsilon: 0.01),
+      );
+    }
+
+    // 首尾 item 的槽位贴住外层胶囊：中间不能再夹一层横向 padding，
+    // 否则端头 tab 的左右内缩会比上下大。
+    expect(
+      tester.getRect(find.byKey(const Key('nav-tab-0'))).left,
+      moreOrLessEquals(pill.left, epsilon: 0.01),
+    );
+    expect(
+      tester.getRect(find.byKey(const Key('nav-tab-2'))).right,
+      moreOrLessEquals(pill.right, epsilon: 0.01),
+    );
+  });
 }
