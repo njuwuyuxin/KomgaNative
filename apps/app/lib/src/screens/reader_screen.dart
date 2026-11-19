@@ -11,6 +11,7 @@ import 'package:komga_native/src/data/page_share.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/screens/reader_args.dart';
+import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/providers/progress_providers.dart';
 import 'package:komga_native/src/providers/reader_prefs_provider.dart';
 import 'package:komga_native/src/providers/reader_providers.dart';
@@ -118,6 +119,12 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   /// 手动修正双页分组的起点（0 基；null = 自动，UI-P3-5）。
   int? _spreadFrom;
 
+  /// 最近一次 build 解析出的**有效**阅读方向。
+  ///
+  /// 显式传入优先；没传（搜索、阅读列表、深链）就按书的系列查。
+  /// 事件回调（音量键、键盘、生命周期）用这个缓存值，不在 build 之外 watch。
+  ReadingDirection _direction = ReadingDirection.unknown;
+
   /// 本次阅读不回写进度（UI-P3-12）；不落盘，退出即恢复。
   bool _incognito = false;
 
@@ -186,7 +193,22 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   }
 
   ReadingMode _modeFor(ReaderPrefs prefs, {bool? landscape}) =>
-      prefs.mode.resolve(widget.direction, landscape: landscape ?? _landscape);
+      prefs.mode.resolve(_direction, landscape: landscape ?? _landscape);
+
+  /// 解析本次阅读的方向：显式传入优先，否则跟随系列。
+  ///
+  /// 只有系列详情页知道方向；搜索、阅读列表、"下一本"、深链都只带一本书。
+  /// 之前这些入口一律按 unknown 处理，RTL 书会反着翻（点击区/箭头/卷页全反）。
+  /// 系列查不到（离线/深链脏数据）时回 unknown，界面按从左到右兜底，不阻塞打开。
+  ReadingDirection _resolveDirection() {
+    if (widget.direction != ReadingDirection.unknown) return widget.direction;
+    final book =
+        widget.book ?? ref.watch(readerBookProvider(widget.bookId)).value;
+    final seriesId = book?.seriesId;
+    if (seriesId == null) return ReadingDirection.unknown;
+    return ref.watch(seriesDetailProvider(seriesId)).value?.readingDirection ??
+        ReadingDirection.unknown;
+  }
 
   /// 用当前状态现算一份布局；页数据还没到时为 null。
   ReaderLayout? _currentLayout() {
@@ -241,7 +263,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     }
     context.pushReplacement(
       '/reader/${next.id}',
-      extra: ReaderArgs(book: next, direction: widget.direction),
+      extra: ReaderArgs(book: next, direction: _direction),
     );
   }
 
@@ -339,6 +361,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   @override
   Widget build(BuildContext context) {
     final isEink = ref.watch(effectiveEinkProvider);
+    // 方向每次 build 重新解析（系列详情可能晚到），事件回调读这个缓存。
+    _direction = _resolveDirection();
     final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     final openingHero = widget.heroTag;
     return EdgeSwipeBack(
@@ -397,7 +421,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     _schedulePreload(page, mode);
     // 阅读方向：设置优先，`auto` 时才跟随系列（UI-P1-4）。
     // 点击区、底栏箭头、缩略图滑条、卷页方向都从这一个值派生。
-    final rightToLeft = prefs.direction.resolveRightToLeft(widget.direction);
+    final rightToLeft = prefs.direction.resolveRightToLeft(_direction);
     final nextBook = _nextBookFor(layout, book);
 
     final readerBar = ReaderTopBar(
@@ -509,7 +533,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     if (pages == null || pages.isEmpty) return KeyEventResult.ignored;
     final prefs = _effectivePrefs(ref.read(readerPrefsProvider));
     final mode = _modeFor(prefs);
-    final rightToLeft = prefs.direction.resolveRightToLeft(widget.direction);
+    final rightToLeft = prefs.direction.resolveRightToLeft(_direction);
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.arrowRight) {
       _requestTurn(rightToLeft ? -1 : 1, mode);
