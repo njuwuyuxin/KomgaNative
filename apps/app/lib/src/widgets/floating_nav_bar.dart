@@ -281,6 +281,9 @@ class _SearchOrb extends StatelessWidget {
 
 /// 选中 / 未选中 / 墨水屏三种情况的前景色与胶囊底色。
 ///
+/// 彩色主题按 iOS 26：选中项是玻璃里再嵌一块**中性**的亮/暗胶囊
+/// （浅色压一层白、深色提一层白），只有图标与文字用主色——
+/// 整块铺主色会把玻璃"染成塑料"。
 /// 墨水屏不用彩色：选中项反过来（墨底纸白图标），灰阶上一眼能认出来。
 ({Color foreground, Color? background}) _navColors(
   ThemeData theme,
@@ -290,14 +293,17 @@ class _SearchOrb extends StatelessWidget {
   final eink = AppTheme.isEink(theme);
   if (!selected) {
     return (
-      foreground: eink ? AppTheme.einkInk : scheme.onSurfaceVariant,
+      foreground: eink ? AppTheme.einkInk : scheme.onSurface,
       background: null,
     );
   }
-  return (
-    foreground: eink ? AppTheme.einkPaper : scheme.primary,
-    background: eink
-        ? AppTheme.einkInk
-        : scheme.primary.withValues(alpha: 0.16),
-  );
+  if (eink) {
+    return (foreground: AppTheme.einkPaper, background: AppTheme.einkInk);
+  }
+  final optics = AppMaterial.resolve(
+    AppMaterialKind.bar,
+    eink: false,
+    dark: theme.brightness == Brightness.dark,
+  ).optics;
+  return (foreground: scheme.primary, background: optics?.selectionFill);
 }

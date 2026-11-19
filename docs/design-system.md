@@ -19,7 +19,8 @@
 | `AppRadii` | `tokens.dart` | xs 6（封面）/ sm 8 / md 12 / lg 20 / xl 28（面板顶角） | 主题与 `AppShapes` 压成 0 |
 | `AppSizes` | `tokens.dart` | 分隔线、图标 16/18/20/24、进度条、最小触控 48、拖动条、货架封面 96×136、阅读器缩略图 36×52 与滑条高 68、卡片行小封面 44×62、悬浮导航条高 64 / 底部留白 112 | — |
 | `AppMotion` | `motion.dart` | 时长 quick 150 / standard 300 / emphasized 450 ms；曲线 standard（easeOutCubic）、emphasized（轻微过冲）、exit；弹簧 snappy / gentle | 时长 0、曲线线性、`enabled = false`（调用方直接跳终值） |
-| `AppMaterial` | `materials.dart` | `chrome`（阅读器，深色强模糊，不跟随深浅色）/ `bar`（悬浮玻璃：更透 + 反光 + 白描边）/ `sheet`，各有深浅两档 | 不模糊、不透明纸色底 + 1px 墨色描边 |
+| `AppMaterial` | `materials.dart` | `chrome`（阅读器，深色强模糊，不跟随深浅色）/ `bar`（液态玻璃：更透 + 提饱和 + `GlassOptics`）/ `sheet`，各有深浅两档 | 不模糊、不透明纸色底 + 1px 墨色描边 |
+| `GlassOptics` | `glass_optics.dart` | 液态玻璃光学参数：饱和度、外缘折射（拉进距离 / 环带宽）、内缘聚光、8 方向镜面高光、轮廓、选中嵌入胶囊底色；`light` / `dark` 两档 | 墨水屏为 null |
 | `AppShadows` | `materials.dart` | cover / card / floating：大半径、低透明度、向下偏移 | 空列表 |
 | `AppShapes` | `shapes.dart` | cover / card / panel 用 `ContinuousRectangleBorder`（squircle 近似），sheet 只圆顶角，bar 是胶囊 | 直角；sheet 改描边 |
 | `AppTypography` | `typography.dart` | largeTitle / title / headline / body / caption / label / pageNumber（等宽数字） | —（字号跟随系统缩放） |
@@ -41,8 +42,9 @@ chrome 永远压在漫画画面上：浅色模式下用浅色毛玻璃，白底�
 
 | 组件 | 作用 | 退化 |
 |---|---|---|
-| `FrostedSurface` | 裁剪 → `BackdropFilter` → 半透明底色 → 材质反光（可传 `shape`） | 墨水屏不建 `BackdropFilter`、不画反光 |
+| `FrostedSurface` | 裁剪 →（液态玻璃档）外缘折射 → `BackdropFilter` 模糊（+ 提饱和）→ 半透明底色 → 体内反光 →（液态玻璃档）内缘聚光 + 方向性镜面高光边 + 轮廓（可传 `shape`） | 墨水屏不建 `BackdropFilter`、不画反光与光学层 |
 | `GlassSurface` | `FrostedSurface` + 浮层阴影，默认胶囊形（导航条 / 搜索圆球） | 墨水屏不模糊、不反光、无阴影，只剩纸底 + 墨边 |
+| `GlassRefraction` / `GlassLightPainter` | 液态玻璃的两块光学零件（`glass_optics_layers.dart`），只由 `FrostedSurface` 组装，页面不要直接用 | 墨水屏不会建出来 |
 | `PressableScale` | 按下缩到 0.97、松开用 `snappy` 弹簧回弹；用 `Listener` 监听原始指针，不抢子组件的点击/长按/滚动 | 墨水屏 / 减少动态效果时完全透传 |
 | `SkeletonBox` / `Shimmer` | 加载骨架色块 / 给骨架加一条扫过的高光（周期取 `AppMotion.shimmer`） | 墨水屏不画微光；`SkeletonBox` 改用 12% 墨色填充（墨水屏的 `surfaceContainerHighest` 会兜底成纸白，骨架会看不见） |
 | `AppHaptics` | `selection` / `light` / `success` 三种语义 + 总开关 | 墨水屏保留（不影响刷新）；设置页"触感反馈"关闭时全部静默 |
@@ -64,8 +66,9 @@ chrome 永远压在漫画画面上：浅色模式下用浅色毛玻璃，白底�
    安全区 + 条高 64 + 上下留白）。漏了的表现是"最后一行点不到"。
 2. **键盘**：外壳 `resizeToAvoidBottomInset: false`，导航条留在原位被键盘盖住
    （iOS 的行为）；页面自己的 `Scaffold` 仍会为键盘让位。
-3. **选中态**：彩色主题是主色胶囊铺满整格 + 主色图标/文字；墨水屏反过来
-   （墨底纸白），灰阶上一眼能认出来。
+3. **选中态**：彩色主题按 iOS 26——玻璃里再嵌一块**中性**胶囊（`GlassOptics.selectionFill`，
+   浅色压一层灰、深色提一层白），只有图标/文字用主色；整块铺主色会把玻璃染成塑料。
+   墨水屏反过来（墨底纸白），灰阶上一眼能认出来。
 4. **标签比页面标题短一档**：英文 tab 是 "Reading"（页面标题仍是 "Reading now"），
    因为 "Reading now" 在 1.3 倍字号下会被截成 "Reading n…"。新增 tab 时先用
    `nav_bar@phone_light_text1.3` 这双眼睛看一下。
@@ -74,6 +77,25 @@ chrome 永远压在漫画画面上：浅色模式下用浅色毛玻璃，白底�
 基线：`nav_bar@{phone_light,phone_dark,eink,phone_light_text1.3}` 是导航条本身
 （背后铺高对比条纹，才看得出透了多少）；`library_nav@phone_light` 是"书架 + 导航条"
 的真实首页形态，专门钉住玻璃压在封面上的观感。
+
+### 液态玻璃怎么合成（不用着色器）
+
+iOS 26 Liquid Glass 的观感拆成五层，全部用 Flutter 自带的滤镜 / 画笔合成，
+Skia 与 Impeller 都成立、黄金图能钉住（片元着色器版的真折射 + 色散只在 Impeller
+生效，黄金图看不到，留作后续叠加）：
+
+| 层 | 实现 | 参数 |
+|---|---|---|
+| 背后提饱和 | `ImageFilter.compose(ColorFilter.matrix(饱和), blur)` | `saturation` 1.8 / 1.6 |
+| 外缘折射 | 只在外缘环带（外形 − 内缩外形，`evenOdd`）里生效的背景滤镜，以玻璃中心为原点缩小背景：外缘显示玻璃外 `refraction` 远的内容，越往里偏移越小；随后整体模糊揉平接缝 | `refraction` 10 / `refractionBand` 14 |
+| 内缘聚光 | 沿外轮廓的两倍宽模糊描边，外半被裁掉，只剩向内渗的柔光 | `rimLight` / `rimWidth` 6 |
+| 镜面高光边 | 沿外轮廓的 `SweepGradient` 描边，8 个方向各一档亮度：左上主光、右下反射、另两侧暗 | `specular` / `specularWidth` 1.2 |
+| 轮廓 | 1px 暗线，浅色背景上把玻璃托出来 | `contour` |
+
+坐标约定（实测，见下）：`BackdropFilterLayer` 里的 `ImageFilter.matrix` 作用在**当前图层的逻辑坐标**里，
+所以折射的缩放原点取 `paint(offset)` 里的 `offset + size.center`，滚动 / 按下缩放 / DPR 都不影响。
+这条是在 Windows 测试渲染器上用条纹探针量出来的（偏移 60px 的 `RepaintBoundary` 里，2 倍缩放以盒中心为不动点）；
+真机 Impeller 的表现以 `ci.dart install` 后的设备观感为准。
 
 ## 触感反馈开关
 

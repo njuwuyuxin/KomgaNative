@@ -1,5 +1,6 @@
 import 'dart:ui' show ImageFilter;
 
+import 'package:komga_design_system/src/glass_optics.dart';
 import 'package:komga_design_system/src/themes.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -9,8 +10,8 @@ import 'package:material_ui/material_ui.dart';
 /// - [chrome]：阅读器顶栏 / 底栏，压在漫画画面上，要最强的模糊和较深的底色，
 ///   保证任何画面上文字都可读；
 /// - [bar]：普通页面的导航栏 / 标题栏，滚动内容从下面穿过。
-///   这一档按 iOS 26 "液态玻璃"取向调得更透，并带一圈反光与高光描边
-///   （见 [AppMaterial.highlight]，由 `GlassSurface` 画出来）；
+///   这一档是 iOS 26 "液态玻璃"：更透、提饱和，并带 [GlassOptics]
+///   （边缘折射、内缘聚光、镜面高光边，由 `FrostedSurface` 画出来）；
 /// - [sheet]：底部面板。
 ///
 /// 墨水屏：不模糊（刷新成本高、残影），改成不透明纸色底 + 1px 墨色描边，
@@ -24,7 +25,13 @@ class AppMaterial {
     required this.tint,
     this.border,
     this.highlight,
+    this.optics,
   });
+
+  /// 液态玻璃的光学参数（饱和、内缘聚光、镜面高光边、内阴影）。
+  ///
+  /// 只给彩色主题的 [AppMaterialKind.bar]；为 null 时就是普通毛玻璃。
+  final GlassOptics? optics;
 
   /// 高斯模糊半径（逻辑像素）；0 = 不模糊。
   final double blurSigma;
@@ -32,19 +39,29 @@ class AppMaterial {
   /// 叠在模糊之上的底色（带透明度）。
   final Color tint;
 
-  /// 描边：墨水屏是 1px 墨线；玻璃（[blurSigma] > 0 的 bar）是半透明白色高光边。
+  /// 描边：墨水屏是 1px 墨线；液态玻璃的边由 [optics] 画（带方向的高光）。
   final BorderSide? border;
 
-  /// 玻璃反光：压在底色之上的斜向高光渐变。
+  /// 玻璃体内反光：压在底色之上、自上而下的柔和渐变。
   ///
-  /// 只给彩色主题的 [AppMaterialKind.bar]；由 `GlassSurface` 叠在模糊层之上。
+  /// 只给彩色主题的 [AppMaterialKind.bar]；由 `FrostedSurface` 叠在模糊层之上。
   /// 墨水屏为 null——灰阶上那层白只会变成一团脏灰。
   final Gradient? highlight;
 
   bool get blurs => blurSigma > 0;
 
-  ImageFilter? get filter =>
-      blurs ? ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma) : null;
+  /// 背景滤镜：先模糊，玻璃档再把模糊结果的饱和度拉高
+  /// （iOS 液态玻璃"背后颜色更鲜"的来源，不提饱和就是一块灰磨砂）。
+  ImageFilter? get filter {
+    if (!blurs) return null;
+    final blur = ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma);
+    final saturation = optics?.saturation ?? 1;
+    if (saturation == 1) return blur;
+    return ImageFilter.compose(
+      outer: ColorFilter.matrix(GlassOptics.saturationMatrix(saturation)),
+      inner: blur,
+    );
+  }
 
   /// 按主题取一种材质。
   ///
@@ -67,38 +84,39 @@ class AppMaterial {
         blurSigma: 24,
         tint: Color(0xB8121214),
       ),
-      // 玻璃导航条：底色留 72%，反光 + 白描边负责"这是玻璃"。参考 iOS 26
-      // 的液态玻璃——压在封面上要能看出后面有东西在动；再透下去，标签在
-      // 彩色封面上就不够读了（`library_nav@phone_light` 基线里有对照）。
+      // 液态玻璃（iOS 26）：模糊比磨砂轻、底色更透、背后颜色提饱和；
+      // "玻璃感"交给 [GlassOptics]：内缘聚光 + 斜对角镜面高光边 + 底部内阴影。
+      // 底色 60% 是可读性的下限：再透，标签在彩色封面上就不够读了
+      // （`library_nav@phone_light` 基线里有对照）。
       (AppMaterialKind.bar, true) => const AppMaterial(
-        blurSigma: 22,
-        tint: Color(0xB81C1C1E),
-        border: BorderSide(color: Color(0x24FFFFFF)),
+        blurSigma: 14,
+        tint: Color(0x991C1C1E),
         highlight: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: <Color>[
-            Color(0x26FFFFFF),
-            Color(0x0AFFFFFF),
+            Color(0x1FFFFFFF),
+            Color(0x05FFFFFF),
             Color(0x00FFFFFF),
           ],
-          stops: <double>[0, 0.55, 1],
+          stops: <double>[0, 0.5, 1],
         ),
+        optics: GlassOptics.dark,
       ),
       (AppMaterialKind.bar, false) => const AppMaterial(
-        blurSigma: 22,
-        tint: Color(0xB8F8F8FA),
-        border: BorderSide(color: Color(0xB3FFFFFF)),
+        blurSigma: 14,
+        tint: Color(0x99F8F8FA),
         highlight: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: <Color>[
-            Color(0x5CFFFFFF),
-            Color(0x14FFFFFF),
+            Color(0x4DFFFFFF),
+            Color(0x0DFFFFFF),
             Color(0x00FFFFFF),
           ],
-          stops: <double>[0, 0.55, 1],
+          stops: <double>[0, 0.5, 1],
         ),
+        optics: GlassOptics.light,
       ),
       (AppMaterialKind.sheet, true) => const AppMaterial(
         blurSigma: 30,

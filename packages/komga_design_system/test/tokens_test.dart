@@ -117,6 +117,7 @@ void main() {
           final material = AppMaterial.resolve(kind, eink: true, dark: dark);
           expect(material.blurs, isFalse);
           expect(material.filter, isNull);
+          expect(material.optics, isNull);
           expect(material.tint, AppTheme.einkPaper);
           expect(material.tint.a, 1);
           expect(material.border?.color, AppTheme.einkInk);
@@ -124,21 +125,54 @@ void main() {
       }
     });
 
-    test('普通主题：都模糊、底色半透明；玻璃档额外带反光与高光描边', () {
+    test('普通主题：都模糊、底色半透明；只有玻璃档带反光与光学层', () {
       for (final kind in AppMaterialKind.values) {
         for (final dark in <bool>[true, false]) {
           final material = AppMaterial.resolve(kind, eink: false, dark: dark);
           expect(material.blurs, isTrue, reason: '$kind dark=$dark');
           expect(material.filter, isNotNull);
           expect(material.tint.a, inExclusiveRange(0, 1));
+          expect(material.border, isNull, reason: '$kind 不该有平涂描边');
           if (kind == AppMaterialKind.bar) {
-            // 悬浮导航条是"液态玻璃"：只有它带斜向反光与白描边。
+            // 悬浮导航条是"液态玻璃"：反光 + 折射 + 方向性高光边。
             expect(material.highlight, isNotNull, reason: 'bar 要有反光');
-            expect(material.border, isNotNull, reason: 'bar 要有高光边');
+            final optics = material.optics;
+            expect(optics, isNotNull, reason: 'bar 要有光学层');
+            expect(optics!.saturation, greaterThan(1), reason: '背后颜色要提饱和');
+            expect(optics.refracts, isTrue, reason: '外缘要折射');
+            expect(optics.specular, hasLength(GlassOptics.specularStops));
+            expect(
+              optics.specular.first,
+              optics.specular.last,
+              reason: '扫描渐变首尾相接，否则 0° 处有一道接缝',
+            );
+            // 左上（索引 5）是主光，必须是全圈最亮的一段。
+            final brightest = optics.specular.reduce(
+              (Color a, Color b) => a.a >= b.a ? a : b,
+            );
+            expect(optics.specular[5], brightest);
           } else {
             expect(material.highlight, isNull, reason: '$kind 不该有反光');
-            expect(material.border, isNull, reason: '$kind 不该有描边');
+            expect(material.optics, isNull, reason: '$kind 不是液态玻璃');
           }
+        }
+      }
+    });
+
+    test('饱和度矩阵：s=1 是单位阵，灰色在任何 s 下都不变', () {
+      final identity = GlassOptics.saturationMatrix(1);
+      expect(identity, <double>[
+        1, 0, 0, 0, 0, //
+        0, 1, 0, 0, 0, //
+        0, 0, 1, 0, 0, //
+        0, 0, 0, 1, 0,
+      ]);
+      for (final s in <double>[0, 1.6, 1.8]) {
+        final m = GlassOptics.saturationMatrix(s);
+        // 每一行 RGB 系数之和为 1：中性灰进去还是中性灰。
+        for (var row = 0; row < 3; row++) {
+          final sum = m[row * 5] + m[row * 5 + 1] + m[row * 5 + 2];
+          expect(sum, moreOrLessEquals(1, epsilon: 1e-9), reason: 's=$s');
         }
       }
     });
@@ -416,10 +450,18 @@ void main() {
               (box.decoration as ShapeDecoration).gradient != null,
         );
 
-    testWidgets('彩色主题：背景模糊 + 反光层 + 阴影', (tester) async {
+    testWidgets('彩色主题：背景模糊 + 反光层 + 光学层 + 阴影', (tester) async {
       await tester.pumpWidget(surface(AppTheme.light()));
       expect(find.byType(BackdropFilter), findsOneWidget);
       expect(hasGloss(tester), isTrue);
+      expect(find.byType(GlassRefraction), findsOneWidget, reason: '外缘折射');
+      expect(
+        tester
+            .widgetList<CustomPaint>(find.byType(CustomPaint))
+            .any((CustomPaint p) => p.painter is GlassLightPainter),
+        isTrue,
+        reason: '内缘聚光 + 镜面高光边',
+      );
       final shadowed = tester
           .widgetList<DecoratedBox>(find.byType(DecoratedBox))
           .map((DecoratedBox box) => box.decoration)
@@ -434,6 +476,7 @@ void main() {
       await tester.pumpWidget(surface(AppTheme.eink()));
       expect(find.byType(BackdropFilter), findsNothing);
       expect(hasGloss(tester), isFalse);
+      expect(find.byType(GlassRefraction), findsNothing);
       final boxes = tester
           .widgetList<DecoratedBox>(find.byType(DecoratedBox))
           .where((DecoratedBox box) => box.decoration is ShapeDecoration)
