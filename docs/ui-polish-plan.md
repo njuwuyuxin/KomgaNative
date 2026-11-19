@@ -503,6 +503,16 @@ Panels 的高级感主要来自三点，和控件本身关系不大：
 | 测试：`collections_test` 覆盖两个 tab 的列表；`collections@phone_light/tablet_dark/eink` 三张黄金图；契约 + fixture 解析 4 条 |
 | 未做：创建/编辑收藏集（只读展示服务端策展）；封面缩略图用系列/书封面，不单独拉 collection thumbnail |
 
+**进度（2026-11-19）：P3-9 全局搜索。**
+
+| 落地 |
+|---|
+| 新增 `/search` 分支（底部/侧栏第 3 项）；一个输入框同时查 `/series?search=` 与 `/books?search=`，按"系列 / 书籍"分区展示 |
+| 防抖用 `AppMotion.of(context).emphasized`（墨水屏为 0，立即查）；清空按钮、无结果/错误态；系列进详情、书进阅读器 |
+| API：`KomgaUrls.books` + `KomgaSession.searchBooks`；真实响应 `books-search.json`，契约 + 解析测试 |
+| 测试：`search_test` 覆盖输入→防抖→书结果；`search@phone_light/tablet_dark/eink` 三张黄金图 |
+| 未做：搜索历史/建议、按标签/作者筛选 chip（服务端已匹配这些字段，客户端暂不单独过滤） |
+
 ## 不做
 
 | 需求 | 理由 |

@@ -242,6 +242,16 @@
     }
   },
   "collectionsTitle": "Collections",
+  "searchTitle": "Search",
+  "searchHint": "Search series, books, authors…",
+  "searchSeriesTab": "Series",
+  "searchBooksTab": "Books",
+  "searchNoResults": "No results for “{query}”",
+  "@searchNoResults": {
+    "placeholders": {
+      "query": {"type": "String"}
+    }
+  },
   "bookCount": "{count} books",
   "@bookCount": {
     "placeholders": {

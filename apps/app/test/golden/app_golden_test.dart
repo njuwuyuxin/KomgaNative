@@ -28,6 +28,7 @@ import 'package:komga_native/src/screens/downloads_screen.dart';
 import 'package:komga_native/src/screens/library_screen.dart';
 import 'package:komga_native/src/screens/reader_screen.dart';
 import 'package:komga_native/src/screens/reading_now_screen.dart';
+import 'package:komga_native/src/screens/search_screen.dart';
 import 'package:komga_native/src/screens/series_detail_screen.dart';
 import 'package:komga_native/src/screens/settings_screen.dart';
 import 'package:komga_native/src/screens/splash_screen.dart';
@@ -394,6 +395,53 @@ void main() {
     );
     await expectGolden(tester, name);
   }
+
+  Future<void> pumpSearchGolden(
+    WidgetTester tester, {
+    required String name,
+    required Size size,
+    required ThemeData theme,
+  }) async {
+    await pumpGoldenScreen(
+      tester,
+      screen: const SearchScreen(),
+      size: size,
+      theme: theme,
+      overrides: <Override>[
+        libraryRepositoryProvider.overrideWithValue(
+          FakeLibraryRepository(series: demoShelf()),
+        ),
+      ],
+    );
+    await expectGolden(tester, name);
+  }
+
+  testWidgets('search@phone_light', (WidgetTester tester) async {
+    await pumpSearchGolden(
+      tester,
+      name: 'search@phone_light',
+      size: GoldenSizes.phone,
+      theme: AppTheme.light(),
+    );
+  });
+
+  testWidgets('search@tablet_dark', (WidgetTester tester) async {
+    await pumpSearchGolden(
+      tester,
+      name: 'search@tablet_dark',
+      size: GoldenSizes.tablet,
+      theme: AppTheme.dark(),
+    );
+  });
+
+  testWidgets('search@eink', (WidgetTester tester) async {
+    await pumpSearchGolden(
+      tester,
+      name: 'search@eink',
+      size: GoldenSizes.eink,
+      theme: AppTheme.eink(),
+    );
+  });
 
   Future<void> pumpCollectionsGolden(
     WidgetTester tester, {

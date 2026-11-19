@@ -30,6 +30,11 @@ class AdaptiveShell extends StatelessWidget {
             label: l10n.libraryTitle,
           ),
           (
+            icon: Icons.search,
+            selectedIcon: Icons.search,
+            label: l10n.searchTitle,
+          ),
+          (
             icon: Icons.settings_outlined,
             selectedIcon: Icons.settings,
             label: l10n.settingsTitle,

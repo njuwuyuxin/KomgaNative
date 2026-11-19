@@ -5,6 +5,7 @@ import 'package:komga_native/src/screens/collection_detail_screen.dart';
 import 'package:komga_native/src/screens/collections_screen.dart';
 import 'package:komga_native/src/screens/connection_screen.dart';
 import 'package:komga_native/src/screens/readlist_detail_screen.dart';
+import 'package:komga_native/src/screens/search_screen.dart';
 import 'package:komga_native/src/screens/library_screen.dart';
 import 'package:komga_native/src/screens/reader_screen.dart';
 import 'package:komga_native/src/screens/reading_now_screen.dart';
@@ -75,6 +76,15 @@ GoRouter createRouter({
                 path: '/library',
                 builder: (BuildContext context, GoRouterState state) =>
                     const LibraryScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: '/search',
+                builder: (BuildContext context, GoRouterState state) =>
+                    const SearchScreen(),
               ),
             ],
           ),

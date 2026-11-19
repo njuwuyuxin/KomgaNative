@@ -29,6 +29,13 @@ abstract interface class LibraryRepository {
   /// 单本书（下载管理页用；不存在时返回 null）。
   Future<Book?> book(String bookId);
 
+  /// 全局书搜索（UI-P3-9）。
+  Future<PageResult<Book>> searchBooks(
+    String query, {
+    int page = 0,
+    int size = 20,
+  });
+
   /// 收藏集列表（UI-P3-8）。
   Future<PageResult<KomgaCollection>> collections({
     int page = 0,
@@ -146,6 +153,19 @@ class KomgaLibraryRepository implements LibraryRepository {
   Future<Book?> book(String bookId) async {
     try {
       return await _session.fetchBook(bookId);
+    } on KomgaError catch (error) {
+      throw shelfFailureOf(error);
+    }
+  }
+
+  @override
+  Future<PageResult<Book>> searchBooks(
+    String query, {
+    int page = 0,
+    int size = 20,
+  }) async {
+    try {
+      return await _session.searchBooks(query, page: page, size: size);
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);
     }

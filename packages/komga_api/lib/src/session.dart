@@ -247,6 +247,19 @@ class KomgaSession {
     return bookFromJson(data);
   }
 
+  /// 全局书搜索（系列名/书名/作者/标签都由服务端 Lucene 匹配）。
+  Future<PageResult<Book>> searchBooks(
+    String query, {
+    int page = 0,
+    int size = 20,
+  }) async {
+    final data = _requireMap(
+      await _getJson(_urls.books(page: page, size: size, search: query)),
+      '书籍搜索',
+    );
+    return pageResultFromJson(data, bookFromJson);
+  }
+
   /// "继续阅读"列表（Komga 的 ondeck：在读过但还没读完的书）。
   Future<PageResult<Book>> fetchOndeck({int size = 20}) async {
     final data = _requireMap(

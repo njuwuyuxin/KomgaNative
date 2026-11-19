@@ -11,7 +11,7 @@
 
 ## 0. 结论先行
 
-1. **UI 细化计划本身已经做完大半**：P0 6/6、P1 7/7、P2 8/8 已全部落地；P3 已完成 12/14。
+1. **UI 细化计划本身已经做完大半**：P0 6/6、P1 7/7、P2 8/8 已全部落地；P3 已完成 13/14。
    所以"还差哪些"的第一个答案就是 P3 清单（§4），而不是从零再列一遍。
 2. **阅读器核心体验已经和 Panels 对齐**：浮层毛玻璃 chrome、卷页（双页还铰接书脊）、
    底部缩略图滑条、单色动态背景、双击缩放、书末"下一本"卡片。
@@ -35,7 +35,7 @@
 | P0 设计系统地基 | 拆 `reader_screen`、动效/材质/形状/字体 token、`PressableScale` / `AppHaptics` | 6/6 | [design-system.md](design-system.md) |
 | P1 阅读器体验 | chrome 动画 + 沉浸、缩略图滑条、适配、方向、动态背景、双击、书末卡片 | 7/7 | [reader.md](reader.md) |
 | P2 书架/详情 | 封面质感、Hero、iOS 转场与大标题、详情重做、长按菜单、Reading Now、视图选项、骨架 | 8/8 | [ui-polish-plan.md](ui-polish-plan.md) |
-| P3 长尾 | 预设、按系列记忆、横屏自动双页、锁定缩放、双页修正、分享页、沉浸背景、墨水屏探测、键盘/遥控、隐身、下载管理、收藏集/阅读列表（均已完成）、全局搜索、滤镜 | **12/14** | §4 |
+| P3 长尾 | 预设、按系列记忆、横屏自动双页、锁定缩放、双页修正、分享页、沉浸背景、墨水屏探测、键盘/遥控、隐身、下载管理、收藏集/阅读列表、全局搜索（均已完成）、滤镜 | **13/14** | §4 |
 
 ### 1.2 P2 缩水已清零
 
@@ -97,7 +97,7 @@ P3 是"长尾功能"，不是"没想好"：14 项都在 `ui-polish-plan.md` 里�
 | 封面大小 | ✅ ⌘+ / ⌘- [9] | ✅ 小 / 中 / 大三档 | ✅ |
 | 排序 | 8 种：Manual / Alphabetically / Creation / File size / Length / Type / Reading progress / Last read [9] | 6 种：标题升 / 标题降 / 最近添加 / 最近阅读 / 书籍数量 / 发行日期 [queries.dart](../packages/komga_domain/lib/src/queries.dart) | 🟡 缺手工/文件大小/类型/长度等；需先确认 Komga 支持 |
 | 筛选 | 未证实 | ✅ 阅读状态 3 档 + 按库 | 不比较 |
-| 搜索 | 库内免费；跨多库付费；独立 Search tab [9][10] | 🟡 书架内 series 搜索（350ms 防抖）；不搜书/作者/标签；无独立入口 | ❌ P3-9 |
+| 搜索 | 库内免费；跨多库付费；独立 Search tab [9][10] | ✅ 独立 Search tab：系列 + 书，服务端 Lucene 匹配（P3-9） | ✅ |
 | 多选 / 批量 | ✅ 全选、标记、删除、移动、分享 [9] | ❌ | ❌ 新-3 |
 | 标记已读 / 未读 | ✅ 单本 + 批量 [17] | ✅ 单本 + 整系列 | ✅ |
 | 收藏库位置（Favorite locations） | ✅（Premium）[10] | ✅ 服务器列表（等价） | ✅ |
@@ -151,7 +151,7 @@ P3 是"长尾功能"，不是"没想好"：14 项都在 `ui-polish-plan.md` 里�
 
 | 维度 | Panels（依据） | KomgaNative（代码/基线） | 差距 |
 |---|---|---|---|
-| 主导航 | Library / Reading Now / **Search** / Settings 四个 tab；iPad 有侧边栏 [9][21] | Reading now / Library / Settings 三个 tab；搜索在书架 app bar；平板用 `NavigationRail` | 缺独立搜索入口 |
+| 主导航 | Library / Reading Now / **Search** / Settings 四个 tab；iPad 有侧边栏 [9][21] | Reading now / Library / Search / Settings 四个 tab；平板用 `NavigationRail` | ✅ |
 | 库层级 | Content → library → collections [11] | 书架 = 系列网格 + 库 chips | 少一层"库/收藏集"浏览 |
 | 阅读器 chrome | `"..."` 菜单（Configure reader / Image filters）+ 底部 carousel + Live Text 按钮 [1][2][8] | 顶栏：返回 / 书名 / 页码 / 网格 / 设置；底栏箭头 + 缩略图滑条 | 信息架构不同；少配置/滤镜入口 |
 | 阅读设置 | Presets 列表 + 完整配置页（Page transition / Scroll direction / Pages / Fitting / Background）[1] | 底部面板：预设 / 按系列 / 模式 / 适配 / 方向 / 背景 / 亮度 / 常亮 / 锁定缩放 / 跳页 | 结构接近，缺按书临时配置 |
@@ -218,7 +218,6 @@ iOS 转场、大标题、骨架微光、卷页）。目前缺的是两件事：
 
 | 编号 | 内容 | 为什么 | 成本 |
 |---|---|---|---|
-| P3-9 | 全局搜索（系列 + 书 + 作者/标签） | Panels 有独立 Search tab；我们只能在书架搜系列 | M–L（需 `/books` 搜索 fixture） |
 | 新-3 | 书架多选与批量操作 | 补"标记/下载/删缓存"的效率 | M |
 | 新-4 | 最近阅读 / 阅读历史 | Reading Now 现在只有 ondeck + 最近添加 | M |
 | 新-6 | 阅读器快捷控制（亮度/背景/方向 + 页码进度条） | 少一次进面板；对标 Panels 的即时反馈 | S–M |

@@ -80,6 +80,14 @@ void main() {
       expect(page.items.first.name, 'Akira v01');
     });
 
+    test('书籍搜索：/books?search= 返回 PageBookDto', () async {
+      final session = _sessionWith(_replay(fixture('books-search.json')));
+      final page = await session.searchBooks('akira');
+      expect(page.items, hasLength(1));
+      expect(page.items.single.name, 'Akira v01');
+      expect(page.items.single.seriesId, isNotEmpty);
+    });
+
     test('账号：没有 username 字段，用 email 作展示名', () async {
       final session = _sessionWith(_replay(fixture('users_me.json')));
       final account = await session.fetchAccount();

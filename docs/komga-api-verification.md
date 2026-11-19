@@ -139,6 +139,8 @@ Invoke-WebRequest 'http://127.0.0.1:25600/api/v1/libraries/<libId>/scan' -Method
 | `GET /api/v1/readlists?page=0&size=20` | 分页对象；`content[]` 带 `id/name/summary/ordered/bookIds/...` | `readlists.json` |
 | `GET /api/v1/readlists/{id}/books?size=20` | 普通 `PageBookDto`，元素与系列书列表完全同形 | `readlist-books.json` |
 
+`GET /api/v1/books?search=akira&size=20` 也是普通 `PageBookDto`，`content[]` 带 `seriesTitle`（解析层暂不用）；响应存入 `books-search.json`，用于 P3-9 的全局书搜索。
+
 → 影响：收藏集/阅读列表只需要两个新的列表解析器，系列与书不用另写一套；顺序以服务端 `content[]` 顺序为准（`ordered` 标记用户是否手工排序）。
 
 ## 4. 由此修掉的缺陷

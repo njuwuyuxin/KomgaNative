@@ -299,6 +299,32 @@ class FakeLibraryRepository implements LibraryRepository {
   }
 
   @override
+  Future<PageResult<Book>> searchBooks(
+    String query, {
+    int page = 0,
+    int size = 20,
+  }) async {
+    final normalized = query.toLowerCase();
+    final items = <Book>[
+      ...ondeckData,
+      for (var i = 0; i < bookCount; i++)
+        Book(
+          id: 's1-b${i + 1}',
+          seriesId: 's1',
+          name: 'Search result $i',
+          pagesCount: 3,
+          number: '${i + 1}',
+        ),
+    ].where((Book b) => b.name.toLowerCase().contains(normalized)).toList();
+    return PageResult<Book>(
+      items: items,
+      totalElements: items.length,
+      page: page,
+      size: size,
+    );
+  }
+
+  @override
   Future<Book?> book(String bookId) async {
     for (final book in ondeckData) {
       if (book.id == bookId) return book;

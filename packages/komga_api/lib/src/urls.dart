@@ -85,6 +85,15 @@ class KomgaUrls {
 
   String book(String bookId) => '$_base/api/v1/books/$bookId';
 
+  /// 全局书搜索（`GET /api/v1/books?search=`，UI-P3-9）。
+  String books({int page = 0, int size = 20, String? search}) {
+    return _withQuery('$_base/api/v1/books', {
+      'page': '$page',
+      'size': '$size',
+      if (search != null && search.isNotEmpty) 'search': search,
+    });
+  }
+
   String bookPages(String bookId) => '$_base/api/v1/books/$bookId/pages';
 
   /// 单页图片。

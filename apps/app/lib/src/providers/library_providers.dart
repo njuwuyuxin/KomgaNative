@@ -105,6 +105,22 @@ final readListBooksProvider = FutureProvider.family<PageResult<Book>, String>((
   return ref.watch(libraryRepositoryProvider).readListBooks(readListId);
 });
 
+/// 全局书搜索（UI-P3-9）；`query` 变化就是一次新查询。
+final searchBooksProvider = FutureProvider.family<PageResult<Book>, String>((
+  Ref ref,
+  String query,
+) {
+  return ref.watch(libraryRepositoryProvider).searchBooks(query);
+});
+
+/// 全局系列搜索（复用书架查询的 `search` 参数）。
+final searchSeriesProvider = FutureProvider.family<PageResult<Series>, String>((
+  Ref ref,
+  String query,
+) {
+  return ref.watch(libraryRepositoryProvider).series(query: query);
+});
+
 /// 单本书的封面。
 final bookCoverProvider = FutureProvider.family<Uint8List?, String>((
   Ref ref,
