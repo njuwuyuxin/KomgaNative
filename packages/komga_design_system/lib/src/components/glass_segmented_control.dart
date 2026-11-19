@@ -3,9 +3,9 @@ import 'dart:async';
 import 'package:komga_design_system/src/components/glass_control_colors.dart';
 import 'package:komga_design_system/src/components/glass_surface.dart';
 import 'package:komga_design_system/src/components/pressable_scale.dart';
+import 'package:komga_design_system/src/components/sliding_selection_track.dart';
 import 'package:komga_design_system/src/haptics.dart';
 import 'package:komga_design_system/src/materials.dart';
-import 'package:komga_design_system/src/motion.dart';
 import 'package:komga_design_system/src/shapes.dart';
 import 'package:komga_design_system/src/tokens.dart';
 import 'package:material_ui/material_ui.dart';
@@ -32,6 +32,10 @@ class GlassSegment<T> {
 /// 同时用于三处以上：收藏集/阅读列表切换、设置页的主题与语言、书架的库筛选
 /// （库数量不定，改用 [scrollable] 横向滚动，宽度按内容）。
 ///
+/// 选中胶囊由 [SlidingSelectionTrack] 统一绘制：切换选项时胶囊从旧段弹到
+/// 新段（弹簧与 `PressableScale` 同源），文字颜色跟着同一进度过渡，
+/// 不再是每段各自瞬间加深。
+///
 /// 墨水屏：选中段反白（墨底纸字），其余透明；圆角与阴影由 token 退化。
 class GlassSegmentedControl<T> extends StatelessWidget {
   const GlassSegmentedControl({
@@ -51,64 +55,34 @@ class GlassSegmentedControl<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final items = <Widget>[
-      for (var i = 0; i < segments.length; i++)
-        if (scrollable)
-          Padding(
-            padding: EdgeInsets.only(
-              right: i == segments.length - 1 ? 0 : AppSpacing.xs,
-            ),
-            child: _GlassSegmentButton<T>(
-              segment: segments[i],
-              selected: segments[i].value == selected,
-              scrollable: scrollable,
-              onSelected: onSelected,
-            ),
-          )
-        else
-          Expanded(
-            child: Padding(
-              padding: EdgeInsets.only(
-                right: i == segments.length - 1 ? 0 : AppSpacing.xs,
-              ),
-              child: _GlassSegmentButton<T>(
-                segment: segments[i],
-                selected: segments[i].value == selected,
+    final shape = AppShapes.of(context, AppShapes.bar);
+    final selectedIndex = segments.indexWhere(
+      (GlassSegment<T> segment) => segment.value == selected,
+    );
+    final selectedColors = GlassControlColors.resolve(context, selected: true);
+
+    final surface = GlassSurface(
+      shape: shape,
+      shadows: AppShadows.card,
+      child: SizedBox(
+        height: AppSizes.glassSegmentHeight,
+        child: SlidingSelectionTrack(
+          itemCount: segments.length,
+          selectedIndex: selectedIndex < 0 ? null : selectedIndex,
+          padding: const EdgeInsets.all(AppSizes.glassControlInset),
+          pillColor: selectedColors.fill ?? Colors.transparent,
+          pillShape: shape,
+          scrollable: scrollable,
+          itemBuilder: (BuildContext context, int index, double selection) =>
+              _GlassSegmentButton<T>(
+                segment: segments[index],
+                selected: index == selectedIndex,
+                selection: selection,
                 scrollable: scrollable,
                 onSelected: onSelected,
               ),
-            ),
-          ),
-    ];
-
-    final Widget content;
-    if (scrollable) {
-      // 横向滚动模式按内容定宽：库少的时候不该拉成一条空胶囊（平板上很明显）。
-      content = SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.all(AppSizes.glassControlInset),
-        child: SizedBox(
-          height: AppSizes.glassSegmentHeight - AppSizes.glassControlInset * 2,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: items,
-          ),
         ),
-      );
-    } else {
-      content = Padding(
-        padding: const EdgeInsets.all(AppSizes.glassControlInset),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: items,
-        ),
-      );
-    }
-
-    final surface = GlassSurface(
-      shape: AppShapes.of(context, AppShapes.bar),
-      shadows: AppShadows.card,
-      child: SizedBox(height: AppSizes.glassSegmentHeight, child: content),
+      ),
     );
     return scrollable
         ? Align(
@@ -124,25 +98,34 @@ class _GlassSegmentButton<T> extends StatelessWidget {
   const _GlassSegmentButton({
     required this.segment,
     required this.selected,
+    required this.selection,
     required this.scrollable,
     required this.onSelected,
   });
 
   final GlassSegment<T> segment;
   final bool selected;
+
+  /// 选中进度（0 → 1），由滑块的弹簧驱动。
+  final double selection;
   final bool scrollable;
   final ValueChanged<T> onSelected;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final motion = AppMotion.of(context);
-    final shape = AppShapes.of(context, AppShapes.bar);
-    final colors = GlassControlColors.resolve(
-      context,
-      selected: selected,
-      subdued: !selected,
-    );
+    final selectedColors = GlassControlColors.resolve(context, selected: true);
+    final unselectedColors = GlassControlColors.resolve(context, subdued: true);
+    final unselectedForeground = unselectedColors.foreground;
+    final selectedForeground = selectedColors.foreground;
+    // 端点直接返回原色：Color.lerp 会经过浮点色彩空间，稳态下像素会有
+    // 肉眼看不见、但黄金图能抓到的差异。
+    final Color foreground = selection <= 0
+        ? unselectedForeground
+        : selection >= 1
+        ? selectedForeground
+        : Color.lerp(unselectedForeground, selectedForeground, selection) ??
+              selectedForeground;
 
     void handleTap() {
       if (selected) return;
@@ -162,16 +145,9 @@ class _GlassSegmentButton<T> extends StatelessWidget {
             key: segment.key,
             behavior: HitTestBehavior.opaque,
             onTap: handleTap,
-            child: AnimatedContainer(
-              duration: motion.quick,
-              curve: motion.standardCurve,
-              alignment: Alignment.center,
+            child: Padding(
               padding: EdgeInsets.symmetric(
                 horizontal: scrollable ? AppSpacing.md : AppSpacing.sm,
-              ),
-              decoration: ShapeDecoration(
-                shape: shape,
-                color: colors.fill ?? Colors.transparent,
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -181,7 +157,7 @@ class _GlassSegmentButton<T> extends StatelessWidget {
                     Icon(
                       segment.icon,
                       size: AppSizes.iconXs,
-                      color: colors.foreground,
+                      color: foreground,
                     ),
                     const SizedBox(width: AppSpacing.xs),
                   ],
@@ -194,7 +170,7 @@ class _GlassSegmentButton<T> extends StatelessWidget {
                         fontWeight: selected
                             ? FontWeight.w600
                             : FontWeight.w500,
-                        color: colors.foreground,
+                        color: foreground,
                       ),
                     ),
                   ),

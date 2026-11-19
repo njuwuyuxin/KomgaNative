@@ -106,24 +106,31 @@ class _GlassPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final selectedColors = _navColors(Theme.of(context), true);
     return GlassSurface(
       shape: AppShapes.of(context, AppShapes.bar),
       child: SizedBox(
         height: AppSizes.navBarHeight,
         // 这里**不要**再加横向 padding：外层胶囊的半径是 高度/2，
-        // 内层选中胶囊要和外层同心，四周的缩进就必须一样宽（见 navIndicatorInset）。
-        // 多一层横向 padding 会让左右缩进比上下大，端头两个 tab 的半圆就不同心了。
-        child: Row(
-          // 拉满 64 高：整块 item 都是点击区，而不是只有图标那一小块。
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            for (var index = 0; index < tabs.length; index++)
+        // 内层选中胶囊的 `pillInset` 四周等宽，两层才同心。
+        // 选中胶囊由 [SlidingSelectionTrack] 统一绘制：切换 tab 时从旧格
+        // 弹到新格（弹簧），不再是一格瞬间变深、另一格瞬间变浅。
+        child: SlidingSelectionTrack(
+          itemCount: tabs.length,
+          selectedIndex: selectedTab,
+          pillColor: selectedColors.background ?? Colors.transparent,
+          pillShape: const StadiumBorder(),
+          pillInset: const EdgeInsets.all(navIndicatorInset),
+          // tab 之间没有空隙：旧版就是等分槽位 + 四边 4 的内缩；
+          // 加 gap 会让每个槽位变窄、图标文字整体左移（黄金图能看出来）。
+          gap: 0,
+          itemBuilder: (BuildContext context, int index, double selection) =>
               _NavItem(
                 destination: tabs[index],
                 selected: selectedTab == index,
+                selection: selection,
                 onTap: () => onSelected(index),
               ),
-          ],
         ),
       ),
     );
@@ -137,78 +144,80 @@ class _GlassPill extends StatelessWidget {
 /// 上下直线段与两端弧线的间隙才会一样宽。`floating_nav_bar_test` 钉了这个等式。
 const double navIndicatorInset = AppSpacing.xs;
 
-/// 胶囊里的单个 tab：图标在上、标签在下，选中时套一层胶囊底色。
+/// 胶囊里的单个 tab：图标在上、标签在下，选中时由滑动的胶囊衬底。
 class _NavItem extends StatelessWidget {
   const _NavItem({
     required this.destination,
     required this.selected,
+    required this.selection,
     required this.onTap,
   });
 
   final GlassNavDestination destination;
   final bool selected;
+
+  /// 选中进度（0 → 1）：颜色跟着滑动胶囊一起过渡。
+  final double selection;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final motion = AppMotion.of(context);
-    final colors = _navColors(theme, selected);
+    final selectedColors = _navColors(theme, true);
+    final unselectedColors = _navColors(theme, false);
+    final unselectedForeground = unselectedColors.foreground;
+    final selectedForeground = selectedColors.foreground;
+    // 端点直接返回原色：Color.lerp 会经过浮点色彩空间，稳态下像素会有
+    // 肉眼看不见、但黄金图能抓到的差异。
+    final Color foreground = selection <= 0
+        ? unselectedForeground
+        : selection >= 1
+        ? selectedForeground
+        : Color.lerp(unselectedForeground, selectedForeground, selection) ??
+              selectedForeground;
 
     void handleTap() {
       unawaited(AppHaptics.selection());
       onTap();
     }
 
-    return Expanded(
-      child: Semantics(
-        container: true,
-        button: true,
-        selected: selected,
-        label: destination.label,
-        onTap: handleTap,
-        // 标签本身已经念过一次，别再让读屏把图标/文字念两遍。
-        child: ExcludeSemantics(
-          child: PressableScale(
-            child: GestureDetector(
-              key: destination.key,
-              behavior: HitTestBehavior.opaque,
-              onTap: handleTap,
+    return Semantics(
+      container: true,
+      button: true,
+      selected: selected,
+      label: destination.label,
+      onTap: handleTap,
+      // 标签本身已经念过一次，别再让读屏把图标/文字念两遍。
+      child: ExcludeSemantics(
+        child: PressableScale(
+          child: GestureDetector(
+            key: destination.key,
+            behavior: HitTestBehavior.opaque,
+            onTap: handleTap,
+            // 选中胶囊铺满整个 item 槽位（iOS 26 是"整格高亮"，而不是只包住文字）。
+            // 四边同宽是关键：横向多留一点，端头的半圆和外层不同心（曾经就是 8/4）。
+            child: Padding(
+              padding: const EdgeInsets.all(navIndicatorInset),
               child: Padding(
-                // 选中胶囊铺满整个 item 槽位（iOS 26 是"整格高亮"，而不是只包住文字）。
-                // 四边同宽是关键：横向多留一点，端头的半圆和外层不同心（曾经就是 8/4）。
-                padding: const EdgeInsets.all(navIndicatorInset),
-                child: AnimatedContainer(
-                  // 墨水屏 / 减少动态效果时时长为 0（token 负责退化）。
-                  duration: motion.quick,
-                  curve: motion.standardCurve,
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.xs,
-                  ),
-                  decoration: ShapeDecoration(
-                    shape: const StadiumBorder(),
-                    color: colors.background ?? Colors.transparent,
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: <Widget>[
-                      Icon(
-                        selected ? destination.selectedIcon : destination.icon,
-                        size: AppSizes.iconLg,
-                        color: colors.foreground,
-                      ),
-                      const SizedBox(height: AppSpacing.xxs),
-                      Text(
-                        destination.label,
-                        maxLines: 1,
-                        softWrap: false,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTypography.of(context).label
-                            .copyWith(color: colors.foreground),
-                      ),
-                    ],
-                  ),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    Icon(
+                      selected ? destination.selectedIcon : destination.icon,
+                      size: AppSizes.iconLg,
+                      color: foreground,
+                    ),
+                    const SizedBox(height: AppSpacing.xxs),
+                    Text(
+                      destination.label,
+                      maxLines: 1,
+                      softWrap: false,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.of(context).label
+                          .copyWith(color: foreground),
+                    ),
+                  ],
                 ),
               ),
             ),

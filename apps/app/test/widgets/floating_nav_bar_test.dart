@@ -47,6 +47,7 @@ void main() {
     ValueChanged<int>? onTabSelected,
     VoidCallback? onSearch,
     double textScale = 1.0,
+    ValueNotifier<int?>? selection,
   }) async {
     tester.view.physicalSize = const Size(390 * 3, 844 * 3);
     tester.view.devicePixelRatio = 3;
@@ -62,14 +63,27 @@ void main() {
         ),
         home: Scaffold(
           body: const SizedBox.expand(),
-          bottomNavigationBar: FloatingNavBar(
-            tabs: tabs,
-            selectedTab: selectedTab,
-            onTabSelected: onTabSelected ?? (_) {},
-            search: search,
-            searchSelected: searchSelected,
-            onSearch: onSearch ?? () {},
-          ),
+          bottomNavigationBar: selection == null
+              ? FloatingNavBar(
+                  tabs: tabs,
+                  selectedTab: selectedTab,
+                  onTabSelected: onTabSelected ?? (_) {},
+                  search: search,
+                  searchSelected: searchSelected,
+                  onSearch: onSearch ?? () {},
+                )
+              : ValueListenableBuilder<int?>(
+                  valueListenable: selection,
+                  builder: (BuildContext context, int? value, _) =>
+                      FloatingNavBar(
+                        tabs: tabs,
+                        selectedTab: value,
+                        onTabSelected: onTabSelected ?? (_) {},
+                        search: search,
+                        searchSelected: searchSelected,
+                        onSearch: onSearch ?? () {},
+                      ),
+                ),
         ),
       ),
     );
@@ -150,53 +164,115 @@ void main() {
     await pumpBar(tester, selectedTab: 0);
 
     final pill = tester.getRect(find.byType(GlassSurface).first);
+    final indicator = tester.getRect(
+      find.byKey(const Key('sliding-selection-pill')),
+    );
+    final selectedItem = tester.getRect(find.byKey(const Key('nav-tab-0')));
 
-    for (var i = 0; i < tabs.length; i++) {
-      final item = tester.getRect(find.byKey(Key('nav-tab-$i')));
-      final indicator = tester.getRect(
-        find.descendant(
-          of: find.byKey(Key('nav-tab-$i')),
-          matching: find.byType(AnimatedContainer),
-        ),
-      );
-
-      // 四个方向的内缩必须一样：横向多 4 时，端头的半圆会和外层错开。
-      expect(
-        indicator.left - item.left,
-        moreOrLessEquals(navIndicatorInset, epsilon: 0.01),
-      );
-      expect(
-        item.right - indicator.right,
-        moreOrLessEquals(navIndicatorInset, epsilon: 0.01),
-      );
-      expect(
-        indicator.top - item.top,
-        moreOrLessEquals(navIndicatorInset, epsilon: 0.01),
-      );
-      expect(
-        item.bottom - indicator.bottom,
-        moreOrLessEquals(navIndicatorInset, epsilon: 0.01),
-      );
-
-      // 外层是胶囊（半径 = 高/2），内层也是胶囊：半径差恰好等于间隙，
-      // 这才是"同心圆"；只有高度差对了还不够。
-      final outerRadius = pill.height / 2;
-      final innerRadius = indicator.height / 2;
-      expect(
-        outerRadius - innerRadius,
-        moreOrLessEquals(navIndicatorInset, epsilon: 0.01),
-      );
-    }
-
-    // 首尾 item 的槽位贴住外层胶囊：中间不能再夹一层横向 padding，
-    // 否则端头 tab 的左右内缩会比上下大。
+    // 四个方向的内缩必须一样：横向多 4 时，端头的半圆会和外层错开。
     expect(
-      tester.getRect(find.byKey(const Key('nav-tab-0'))).left,
-      moreOrLessEquals(pill.left, epsilon: 0.01),
+      indicator.left - selectedItem.left,
+      moreOrLessEquals(navIndicatorInset, epsilon: 0.01),
     );
     expect(
-      tester.getRect(find.byKey(const Key('nav-tab-3'))).right,
-      moreOrLessEquals(pill.right, epsilon: 0.01),
+      selectedItem.right - indicator.right,
+      moreOrLessEquals(navIndicatorInset, epsilon: 0.01),
+    );
+    expect(
+      indicator.top - selectedItem.top,
+      moreOrLessEquals(navIndicatorInset, epsilon: 0.01),
+    );
+    expect(
+      selectedItem.bottom - indicator.bottom,
+      moreOrLessEquals(navIndicatorInset, epsilon: 0.01),
+    );
+
+    // 外层是胶囊（半径 = 高/2），内层也是胶囊：半径差恰好等于间隙，
+    // 这才是"同心圆"；只有高度差对了还不够。
+    final outerRadius = pill.height / 2;
+    final innerRadius = indicator.height / 2;
+    expect(
+      outerRadius - innerRadius,
+      moreOrLessEquals(navIndicatorInset, epsilon: 0.01),
+    );
+
+    // 四个槽位等宽，首尾槽位贴住外层胶囊：中间不能再夹一层横向 padding，
+    // 否则端头 tab 的左右内缩会比上下大。
+    final items = <Rect>[
+      for (var i = 0; i < tabs.length; i++)
+        tester.getRect(find.byKey(Key('nav-tab-$i'))),
+    ];
+    for (final item in items) {
+      expect(
+        item.width,
+        moreOrLessEquals(items.first.width, epsilon: 0.01),
+        reason: '等分槽位，胶囊滑动距离才可预测',
+      );
+    }
+    expect(items.first.left, moreOrLessEquals(pill.left, epsilon: 0.01));
+    expect(items.last.right, moreOrLessEquals(pill.right, epsilon: 0.01));
+  });
+
+  testWidgets('切换 tab 时选中胶囊从旧格弹簧滑到新格', (WidgetTester tester) async {
+    final selection = ValueNotifier<int?>(0);
+    addTearDown(selection.dispose);
+    await pumpBar(
+      tester,
+      selection: selection,
+      onTabSelected: (int index) => selection.value = index,
+    );
+
+    final from = tester.getRect(
+      find.byKey(const Key('sliding-selection-pill')),
+    );
+    final targetItem = tester.getRect(find.byKey(const Key('nav-tab-3')));
+    final targetLeft = targetItem.left + navIndicatorInset;
+
+    await tester.tap(find.byKey(const Key('nav-tab-3')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 60));
+
+    final midway = tester.getRect(
+      find.byKey(const Key('sliding-selection-pill')),
+    );
+    expect(midway.left, greaterThan(from.left + 1));
+    expect(
+      midway.left,
+      lessThan(targetLeft - 1),
+      reason: '60ms 时应还在半路，而不是瞬间到位',
+    );
+
+    await tester.pumpAndSettle();
+    final settled = tester.getRect(
+      find.byKey(const Key('sliding-selection-pill')),
+    );
+    expect(settled.left, moreOrLessEquals(targetLeft, epsilon: 0.01));
+    expect(
+      settled.width,
+      moreOrLessEquals(targetItem.width - navIndicatorInset * 2, epsilon: 0.01),
+    );
+  });
+
+  testWidgets('墨水屏：切换 tab 不跑弹簧，直接到新格', (WidgetTester tester) async {
+    final selection = ValueNotifier<int?>(0);
+    addTearDown(selection.dispose);
+    await pumpBar(
+      tester,
+      theme: AppTheme.eink(),
+      selection: selection,
+      onTabSelected: (int index) => selection.value = index,
+    );
+
+    await tester.tap(find.byKey(const Key('nav-tab-2')));
+    await tester.pump();
+
+    final targetItem = tester.getRect(find.byKey(const Key('nav-tab-2')));
+    final indicator = tester.getRect(
+      find.byKey(const Key('sliding-selection-pill')),
+    );
+    expect(
+      indicator.left,
+      moreOrLessEquals(targetItem.left + navIndicatorInset, epsilon: 0.01),
     );
   });
 }

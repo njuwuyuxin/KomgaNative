@@ -47,10 +47,11 @@ chrome 永远压在漫画画面上：浅色模式下用浅色毛玻璃，白底�
 | `GlassRefraction` / `GlassLightPainter` | 液态玻璃合成版（fallback）的两块光学零件（`glass_optics_layers.dart`），只由 `FrostedSurface` 组装，页面不要直接用 | 墨水屏不会建出来 |
 | `LiquidGlassShaderSurface` | 液态玻璃着色器版（`liquid_glass_shader.dart` + `shaders/liquid_glass.frag`），Impeller 真机上由 `FrostedSurface` 自动选用 | 墨水屏 / 非 Impeller / 加载失败 → 合成版 |
 | `PressableScale` | 按下缩到 0.97、松开用 `snappy` 弹簧回弹；用 `Listener` 监听原始指针，不抢子组件的点击/长按/滚动 | 墨水屏 / 减少动态效果时完全透传 |
+| `SlidingSelectionTrack` | 会滑动的选中胶囊：同一块胶囊从旧槽位用弹簧弹到新槽位，槽位内容按 `selection` 进度过渡文字/图标颜色；等分与按内容定宽共用一套几何（布局后量槽位） | 不跑弹簧，直接到终值；胶囊颜色由调用方给 |
 | `GlassIconButton` | 独立玻璃圆球（返回 / 搜索 / 更多），52×52、图标 24、`label` 同时做读屏与长按提示 | 纸底墨边的圆球（与导航条搜索球一致） |
 | `GlassBarAction` | 玻璃条**内部**的图标格（44×44、无自带玻璃底、选中嵌中性胶囊） | 选中反白 |
 | `GlassPillButton` | 玻璃胶囊主按钮（继续阅读 / 开始阅读 / 连接 / 重试），可带图标、`expanded`、`busy` | 墨底纸字、直角 |
-| `GlassSegmentedControl` | 玻璃分段控件；`scrollable` 时按内容定宽并横向滚动（库筛选），否则等分（主题 / 语言 / 收藏集） | 选中反白、直角 |
+| `GlassSegmentedControl` | 玻璃分段控件；`scrollable` 时按内容定宽并横向滚动（库筛选），否则等分（主题 / 语言 / 收藏集）。选中胶囊由 `SlidingSelectionTrack` 绘制，切换时从旧段弹到新段 | 选中反白、直角；不做滑动（直接到终值） |
 | `GlassSearchField` | 玻璃胶囊搜索框，左放大镜、有内容才出现清除键；边框/填充全关掉 | 纸底墨边、直角 |
 | `GlassMenuButton` | 玻璃图标 + `MenuAnchor` **玻璃菜单**（排序 / 筛选 / 视图 / 更多）；菜单项由调用方给 `GlassMenuItemButton`，key 挂在项上 | 纸底墨框菜单 |
 | `GlassMenuItemButton` | 菜单里的一行：文本按菜单中线居中；对勾/图标用 `Positioned` 叠在左侧，不参与文本排版（不会把文字往右挤） | 同菜单 |
@@ -81,11 +82,15 @@ chrome 永远压在漫画画面上：浅色模式下用浅色毛玻璃，白底�
 3. **选中态**：彩色主题按 iOS 26——玻璃里再嵌一块**中性**胶囊（`GlassOptics.selectionFill`，
    浅色压一层灰、深色提一层白），只有图标/文字用主色；整块铺主色会把玻璃染成塑料。
    墨水屏反过来（墨底纸白），灰阶上一眼能认出来。
+   切换 tab 时**同一块胶囊**用 `AppMotion.snappy` 弹簧从旧格弹到新格（与 `PressableScale`
+   同一条手感），图标/文字颜色跟着同一进度过渡；不是"旧格瞬间变浅、新格瞬间变深"。
+   动画实现是 `SlidingSelectionTrack`，与顶部标题栏的分段控件共用。
    内嵌胶囊四周按 `navIndicatorInset`（4）**等宽**内缩：外层也是胶囊，半径是
    `navBarHeight / 2`，内层半径（内层高 / 2）正好等于 `外层半径 − 内缩`，两层才同心；
    端头两个 tab 的半圆与上下直线段的间隙才会一样宽。外层胶囊**不要**再加横向
-   padding（加了左右内缩就比上下大，端头弧线会错开）——`floating_nav_bar_test` 钉了
-   四个方向的间隙与半径差。
+   padding（加了左右内缩就比上下大，端头弧线会错开），`SlidingSelectionTrack` 的
+   `gap` 因此必须是 0——加了 tab 间隙，槽位会变窄、图标文字整体左移
+   （`floating_nav_bar_test` 钉了四个方向的间隙、半径差与等宽槽位）。
 4. **标签比页面标题短一档**：英文 tab 是 "Reading" / "Saved"（页面标题仍是
    "Reading now" / "Collections"），因为长标签在 1.3 倍字号下会被截断。
    新增 tab 时先用 `nav_bar@phone_light_text1.3` 这双眼睛看一下。
@@ -114,6 +119,11 @@ chrome 永远压在漫画画面上：浅色模式下用浅色毛玻璃，白底�
   搜索与动作合成一行，比"标题栏 + 搜索框"省掉整整一行；
 - **搜索页**：`bar: GlassSearchField(...)`，搜索框就是标题栏；
 - **收藏集**：`bar: GlassSegmentedControl(...)`，它是 dock 的一个 tab，没有返回键。
+
+分段控件（收藏集的收藏集/阅读列表、设置页的主题/语言、书架顶部的库筛选）和 dock
+共用 `SlidingSelectionTrack`：选中胶囊从旧段弹到新段，文字颜色跟着滑块过渡。
+等分（2～3 段）与按内容定宽（库筛选）走同一套实现；槽位几何在布局后量一次，
+不靠调用方硬编码宽度。
 
 几条不要踩的：
 
@@ -216,13 +226,15 @@ chrome 永远压在漫画画面上：浅色模式下用浅色毛玻璃，白底�
   `PressableScale` 的按下回弹、不抢点击、墨水屏透传，`FrostedSurface` / `GlassSurface` 的墨水屏退化
   （不模糊、不反光、无阴影），`AppHaptics` 的映射与开关。
 - `apps/app/test/widgets/floating_nav_bar_test.dart`：导航条的点击派发、48 点按区、
-  `selected` 语义、搜索圆球的读屏标签、墨水屏反白、1.3 倍字号不溢出，以及选中胶囊
-  四边等宽内缩 / 内外半径差 = 内缩（端头半圆同心）。
+  `selected` 语义、搜索圆球的读屏标签、墨水屏反白、1.3 倍字号不溢出，选中胶囊
+  四边等宽内缩 / 内外半径差 = 内缩（端头半圆同心）、四个槽位等宽，以及
+  "点另一个 tab 后 60ms 胶囊还在半路、最终落位到新槽位"的弹簧补间；
+  墨水屏下同一次点击直接到新槽位。
 - `packages/komga_design_system/test/glass_controls_test.dart`：玻璃圆球 / 胶囊按钮 /
   分段控件 / 搜索框 / 标题栏 / 分组卡 / 二级菜单的行为：点击派发、读屏标签、`busy` 防重复提交、
   搜索框清除键、`GlassHeaderSliver` 滚动后仍钉在顶部、`GlassTopBar.preferredSize`、
   墨水屏不建 `BackdropFilter` 与墨框退化；菜单是玻璃面，且菜单项文本按菜单中线居中、
-  对勾在左侧不挤压排版。
+  对勾在左侧不挤压排版；分段控件的滑动补间与横向滚动模式的槽位对齐。
 - `apps/app/test/shelf_polish_test.dart`：书架顶部的搜索框 + 三颗动作是钉住的
   （滚动后动作位置不动），并且不再有标题文字。
 - `apps/app/test/library_screen_test.dart`：下拉刷新仍然触发重新请求（关掉 Android
@@ -231,6 +243,8 @@ chrome 永远压在漫画画面上：浅色模式下用浅色毛玻璃，白底�
   改 token 时先看这三张图变没变，再看页面。
 - 黄金图 `nav_bar@{phone_light,phone_dark,eink,phone_light_text1.3}`、`nav_bar@phone_light_edge`
   （端头间隙）与 `library_nav@phone_light`：导航条本身 + 真实首页形态（见上一节）。
+  分段控件改为"等分 + 段间 4px 间隙"后，`collections@*`、`connection@*`、`settings@eink`
+  的选中胶囊与旧基线相差约 2–3px（末端段变窄、其余略变宽）——只影响几何，颜色/材质不变。
 - 页面基线：`library@*`（含 `text1.3` / `library_nav` / `library_sort_menu` / `library_offline`、
   以及墨水屏的 `library_sort_menu@eink`）、`reading_now@*`、`settings@eink`、`search@*`、
   `collections@*`、`collection_detail@*`、`readlist_detail@*`、`downloads@*`、`series@*`、

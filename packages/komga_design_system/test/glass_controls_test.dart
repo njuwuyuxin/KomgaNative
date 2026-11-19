@@ -132,7 +132,11 @@ void main() {
               scrollable: true,
               segments: <GlassSegment<int>>[
                 for (var i = 0; i < 8; i++)
-                  GlassSegment<int>(value: i, label: 'Library $i'),
+                  GlassSegment<int>(
+                    value: i,
+                    label: 'Library $i',
+                    key: Key('seg-$i'),
+                  ),
               ],
               selected: 0,
               onSelected: (_) {},
@@ -142,6 +146,117 @@ void main() {
       );
       expect(tester.takeException(), isNull);
       expect(find.text('Library 7'), findsOneWidget);
+      await tester.pumpAndSettle();
+      final pill = tester.getRect(
+        find.byKey(const Key('sliding-selection-pill')),
+      );
+      final slot = tester.getRect(find.byKey(const Key('seg-0')));
+      expect(pill.left, moreOrLessEquals(slot.left, epsilon: 0.01));
+      expect(pill.width, moreOrLessEquals(slot.width, epsilon: 0.01));
+    });
+
+    testWidgets('切换段时选中胶囊从旧段弹簧滑到新段', (WidgetTester tester) async {
+      var selected = 0;
+      await tester.pumpWidget(
+        host(
+          StatefulBuilder(
+            builder: (BuildContext context, StateSetter setState) {
+              return SizedBox(
+                width: 320,
+                child: GlassSegmentedControl<int>(
+                  segments: const <GlassSegment<int>>[
+                    GlassSegment<int>(
+                      value: 0,
+                      label: 'Collections',
+                      key: Key('seg-collections'),
+                    ),
+                    GlassSegment<int>(
+                      value: 1,
+                      label: 'Read lists',
+                      key: Key('seg-read-lists'),
+                    ),
+                  ],
+                  selected: selected,
+                  onSelected: (int value) => setState(() => selected = value),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final from = tester.getRect(
+        find.byKey(const Key('sliding-selection-pill')),
+      );
+      final targetSlot = tester.getRect(
+        find.byKey(const Key('seg-read-lists')),
+      );
+
+      await tester.tap(find.text('Read lists'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 60));
+
+      final midway = tester.getRect(
+        find.byKey(const Key('sliding-selection-pill')),
+      );
+      expect(midway.left, greaterThan(from.left + 1));
+      expect(
+        midway.left,
+        lessThan(targetSlot.left - 1),
+        reason: '60ms 时应还在半路，而不是瞬间到位',
+      );
+
+      await tester.pumpAndSettle();
+      final settled = tester.getRect(
+        find.byKey(const Key('sliding-selection-pill')),
+      );
+      expect(settled.left, moreOrLessEquals(targetSlot.left, epsilon: 0.01));
+      expect(settled.width, moreOrLessEquals(targetSlot.width, epsilon: 0.01));
+    });
+
+    testWidgets('墨水屏：切换段不跑弹簧，选中反白直接到新段', (WidgetTester tester) async {
+      var selected = 0;
+      await tester.pumpWidget(
+        host(
+          StatefulBuilder(
+            builder: (BuildContext context, StateSetter setState) {
+              return SizedBox(
+                width: 320,
+                child: GlassSegmentedControl<int>(
+                  segments: const <GlassSegment<int>>[
+                    GlassSegment<int>(
+                      value: 0,
+                      label: 'Collections',
+                      key: Key('seg-collections'),
+                    ),
+                    GlassSegment<int>(
+                      value: 1,
+                      label: 'Read lists',
+                      key: Key('seg-read-lists'),
+                    ),
+                  ],
+                  selected: selected,
+                  onSelected: (int value) => setState(() => selected = value),
+                ),
+              );
+            },
+          ),
+          theme: AppTheme.eink(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Read lists'));
+      await tester.pump();
+
+      final slot = tester.getRect(find.byKey(const Key('seg-read-lists')));
+      final pill = tester.getRect(
+        find.byKey(const Key('sliding-selection-pill')),
+      );
+      expect(pill.left, moreOrLessEquals(slot.left, epsilon: 0.01));
+      final selectedLabel = tester.widget<Text>(find.text('Read lists'));
+      expect(selectedLabel.style?.color, AppTheme.einkPaper);
     });
   });
 

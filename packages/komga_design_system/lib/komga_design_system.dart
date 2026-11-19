@@ -22,6 +22,7 @@ export 'src/components/page_background.dart';
 export 'src/components/pressable_scale.dart';
 export 'src/components/series_tile.dart';
 export 'src/components/skeleton.dart';
+export 'src/components/sliding_selection_track.dart';
 export 'src/components/status_view.dart';
 export 'src/glass_optics.dart';
 export 'src/haptics.dart';

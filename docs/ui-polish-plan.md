@@ -536,6 +536,15 @@ Panels 的高级感主要来自三点，和控件本身关系不大：
 基线变更原因：`bar` 从"85% 不透明灰白"变成"72% + 反光 + 白描边"的玻璃，token 图上的 swatch 变透；
 其余页面基线未动（外壳不进页面黄金图，真实首页形态单开 `library_nav@phone_light` 钉住）。
 
+**进度（2026-11-19）：分段控件 / dock 的选中胶囊滑动补间。**
+
+| 落地 |
+|---|
+| 设计系统新增 `SlidingSelectionTrack`：同一块选中胶囊从旧槽位用 `AppMotion.snappy` 弹簧弹到新槽位，文字/图标颜色按同一进度过渡；布局后量槽位矩形，等分与按内容定宽共用 |
+| `GlassSegmentedControl`（收藏集 / 设置 / 连接页 / 库筛选）与底部 `FloatingNavBar` 都改用它；dock 用 `gap: 0` + 四边 4 内缩保持原同心几何，分段控件改成等分 + 段间 4 间隙（末端段不再更宽） |
+| 动画中断处理：新选中项到来时从胶囊当前所在位置续弹；墨水屏 / 减少动态效果直接跳终值，不建 `Opacity` 合成层（稳态下一层都不多） |
+| 测试：`floating_nav_bar_test` / `glass_controls_test` 各覆盖"60ms 还在半路、最终落位"的弹簧补间与墨水屏瞬时到位；`collections@*`、`connection@*`、`settings@eink` 基线按新几何重生成 |
+
 ## 不做
 
 | 需求 | 理由 |
