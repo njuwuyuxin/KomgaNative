@@ -31,13 +31,17 @@ class _PhaseFadeState extends State<PhaseFade>
     super.didChangeDependencies();
     final motion = AppMotion.of(context);
     _controller.duration = motion.standard;
+    if (!motion.enabled) {
+      // 墨水屏 / 系统"减少动态效果"：没有淡入这回事，直接到终值。
+      // 从普通主题切过来时控制器可能正停在半路，必须在这里落地，
+      // 否则内容会一直半透明（见下方 `didUpdateWidget` 的注释）。
+      _started = true;
+      _controller.value = 1;
+      return;
+    }
     if (_started) return;
     _started = true;
-    if (motion.enabled) {
-      unawaited(_controller.forward());
-    } else {
-      _controller.value = 1;
-    }
+    unawaited(_controller.forward());
   }
 
   @override
@@ -46,8 +50,15 @@ class _PhaseFadeState extends State<PhaseFade>
     if (oldWidget.phase == widget.phase) return;
     final motion = AppMotion.of(context);
     _controller.duration = motion.standard;
+    if (!motion.enabled) {
+      // 动画被禁用时也必须把值推到 1。以前这里只 `value = 0` 再 `forward()`，
+      // 而 forward() 在零时长下不一定推进 → 书架整页停在 opacity 0：
+      // 墨水屏上"有数据但看不见"，黄金图 `library@eink` 抓到过。
+      _controller.value = 1;
+      return;
+    }
     _controller.value = 0;
-    if (motion.enabled) unawaited(_controller.forward());
+    unawaited(_controller.forward());
   }
 
   @override
