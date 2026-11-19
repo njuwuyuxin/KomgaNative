@@ -8,6 +8,7 @@ import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/screens/series_detail_args.dart';
 import 'package:komga_native/src/widgets/reading_now_continue.dart';
+import 'package:komga_native/src/widgets/recent_history_row.dart';
 import 'package:komga_native/src/widgets/series_hero_tag.dart';
 import 'package:komga_native/src/widgets/series_shelf_tile.dart';
 import 'package:material_ui/material_ui.dart';
@@ -76,6 +77,8 @@ class ReadingNowScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
+                // 最近阅读（HIS-02）：有历史才出现，没历史时这一段不占位置。
+                const SliverToBoxAdapter(child: RecentHistoryRow()),
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(

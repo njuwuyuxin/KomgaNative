@@ -22,6 +22,26 @@ class ReadingSessionRecorder {
 
   final Ref _ref;
 
+  /// 删一条历史；失败静默（跟写入同一套理由）。
+  Future<void> delete(int id) async {
+    try {
+      await _ref.read(httpCacheDatabaseProvider).deleteReadingSession(id);
+      _ref.invalidate(readingSessionsProvider);
+    } on Object {
+      // 见 [record]。
+    }
+  }
+
+  /// 清空历史。
+  Future<void> clear() async {
+    try {
+      await _ref.read(httpCacheDatabaseProvider).clearReadingSessions();
+      _ref.invalidate(readingSessionsProvider);
+    } on Object {
+      // 见 [record]。
+    }
+  }
+
   Future<void> record(ReadingSessionDraft draft) async {
     try {
       await _ref

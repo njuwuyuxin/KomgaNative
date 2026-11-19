@@ -457,6 +457,11 @@ void main() {
       theme: theme,
       overrides: <Override>[
         libraryRepositoryProvider.overrideWithValue(repository),
+        // "最近阅读"横滑条读本地会话表（HIS-02）：黄金图环境没有 path_provider，
+        // 必须换成内存库，否则整页停在 MissingPluginException。
+        httpCacheDatabaseProvider.overrideWithValue(
+          HttpCacheDatabase(NativeDatabase.memory()),
+        ),
       ],
       precacheImages: covers,
       // 骨架的微光是无限循环动画，settle 会把 pumpAndSettle 拖到超时。

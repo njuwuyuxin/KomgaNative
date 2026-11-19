@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/providers/app_info_provider.dart';
@@ -120,6 +121,17 @@ class SettingsScreen extends ConsumerWidget {
                     ),
                     const SettingsReadingSection(),
                     const SettingsLibrarySection(),
+                    AppListGroup(
+                      header: l10n.history,
+                      children: <Widget>[
+                        ListTile(
+                          key: const Key('settings-history'),
+                          leading: const Icon(Icons.history),
+                          title: Text(l10n.history),
+                          onTap: () => context.push('/history'),
+                        ),
+                      ],
+                    ),
                     AppListGroup(
                       header: l10n.servers,
                       children: <Widget>[

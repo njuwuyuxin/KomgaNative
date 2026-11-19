@@ -119,6 +119,10 @@ abstract final class AppSizes {
   /// 阅读设置里"适配方式"示意图的宽高（RDR-04）。
   static const double fitPreviewWidth = 30;
   static const double fitPreviewHeight = 38;
+
+  /// 最近阅读横滑条的整条高度与单个封面宽度（HIS-02）。
+  static const double recentHistoryHeight = 132;
+  static const double recentHistoryTileWidth = 84;
 }
 
 /// 布局断点，与 `komga_platform` 的形态判断保持同一套数值。
