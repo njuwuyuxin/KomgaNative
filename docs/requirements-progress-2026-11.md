@@ -49,7 +49,7 @@
 
 | ID | 需求 | P | 状态 | commit |
 |---|---|---|---|---|
-| SCH-01 | 搜索历史 + 空态 | P1 | TODO | — |
+| SCH-01 | 搜索历史 + 空态 | P1 | DONE | `feat(search): 搜索历史与空态引导` |
 | SCH-02 | 搜索 facets（状态/标签/作者） | P1 | TODO | — |
 | SCH-03 | 搜索分页 + 结果系列名 | P1 | TODO | — |
 | DLD-01 | 下载设置（仅 Wi-Fi/读完删除/并发） | P1 | TODO | — |
@@ -228,6 +228,24 @@
   `continueReadingProgress` 是 FIX-06 之后失效的）。
 - 验证：55 条阅读器测试 + 黄金图全部不变（零行为变更）；设备上打开第 114/227 页
   照常渲染，滑杆与"剩 113 页"一致。
+
+### SCH-01 搜索历史 + 空态
+
+- `AppSettings.searchHistory`（最多 10 条，最新的在前）+ `withSearchTerm/withoutSearchTerm/clearSearchHistory`；
+  存档容错：非字符串、空串、重复项一律丢弃。
+- 只在**用户按下搜索键**或点历史/建议时记录，不在防抖里记——否则打 "frieren" 的过程中
+  会把 "fri"、"frie" 也存进历史。
+- 空态重做（`SearchEmptyState`）：有历史 → "最近搜索" + 清空 + 每条右侧 ✕；
+  没历史 → 图标 + 标题 + 说明，并用"正在读"的系列名给出可点的建议胶囊。
+  **为什么不用热门标签**：没有可靠的"热门"接口，按 API 真值规则不编。
+- 踩坑：空态一开始是 `ListView` 塞进 `SliverFillRemaining(hasScrollBody: false)`，
+  直接触发 `RenderViewport does not support returning intrinsic dimensions`；
+  改成 `SliverToBoxAdapter` + `Column`，滚动交给整页。
+- 测试：`search_history_test.dart` 5 条（去重/上限/空白词、单删与全清、存档往返与坏条目、
+  空态列出历史并可回填搜索、删除与清空会落盘并回落到引导态）。
+- 黄金图：新增 `search_history@phone_light`，`search@*` 因空态改版重生成，两张都自查过。
+- 设备走查：搜 "frieren"（该服务器无结果）→ 点输入框的 ✕ 清空 → "最近搜索"里出现
+  `frieren`，带 ✕ 与"清空"。
 
 ### UI-01 玻璃层级 / 阴影 / 字体克制
 

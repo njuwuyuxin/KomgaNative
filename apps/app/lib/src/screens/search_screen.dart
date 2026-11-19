@@ -6,7 +6,10 @@ import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
+import 'package:komga_native/src/data/app_settings.dart';
 import 'package:komga_native/src/data/shelf_view_options.dart';
+import 'package:komga_native/src/providers/settings_provider.dart';
+import 'package:komga_native/src/widgets/search_empty_state.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/screens/reader_args.dart';
 import 'package:komga_native/src/widgets/load_more_footer.dart';
@@ -49,6 +52,73 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     });
   }
 
+  /// 用户"确认"搜索（键盘上的搜索键）时才记历史。
+  ///
+  /// 不在防抖里记：那样打 "frieren" 的过程中会把 "fri"、"frie" 也存进去。
+  void _onSubmitted(String value) {
+    final query = value.trim();
+    if (query.isEmpty) return;
+    _remember(query);
+    setState(() => _query = query);
+  }
+
+  void _remember(String query) {
+    final store = ref.read(settingsStoreProvider);
+    unawaited(store.update((AppSettings s) => s.withSearchTerm(query)));
+    setState(
+      () => _history = <String>[
+        query,
+        for (final item in _history)
+          if (item != query) item,
+      ].take(kSearchHistoryLimit).toList(),
+    );
+  }
+
+  List<String> _history = const <String>[];
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadHistory());
+  }
+
+  Future<void> _loadHistory() async {
+    final settings = await ref.read(settingsStoreProvider).load();
+    if (!mounted) return;
+    setState(() => _history = settings.searchHistory);
+  }
+
+  /// 点历史/建议：回填输入框并立刻搜。
+  void _pick(String term) {
+    _debounce?.cancel();
+    _controller.text = term;
+    _remember(term);
+    setState(() => _query = term);
+  }
+
+  void _removeHistory(String term) {
+    unawaited(
+      ref
+          .read(settingsStoreProvider)
+          .update((AppSettings s) => s.withoutSearchTerm(term)),
+    );
+    setState(
+      () => _history = <String>[
+        for (final item in _history)
+          if (item != term) item,
+      ],
+    );
+  }
+
+  void _clearHistory() {
+    unawaited(
+      ref
+          .read(settingsStoreProvider)
+          .update((AppSettings s) => s.clearSearchHistory()),
+    );
+    setState(() => _history = const <String>[]);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -65,13 +135,21 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   clearLabel: l10n.closeSearch,
                   autofocus: true,
                   onChanged: _onChanged,
+                  onSubmitted: _onSubmitted,
                 ),
               ),
             ),
             if (_query.isEmpty)
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: _SearchHint(text: l10n.searchHint),
+              // 用 ToBoxAdapter 而不是 FillRemaining：空态里是 ListView，
+              // 塞进 hasScrollBody:false 的 FillRemaining 会触发
+              // "RenderViewport does not support intrinsics"。
+              SliverToBoxAdapter(
+                child: SearchEmptyState(
+                  history: _history,
+                  onPick: _pick,
+                  onRemove: _removeHistory,
+                  onClear: _clearHistory,
+                ),
               )
             else
               _SearchResults(query: _query),

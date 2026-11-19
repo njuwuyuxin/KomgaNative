@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
+import 'package:komga_native/src/data/app_settings.dart';
 import 'package:komga_native/src/data/cache/drift_http_cache.dart';
 import 'package:komga_native/src/data/cache/http_cache_database.dart';
 import 'package:komga_native/src/data/download/download_service.dart';
@@ -14,14 +15,15 @@ import 'package:komga_native/src/data/progress/progress_store.dart';
 import 'package:komga_native/src/data/progress/progress_sync_service.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
 import 'package:komga_native/src/data/reader_prefs_store.dart';
+import 'package:komga_native/src/data/settings_store.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/cache_providers.dart';
 import 'package:komga_native/src/providers/download_providers.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/providers/progress_providers.dart';
+import 'package:komga_native/src/providers/settings_provider.dart';
 import 'package:komga_native/src/providers/reader_prefs_provider.dart';
 import 'package:komga_native/src/providers/reader_providers.dart';
-import 'package:komga_native/src/providers/settings_provider.dart';
 import 'package:komga_native/src/screens/collections_screen.dart';
 import 'package:komga_native/src/screens/collection_detail_screen.dart';
 import 'package:komga_native/src/screens/connection_screen.dart';
@@ -586,6 +588,7 @@ void main() {
     required String name,
     required Size size,
     required ThemeData theme,
+    List<String> history = const <String>[],
   }) async {
     await pumpGoldenScreen(
       tester,
@@ -596,10 +599,27 @@ void main() {
         libraryRepositoryProvider.overrideWithValue(
           FakeLibraryRepository(series: demoShelf()),
         ),
+        if (history.isNotEmpty)
+          settingsStoreProvider.overrideWithValue(
+            InMemorySettingsStore(
+              const AppSettings().copyWith(searchHistory: history),
+            ),
+          ),
       ],
     );
     await expectGolden(tester, name);
   }
+
+  /// 搜索历史态（SCH-01）：最近搜索列表 + 清空 + 单条删除。
+  testWidgets('search_history@phone_light', (WidgetTester tester) async {
+    await pumpSearchGolden(
+      tester,
+      name: 'search_history@phone_light',
+      size: GoldenSizes.phone,
+      theme: AppTheme.light(),
+      history: <String>['vagabond', 'frieren', 'akira'],
+    );
+  });
 
   testWidgets('search@phone_light', (WidgetTester tester) async {
     await pumpSearchGolden(

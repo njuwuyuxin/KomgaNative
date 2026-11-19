@@ -3,6 +3,9 @@ import 'package:komga_native/src/data/shelf_filter_preset.dart';
 import 'package:komga_native/src/data/shelf_view_options.dart';
 import 'package:material_ui/material_ui.dart';
 
+/// 搜索历史最多留几条：10 条足够覆盖最近找过的，再多会把空态撑成一整屏。
+const int kSearchHistoryLimit = 10;
+
 /// 全部可持久化的本地偏好。
 ///
 /// 为什么集中成一个快照：这些字段分别被设置页（主题/墨水屏/语言/触感）和书架
@@ -23,6 +26,7 @@ class AppSettings {
     this.readStatus,
     this.libraryFilters = const <String, String>{},
     this.filterPresets = const <String, List<ShelfFilterPreset>>{},
+    this.searchHistory = const <String>[],
   });
 
   /// 全默认值（没有存档、存档写坏、字段缺失时都用它）。
@@ -56,6 +60,9 @@ class AppSettings {
   /// 按服务器分区：切服务器时另一台的库 id 在本机根本不成立。
   final Map<String, List<ShelfFilterPreset>> filterPresets;
 
+  /// 最近搜索（最新的在前，最多 kSearchHistoryLimit 条）。空态展示与回填用。
+  final List<String> searchHistory;
+
   AppSettings copyWith({
     ThemeMode? themeMode,
     bool? forceEink,
@@ -67,6 +74,7 @@ class AppSettings {
     Object? readStatus = _unset,
     Map<String, String>? libraryFilters,
     Map<String, List<ShelfFilterPreset>>? filterPresets,
+    List<String>? searchHistory,
   }) => AppSettings(
     themeMode: themeMode ?? this.themeMode,
     forceEink: forceEink ?? this.forceEink,
@@ -80,6 +88,7 @@ class AppSettings {
         : readStatus as SeriesReadStatus?,
     libraryFilters: libraryFilters ?? this.libraryFilters,
     filterPresets: filterPresets ?? this.filterPresets,
+    searchHistory: searchHistory ?? this.searchHistory,
   );
 
   /// 记下某台服务器选的库；[libraryId] 为 null 表示"全部库"。
@@ -128,6 +137,28 @@ class AppSettings {
     return copyWith(filterPresets: next);
   }
 
+  /// 记一条搜索：去重（再次搜同一个词要移到最前）、截断到上限。
+  AppSettings withSearchTerm(String term) {
+    final trimmed = term.trim();
+    if (trimmed.isEmpty) return this;
+    final next = <String>[
+      trimmed,
+      for (final item in searchHistory)
+        if (item != trimmed) item,
+    ];
+    return copyWith(searchHistory: next.take(kSearchHistoryLimit).toList());
+  }
+
+  /// 删掉一条历史（长按 / 滑动删除）。
+  AppSettings withoutSearchTerm(String term) => copyWith(
+    searchHistory: <String>[
+      for (final item in searchHistory)
+        if (item != term) item,
+    ],
+  );
+
+  AppSettings clearSearchHistory() => copyWith(searchHistory: const <String>[]);
+
   Map<String, Object?> toJson() => <String, Object?>{
     'theme': themeMode.name,
     'forceEink': forceEink,
@@ -138,6 +169,7 @@ class AppSettings {
     if (sort != null) 'sort': sort!.name,
     if (readStatus != null) 'readStatus': readStatus!.name,
     if (libraryFilters.isNotEmpty) 'libraryFilters': libraryFilters,
+    if (searchHistory.isNotEmpty) 'searchHistory': searchHistory,
     if (filterPresets.isNotEmpty)
       'filterPresets': <String, Object?>{
         for (final entry in filterPresets.entries)
@@ -176,10 +208,25 @@ class AppSettings {
             }
           : const <String, String>{},
       filterPresets: _parsePresets(json['filterPresets']),
+      searchHistory: _parseHistory(json['searchHistory']),
     );
   }
 
   /// 解析"每台服务器的筛选组合"：坏条目逐条丢弃，不影响其它条。
+  /// 解析搜索历史：只收非空字符串，去重并截断（存档可能被改坏）。
+  static List<String> _parseHistory(Object? raw) {
+    if (raw is! List) return const <String>[];
+    final result = <String>[];
+    for (final item in raw) {
+      if (item is! String) continue;
+      final trimmed = item.trim();
+      if (trimmed.isEmpty || result.contains(trimmed)) continue;
+      result.add(trimmed);
+      if (result.length >= kSearchHistoryLimit) break;
+    }
+    return result;
+  }
+
   static Map<String, List<ShelfFilterPreset>> _parsePresets(Object? raw) {
     if (raw is! Map) return const <String, List<ShelfFilterPreset>>{};
     final result = <String, List<ShelfFilterPreset>>{};
