@@ -60,7 +60,7 @@
 
 | ID | 需求 | P | 状态 | commit |
 |---|---|---|---|---|
-| HIS-01 | 阅读 session 数据模型 | P2 | TODO | — |
+| HIS-01 | 阅读 session 数据模型 | P2 | DONE | `feat(history): 阅读会话记账与落库` |
 | HIS-02 | History 页 + 最近阅读行 | P2 | TODO | — |
 | SET-02 | 本地偏好导出/导入 | P2 | TODO | — |
 | UI-02 | 收藏集封面拼贴/描述/搜索 | P2 | TODO | — |
@@ -228,6 +228,26 @@
   `continueReadingProgress` 是 FIX-06 之后失效的）。
 - 验证：55 条阅读器测试 + 黄金图全部不变（零行为变更）；设备上打开第 114/227 页
   照常渲染，滑杆与"剩 113 页"一致。
+
+### HIS-01 阅读 session 数据模型
+
+- Drift 新增 `reading_sessions`（schema v5，`if (from < 5) createTable`）：
+  bookId / seriesId / bookName / startedAt / endedAt / durationMs / startPage / endPage / completed。
+  **为什么单独一张表**：进度只记"读到哪"，记不了"读了多久、读了几次"。
+- `ReadingSessionTracker`（纯 Dart，可注入时钟）：`start / note / pause / resume / finish`。
+  - 一次阅读只记一条（重复 `start` 忽略）；
+  - **最短 10 秒**过滤：翻目录、误点、截图都会进出一次阅读器，记进去 Insights 立刻失真；
+  - 切后台 `pause` 把结束时间钉住，回来 `resume` 把暂停区间从时长里剪掉；
+  - 暂停期间翻页不改写 endPage。
+- 阅读器接入：`initState` 开始计时（起点取书自带进度）、`_setPage` 记页、
+  `didChangeAppLifecycleState` 暂停/恢复、`dispose` 结算写入。**隐身模式不记**——
+  用户开隐身就是想"这次阅读别留痕"。
+- 落库失败只影响"历史少一条"，不打断退出阅读器（`record` 里吞异常）。
+- 测试：`reading_session_test.dart` 7 条（单条会话/最短过滤/暂停不计时/暂停中翻页无效/
+  重复 start/结算后可再开始、表的写入-倒序-删除-清空）。
+- 设备走查：进阅读器 → 返回系列页，无崩溃、进度与界面正常。
+  **这次设备上只读了约 4 秒，按 10 秒规则不会落库**，所以看不到历史记录——
+  真正的可见验证要等 HIS-02 的历史页。
 
 ### SET-01 设置 IA
 

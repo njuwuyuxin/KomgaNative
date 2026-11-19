@@ -9,10 +9,12 @@ import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/page_share.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
+import 'package:komga_native/src/data/reading_session_tracker.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/screens/reader_args.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/providers/progress_providers.dart';
+import 'package:komga_native/src/providers/reading_history_provider.dart';
 import 'package:komga_native/src/providers/reader_prefs_provider.dart';
 import 'package:komga_native/src/providers/reader_providers.dart';
 import 'package:komga_native/src/providers/settings_provider.dart';
@@ -93,6 +95,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // 阅读会话从这里开始计时（HIS-01）。起点页码用书自带的进度，
+    // 页列表还没回来也不影响——`_setPage` 之后会把 endPage 更新上去。
+    _session.start(page: widget.book?.readProgress?.page ?? 1);
+    _recorder = ref.read(readingSessionRecorderProvider);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _keyboardFocus.requestFocus();
     });
@@ -100,6 +106,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 
   @override
   void dispose() {
+    // 退出阅读器时结算本次会话（HIS-01）。`ref` 在 dispose 里不能再用，
+    // 所以 recorder 在 initState 就取好了。
+    _settleSession(completed: false);
     WidgetsBinding.instance.removeObserver(this);
     _keyboardFocus.dispose();
     _progress.dispose();

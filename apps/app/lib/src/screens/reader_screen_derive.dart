@@ -33,6 +33,36 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
   int _page = 0;
   bool _chromeVisible = true;
 
+  /// 本次阅读的时长/页数统计（HIS-01）。
+  final ReadingSessionTracker _session = ReadingSessionTracker();
+
+  /// 会话落库用；在 `initState` 里取好，`dispose` 里不能再碰 `ref`。
+  late ReadingSessionRecorder _recorder;
+
+  /// 结算本次会话并写库；太短（<10s）直接丢掉。
+  ///
+  /// 隐身模式下不记：用户开隐身就是想"这次阅读别留痕"。
+  void _settleSession({required bool completed}) {
+    if (_incognito) {
+      _session.finish(
+        bookId: widget.bookId,
+        seriesId: widget.book?.seriesId ?? widget.bookId,
+        bookName: widget.book?.name ?? widget.bookId,
+        completed: completed,
+      );
+      return;
+    }
+    final draft = _session.finish(
+      bookId: widget.bookId,
+      seriesId: widget.book?.seriesId ?? widget.bookId,
+      bookName: widget.book?.name ?? widget.bookId,
+      completed: completed,
+      page: _page > 0 ? _page : null,
+    );
+    if (draft == null) return;
+    unawaited(_recorder.record(draft));
+  }
+
   /// 横屏自动双页用；由 `_buildPages` 每次布局时更新（UI-P3-3）。
   bool _landscape = false;
 
@@ -92,7 +122,13 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
   /// 切后台/锁屏时立刻落一次进度：只靠防抖会丢掉"看完就退出"的那一页。
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) return;
+    if (state == AppLifecycleState.resumed) {
+      // 回到前台：继续计时（暂停区间会被剪掉，HIS-01）。
+      _session.resume();
+      return;
+    }
+    // 切后台：先把已读时长钉住，避免后台挂着继续算。
+    _session.pause();
     final total =
         ref.read(readerPagesProvider(widget.bookId)).value?.length ?? 0;
     if (total == 0) return;
@@ -158,6 +194,8 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
   void _setPage(int page, int total) {
     if (page == _page) return;
     setState(() => _page = page);
+    // 阅读会话记下"读到哪"（HIS-01）。
+    _session.note(page: page);
     // 预取不用在这里排：`build` 里的 `_schedulePreload` 会看到页码变化重排。
     _scheduleProgress(page);
   }

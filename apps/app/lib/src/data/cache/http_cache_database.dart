@@ -100,6 +100,33 @@ class PinnedSeriesRows extends Table {
   Set<Column<Object>> get primaryKey => <Column<Object>>{serverId, seriesId};
 }
 
+/// 一次阅读会话（HIS-01）。
+///
+/// 为什么单独一张表而不是从进度反推：进度只记"读到哪"，记不了"读了多久/读了几次"。
+/// 结算点是"退阅读器 / 切后台 / 换书"，最短 10 秒过滤掉误触。
+class ReadingSessions extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  TextColumn get bookId => text()();
+
+  TextColumn get seriesId => text()();
+
+  TextColumn get bookName => text().withDefault(const Constant(''))();
+
+  DateTimeColumn get startedAt => dateTime()();
+
+  DateTimeColumn get endedAt => dateTime()();
+
+  IntColumn get durationMs => integer()();
+
+  IntColumn get startPage => integer().withDefault(const Constant(1))();
+
+  IntColumn get endPage => integer().withDefault(const Constant(1))();
+
+  /// 这本书在本次会话结束时是否已读完（用于"读完的书"统计）。
+  BoolColumn get completed => boolean().withDefault(const Constant(false))();
+}
+
 /// 缓存占用统计（设置页展示）。
 class CacheUsage {
   const CacheUsage({required this.bytes, required this.entries});
@@ -124,6 +151,7 @@ class CacheUsage {
     DownloadedBooks,
     DownloadQueueEntries,
     PinnedSeriesRows,
+    ReadingSessions,
   ],
 )
 class HttpCacheDatabase extends _$HttpCacheDatabase {
@@ -146,7 +174,7 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
   int? _seqSeed;
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -160,6 +188,7 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
       // v2 → v3：新增下载队列表（FIX-07）。旧版本没有队列可恢复，建空表即可。
       if (from < 3) await m.createTable(downloadQueueEntries);
       if (from < 4) await m.createTable(pinnedSeriesRows);
+      if (from < 5) await m.createTable(readingSessions);
     },
   );
 
@@ -334,6 +363,50 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
   /// 删掉一本书已缓存的页图（按 URL 片段）。  ///
   /// 用 `contains` 而不是精确 URL：页图 URL 带 `?zero_based=false`（将来还可能有
   /// `convert=jpeg`），按"书 + /pages/"匹配才不会漏。返回删除条数。
+  /// 记一次阅读会话（HIS-01）。
+  Future<int> addReadingSession({
+    required String bookId,
+    required String seriesId,
+    required String bookName,
+    required DateTime startedAt,
+    required DateTime endedAt,
+    required int durationMs,
+    required int startPage,
+    required int endPage,
+    required bool completed,
+  }) {
+    return into(readingSessions).insert(
+      ReadingSessionsCompanion.insert(
+        bookId: bookId,
+        seriesId: seriesId,
+        bookName: Value(bookName),
+        startedAt: startedAt,
+        endedAt: endedAt,
+        durationMs: durationMs,
+        startPage: Value(startPage),
+        endPage: Value(endPage),
+        completed: Value(completed),
+      ),
+    );
+  }
+
+  /// 最近的会话（默认 200 条，History 页用）。
+  Future<List<ReadingSession>> readingSessionList({int limit = 200}) {
+    return (select(readingSessions)
+          ..orderBy(<OrderClauseGenerator<ReadingSessions>>[
+            (ReadingSessions t) =>
+                OrderingTerm(expression: t.startedAt, mode: OrderingMode.desc),
+          ])
+          ..limit(limit))
+        .get();
+  }
+
+  Future<void> deleteReadingSession(int id) => (delete(
+    readingSessions,
+  )..where((ReadingSessions t) => t.id.equals(id))).go();
+
+  Future<void> clearReadingSessions() => delete(readingSessions).go();
+
   /// 这台服务器上置顶的系列 id（按置顶时间倒序，最近的在前）。
   Future<List<String>> pinnedSeries(String serverId) async {
     final rows =
