@@ -136,10 +136,11 @@ void main() {
 
     await pumpReader(tester, book: demoReaderBook());
 
+    // 顶栏收成 4 槽后（RDR-03）：返回 / AA / 更多 是常驻按钮，
+    // 目录/隐身/缩略图/设置/分享在"更多"菜单里。
     for (final (String key, String label) in <(String, String)>[
       ('reader-close-button', 'Close'),
-      ('reader-pages-button', 'Page thumbnails'),
-      ('reader-settings-button', 'Reading settings'),
+      ('reader-quick-settings-button', 'Quick settings'),
       ('reader-previous-button', 'Previous page'),
       ('reader-next-button', 'Next page'),
     ]) {
@@ -148,6 +149,23 @@ void main() {
       expect(node.tooltip, label, reason: '$key 的读屏文案');
       expect(node.flagsCollection.isButton, isTrue, reason: '$key 应是按钮');
       expectTapTarget(tester, finder);
+    }
+
+    // "更多"是 PopupMenuButton：tooltip 挂在它内部的按钮上，
+    // 语义节点在弹层外只能按 tooltip 找。
+    final more = find.byKey(const Key('reader-more-button'));
+    expect(find.byTooltip('More'), findsOneWidget);
+    expectTapTarget(tester, more);
+
+    // 菜单项同样要有可读标签。
+    await openReaderMenu(tester);
+    for (final (String key, String label) in <(String, String)>[
+      ('reader-pages-button', 'Page thumbnails'),
+      ('reader-settings-button', 'Reading settings'),
+    ]) {
+      final finder = find.byKey(Key(key));
+      expect(finder, findsOneWidget);
+      expect(tester.getSemantics(finder).label, contains(label));
     }
     handle.dispose();
   });

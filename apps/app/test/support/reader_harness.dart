@@ -152,10 +152,33 @@ Future<void> doubleTapMiddle(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
-/// 打开设置面板。
-Future<void> openSettings(WidgetTester tester) async {
-  await tester.tap(find.byKey(const Key('reader-settings-button')));
+/// 打开顶栏"更多"菜单（RDR-03：目录/隐身/缩略图/设置/分享都收在这里）。
+Future<void> openReaderMenu(WidgetTester tester) async {
+  await tester.tap(find.byKey(const Key('reader-more-button')));
   await tester.pumpAndSettle();
+}
+
+/// 从"更多"菜单里点一项（`reader-settings-button` 等 key 仍挂在菜单项上）。
+Future<void> tapReaderMenu(WidgetTester tester, String key) async {
+  await openReaderMenu(tester);
+  await tester.tap(find.byKey(Key(key)));
+  await tester.pumpAndSettle();
+}
+
+/// 打开完整设置面板。
+Future<void> openSettings(WidgetTester tester) async {
+  await tapReaderMenu(tester, 'reader-settings-button');
+}
+
+/// 打开 AA 快捷设置（RDR-03）。
+Future<void> openQuickSettings(WidgetTester tester) async {
+  await tester.tap(find.byKey(const Key('reader-quick-settings-button')));
+  await tester.pumpAndSettle();
+}
+
+/// 打开缩略图/跳页面板。
+Future<void> openPages(WidgetTester tester) async {
+  await tapReaderMenu(tester, 'reader-pages-button');
 }
 
 /// 把面板里的控件滚到可见。

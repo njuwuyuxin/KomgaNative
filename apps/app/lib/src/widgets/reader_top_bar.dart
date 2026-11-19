@@ -5,7 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/providers/cache_providers.dart';
 import 'package:komga_native/src/widgets/page_navigator_sheet.dart';
-import 'package:komga_native/src/widgets/reader_chrome.dart';
+import 'package:komga_native/src/widgets/reader_bar.dart';
+import 'package:komga_native/src/widgets/reader_quick_settings_sheet.dart';
 import 'package:komga_native/src/widgets/reader_palette.dart';
 import 'package:komga_native/src/widgets/reader_settings_sheet.dart';
 import 'package:komga_native/src/widgets/reader_toc_sheet.dart';
@@ -30,7 +31,8 @@ class ReaderTopBar extends ConsumerWidget {
     this.direction = ReadingDirection.unknown,
     this.onGroupFrom,
     this.incognito = false,
-    this.onToggleIncognito,
+    required this.onToggleIncognito,
+    this.onSharePage,
     super.key,
   });
 
@@ -57,7 +59,10 @@ class ReaderTopBar extends ConsumerWidget {
   final void Function(int page)? onGroupFrom;
 
   final bool incognito;
-  final VoidCallback? onToggleIncognito;
+  final VoidCallback onToggleIncognito;
+
+  /// 分享当前页（UI-P3-6）：菜单里的"分享本页"。
+  final VoidCallback? onSharePage;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -71,6 +76,13 @@ class ReaderTopBar extends ConsumerWidget {
         offline: offline,
         incognito: incognito,
         onToggleIncognito: onToggleIncognito,
+        onSharePage: onSharePage,
+        // AA：只放读的时候真的会改的五项，改完立刻回到画面（RDR-03）。
+        onOpenQuickSettings: () => showReaderQuickSettingsSheet(
+          context,
+          palette: palette,
+          seriesId: seriesId,
+        ),
         onOpenPages: () => unawaited(
           showPageNavigator(
             context,

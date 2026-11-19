@@ -180,6 +180,8 @@
   "readerSliderLabel": "Page {page} of {total}",
   "readerToc": "Contents",
   "readerTocCurrent": "Current · {progress}",
+  "readerQuickSettings": "Quick settings",
+  "readerMore": "More",
   "cancelDownload": "Cancel download",
   "downloadRetryTooltip": "{error} · tap to retry",
   "@downloadRetryTooltip": {

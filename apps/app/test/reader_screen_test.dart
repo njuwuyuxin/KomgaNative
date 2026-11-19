@@ -92,7 +92,7 @@ void main() {
     );
 
     // 先跳到第 3 页：默认它在 [1,2] 这一屏里。
-    await tester.tap(find.byKey(const Key('reader-pages-button')));
+    await openPages(tester);
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('page-thumb-3')));
     await tester.pumpAndSettle();
@@ -100,7 +100,7 @@ void main() {
     expect(view.spread, <int>[1, 2]);
 
     // 从第 3 页开始重新配对：第 3 页变成新一屏的第一页。
-    await tester.tap(find.byKey(const Key('reader-pages-button')));
+    await openPages(tester);
     await tester.pumpAndSettle();
     await tester.longPress(find.byKey(const Key('page-thumb-3')));
     await tester.pumpAndSettle();
@@ -108,7 +108,7 @@ void main() {
     expect(view.spread, <int>[2, 3]);
 
     // 再长按同一页：恢复自动分组。
-    await tester.tap(find.byKey(const Key('reader-pages-button')));
+    await openPages(tester);
     await tester.pumpAndSettle();
     await tester.longPress(find.byKey(const Key('page-thumb-3')));
     await tester.pumpAndSettle();
@@ -158,14 +158,12 @@ void main() {
     await pumpReader(tester, repository: repository, book: demoReaderBook());
     repository.saved.clear();
 
-    await tester.tap(find.byKey(const Key('reader-incognito-button')));
-    await tester.pumpAndSettle();
+    await tapReaderMenu(tester, 'reader-incognito-button');
     await tapRight(tester);
     await tester.pump(const Duration(milliseconds: 700));
     expect(repository.saved, isEmpty);
 
-    await tester.tap(find.byKey(const Key('reader-incognito-button')));
-    await tester.pumpAndSettle();
+    await tapReaderMenu(tester, 'reader-incognito-button');
     await tapRight(tester);
     await tester.pump(const Duration(milliseconds: 700));
     expect(repository.saved.last.page, 3);

@@ -27,7 +27,7 @@
 | QUA-01 | 拆 `reader_screen` + 清理死代码 | P1 | DONE | `refactor(reader): 拆分阅读器状态与命令` |
 | RDR-01 | 阅读器页码滑杆 + 剩余页 | P1 | DONE | `feat(reader): 页码滑杆与剩余页` |
 | RDR-02 | 阅读器目录/章节列表 | P1 | DONE | `feat(reader): 目录面板` |
-| RDR-03 | 顶栏 IA + AA 快捷设置 | P1 | TODO | — |
+| RDR-03 | 顶栏 IA + AA 快捷设置 | P1 | DONE | `feat(reader): 顶栏四槽 + AA 快捷设置` |
 | RDR-04 | 阅读设置分组/重置/适配预览 | P1 | TODO | — |
 | RDR-05 | 翻页动画选择 | P1 | TODO | — |
 | RDR-06 | 双页分组持久化 | P1 | TODO | — |
@@ -228,6 +228,27 @@
   `continueReadingProgress` 是 FIX-06 之后失效的）。
 - 验证：55 条阅读器测试 + 黄金图全部不变（零行为变更）；设备上打开第 114/227 页
   照常渲染，滑杆与"剩 113 页"一致。
+
+### RDR-03 顶栏 IA + AA 快捷设置
+
+- 顶栏收成 4 槽：返回 / 标题（书名右侧带 `x / y` 页码）/ `AA` / `⋯`。
+  目录、隐身、页面缩略图、阅读设置、分享本页全部进"⋯"菜单——6 颗图标挤一条时
+  每颗的点击区都掉到 40pt 以下，比多一次点击更难受。
+- `AA` 打开新的 `reader_quick_settings_sheet`：亮度、背景、方向、适配、锁定缩放，
+  紧凑胶囊 + 滑杆，一屏放得下；墨水屏不显示背景（固定白底）。
+- 新增 `reader_bar.dart`（原 `ReaderBar` 从 `reader_chrome.dart` 拆出），
+  菜单项的 key 沿用旧的按钮名（`reader-settings-button` 等），测试只要"先开菜单"
+  就能照旧点到；主壳换成 `reader-more-button` / `reader-quick-settings-button`。
+- **修掉一个顺带发现的 bug**：快捷设置一开始无条件把改动写成"按系列覆盖"，
+  即使这个系列没开"按系列记住"——用户会看到"改了只有这一本生效"。
+  现在与完整面板同一条规则：只有已经存在系列覆盖时才写覆盖。
+- 测试：`reader_quick_settings_test.dart` 5 条（AA 改背景/方向/适配/锁定缩放、
+  墨水屏无背景、菜单五项齐全、顶栏只剩三颗常驻按钮）；`reader_harness` 新增
+  `openReaderMenu` / `tapReaderMenu` / `openQuickSettings` / `openPages`，
+  旧的 `reader-*-button` 调用点统一改走菜单；新增黄金图
+  `reader_quick_settings@phone_dark`，并更新全部 `reader@*`。
+- 设备走查：顶栏四个槽位；`AA` 里选"填满屏幕"后页面立即铺满（没进完整设置）；
+  `⋯` 菜单五项齐全。
 
 ### RDR-02 阅读器目录
 

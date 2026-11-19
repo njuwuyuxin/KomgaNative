@@ -836,6 +836,8 @@ void main() {
       ReadingMode.doublePage => ReaderModeChoice.double,
       ReadingMode.verticalScroll => ReaderModeChoice.vertical,
     };
+    await tester.tap(find.byKey(const Key('reader-more-button')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('reader-settings-button')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(Key('reader-mode-${choice.name}')));
@@ -1001,8 +1003,23 @@ void main() {
       // 真实时间再截屏（否则缩略图全是黑块）。
       settleAfterActWithRealTime: true,
       act: (WidgetTester t) async {
+        await t.tap(find.byKey(const Key('reader-more-button')));
+        await t.pumpAndSettle();
         await t.tap(find.byKey(const Key('reader-pages-button')));
         await t.pumpAndSettle();
+      },
+    );
+  });
+
+  testWidgets('reader_quick_settings@phone_dark', (WidgetTester tester) async {
+    // RDR-03：顶栏 AA 打开的快捷设置（亮度/背景/方向/适配/锁定缩放）。
+    await pumpReaderGolden(
+      tester,
+      name: 'reader_quick_settings@phone_dark',
+      size: GoldenSizes.phone,
+      theme: AppTheme.dark(),
+      act: (WidgetTester t) async {
+        await t.tap(find.byKey(const Key('reader-quick-settings-button')));
       },
     );
   });
@@ -1014,6 +1031,8 @@ void main() {
       size: GoldenSizes.phone,
       theme: AppTheme.dark(),
       act: (WidgetTester t) async {
+        await t.tap(find.byKey(const Key('reader-more-button')));
+        await t.pumpAndSettle();
         await t.tap(find.byKey(const Key('reader-settings-button')));
       },
     );
@@ -1042,6 +1061,8 @@ void main() {
         ],
       ),
       act: (WidgetTester t) async {
+        await t.tap(find.byKey(const Key('reader-more-button')));
+        await t.pumpAndSettle();
         await t.tap(find.byKey(const Key('reader-settings-button')));
       },
     );
@@ -1054,6 +1075,8 @@ void main() {
       size: GoldenSizes.phone,
       theme: AppTheme.light(),
       act: (WidgetTester t) async {
+        await t.tap(find.byKey(const Key('reader-more-button')));
+        await t.pumpAndSettle();
         await t.tap(find.byKey(const Key('reader-settings-button')));
       },
     );
@@ -1067,6 +1090,8 @@ void main() {
       theme: AppTheme.eink(),
       forceEink: true,
       act: (WidgetTester t) async {
+        await t.tap(find.byKey(const Key('reader-more-button')));
+        await t.pumpAndSettle();
         await t.tap(find.byKey(const Key('reader-settings-button')));
       },
     );

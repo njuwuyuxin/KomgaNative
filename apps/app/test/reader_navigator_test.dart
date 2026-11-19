@@ -10,8 +10,7 @@ void main() {
   testWidgets('顶栏 Pages 按钮打开缩略图网格', (WidgetTester tester) async {
     await pumpReader(tester, book: demoReaderBook());
 
-    await tester.tap(find.byKey(const Key('reader-pages-button')));
-    await tester.pumpAndSettle();
+    await openPages(tester);
 
     expect(find.byType(PageNavigatorSheet), findsOneWidget);
     expect(find.byKey(const Key('page-navigator-grid')), findsOneWidget);
@@ -22,8 +21,7 @@ void main() {
   testWidgets('点缩略图跳到对应页', (WidgetTester tester) async {
     await pumpReader(tester, book: demoReaderBook());
 
-    await tester.tap(find.byKey(const Key('reader-pages-button')));
-    await tester.pumpAndSettle();
+    await openPages(tester);
     await tester.tap(find.byKey(const Key('page-thumb-3')));
     await tester.pumpAndSettle();
 
@@ -34,8 +32,7 @@ void main() {
   testWidgets('关掉面板不改变页码', (WidgetTester tester) async {
     await pumpReader(tester, book: demoReaderBook());
 
-    await tester.tap(find.byKey(const Key('reader-pages-button')));
-    await tester.pumpAndSettle();
+    await openPages(tester);
     await tester.tap(find.byKey(const Key('page-navigator-close')));
     await tester.pumpAndSettle();
 
@@ -48,8 +45,7 @@ void main() {
     final repository = FakeReaderRepository()..failingPages.addAll(<int>[2, 3]);
     await pumpReader(tester, repository: repository, book: demoReaderBook());
 
-    await tester.tap(find.byKey(const Key('reader-pages-button')));
-    await tester.pumpAndSettle();
+    await openPages(tester);
 
     expect(find.byType(PageNavigatorSheet), findsOneWidget);
     expect(find.byIcon(Icons.broken_image_outlined), findsWidgets);

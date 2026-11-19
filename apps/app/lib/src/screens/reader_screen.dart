@@ -189,6 +189,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
           : null,
       incognito: _incognito,
       onToggleIncognito: _toggleIncognito,
+      onSharePage: () => unawaited(_sharePage(page)),
     );
     final content = switch (mode) {
       ReadingMode.verticalScroll => ReaderVerticalView(

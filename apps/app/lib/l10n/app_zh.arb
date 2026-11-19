@@ -115,6 +115,8 @@
   "readerSliderLabel": "第 {page} 页，共 {total} 页",
   "readerToc": "目录",
   "readerTocCurrent": "当前 · {progress}",
+  "readerQuickSettings": "快捷设置",
+  "readerMore": "更多",
   "cancelDownload": "取消下载",
   "downloadRetryTooltip": "{error} · 点按重试",
   "downloadedTapToRemove": "已下载 · 点按删除",
