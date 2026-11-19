@@ -12,6 +12,7 @@ import 'package:komga_native/src/data/progress/progress_store.dart';
 import 'package:komga_native/src/session/connection_service.dart';
 import 'package:komga_native/src/session/server_store.dart';
 import 'package:komga_native/src/session/session_controller.dart';
+import 'package:komga_native/src/widgets/floating_nav_bar.dart';
 
 import 'golden/golden_harness.dart';
 import 'support/fake_library.dart';
@@ -64,7 +65,9 @@ void main() {
     await pumpApp(tester, store: InMemoryServerStore(storedServer()));
     expect(find.text('Library'), findsWidgets);
     expect(find.text('Frieren'), findsOneWidget);
-    expect(find.byType(NavigationBar), findsOneWidget);
+    // 手机形态是自定义的悬浮玻璃导航（不再是 Material 的 NavigationBar）。
+    expect(find.byType(FloatingNavBar), findsOneWidget);
+    expect(find.byType(NavigationBar), findsNothing);
   });
 
   testWidgets('填写账号密码并连接 → 进入书架', (WidgetTester tester) async {

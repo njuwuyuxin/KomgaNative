@@ -155,9 +155,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                   phase: _phaseOf(state),
                   slivers: <Widget>[
                     ..._shelfSlivers(l10n, state, controller),
-                    // 底部留白，避免最后一行贴住屏幕底边。
+                    // 底部留白：悬浮导航条压在内容之上，最后一行要能让开它。
                     const SliverToBoxAdapter(
-                      child: SizedBox(height: AppSpacing.xl),
+                      child: SizedBox(height: AppSizes.navBarClearance),
                     ),
                   ],
                 ),

@@ -151,7 +151,7 @@ P3 是"长尾功能"，不是"没想好"：14 项都在 `ui-polish-plan.md` 里�
 
 | 维度 | Panels（依据） | KomgaNative（代码/基线） | 差距 |
 |---|---|---|---|
-| 主导航 | Library / Reading Now / **Search** / Settings 四个 tab；iPad 有侧边栏 [9][21] | Reading now / Library / Search / Settings 四个 tab；平板用 `NavigationRail` | ✅ |
+| 主导航 | Library / Reading Now / **Search** / Settings 四个 tab；iPad 有侧边栏 [9][21] | 手机：悬浮玻璃胶囊（正在读 / 书架 / 设置）+ 右侧搜索圆球（iOS 26 液态玻璃）；平板用 `NavigationRail` | ✅ |
 | 库层级 | Content → library → collections [11] | 书架 = 系列网格 + 库 chips | 少一层"库/收藏集"浏览 |
 | 阅读器 chrome | `"..."` 菜单（Configure reader / Image filters）+ 底部 carousel + Live Text 按钮 [1][2][8] | 顶栏：返回 / 书名 / 页码 / 网格 / 设置；底栏箭头 + 缩略图滑条 | 信息架构不同；少配置/滤镜入口 |
 | 阅读设置 | Presets 列表 + 完整配置页（Page transition / Scroll direction / Pages / Fitting / Background）[1] | 底部面板：预设 / 按系列 / 模式 / 适配 / 方向 / 背景 / 亮度 / 常亮 / 锁定缩放 / 跳页 | 结构接近，缺按书临时配置 |

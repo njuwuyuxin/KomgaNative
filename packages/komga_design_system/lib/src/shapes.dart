@@ -23,6 +23,13 @@ abstract final class AppShapes {
   /// 大容器（面板、对话框）。
   static ShapeBorder panel({required bool eink}) => _shape(AppRadii.lg, eink);
 
+  /// 悬浮导航条：胶囊形（iOS 26 的玻璃 tab bar）。
+  ///
+  /// 胶囊不需要连续曲率系数：端头本来就是半径 = 高度/2 的半圆，
+  /// 用 [StadiumBorder] 比近似 squircle 更准确。墨水屏退化成直角。
+  static ShapeBorder bar({required bool eink}) =>
+      eink ? const RoundedRectangleBorder() : const StadiumBorder();
+
   /// 底部面板：只有顶部两个角是圆的。
   static ShapeBorder sheet({required bool eink}) => eink
       ? const RoundedRectangleBorder(side: BorderSide(color: AppTheme.einkInk))

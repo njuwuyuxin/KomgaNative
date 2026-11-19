@@ -113,11 +113,6 @@ abstract final class AppTheme {
           borderRadius: BorderRadius.circular(AppRadii.md),
         ),
       ),
-      navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: scheme.surface,
-        indicatorColor: scheme.secondaryContainer,
-        elevation: 0,
-      ),
       navigationRailTheme: NavigationRailThemeData(
         backgroundColor: scheme.surface,
         indicatorColor: scheme.secondaryContainer,

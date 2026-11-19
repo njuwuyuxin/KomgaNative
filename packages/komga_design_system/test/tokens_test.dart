@@ -124,14 +124,21 @@ void main() {
       }
     });
 
-    test('普通主题：都模糊、底色半透明', () {
+    test('普通主题：都模糊、底色半透明；玻璃档额外带反光与高光描边', () {
       for (final kind in AppMaterialKind.values) {
         for (final dark in <bool>[true, false]) {
           final material = AppMaterial.resolve(kind, eink: false, dark: dark);
           expect(material.blurs, isTrue, reason: '$kind dark=$dark');
           expect(material.filter, isNotNull);
           expect(material.tint.a, inExclusiveRange(0, 1));
-          expect(material.border, isNull);
+          if (kind == AppMaterialKind.bar) {
+            // 悬浮导航条是"液态玻璃"：只有它带斜向反光与白描边。
+            expect(material.highlight, isNotNull, reason: 'bar 要有反光');
+            expect(material.border, isNotNull, reason: 'bar 要有高光边');
+          } else {
+            expect(material.highlight, isNull, reason: '$kind 不该有反光');
+            expect(material.border, isNull, reason: '$kind 不该有描边');
+          }
         }
       }
     });
@@ -214,6 +221,12 @@ void main() {
       expect(radius.bottomLeft, Radius.zero);
       final eink = AppShapes.sheet(eink: true) as RoundedRectangleBorder;
       expect(eink.side.color, AppTheme.einkInk);
+    });
+
+    test('悬浮导航条是胶囊；墨水屏是直角', () {
+      expect(AppShapes.bar(eink: false), isA<StadiumBorder>());
+      final eink = AppShapes.bar(eink: true) as RoundedRectangleBorder;
+      expect(eink.borderRadius, BorderRadius.zero);
     });
   });
 
@@ -382,6 +395,57 @@ void main() {
 
       await tester.pumpWidget(surface(AppTheme.eink()));
       expect(find.byType(BackdropFilter), findsNothing);
+    });
+  });
+
+  group('GlassSurface', () {
+    Widget surface(ThemeData theme) => MaterialApp(
+      key: UniqueKey(),
+      theme: theme,
+      home: const Center(
+        child: GlassSurface(child: SizedBox(width: 120, height: 48)),
+      ),
+    );
+
+    /// 玻璃反光层：一个带 gradient 的 ShapeDecoration。
+    bool hasGloss(WidgetTester tester) => tester
+        .widgetList<DecoratedBox>(find.byType(DecoratedBox))
+        .any(
+          (DecoratedBox box) =>
+              box.decoration is ShapeDecoration &&
+              (box.decoration as ShapeDecoration).gradient != null,
+        );
+
+    testWidgets('彩色主题：背景模糊 + 反光层 + 阴影', (tester) async {
+      await tester.pumpWidget(surface(AppTheme.light()));
+      expect(find.byType(BackdropFilter), findsOneWidget);
+      expect(hasGloss(tester), isTrue);
+      final shadowed = tester
+          .widgetList<DecoratedBox>(find.byType(DecoratedBox))
+          .map((DecoratedBox box) => box.decoration)
+          .whereType<ShapeDecoration>()
+          .where((ShapeDecoration d) => d.shadows?.isNotEmpty ?? false)
+          .toList();
+      expect(shadowed, isNotEmpty, reason: '浮层要有阴影');
+      expect(shadowed.first.shape, isA<StadiumBorder>());
+    });
+
+    testWidgets('墨水屏：不模糊、不反光、无阴影，改纸底墨边', (tester) async {
+      await tester.pumpWidget(surface(AppTheme.eink()));
+      expect(find.byType(BackdropFilter), findsNothing);
+      expect(hasGloss(tester), isFalse);
+      final boxes = tester
+          .widgetList<DecoratedBox>(find.byType(DecoratedBox))
+          .where((DecoratedBox box) => box.decoration is ShapeDecoration)
+          .map((DecoratedBox box) => box.decoration as ShapeDecoration);
+      expect(
+        boxes.any((ShapeDecoration d) => d.color == AppTheme.einkPaper),
+        isTrue,
+      );
+      expect(
+        boxes.any((ShapeDecoration d) => d.shadows?.isNotEmpty ?? false),
+        isFalse,
+      );
     });
   });
 }

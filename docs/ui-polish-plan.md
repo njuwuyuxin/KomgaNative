@@ -522,6 +522,20 @@ Panels 的高级感主要来自三点，和控件本身关系不大：
 | `ReaderPrefs.trimBorders` + 设置开关 `reader-trim-borders`；预设/系列覆盖/JSON 都带上；修复了相等性漏字段导致恢复被 Riverpod 吞掉的问题 |
 | 测试：`reader_trim_test` 覆盖"白边页图开启后走裁剪绘制"；`reader_trim@phone_dark` 黄金图（合成白边页） |
 
+**进度（2026-11-19）：底部导航玻璃化（iOS 26 液态玻璃）。**
+
+| 落地 |
+|---|
+| 设计系统：`AppMaterialKind.bar` 改成玻璃档（模糊 22、底色 72%、白色高光描边、斜向反光渐变）；反光由 `FrostedSurface` 画在裁剪之内；新增 `GlassSurface`（毛玻璃 + 浮层阴影 + 默认胶囊）、`AppShapes.bar`（`StadiumBorder`，墨水屏直角）、`AppSizes.navBarHeight` / `navBarClearance` |
+| 手机导航：新增 `widgets/floating_nav_bar.dart`（胶囊 tab + 右侧搜索圆球；选中项整格高亮、按下缩放、`AppHaptics.selection`、读屏 `selected` 语义）；`AdaptiveShell` 改成 `extendBody: true` 的浮层导航，`resizeToAvoidBottomInset: false` 让键盘盖住导航条（页面自己的 `Scaffold` 仍为键盘让位）；平板侧栏不变 |
+| 信息架构：搜索从"胶囊里的第 3 个 tab"改成右侧圆球（与参照图一致）；英文 tab 标签用短一档的 "Reading"（新增 `navReadingNow`），否则 1.3 倍字号会截成 "Reading n…" |
+| 页面让位：正在读 / 书架 / 设置 / 搜索四个分支页的滚动内容末尾统一留 `AppSizes.navBarClearance` |
+| 测试：`floating_nav_bar_test`（点击派发、48 点按区、`selected` 语义、墨水屏反白、1.3 倍字号不溢出）；`tokens_test` 补 `GlassSurface` / `AppShapes.bar` / 玻璃材质断言；`app_smoke_test` 断言外壳是 `FloatingNavBar` 而不是 `NavigationBar` |
+| 基线：新增 `nav_bar@{phone_light,phone_dark,eink,phone_light_text1.3}` 与 `library_nav@phone_light`；`design_tokens@{phone_light,tablet_dark}` 因 `bar` 材质变玻璃而更新（`design_tokens@eink` 未变，说明退化路径没动） |
+
+基线变更原因：`bar` 从"85% 不透明灰白"变成"72% + 反光 + 白描边"的玻璃，token 图上的 swatch 变透；
+其余页面基线未动（外壳不进页面黄金图，真实首页形态单开 `library_nav@phone_light` 钉住）。
+
 ## 不做
 
 | 需求 | 理由 |

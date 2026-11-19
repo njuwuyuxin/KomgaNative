@@ -196,6 +196,10 @@ class SettingsScreen extends ConsumerWidget {
               ],
             ),
           ),
+          // 悬浮导航条压在内容之上：最后一块要能让开它。
+          const SliverToBoxAdapter(
+            child: SizedBox(height: AppSizes.navBarClearance),
+          ),
         ],
       ),
     );

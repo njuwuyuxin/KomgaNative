@@ -107,6 +107,8 @@ class _SearchResults extends ConsumerWidget {
     }
 
     return ListView(
+      // 悬浮导航条浮在内容上：结果列表末尾让开它。
+      padding: const EdgeInsets.only(bottom: AppSizes.navBarClearance),
       children: <Widget>[
         if (seriesItems.isNotEmpty) ...<Widget>[
           _Header(text: l10n.searchSeriesTab),

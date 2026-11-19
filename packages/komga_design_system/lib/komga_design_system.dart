@@ -7,6 +7,7 @@ library;
 
 export 'src/breakpoints.dart';
 export 'src/components/frosted_surface.dart';
+export 'src/components/glass_surface.dart';
 export 'src/components/pressable_scale.dart';
 export 'src/components/series_tile.dart';
 export 'src/components/skeleton.dart';

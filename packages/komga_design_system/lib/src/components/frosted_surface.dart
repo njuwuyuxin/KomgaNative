@@ -1,7 +1,11 @@
 import 'package:komga_design_system/src/materials.dart';
 import 'package:material_ui/material_ui.dart';
 
-/// 毛玻璃表面：裁剪 → 背景模糊 → 半透明底色 →（墨水屏）描边。
+/// 毛玻璃表面：裁剪 → 背景模糊 → 半透明底色 → 玻璃反光 →（墨水屏）描边。
+///
+/// 反光来自 [AppMaterial.highlight]：只有"液态玻璃"档（彩色主题的
+/// [AppMaterialKind.bar]）有，压在底色之上、裁剪之内，但**不在**模糊里——
+/// 模糊只作用于背后已经画好的像素，反光是这一层自己的高光。
 ///
 /// 性能约束：`BackdropFilter` 每帧都要读回背后的像素，**只用于 chrome 和面板**，
 /// 不要放进网格单元格或列表行里。
@@ -31,7 +35,7 @@ class FrostedSurface extends StatelessWidget {
     final resolved = material ?? AppMaterial.of(context, kind);
     final border = resolved.border;
     final outline = shape ?? const RoundedRectangleBorder();
-    final decorated = DecoratedBox(
+    final tinted = DecoratedBox(
       decoration: ShapeDecoration(
         color: resolved.tint,
         shape: border == null
@@ -42,16 +46,38 @@ class FrostedSurface extends StatelessWidget {
       ),
       child: child,
     );
+
+    final highlight = resolved.highlight;
+    final surface = highlight == null
+        ? tinted
+        : Stack(
+            // passthrough：由玻璃里的内容决定尺寸，反光层再铺满它。
+            fit: StackFit.passthrough,
+            children: <Widget>[
+              tinted,
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: ShapeDecoration(
+                      shape: outline,
+                      gradient: highlight,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+
     final filter = resolved.filter;
     if (filter == null) {
       return ClipPath(
         clipper: ShapeBorderClipper(shape: outline),
-        child: decorated,
+        child: surface,
       );
     }
     return ClipPath(
       clipper: ShapeBorderClipper(shape: outline),
-      child: BackdropFilter(filter: filter, child: decorated),
+      child: BackdropFilter(filter: filter, child: surface),
     );
   }
 }

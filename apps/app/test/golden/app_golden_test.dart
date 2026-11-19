@@ -38,6 +38,7 @@ import 'package:komga_native/src/session/certificate_prompt.dart';
 import 'package:komga_native/src/session/server_store.dart';
 import 'package:komga_native/src/session/session_controller.dart';
 import 'package:komga_native/src/widgets/certificate_panel.dart';
+import 'package:komga_native/src/widgets/floating_nav_bar.dart';
 import 'package:komga_reader_engine/komga_reader_engine.dart';
 import 'package:komga_sync_engine/komga_sync_engine.dart';
 
@@ -70,6 +71,7 @@ void main() {
     ShelfFailure? failure,
     bool offline = false,
     List<Book>? ondeck,
+    bool withNavBar = false,
     Future<void> Function(WidgetTester tester)? act,
   }) async {
     final data = series ?? demoShelf();
@@ -104,7 +106,9 @@ void main() {
 
     await pumpGoldenScreen(
       tester,
-      screen: const LibraryScreen(),
+      screen: withNavBar
+          ? const _WithFloatingNavBar(child: LibraryScreen())
+          : const LibraryScreen(),
       size: size,
       theme: theme,
       textScale: textScale,
@@ -124,6 +128,20 @@ void main() {
       name: 'library@phone_light',
       size: GoldenSizes.phone,
       theme: AppTheme.light(),
+    );
+  });
+
+  /// 真实首页形态：书架 + 底部悬浮玻璃导航条。
+  ///
+  /// 页面基线本身不带外壳（外壳在 `AdaptiveShell` 里），这一张专门钉住
+  /// "玻璃压在封面上"的观感，以及内容底部为浮层留出的空白。
+  testWidgets('library_nav@phone_light', (WidgetTester tester) async {
+    await pumpShelfGolden(
+      tester,
+      name: 'library_nav@phone_light',
+      size: GoldenSizes.phone,
+      theme: AppTheme.light(),
+      withNavBar: true,
     );
   });
 
@@ -1106,6 +1124,47 @@ void main() {
       textScale: 1.3,
     );
   });
+}
+
+/// 模拟 `AdaptiveShell` 的手机形态：内容铺到屏幕底 + 浮动玻璃导航条。
+///
+/// 这里不建整条路由（`StatefulShellRoute` 在黄金图里没有意义），只要外壳的
+/// 关键几何：`extendBody` + 导航条自己带安全区、左右与底部留白。
+class _WithFloatingNavBar extends StatelessWidget {
+  const _WithFloatingNavBar({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      extendBody: true,
+      body: child,
+      bottomNavigationBar: FloatingNavBar(
+        tabs: const <GlassNavDestination>[
+          GlassNavDestination(
+            icon: Icons.auto_stories_outlined,
+            selectedIcon: Icons.auto_stories,
+            label: 'Reading',
+          ),
+          GlassNavDestination(
+            icon: Icons.grid_view_outlined,
+            selectedIcon: Icons.grid_view,
+            label: 'Library',
+          ),
+          GlassNavDestination(
+            icon: Icons.settings_outlined,
+            selectedIcon: Icons.settings,
+            label: 'Settings',
+          ),
+        ],
+        selectedTab: 1,
+        onTabSelected: (_) {},
+        search: const GlassNavDestination(icon: Icons.search, label: 'Search'),
+        onSearch: () {},
+      ),
+    );
+  }
 }
 
 /// 黄金图用的下载服务：不会真的跑下载，只负责让"已下载"查询返回 null。

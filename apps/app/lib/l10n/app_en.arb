@@ -367,6 +367,7 @@
   "showMore": "Show more",
   "showLess": "Show less",
   "readingNow": "Reading now",
+  "navReadingNow": "Reading",
   "readingNowEmpty": "Nothing in progress",
   "readingNowEmptyHint": "Start a book from your library and it will show up here",
   "recentlyAdded": "Recently added",

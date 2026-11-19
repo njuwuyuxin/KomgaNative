@@ -57,6 +57,13 @@ abstract final class AppSizes {
   /// 底部面板顶部的拖动条。
   static const Size grabber = Size(36, 4);
 
+  /// 悬浮玻璃导航条的胶囊高度（搜索圆球同高，所以是正方形）。
+  static const double navBarHeight = 64;
+
+  /// 页面滚动内容末尾为悬浮导航条留出的空白：条高 64 + 上方 16 + 下方 8，
+  /// 再按最长的一档系统安全区（34）留足，避免最后一行被导航条压住。
+  static const double navBarClearance = 112;
+
   /// 横向货架（继续阅读）里的封面。
   static const Size shelfCover = Size(96, 136);
 

@@ -100,7 +100,9 @@ class ReadingNowScreen extends ConsumerWidget {
                     const <Series>[],
               ),
             ],
-            const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xl)),
+            const SliverToBoxAdapter(
+              child: SizedBox(height: AppSizes.navBarClearance),
+            ),
           ],
         ),
       ),
