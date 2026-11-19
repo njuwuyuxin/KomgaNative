@@ -112,7 +112,12 @@ class ReaderBar extends StatelessWidget {
                   ),
                 ],
                 const SizedBox(width: AppSpacing.sm),
-                Text(pageLabel, style: TextStyle(color: palette.muted)),
+                Text(
+                  pageLabel,
+                  // 页码每翻一页都在变：等宽数字让它不左右跳（UI-01）。
+                  style: AppTypography.of(context).progressNumber
+                      .copyWith(color: palette.muted),
+                ),
               ],
             ),
           ),

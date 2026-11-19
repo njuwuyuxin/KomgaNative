@@ -19,7 +19,7 @@ class GlassSurface extends StatelessWidget {
     required this.child,
     this.shape,
     this.kind = AppMaterialKind.bar,
-    this.shadows = AppShadows.floating,
+    this.shadows,
     super.key,
   });
 
@@ -31,8 +31,8 @@ class GlassSurface extends StatelessWidget {
   /// 取哪种材质；默认 [AppMaterialKind.bar]（玻璃档）。
   final AppMaterialKind kind;
 
-  /// 浮层阴影；墨水屏自动清空。
-  final List<BoxShadow> shadows;
+  /// 浮层阴影；为空时按主题取（浅色更淡），墨水屏自动清空。
+  final List<BoxShadow>? shadows;
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +40,9 @@ class GlassSurface extends StatelessWidget {
     return DecoratedBox(
       decoration: ShapeDecoration(
         shape: outline,
-        shadows: AppShadows.of(context, shadows),
+        shadows: shadows == null
+            ? AppShadows.floatingOf(context)
+            : AppShadows.of(context, shadows!),
       ),
       child: FrostedSurface(kind: kind, shape: outline, child: child),
     );

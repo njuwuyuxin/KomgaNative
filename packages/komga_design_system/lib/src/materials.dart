@@ -155,11 +155,26 @@ abstract final class AppShadows {
     BoxShadow(color: Color(0x1A000000), blurRadius: 12, offset: Offset(0, 4)),
   ];
 
-  /// 浮层（菜单、浮动按钮）。
+  /// 浮层（菜单、浮动按钮）。深色主题用这一组。
   static const List<BoxShadow> floating = <BoxShadow>[
     BoxShadow(color: Color(0x14000000), blurRadius: 4, offset: Offset(0, 1)),
     BoxShadow(color: Color(0x2E000000), blurRadius: 32, offset: Offset(0, 12)),
   ];
+
+  /// 浅色主题的浮层阴影：更淡、更短。
+  ///
+  /// 白底上的 0x2E 大阴影会糊成一圈灰边，看起来像"脏"而不是"浮起来"
+  /// （UI-01：降低浅色模式 floating 阴影）。
+  static const List<BoxShadow> floatingLight = <BoxShadow>[
+    BoxShadow(color: Color(0x0D000000), blurRadius: 3, offset: Offset(0, 1)),
+    BoxShadow(color: Color(0x1A000000), blurRadius: 20, offset: Offset(0, 8)),
+  ];
+
+  /// 按当前主题取浮层阴影：浅色更淡，墨水屏清零。
+  static List<BoxShadow> floatingOf(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return of(context, dark ? floating : floatingLight);
+  }
 
   static const List<BoxShadow> none = <BoxShadow>[];
 

@@ -35,23 +35,41 @@ class DownloadsScreen extends ConsumerWidget {
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: <Widget>[
               GlassHeaderSliver(
+                // UI-01：整条标题栏只有**一层**玻璃——返回、标题、"取消全部"
+                // 全在同一个胶囊里，不再是"圆球 + 胶囊 + 圆球"三件套。
                 header: GlassHeader(
-                  leading: GlassIconButton(
-                    icon: Icons.chevron_left,
-                    label: MaterialLocalizations.of(context).backButtonTooltip,
-                    onPressed: () => Navigator.of(context).maybePop(),
-                  ),
-                  title: Text(l10n.downloadedBooks),
-                  // 有排队/进行中才出现："取消全部"在没有下载时是个无意义按钮。
-                  trailing: active.isEmpty
-                      ? null
-                      : GlassIconButton(
-                          key: const Key('downloads-cancel-all'),
-                          icon: Icons.stop_circle_outlined,
-                          label: l10n.downloadCancelAll,
-                          onPressed: () =>
-                              ref.read(downloadsProvider.notifier).cancelAll(),
+                  bar: GlassSurface(
+                    shape: AppShapes.of(context, AppShapes.bar),
+                    child: Row(
+                      children: <Widget>[
+                        IconButton(
+                          key: const Key('downloads-back'),
+                          tooltip: MaterialLocalizations.of(context)
+                              .backButtonTooltip,
+                          onPressed: () => Navigator.of(context).maybePop(),
+                          icon: const Icon(Icons.chevron_left),
                         ),
+                        Expanded(
+                          child: Text(
+                            l10n.downloadedBooks,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.of(context).title,
+                          ),
+                        ),
+                        // 有排队/进行中才出现：没有下载时它是个无意义按钮。
+                        if (active.isNotEmpty)
+                          IconButton(
+                            key: const Key('downloads-cancel-all'),
+                            tooltip: l10n.downloadCancelAll,
+                            onPressed: () => ref
+                                .read(downloadsProvider.notifier)
+                                .cancelAll(),
+                            icon: const Icon(Icons.stop_circle_outlined),
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
               if (ids.isEmpty)
@@ -141,7 +159,13 @@ class _DownloadRow extends ConsumerWidget {
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(subtitle),
+          Text(
+            subtitle,
+            // 进度数字用等宽字形：否则 "9 / 12" → "10 / 12" 会让整行左右抖。
+            style: (status?.isRunning ?? false)
+                ? AppTypography.of(context).progressNumber
+                : null,
+          ),
           if (status?.isRunning ?? false) ...<Widget>[
             const SizedBox(height: AppSpacing.xxs),
             LinearProgressIndicator(

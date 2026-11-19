@@ -53,6 +53,14 @@ class AppTypography {
   TextStyle get pageNumber =>
       _require(_base.labelLarge).copyWith(fontFeatures: tabularFigures);
 
+  /// 进度数字（UI-01）：等宽数字 + 中等字重。
+  ///
+  /// 用在"会原地变化的数字"上（页码、下载进度、已读 N / M）。
+  /// 不用等宽的话数字一变宽度就跳，进度条旁边的文本会左右抖。
+  TextStyle get progressNumber =>
+      _require(_base.labelLarge)
+          .copyWith(fontFeatures: tabularFigures, fontWeight: FontWeight.w600);
+
   /// Material 的默认 `TextTheme` 每个层级都有值；为空说明主题被裁剪过，
   /// 退回一个空样式而不是崩溃（字号仍会继承 `DefaultTextStyle`）。
   static TextStyle _require(TextStyle? style) => style ?? const TextStyle();
