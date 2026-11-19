@@ -8,15 +8,17 @@ import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/shelf_view_options.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
+import 'package:komga_native/src/providers/pinned_series_provider.dart';
 import 'package:komga_native/src/providers/series_read_provider.dart';
 import 'package:komga_native/src/screens/series_detail_args.dart';
 import 'package:komga_native/src/widgets/context_menu.dart';
 import 'package:komga_native/src/widgets/cover_image.dart';
 import 'package:komga_native/src/widgets/series_hero_tag.dart';
+import 'package:komga_native/src/widgets/unread_badge.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 长按系列卡片能做的事（UI-P2-5）。
-enum SeriesMenuAction { markRead, markUnread, viewDetails }
+enum SeriesMenuAction { markRead, markUnread, viewDetails, pin, unpin }
 
 /// 书架上的一个系列卡片：把"封面字节 + Hero + 长按菜单"翻译成 [SeriesTile] 认的 widget。
 ///
@@ -52,6 +54,8 @@ class SeriesShelfTile extends ConsumerWidget {
       _ => null,
     };
     final tag = heroTag ?? seriesHeroTag(series.id);
+    final pinned =
+        ref.watch(pinnedSeriesIdsProvider).value?.contains(series.id) ?? false;
 
     final tile = SeriesTile(
       key: Key('series-${series.id}'),
@@ -61,20 +65,39 @@ class SeriesShelfTile extends ConsumerWidget {
           '${series.title}, '
           '${l10n.readOfTotal(series.booksReadCount, series.booksCount)}',
       onTap: onTap,
-      onLongPress: () =>
-          unawaited(showSeriesMenu(context, ref, series, heroTag: tag)),
+      onLongPress: () => unawaited(
+        showSeriesMenu(context, ref, series, heroTag: tag, pinned: pinned),
+      ),
       cover: bytes == null || bytes.isEmpty ? null : CoverImage(bytes: bytes),
     );
+    final badged = _withUnreadBadge(series, tile);
 
-    if (AppTheme.isEink(Theme.of(context))) return tile;
+    if (AppTheme.isEink(Theme.of(context))) return badged;
     // Hero 飞行时子组件会被放进 Overlay，而 Overlay 里**没有 Material 祖先**；
     // `SeriesTile` 内部有 InkWell（debug 会断言 "No Material widget found"，
     // 表现是退出时红一下）。透明 Material 只补祖先、不画任何东西。
     return Hero(
       tag: tag,
-      child: Material(type: MaterialType.transparency, child: tile),
+      child: Material(type: MaterialType.transparency, child: badged),
     );
   }
+}
+
+/// 有未读时在封面左上角叠一个未读数（LIB-02）。
+Widget _withUnreadBadge(Series series, Widget child) {
+  final unread = series.booksCount - series.booksReadCount;
+  if (unread <= 0) return child;
+  return Stack(
+    clipBehavior: Clip.none,
+    children: <Widget>[
+      child,
+      Positioned(
+        left: AppSpacing.xs,
+        top: AppSpacing.xs,
+        child: UnreadBadge(count: unread),
+      ),
+    ],
+  );
 }
 
 /// 列表视图里的一行（UI-P2-7）：封面 + 标题 + 进度，长按菜单与网格卡片一致。
@@ -112,6 +135,8 @@ class SeriesShelfRow extends ConsumerWidget {
       series.booksCount,
     );
     final tag = heroTag ?? seriesHeroTag(series.id);
+    final pinned =
+        ref.watch(pinnedSeriesIdsProvider).value?.contains(series.id) ?? false;
 
     final row = Semantics(
       container: true,
@@ -122,8 +147,15 @@ class SeriesShelfRow extends ConsumerWidget {
         child: PressableScale(
           child: InkWell(
             onTap: onTap,
-            onLongPress: () =>
-                unawaited(showSeriesMenu(context, ref, series, heroTag: tag)),
+            onLongPress: () => unawaited(
+              showSeriesMenu(
+                context,
+                ref,
+                series,
+                heroTag: tag,
+                pinned: pinned,
+              ),
+            ),
             child: Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.md,
@@ -194,11 +226,12 @@ class SeriesShelfRow extends ConsumerWidget {
       ),
     );
 
-    if (AppTheme.isEink(theme)) return row;
+    final badged = _withUnreadBadge(series, row);
+    if (AppTheme.isEink(theme)) return badged;
     // 同上：退出时的飞行层没有 Material 祖先，而这一行里有 InkWell。
     return Hero(
       tag: tag,
-      child: Material(type: MaterialType.transparency, child: row),
+      child: Material(type: MaterialType.transparency, child: badged),
     );
   }
 }
@@ -212,6 +245,7 @@ Future<void> showSeriesMenu(
   WidgetRef ref,
   Series series, {
   String? heroTag,
+  bool pinned = false,
 }) async {
   final l10n = AppLocalizations.of(context);
   // 长按先给一次轻触反馈：菜单弹出前用户要知道"按到了"。
@@ -230,6 +264,18 @@ Future<void> showSeriesMenu(
         label: l10n.markAllUnread,
         icon: Icons.remove_done,
       ),
+      if (pinned)
+        ContextMenuEntry(
+          value: SeriesMenuAction.unpin,
+          label: l10n.unpinSeries,
+          icon: Icons.push_pin_outlined,
+        )
+      else
+        ContextMenuEntry(
+          value: SeriesMenuAction.pin,
+          label: l10n.pinSeries,
+          icon: Icons.push_pin,
+        ),
       ContextMenuEntry(
         value: SeriesMenuAction.viewDetails,
         label: l10n.viewDetails,
@@ -252,5 +298,13 @@ Future<void> showSeriesMenu(
       await ref
           .read(seriesReadProvider.notifier)
           .setRead(series.id, read: false);
+    case SeriesMenuAction.pin:
+      await ref
+          .read(pinnedSeriesControllerProvider)
+          .toggle(series.id, pinned: true);
+    case SeriesMenuAction.unpin:
+      await ref
+          .read(pinnedSeriesControllerProvider)
+          .toggle(series.id, pinned: false);
   }
 }

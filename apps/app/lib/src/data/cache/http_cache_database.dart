@@ -85,6 +85,21 @@ class DownloadQueueEntries extends Table {
   Set<Column<Object>> get primaryKey => <Column<Object>>{bookId};
 }
 
+/// 置顶的系列（LIB-02）。
+///
+/// 按 **serverId 分区**：切服务器不能串（同一台机器可能连过多个 Komga）。
+/// 只存 id 与时间，书名等元数据照常从服务器取——置顶是"显示顺序"，不是书库副本。
+class PinnedSeriesRows extends Table {
+  TextColumn get serverId => text()();
+
+  TextColumn get seriesId => text()();
+
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => <Column<Object>>{serverId, seriesId};
+}
+
 /// 缓存占用统计（设置页展示）。
 class CacheUsage {
   const CacheUsage({required this.bytes, required this.entries});
@@ -104,7 +119,12 @@ class CacheUsage {
 }
 
 @DriftDatabase(
-  tables: <Type>[CachedResponses, DownloadedBooks, DownloadQueueEntries],
+  tables: <Type>[
+    CachedResponses,
+    DownloadedBooks,
+    DownloadQueueEntries,
+    PinnedSeriesRows,
+  ],
 )
 class HttpCacheDatabase extends _$HttpCacheDatabase {
   HttpCacheDatabase(
@@ -126,7 +146,7 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
   int? _seqSeed;
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -139,6 +159,7 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
       if (from < 2) await m.createTable(downloadedBooks);
       // v2 → v3：新增下载队列表（FIX-07）。旧版本没有队列可恢复，建空表即可。
       if (from < 3) await m.createTable(downloadQueueEntries);
+      if (from < 4) await m.createTable(pinnedSeriesRows);
     },
   );
 
@@ -313,6 +334,44 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
   /// 删掉一本书已缓存的页图（按 URL 片段）。  ///
   /// 用 `contains` 而不是精确 URL：页图 URL 带 `?zero_based=false`（将来还可能有
   /// `convert=jpeg`），按"书 + /pages/"匹配才不会漏。返回删除条数。
+  /// 这台服务器上置顶的系列 id（按置顶时间倒序，最近的在前）。
+  Future<List<String>> pinnedSeries(String serverId) async {
+    final rows =
+        await (select(pinnedSeriesRows)
+              ..where((PinnedSeriesRows t) => t.serverId.equals(serverId))
+              ..orderBy(<OrderClauseGenerator<PinnedSeriesRows>>[
+                (PinnedSeriesRows t) => OrderingTerm(
+                  expression: t.createdAt,
+                  mode: OrderingMode.desc,
+                ),
+              ]))
+            .get();
+    return <String>[for (final row in rows) row.seriesId];
+  }
+
+  /// 置顶 / 取消置顶。[pinned] 为 false 时删掉这一行。
+  Future<void> setPinned({
+    required String serverId,
+    required String seriesId,
+    required bool pinned,
+  }) async {
+    if (!pinned) {
+      await (delete(pinnedSeriesRows)..where(
+            (PinnedSeriesRows t) =>
+                t.serverId.equals(serverId) & t.seriesId.equals(seriesId),
+          ))
+          .go();
+      return;
+    }
+    await into(pinnedSeriesRows).insertOnConflictUpdate(
+      PinnedSeriesRowsCompanion.insert(
+        serverId: serverId,
+        seriesId: seriesId,
+        createdAt: DateTime.now(),
+      ),
+    );
+  }
+
   Future<int> deleteCachedPages({
     required String scope,
     required String bookId,

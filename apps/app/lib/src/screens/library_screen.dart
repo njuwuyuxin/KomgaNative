@@ -8,6 +8,7 @@ import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/data/shelf_view_options.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
+import 'package:komga_native/src/providers/pinned_series_provider.dart';
 import 'package:komga_native/src/session/session_controller.dart';
 import 'package:komga_native/src/widgets/offline_banner.dart';
 import 'package:komga_native/src/widgets/phase_fade.dart';
@@ -246,8 +247,60 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         ),
       ];
     }
+    // 置顶区（LIB-02）：单独取这几本的元数据排在前面，主列表里把它们剔掉，
+    // 免得同一个系列在屏幕上出现两次。
+    final pinned = ref.watch(pinnedSeriesProvider).value ?? const <Series>[];
+    final pinnedIds = <String>{for (final series in pinned) series.id};
+    final series = <Series>[
+      for (final item in state.series)
+        if (!pinnedIds.contains(item.id)) item,
+    ];
     return <Widget>[
-      // 网格 / 列表（UI-P2-7）：两种视图共用同一个 `state.series`，
+      if (pinned.isNotEmpty) ...<Widget>[
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.sm,
+              AppSpacing.md,
+              AppSpacing.xs,
+            ),
+            child: Row(
+              children: <Widget>[
+                Icon(
+                  Icons.push_pin,
+                  size: AppSizes.iconSm,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Text(
+                  l10n.pinned,
+                  key: const Key('shelf-pinned-header'),
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+              ],
+            ),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          sliver: SliverGrid(
+            gridDelegate: shelfGridDelegate(state.coverSize),
+            delegate: SliverChildBuilderDelegate((
+              BuildContext context,
+              int index,
+            ) {
+              final item = pinned[index];
+              return SeriesShelfTile(
+                series: item,
+                onTap: () => unawaited(_openSeries(item)),
+              );
+            }, childCount: pinned.length),
+          ),
+        ),
+        const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.md)),
+      ],
+      // 网格 / 列表（UI-P2-7）：两种视图共用同一份列表，
       // 切换只是换 sliver 的类型，不重新请求。
       if (state.view == ShelfView.grid)
         SliverPadding(
@@ -258,12 +311,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
               BuildContext context,
               int index,
             ) {
-              final series = state.series[index];
+              final item = series[index];
               return SeriesShelfTile(
-                series: series,
-                onTap: () => unawaited(_openSeries(series)),
+                series: item,
+                onTap: () => unawaited(_openSeries(item)),
               );
-            }, childCount: state.series.length),
+            }, childCount: series.length),
           ),
         )
       else
@@ -272,14 +325,14 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             BuildContext context,
             int index,
           ) {
-            final series = state.series[index];
+            final item = series[index];
             return SeriesShelfRow(
-              key: Key('series-${series.id}'),
-              series: series,
+              key: Key('series-${item.id}'),
+              series: item,
               coverSize: state.coverSize,
-              onTap: () => unawaited(_openSeries(series)),
+              onTap: () => unawaited(_openSeries(item)),
             );
-          }, childCount: state.series.length),
+          }, childCount: series.length),
         ),
       SliverToBoxAdapter(
         child: ShelfPagingFooter(
