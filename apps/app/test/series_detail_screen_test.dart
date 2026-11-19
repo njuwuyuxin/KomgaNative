@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
@@ -7,8 +9,10 @@ import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/providers/reader_providers.dart';
+import 'package:komga_native/src/screens/library_screen.dart';
 import 'package:komga_native/src/screens/reader_screen.dart';
 import 'package:komga_native/src/screens/series_detail_screen.dart';
+import 'package:komga_native/src/widgets/series_hero_tag.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/l10n/l10n.dart';
 import 'package:material_ui/material_ui.dart';
@@ -171,5 +175,114 @@ void main() {
     final header = tester.getRect(find.text('5 of 12 read'));
     final book = tester.getRect(find.byKey(const Key('book-s1-b1')));
     expect(header.center.dy, lessThan(book.center.dy));
+  });
+
+  testWidgets('首次打开：头部与 Hero 首帧就在，元信息/书列表用骨架占位', (WidgetTester tester) async {
+    final gate = Completer<void>();
+    final repository = FakeLibraryRepository(series: demoShelf())
+      ..detailGate = gate
+      ..booksGate = gate;
+
+    await pumpDetail(tester, repository);
+    await tester.pump();
+
+    // 从书架点进来时，封面 Hero 的终点必须在首帧存在，否则共享元素动画不会播。
+    expect(
+      find.byWidgetPredicate(
+        (Widget widget) => widget is Hero && widget.tag == seriesHeroTag('s1'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('series-titlebar-skeleton')), findsOneWidget);
+    expect(find.byKey(const Key('series-title-skeleton')), findsOneWidget);
+    expect(find.byKey(const Key('series-action-skeleton')), findsOneWidget);
+    expect(find.byKey(const Key('series-skeleton')), findsOneWidget);
+    expect(
+      find.text('5 of 12 read'),
+      findsNothing,
+      reason: '元信息还没回来，先占位而不是显示 0 of 0',
+    );
+
+    gate.complete();
+    await tester.pumpAndSettle();
+
+    expect(find.text('5 of 12 read'), findsOneWidget);
+    expect(find.byKey(const Key('series-titlebar-skeleton')), findsNothing);
+    expect(find.byKey(const Key('series-title-skeleton')), findsNothing);
+    expect(find.byKey(const Key('series-action-skeleton')), findsNothing);
+    expect(find.byKey(const Key('series-skeleton')), findsNothing);
+  });
+
+  testWidgets('从书架首次进入详情：源与目标 Hero 同时存在（封面会飞过去）', (WidgetTester tester) async {
+    final gate = Completer<void>();
+    final repository = FakeLibraryRepository(series: demoShelf())
+      ..detailGate = gate
+      ..booksGate = gate;
+    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+
+    final router = GoRouter(
+      initialLocation: '/library',
+      routes: <RouteBase>[
+        GoRoute(
+          path: '/library',
+          builder: (BuildContext context, GoRouterState state) =>
+              const LibraryScreen(),
+        ),
+        GoRoute(
+          path: '/series/:seriesId',
+          builder: (BuildContext context, GoRouterState state) =>
+              SeriesDetailScreen(
+                seriesId: state.pathParameters['seriesId'] ?? '',
+              ),
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          libraryRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: MaterialApp.router(
+          locale: const Locale('en'),
+          localizationsDelegates: appLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          theme: AppTheme.light(),
+          routerConfig: router,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('series-s1')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 16));
+
+    expect(
+      find.byWidgetPredicate(
+        (Widget widget) => widget is Hero && widget.tag == seriesHeroTag('s1'),
+      ),
+      findsNWidgets(2),
+      reason: '书架卡片与详情头部各有一个落点，Hero 才会沿曲线飞过去',
+    );
+
+    gate.complete();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('详情也失败时头部退回兜底标题，不会永远停在骨架上', (WidgetTester tester) async {
+    final repository = FakeLibraryRepository(
+      series: demoShelf(),
+      booksFailure: const NetworkFailure(),
+      detailFailure: const NetworkFailure(),
+    );
+    await pumpDetail(tester, repository);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('series-title-skeleton')), findsNothing);
+    expect(find.byKey(const Key('series-error')), findsOneWidget);
+    expect(find.text('Series'), findsWidgets, reason: '兜底标题（AppBar + 头部）');
   });
 }

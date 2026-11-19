@@ -1,5 +1,4 @@
 import 'dart:typed_data';
-import 'dart:ui' as ui;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_design_system/komga_design_system.dart';
@@ -7,8 +6,7 @@ import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/book_selection.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
-import 'package:komga_native/src/widgets/cover_image.dart';
-import 'package:komga_native/src/widgets/series_shelf_tile.dart';
+import 'package:komga_native/src/widgets/series_header_cover.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 系列详情页的头部（UI-P2-4）。
@@ -18,12 +16,19 @@ import 'package:material_ui/material_ui.dart';
 /// 上面压渐变遮罩，再放封面、标题、作者/出版社/年份、标签、可展开简介，
 /// 最后是主按钮（继续阅读第 N 本 / 开始阅读）。
 ///
+/// **加载态与内容态是同一个组件**：封面槽位（含 Hero）第一帧就在，元信息还没
+/// 回来时用骨架占位。这样从书架进详情时共享元素的终点始终存在，首次打开和
+/// 后续打开看到的是同一段动画，而不是"第一次全屏加载、第二次才飞"。
+///
 /// 墨水屏：不做模糊背景，用纯纸色 + 描边（模糊在灰阶屏上就是一团脏灰）。
 class SeriesHeader extends ConsumerWidget {
   const SeriesHeader({
     required this.series,
     required this.seriesId,
+    required this.heroTag,
     required this.books,
+    required this.metadataLoading,
+    required this.booksLoading,
     required this.onOpenBook,
     super.key,
   });
@@ -31,8 +36,20 @@ class SeriesHeader extends ConsumerWidget {
   final Series? series;
   final String seriesId;
 
-  /// 书列表：主按钮要知道"下一本该读哪本"。
-  final List<Book> books;
+  /// 封面 Hero tag（从货架带过来的那一份，见 `seriesHeroTag`）。
+  final String heroTag;
+
+  /// 书列表；还没回来或失败时是 null（主按钮位置按 [booksLoading] 处理）。
+  final List<Book>? books;
+
+  /// 系列元信息（标题 / 作者 / 进度）还在加载：先用骨架占位，
+  /// 不要先显示 "Series / 0 of 0 read" 再跳成真数据。
+  final bool metadataLoading;
+
+  /// 书列表还在加载：主按钮位置先放骨架，避免整块区域先空着再突然出现。
+  ///
+  /// 与 [books] 为 null 分开判断：请求失败时也没有书，但那时不该一直转微光。
+  final bool booksLoading;
 
   final void Function(Book book) onOpenBook;
 
@@ -49,10 +66,10 @@ class SeriesHeader extends ConsumerWidget {
       AsyncData<Uint8List?>(:final value) => value,
       _ => null,
     };
-    final read = series?.booksReadCount ?? 0;
-    final total = series?.booksCount ?? 0;
-    final next = nextBookToRead(books);
-    final unstarted = isUnstartedSeries(books);
+    final books = this.books;
+    final next = books == null ? null : nextBookToRead(books);
+    final unstarted = books == null || isUnstartedSeries(books);
+    final summary = series?.summary?.trim() ?? '';
 
     final content = Padding(
       padding: const EdgeInsets.all(AppSpacing.md),
@@ -63,19 +80,34 @@ class SeriesHeader extends ConsumerWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              _Cover(bytes: bytes, seriesId: seriesId),
+              SeriesHeaderCover(bytes: bytes, heroTag: heroTag),
               const SizedBox(width: AppSpacing.md),
               Expanded(
-                child: _TitleBlock(
-                  series: series,
-                  seriesId: seriesId,
-                  read: read,
-                  total: total,
-                ),
+                child: metadataLoading
+                    ? const Shimmer(
+                        child: ExcludeSemantics(
+                          child: _TitleSkeleton(
+                            key: Key('series-title-skeleton'),
+                          ),
+                        ),
+                      )
+                    : _TitleBlock(series: series),
               ),
             ],
           ),
-          if (next != null) ...<Widget>[
+          if (booksLoading) ...<Widget>[
+            const SizedBox(height: AppSpacing.md),
+            const Shimmer(
+              child: ExcludeSemantics(
+                child: SizedBox(
+                  key: Key('series-action-skeleton'),
+                  width: AppSpacing.xxl * 3,
+                  height: AppSpacing.xxl,
+                  child: SkeletonBox(shape: StadiumBorder()),
+                ),
+              ),
+            ),
+          ] else if (next != null) ...<Widget>[
             const SizedBox(height: AppSpacing.md),
             FilledButton.icon(
               key: const Key('series-main-action'),
@@ -90,9 +122,9 @@ class SeriesHeader extends ConsumerWidget {
               ),
             ),
           ],
-          if (series?.summary?.trim().isNotEmpty ?? false) ...<Widget>[
+          if (!metadataLoading && summary.isNotEmpty) ...<Widget>[
             const SizedBox(height: AppSpacing.md),
-            _Summary(text: series!.summary!.trim()),
+            _Summary(text: summary),
           ],
         ],
       ),
@@ -110,11 +142,7 @@ class SeriesHeader extends ConsumerWidget {
     return Stack(
       children: <Widget>[
         // 背景：同一张封面放大 + 模糊，压一层暗渐变让文字可读。
-        Positioned.fill(
-          child: bytes == null
-              ? const ColoredBox(color: Colors.black12)
-              : _BlurredCover(bytes: bytes),
-        ),
+        Positioned.fill(child: SeriesHeaderBackdrop(bytes: bytes)),
         Positioned.fill(
           child: DecoratedBox(
             decoration: BoxDecoration(
@@ -135,80 +163,44 @@ class SeriesHeader extends ConsumerWidget {
   }
 }
 
-/// 模糊放大的封面背景。
-class _BlurredCover extends StatelessWidget {
-  const _BlurredCover({required this.bytes});
-
-  final Uint8List bytes;
+/// 元信息未就绪时的标题区占位：标题两行 + 作者行 + 进度条的位置。
+///
+/// 宽度/高度都取 token，尽量贴近真实排版；即便真实标题只有一行，
+/// 变化的也只是封面**下方**的高度，封面槽位不会挪位置（Hero 落点稳定）。
+class _TitleSkeleton extends StatelessWidget {
+  const _TitleSkeleton({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return ClipRect(
-      child: ImageFiltered(
-        imageFilter: ui.ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-        child: Transform.scale(
-          // 放大一点，避免模糊后边缘露出底色。
-          scale: 1.2,
-          child: Image.memory(
-            bytes,
-            fit: BoxFit.cover,
-            gaplessPlayback: true,
-            filterQuality: FilterQuality.low,
-          ),
+    return const Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        SizedBox(
+          height: AppSpacing.lg,
+          width: AppSpacing.xxl * 3,
+          child: SkeletonBox(),
         ),
-      ),
+        SizedBox(height: AppSpacing.sm),
+        SizedBox(
+          height: AppSpacing.md,
+          width: AppSpacing.xxl * 2,
+          child: SkeletonBox(),
+        ),
+        SizedBox(height: AppSpacing.sm),
+        SizedBox(
+          height: AppSizes.progressBar,
+          child: SkeletonBox(shape: StadiumBorder()),
+        ),
+      ],
     );
-  }
-}
-
-class _Cover extends StatelessWidget {
-  const _Cover({required this.bytes, required this.seriesId});
-
-  final Uint8List? bytes;
-  final String seriesId;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final shape = AppShapes.of(context, AppShapes.panel);
-    final box = SizedBox(
-      width: AppSpacing.xxl * 2,
-      height: AppSpacing.xxl * 3,
-      child: bytes == null
-          ? DecoratedBox(
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
-              ),
-            )
-          : CoverImage(bytes: bytes!),
-    );
-    final cover = DecoratedBox(
-      decoration: ShapeDecoration(
-        shape: shape,
-        shadows: AppShadows.of(context, AppShadows.cover),
-      ),
-      child: ClipPath(
-        clipper: ShapeBorderClipper(shape: shape),
-        child: box,
-      ),
-    );
-    if (AppTheme.isEink(theme)) return cover;
-    return Hero(tag: seriesHeroTag(seriesId), child: cover);
   }
 }
 
 class _TitleBlock extends StatelessWidget {
-  const _TitleBlock({
-    required this.series,
-    required this.seriesId,
-    required this.read,
-    required this.total,
-  });
+  const _TitleBlock({required this.series});
 
   final Series? series;
-  final String seriesId;
-  final int read;
-  final int total;
 
   @override
   Widget build(BuildContext context) {
@@ -216,6 +208,8 @@ class _TitleBlock extends StatelessWidget {
     final theme = Theme.of(context);
     final muted = theme.colorScheme.onSurfaceVariant;
     final series = this.series;
+    final read = series?.booksReadCount ?? 0;
+    final total = series?.booksCount ?? 0;
     final facts = <String>[
       if (series != null && series.authors.isNotEmpty)
         series.authors.join(', '),

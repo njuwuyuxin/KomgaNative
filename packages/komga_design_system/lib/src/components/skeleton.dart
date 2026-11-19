@@ -1,5 +1,6 @@
 import 'package:komga_design_system/src/motion.dart';
 import 'package:komga_design_system/src/shapes.dart';
+import 'package:komga_design_system/src/themes.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 骨架块：加载中的占位色块。
@@ -11,9 +12,16 @@ class SkeletonBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return DecoratedBox(
       decoration: ShapeDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        // 墨水屏的 `surfaceContainerHighest` 没定义、退化成纸白（`ColorScheme`
+        // 对容器色的兜底就是 surface），骨架会变成白底白块，加载中什么都看不见
+        // （`series_loading@eink` 黄金图抓到过）。灰阶屏上用 12% 墨色，
+        // 约等于浅灰，静态也看得出"这里在加载"。
+        color: AppTheme.isEink(theme)
+            ? AppTheme.einkInk.withValues(alpha: 0.12)
+            : theme.colorScheme.surfaceContainerHighest,
         shape: shape ?? AppShapes.of(context, AppShapes.card),
       ),
     );

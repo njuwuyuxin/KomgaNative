@@ -10,8 +10,8 @@ import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/providers/series_read_provider.dart';
 import 'package:komga_native/src/screens/reader_screen.dart';
 import 'package:komga_native/src/widgets/offline_banner.dart';
+import 'package:komga_native/src/widgets/series_hero_tag.dart';
 import 'package:komga_native/src/widgets/series_two_pane.dart';
-import 'package:komga_native/src/widgets/shelf_views.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 系列详情：头部（封面/进度）+ 书列表，点一本书进阅读器。
@@ -19,13 +19,22 @@ import 'package:material_ui/material_ui.dart';
 /// 窄屏是"头部 + 列表"一条滚动流；宽屏（`WindowSizeClass.expanded`）换成
 /// 左头部 / 右书列表两栏，具体布局在 `widgets/series_two_pane.dart`。
 ///
+/// **头部第一帧就渲染**，不等任何请求：从书架点进来时，封面 Hero 的终点必须
+/// 在首帧存在，共享元素动画才会播；元信息（标题/作者/进度/主按钮）与书列表
+/// 各自异步到，未到时用骨架占位。这样首次打开和第二次打开是同一段动画，
+/// 不会出现"第一次全屏加载、第二次才飞"。
+///
 /// 为什么是 StatefulWidget：书列表要能"加载更多"（UI-P2-4 解除 100 本上限），
 /// 而"要多少本"是**视图状态**（重进详情页从 100 本重新开始就够），
 /// 所以放在页面里，请求本身仍然只发生在 Repository 层。
 class SeriesDetailScreen extends ConsumerStatefulWidget {
-  const SeriesDetailScreen({required this.seriesId, super.key});
+  const SeriesDetailScreen({required this.seriesId, this.heroTag, super.key});
 
   final String seriesId;
+
+  /// 封面 Hero 的 tag：从货架进来时由 `SeriesDetailArgs` 带过来（同一页面上
+  /// 同一个系列可能有多份副本）；深链/冷启动没有源卡片时用默认 tag。
+  final String? heroTag;
 
   @override
   ConsumerState<SeriesDetailScreen> createState() => _SeriesDetailScreenState();
@@ -36,6 +45,9 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
   int _size = 100;
 
   String get seriesId => widget.seriesId;
+
+  /// 封面 Hero tag：源卡片带来的优先，否则按默认 `series-<id>`。
+  String get heroTag => widget.heroTag ?? seriesHeroTag(seriesId);
 
   SeriesBooksQuery get _booksQuery => (seriesId: seriesId, size: _size);
 
@@ -75,22 +87,28 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
     final detail = ref.watch(seriesDetailProvider(seriesId));
     final books = ref.watch(seriesBooksProvider(_booksQuery));
     final series = detail.value;
+    final page = books.value;
+    final failure = books.error;
 
     // 注意：Riverpod 3 里"首次加载失败"会表现为 AsyncLoading + hasError，
     // 用 `AsyncError` 模式匹配会掉进 loading 分支（踩过）。这里按 hasError/value 判断。
-    final error = books.error;
-    final page = books.value;
+    // hasError 也算"元信息已就绪"：请求失败时头部退回兜底标题，不能永远停在骨架上。
+    final metadataLoading = !detail.hasValue && !detail.hasError;
+
+    // 宽屏两栏；窄屏一条滚动流。断点判断只在这里做一次（WindowSizeClass）。
     final wide =
         WindowSizeClass.of(MediaQuery.sizeOf(context).width) ==
         WindowSizeClass.expanded;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          series?.title ?? l10n.seriesFallbackTitle,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
+        title: metadataLoading
+            ? const _AppBarTitleSkeleton()
+            : Text(
+                series?.title ?? l10n.seriesFallbackTitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
         actions: <Widget>[
           PopupMenuButton<String>(
             key: const Key('series-mark-menu'),
@@ -117,45 +135,31 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
         children: <Widget>[
           OfflineBanner(onRetry: () => unawaited(_refresh())),
           Expanded(
-            // 三态之间交叉淡入（UI-P2-8）：这里的内容是 box 而不是 sliver，
-            // 可以直接用 `AnimatedSwitcher`（书架页用 `PhaseFade`，见那边的注释）。
-            child: AnimatedSwitcher(
-              duration: AppMotion.of(context).standard,
-              switchInCurve: AppMotion.of(context).standardCurve,
-              switchOutCurve: AppMotion.of(context).exitCurve,
-              child: KeyedSubtree(
-                key: ValueKey<String>(
-                  error != null
-                      ? 'error'
-                      : (page != null ? 'books' : 'loading'),
-                ),
-                child: switch ((error, page)) {
-                  (final Object failure, _) => _ErrorView(
+            child: wide
+                ? SeriesTwoPane(
+                    series: series,
+                    books: page,
                     failure: failure,
+                    metadataLoading: metadataLoading,
+                    seriesId: seriesId,
+                    heroTag: heroTag,
+                    onRefresh: _refresh,
                     onRetry: () => unawaited(_refresh()),
+                    onLoadMore: _loadMore,
+                    onOpenBook: _openBook,
+                  )
+                : SeriesSinglePane(
+                    series: series,
+                    books: page,
+                    failure: failure,
+                    metadataLoading: metadataLoading,
+                    seriesId: seriesId,
+                    heroTag: heroTag,
+                    onRefresh: _refresh,
+                    onRetry: () => unawaited(_refresh()),
+                    onLoadMore: _loadMore,
+                    onOpenBook: _openBook,
                   ),
-                  (null, final PageResult<Book> data) =>
-                    wide
-                        ? SeriesTwoPane(
-                            series: series,
-                            books: data,
-                            seriesId: seriesId,
-                            onRefresh: _refresh,
-                            onLoadMore: _loadMore,
-                            onOpenBook: _openBook,
-                          )
-                        : SeriesSinglePane(
-                            series: series,
-                            books: data,
-                            seriesId: seriesId,
-                            onRefresh: _refresh,
-                            onLoadMore: _loadMore,
-                            onOpenBook: _openBook,
-                          ),
-                  _ => const _BooksSkeleton(),
-                },
-              ),
-            ),
           ),
         ],
       ),
@@ -163,55 +167,18 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
   }
 }
 
-class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.failure, required this.onRetry});
-
-  final Object failure;
-  final VoidCallback onRetry;
+/// 元信息未到时顶部 AppBar 的标题占位，避免先显示 "Series" 再跳成真实标题。
+class _AppBarTitleSkeleton extends StatelessWidget {
+  const _AppBarTitleSkeleton();
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final message = failure is ShelfFailure ? failure as ShelfFailure : null;
-    return RefreshableStatus(
-      onRefresh: () async => onRetry(),
-      status: StatusView(
-        key: const Key('series-error'),
-        icon: Icons.cloud_off_outlined,
-        title: message?.message ?? const UnexpectedFailure('').message,
-        message: message?.hint,
-        actionLabel: l10n.retry,
-        onAction: onRetry,
-      ),
-    );
-  }
-}
-
-class _BooksSkeleton extends StatelessWidget {
-  const _BooksSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    return Shimmer(
-      child: ListView.separated(
-        key: const Key('series-skeleton'),
-        padding: const EdgeInsets.all(AppSpacing.md),
-        itemCount: 6,
-        separatorBuilder: (BuildContext context, int index) =>
-            const SizedBox(height: AppSpacing.sm),
-        itemBuilder: (BuildContext context, int index) => const Row(
-          children: <Widget>[
-            SizedBox(
-              width: AppSpacing.xl,
-              height: AppSpacing.xxl,
-              child: SkeletonBox(),
-            ),
-            SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: SizedBox(height: AppSpacing.md, child: SkeletonBox()),
-            ),
-          ],
-        ),
+    return const ExcludeSemantics(
+      child: SizedBox(
+        key: Key('series-titlebar-skeleton'),
+        width: AppSpacing.xxl * 3,
+        height: AppSpacing.md,
+        child: SkeletonBox(),
       ),
     );
   }

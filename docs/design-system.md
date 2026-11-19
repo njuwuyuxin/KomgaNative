@@ -43,6 +43,7 @@ chrome 永远压在漫画画面上：浅色模式下用浅色毛玻璃，白底�
 |---|---|---|
 | `FrostedSurface` | 裁剪 → `BackdropFilter` → 半透明底色（可传 `shape`） | 墨水屏不建 `BackdropFilter` |
 | `PressableScale` | 按下缩到 0.97、松开用 `snappy` 弹簧回弹；用 `Listener` 监听原始指针，不抢子组件的点击/长按/滚动 | 墨水屏 / 减少动态效果时完全透传 |
+| `SkeletonBox` / `Shimmer` | 加载骨架色块 / 给骨架加一条扫过的高光（周期取 `AppMotion.shimmer`） | 墨水屏不画微光；`SkeletonBox` 改用 12% 墨色填充（墨水屏的 `surfaceContainerHighest` 会兜底成纸白，骨架会看不见） |
 | `AppHaptics` | `selection` / `light` / `success` 三种语义 + 总开关 | 墨水屏保留（不影响刷新）；设置页"触感反馈"关闭时全部静默 |
 
 **性能约束**：`BackdropFilter` 每帧都要读回背后像素，只用于 chrome、导航栏和面板，

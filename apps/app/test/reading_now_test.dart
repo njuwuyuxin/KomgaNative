@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
@@ -8,6 +9,9 @@ import 'package:komga_native/l10n/l10n.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/screens/reading_now_screen.dart';
+import 'package:komga_native/src/screens/series_detail_args.dart';
+import 'package:komga_native/src/screens/series_detail_screen.dart';
+import 'package:komga_native/src/widgets/series_hero_tag.dart';
 import 'package:komga_native/src/widgets/series_shelf_tile.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -116,5 +120,122 @@ void main() {
 
     expect(find.byKey(const Key('reading-now-continue')), findsOneWidget);
     expect(find.byType(SeriesShelfTile), findsNothing);
+  });
+
+  testWidgets('同一系列出现在"最近添加"和按库货架时，Hero tag 不能重复', (WidgetTester tester) async {
+    await pumpPage(tester);
+
+    final tags = tester
+        .widgetList<Hero>(find.byType(Hero))
+        .map((Hero hero) => hero.tag)
+        .toList();
+    expect(tags, isNotEmpty);
+    expect(
+      tags.toSet(),
+      hasLength(tags.length),
+      reason:
+          '同一路由里 tag 重复时 Flutter 只会挑其中一个 Hero，'
+          '封面会从另一份的位置飞进来',
+    );
+  });
+
+  testWidgets('点哪一份货架卡片，详情页就用那一份的 Hero tag', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+
+    /// 在给定货架上点 s1，断言详情页头部与源卡片用同一个（带作用域的）tag。
+    Future<void> check({required Key shelfKey, required String scope}) async {
+      // 每轮都从空树开始：两轮之间换了 ProviderScope / GoRouter，避免复用旧树。
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+
+      final repository = FakeLibraryRepository(
+        series: demoShelf(),
+        libraries: demoLibraries(),
+        ondeck: demoOndeck(),
+      );
+      final router = GoRouter(
+        initialLocation: '/reading',
+        routes: <RouteBase>[
+          GoRoute(
+            path: '/reading',
+            builder: (BuildContext context, GoRouterState state) =>
+                const ReadingNowScreen(),
+          ),
+          GoRoute(
+            path: '/series/:seriesId',
+            builder: (BuildContext context, GoRouterState state) {
+              final extra = state.extra;
+              final args = extra is SeriesDetailArgs ? extra : null;
+              return SeriesDetailScreen(
+                seriesId: state.pathParameters['seriesId'] ?? '',
+                heroTag: args?.heroTag,
+              );
+            },
+          ),
+        ],
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: <Override>[
+            libraryRepositoryProvider.overrideWithValue(repository),
+          ],
+          child: MaterialApp.router(
+            locale: const Locale('en'),
+            localizationsDelegates: appLocalizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            theme: AppTheme.light(),
+            routerConfig: router,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final source = find.descendant(
+        of: find.byKey(shelfKey),
+        matching: find.byKey(const Key('series-s1')),
+      );
+      expect(source, findsOneWidget);
+      await tester.ensureVisible(source);
+      await tester.pumpAndSettle();
+
+      await tester.tap(source);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 16));
+
+      final tag = seriesHeroTag('s1', scope: scope);
+      expect(
+        find.byWidgetPredicate(
+          (Widget widget) => widget is Hero && widget.tag == tag,
+        ),
+        findsNWidgets(2),
+        reason:
+            '$scope：源卡片与详情头部必须是同一个 tag，'
+            '否则封面会从另一份的位置飞进来',
+      );
+
+      // 退出：飞回同一张卡片，页面回到"正在读"（飞行层没有 Material 祖先，
+      // 卡片里的 InkWell 在 debug 下会断言，这条也顺带钉住）。
+      await tester.pumpAndSettle();
+      router.pop();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('reading-now-scroll')), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (Widget widget) => widget is Hero && widget.tag == tag,
+        ),
+        findsOneWidget,
+      );
+    }
+
+    await check(
+      shelfKey: const Key('reading-now-recent'),
+      scope: 'reading-now-recent',
+    );
+    await check(
+      shelfKey: const Key('reading-now-library-l1'),
+      scope: 'reading-now-library-l1',
+    );
   });
 }

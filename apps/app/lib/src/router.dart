@@ -5,6 +5,7 @@ import 'package:komga_native/src/screens/connection_screen.dart';
 import 'package:komga_native/src/screens/library_screen.dart';
 import 'package:komga_native/src/screens/reader_screen.dart';
 import 'package:komga_native/src/screens/reading_now_screen.dart';
+import 'package:komga_native/src/screens/series_detail_args.dart';
 import 'package:komga_native/src/screens/series_detail_screen.dart';
 import 'package:komga_native/src/screens/settings_screen.dart';
 import 'package:komga_native/src/screens/splash_screen.dart';
@@ -87,10 +88,16 @@ GoRouter createRouter({
       ),
       GoRoute(
         path: '/series/:seriesId',
-        builder: (BuildContext context, GoRouterState state) =>
-            SeriesDetailScreen(
-              seriesId: state.pathParameters['seriesId'] ?? '',
-            ),
+        builder: (BuildContext context, GoRouterState state) {
+          // 从货架进来时带着源卡片的 Hero tag：同一页面上同一个系列可能有多份
+          // 副本（"正在读"页的多条货架），不带的话封面会从另一份的位置飞。
+          final extra = state.extra;
+          final args = extra is SeriesDetailArgs ? extra : null;
+          return SeriesDetailScreen(
+            seriesId: state.pathParameters['seriesId'] ?? '',
+            heroTag: args?.heroTag,
+          );
+        },
       ),
       GoRoute(
         path: '/reader/:bookId',

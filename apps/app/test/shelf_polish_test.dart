@@ -9,7 +9,8 @@ import 'package:komga_native/l10n/l10n.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/screens/library_screen.dart';
 import 'package:komga_native/src/screens/series_detail_screen.dart';
-import 'package:komga_native/src/widgets/series_shelf_tile.dart';
+import 'package:komga_native/src/widgets/phase_fade.dart';
+import 'package:komga_native/src/widgets/series_hero_tag.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_library.dart';
@@ -163,17 +164,39 @@ void main() {
       await tester.pumpAndSettle();
     });
 
-    testWidgets('详情页三态之间有 AnimatedSwitcher', (WidgetTester tester) async {
+    testWidgets('详情页头部不在三态切换里，书列表用 PhaseFade 入场淡入', (
+      WidgetTester tester,
+    ) async {
+      // 卡住请求，才观察得到首帧的占位态（假仓库默认在微任务里就返回了）。
+      final gate = Completer<void>();
+      final repository = FakeLibraryRepository(series: demoShelf())
+        ..detailGate = gate
+        ..booksGate = gate;
       await pumpScreen(
         tester,
         const SeriesDetailScreen(seriesId: 's1'),
         theme: AppTheme.light(),
+        repository: repository,
       );
       await tester.pump();
-      expect(find.byType(AnimatedSwitcher), findsWidgets);
 
+      // 首帧：头部（含封面 Hero 落点）已经在，书列表区是骨架。
+      expect(find.byKey(const Key('series-title-skeleton')), findsOneWidget);
+      expect(find.byKey(const Key('series-skeleton')), findsOneWidget);
+      expect(find.byType(PhaseFade), findsOneWidget);
+      expect(
+        find.ancestor(
+          of: find.byKey(const Key('series-title-skeleton')),
+          matching: find.byType(PhaseFade),
+        ),
+        findsNothing,
+        reason: '头部不能跟着列表一起淡出，否则首次打开时 Hero 落点会中途消失',
+      );
+
+      gate.complete();
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('series-skeleton')), findsNothing);
+      expect(find.byKey(const Key('series-title-skeleton')), findsNothing);
     });
   });
 }

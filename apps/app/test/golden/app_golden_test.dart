@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:drift/native.dart';
@@ -170,6 +171,37 @@ void main() {
     );
   });
 
+  /// 列表视图（UI-P2-7）：与网格共用同一份数据，只换 sliver 类型。
+  /// 这是一套独立版式（横向封面行），必须有基线，不能只靠 widget 测试。
+  testWidgets('library_list@phone_light', (WidgetTester tester) async {
+    await pumpShelfGolden(
+      tester,
+      name: 'library_list@phone_light',
+      size: GoldenSizes.phone,
+      theme: AppTheme.light(),
+      act: (WidgetTester t) async {
+        await t.tap(find.byKey(const Key('shelf-view-menu')));
+        await t.pumpAndSettle();
+        await t.tap(find.text('List'));
+        await t.pumpAndSettle();
+      },
+    );
+  });
+
+  /// 长按上下文菜单（UI-P2-5）：缩放弹出层也是新 UI，单独出一张基线。
+  testWidgets('library_context_menu@phone_light', (WidgetTester tester) async {
+    await pumpShelfGolden(
+      tester,
+      name: 'library_context_menu@phone_light',
+      size: GoldenSizes.phone,
+      theme: AppTheme.light(),
+      act: (WidgetTester t) async {
+        await t.longPress(find.byKey(const Key('series-s1')));
+        await t.pumpAndSettle();
+      },
+    );
+  });
+
   testWidgets('library_empty@phone_light', (WidgetTester tester) async {
     await pumpShelfGolden(
       tester,
@@ -256,6 +288,68 @@ void main() {
     await pumpSeriesGolden(
       tester,
       name: 'series@eink',
+      size: GoldenSizes.eink,
+      theme: AppTheme.eink(),
+    );
+  });
+
+  /// 首次打开（元信息与书列表都还没回来）：头部封面/Hero 落点必须在，
+  /// 其余字段与书列表用骨架占位。这条基线钉住"首次打开与后续打开视觉一致"。
+  ///
+  /// 不能用 `pumpAndSettle`：骨架的微光是无限循环动画。多推一段（> 一屏的
+  /// 淡入时长）让列表区的 `PhaseFade` 到终值、封面 Provider 换进真图。
+  Future<void> pumpSeriesLoadingGolden(
+    WidgetTester tester, {
+    required String name,
+    required Size size,
+    required ThemeData theme,
+  }) async {
+    final repository =
+        FakeLibraryRepository(series: demoShelf(), libraries: demoLibraries())
+          ..detailGate = Completer<void>()
+          ..booksGate = Completer<void>();
+
+    final covers = <Uint8List>[];
+    final seriesCover = await repository.seriesCover('s1');
+    if (seriesCover != null) covers.add(seriesCover);
+
+    await pumpGoldenScreen(
+      tester,
+      screen: const SeriesDetailScreen(seriesId: 's1'),
+      size: size,
+      theme: theme,
+      overrides: <Override>[
+        libraryRepositoryProvider.overrideWithValue(repository),
+      ],
+      precacheImages: covers,
+      settle: false,
+    );
+    await tester.pump(const Duration(milliseconds: 400));
+    await expectGolden(tester, name);
+  }
+
+  testWidgets('series_loading@phone_light', (WidgetTester tester) async {
+    await pumpSeriesLoadingGolden(
+      tester,
+      name: 'series_loading@phone_light',
+      size: GoldenSizes.phone,
+      theme: AppTheme.light(),
+    );
+  });
+
+  testWidgets('series_loading@tablet_two_pane', (WidgetTester tester) async {
+    await pumpSeriesLoadingGolden(
+      tester,
+      name: 'series_loading@tablet_two_pane',
+      size: GoldenSizes.tablet,
+      theme: AppTheme.light(),
+    );
+  });
+
+  testWidgets('series_loading@eink', (WidgetTester tester) async {
+    await pumpSeriesLoadingGolden(
+      tester,
+      name: 'series_loading@eink',
       size: GoldenSizes.eink,
       theme: AppTheme.eink(),
     );

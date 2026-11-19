@@ -9,8 +9,10 @@ import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/shelf_view_options.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/providers/series_read_provider.dart';
+import 'package:komga_native/src/screens/series_detail_args.dart';
 import 'package:komga_native/src/widgets/context_menu.dart';
 import 'package:komga_native/src/widgets/cover_image.dart';
+import 'package:komga_native/src/widgets/series_hero_tag.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 长按系列卡片能做的事（UI-P2-5）。
@@ -22,14 +24,24 @@ enum SeriesMenuAction { markRead, markUnread, viewDetails }
 /// - **没有封面时必须把 `cover` 传成 null**，让 [SeriesTile] 画占位图；
 ///   传一个空 widget 会把占位图顶掉，屏幕上就是一块白板；
 /// - 封面出第一帧时淡入（[CoverImage]，UI-P2-1）；
-/// - Hero（UI-P2-2）：tag 是 `series-<id>`，系列详情页头部用同一个 tag。
+/// - Hero（UI-P2-2）：tag 默认是 `series-<id>`，系列详情页头部用同一个 tag。
 ///   墨水屏关掉 Hero——灰阶屏上的共享元素只会变成一层拖影；
+/// - 同一页面上同一个系列可能出现多次（"正在读"页的多条货架），这时调用方要传
+///   [heroTag]（见 `seriesHeroTag`），否则飞行起点/终点会是另一份的位置；
 /// - 长按弹上下文菜单：整系列标记已读/未读、查看详情。
 class SeriesShelfTile extends ConsumerWidget {
-  const SeriesShelfTile({required this.series, this.onTap, super.key});
+  const SeriesShelfTile({
+    required this.series,
+    this.onTap,
+    this.heroTag,
+    super.key,
+  });
 
   final Series series;
   final VoidCallback? onTap;
+
+  /// 这张卡片的 Hero tag；null = 默认 `series-<id>`（页面上只有一份时）。
+  final String? heroTag;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -39,6 +51,7 @@ class SeriesShelfTile extends ConsumerWidget {
       AsyncData<Uint8List?>(:final value) => value,
       _ => null,
     };
+    final tag = heroTag ?? seriesHeroTag(series.id);
 
     final tile = SeriesTile(
       key: Key('series-${series.id}'),
@@ -48,17 +61,21 @@ class SeriesShelfTile extends ConsumerWidget {
           '${series.title}, '
           '${l10n.readOfTotal(series.booksReadCount, series.booksCount)}',
       onTap: onTap,
-      onLongPress: () => unawaited(showSeriesMenu(context, ref, series)),
+      onLongPress: () =>
+          unawaited(showSeriesMenu(context, ref, series, heroTag: tag)),
       cover: bytes == null || bytes.isEmpty ? null : CoverImage(bytes: bytes),
     );
 
     if (AppTheme.isEink(Theme.of(context))) return tile;
-    return Hero(tag: seriesHeroTag(series.id), child: tile);
+    // Hero 飞行时子组件会被放进 Overlay，而 Overlay 里**没有 Material 祖先**；
+    // `SeriesTile` 内部有 InkWell（debug 会断言 "No Material widget found"，
+    // 表现是退出时红一下）。透明 Material 只补祖先、不画任何东西。
+    return Hero(
+      tag: tag,
+      child: Material(type: MaterialType.transparency, child: tile),
+    );
   }
 }
-
-/// 系列封面的 Hero tag（书架 → 详情页头部）。
-String seriesHeroTag(String seriesId) => 'series-$seriesId';
 
 /// 列表视图里的一行（UI-P2-7）：封面 + 标题 + 进度，长按菜单与网格卡片一致。
 ///
@@ -69,12 +86,16 @@ class SeriesShelfRow extends ConsumerWidget {
     required this.series,
     required this.coverSize,
     this.onTap,
+    this.heroTag,
     super.key,
   });
 
   final Series series;
   final ShelfCoverSize coverSize;
   final VoidCallback? onTap;
+
+  /// 这张行的 Hero tag；null = 默认 `series-<id>`。
+  final String? heroTag;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -90,6 +111,7 @@ class SeriesShelfRow extends ConsumerWidget {
       series.booksReadCount,
       series.booksCount,
     );
+    final tag = heroTag ?? seriesHeroTag(series.id);
 
     final row = Semantics(
       container: true,
@@ -100,7 +122,8 @@ class SeriesShelfRow extends ConsumerWidget {
         child: PressableScale(
           child: InkWell(
             onTap: onTap,
-            onLongPress: () => unawaited(showSeriesMenu(context, ref, series)),
+            onLongPress: () =>
+                unawaited(showSeriesMenu(context, ref, series, heroTag: tag)),
             child: Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.md,
@@ -172,16 +195,24 @@ class SeriesShelfRow extends ConsumerWidget {
     );
 
     if (AppTheme.isEink(theme)) return row;
-    return Hero(tag: seriesHeroTag(series.id), child: row);
+    // 同上：退出时的飞行层没有 Material 祖先，而这一行里有 InkWell。
+    return Hero(
+      tag: tag,
+      child: Material(type: MaterialType.transparency, child: row),
+    );
   }
 }
 
 /// 长按系列的上下文菜单（UI-P2-5），网格卡片与列表行共用。
+///
+/// [heroTag] 是这张卡片的 Hero tag：从"查看详情"进系列页时带过去，
+/// 否则详情页会用默认 tag，与多份副本页面上的源卡片对不上。
 Future<void> showSeriesMenu(
   BuildContext context,
   WidgetRef ref,
-  Series series,
-) async {
+  Series series, {
+  String? heroTag,
+}) async {
   final l10n = AppLocalizations.of(context);
   // 长按先给一次轻触反馈：菜单弹出前用户要知道"按到了"。
   unawaited(AppHaptics.light());
@@ -209,7 +240,10 @@ Future<void> showSeriesMenu(
   if (action == null || !context.mounted) return;
   switch (action) {
     case SeriesMenuAction.viewDetails:
-      await context.push('/series/${series.id}');
+      await context.push(
+        '/series/${series.id}',
+        extra: SeriesDetailArgs(heroTag: heroTag),
+      );
     case SeriesMenuAction.markRead:
       await ref
           .read(seriesReadProvider.notifier)

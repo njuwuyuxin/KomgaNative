@@ -8,7 +8,9 @@ import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/screens/reader_screen.dart';
+import 'package:komga_native/src/screens/series_detail_args.dart';
 import 'package:komga_native/src/widgets/cover_image.dart';
+import 'package:komga_native/src/widgets/series_hero_tag.dart';
 import 'package:komga_native/src/widgets/series_shelf_tile.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -71,6 +73,7 @@ class ReadingNowScreen extends ConsumerWidget {
             ),
             _SeriesShelf(
               key: const Key('reading-now-recent'),
+              heroScope: 'reading-now-recent',
               series: ref.watch(recentSeriesProvider).value ?? const <Series>[],
             ),
             for (final library in libraries) ...<Widget>[
@@ -90,6 +93,7 @@ class ReadingNowScreen extends ConsumerWidget {
               ),
               _SeriesShelf(
                 key: Key('reading-now-library-${library.id}'),
+                heroScope: 'reading-now-library-${library.id}',
                 series:
                     ref.watch(libraryShelfProvider(library.id)).value ??
                     const <Series>[],
@@ -236,10 +240,19 @@ class _EmptyContinueCard extends StatelessWidget {
 }
 
 /// 一条横向货架：系列卡片。
+///
+/// [heroScope] 区分同一页面上同一个系列的多份副本（"最近添加"与按库货架会重叠）。
+/// 每条货架一个 scope，详情页通过 `SeriesDetailArgs` 记住被点的那一份，
+/// 封面才会从手指下的卡片飞出去、退出时也飞回同一张。
 class _SeriesShelf extends StatelessWidget {
-  const _SeriesShelf({required this.series, super.key});
+  const _SeriesShelf({
+    required this.series,
+    required this.heroScope,
+    super.key,
+  });
 
   final List<Series> series;
+  final String heroScope;
 
   @override
   Widget build(BuildContext context) {
@@ -256,11 +269,18 @@ class _SeriesShelf extends StatelessWidget {
               const SizedBox(width: AppSpacing.sm),
           itemBuilder: (BuildContext context, int index) {
             final item = series[index];
+            final heroTag = seriesHeroTag(item.id, scope: heroScope);
             return SizedBox(
               width: AppSizes.shelfCover.width + AppSpacing.xl,
               child: SeriesShelfTile(
                 series: item,
-                onTap: () => unawaited(context.push('/series/${item.id}')),
+                heroTag: heroTag,
+                onTap: () => unawaited(
+                  context.push(
+                    '/series/${item.id}',
+                    extra: SeriesDetailArgs(heroTag: heroTag),
+                  ),
+                ),
               ),
             );
           },

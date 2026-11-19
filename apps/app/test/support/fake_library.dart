@@ -93,6 +93,11 @@ class FakeLibraryRepository implements LibraryRepository {
   /// 设成非 null 后，`series()` 会等它完成——用来稳定观察 loading 态。
   Completer<void>? gate;
 
+  /// 同上，但卡住的是系列详情 / 书列表：用来观察"首次打开详情页"的占位态
+  /// （封面 Hero 已经在，元信息还没到）。
+  Completer<void>? detailGate;
+  Completer<void>? booksGate;
+
   final Map<String, String> _coverBySeries = <String, String>{};
   final Map<String, Uint8List> _coverBytes = <String, Uint8List>{};
 
@@ -202,6 +207,8 @@ class FakeLibraryRepository implements LibraryRepository {
   @override
   Future<Series?> seriesById(String seriesId) async {
     seriesByIdCalls++;
+    final pending = detailGate;
+    if (pending != null) await pending.future;
     final failure = detailFailure;
     if (failure != null) throw failure;
     for (final series in seriesData) {
@@ -217,6 +224,8 @@ class FakeLibraryRepository implements LibraryRepository {
     int size = 100,
   }) async {
     booksCalls++;
+    final pending = booksGate;
+    if (pending != null) await pending.future;
     final failure = booksFailure;
     if (failure != null) throw failure;
 

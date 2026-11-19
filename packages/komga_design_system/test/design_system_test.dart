@@ -44,6 +44,51 @@ void main() {
     });
   });
 
+  group('SkeletonBox', () {
+    /// 取骨架块实际的填充色（骨架根本身就是一个 `DecoratedBox`）。
+    Color fillOf(WidgetTester tester) {
+      final box = tester.widget<DecoratedBox>(
+        find.descendant(
+          of: find.byType(SkeletonBox),
+          matching: find.byType(DecoratedBox),
+        ),
+      );
+      return (box.decoration as ShapeDecoration).color!;
+    }
+
+    testWidgets('普通主题用容器色', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: const Scaffold(body: SkeletonBox()),
+        ),
+      );
+
+      expect(
+        fillOf(tester),
+        AppTheme.light().colorScheme.surfaceContainerHighest,
+      );
+    });
+
+    testWidgets('墨水屏用墨色填充：容器色会兜底成纸白，骨架会看不见', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.eink(),
+          home: const Scaffold(body: SkeletonBox()),
+        ),
+      );
+
+      final fill = fillOf(tester);
+      // 墨水屏的 ColorScheme 没定义 surfaceContainerHighest → 取到的是纸白。
+      expect(
+        AppTheme.eink().colorScheme.surfaceContainerHighest,
+        AppTheme.einkPaper,
+      );
+      expect(fill, isNot(AppTheme.einkPaper));
+      expect(fill.a, greaterThan(0.05), reason: '灰阶屏上要真的看得见');
+    });
+  });
+
   group('SeriesTile', () {
     testWidgets('渲染标题与已读进度，并带无障碍标签', (tester) async {
       final handle = tester.ensureSemantics();

@@ -221,9 +221,18 @@ Panels 的高级感主要来自三点，和控件本身关系不大：
 
 ### UI-P2-2 Hero 过渡
 - 书架封面到系列详情头部封面，继续阅读卡片到阅读器首页。
-- tag 用 `series-<id>` / `book-<id>`。注意同一页面上不能有重复的 tag：继续阅读行和网格里可能是同一个系列。
+- tag 用 `series-<id>` / `book-<id>`。**同一页面上不能有重复的 tag**：同一个系列可能
+  同时出现在"正在读"页的"最近添加"与按库货架里，这时每条货架用自己的作用域
+  （`seriesHeroTag(id, scope: …)` → `series-<id>@<scope>`），详情页通过
+  `SeriesDetailArgs` 接收被点那一份的 tag；tag 重复时 Flutter 只会随便挑一个 Hero，
+  封面就会从另一份的位置飞进来。
+- **首次打开也必须播**：系列详情页的头部第一帧就渲染（封面槽位 + Hero 落点），
+  元信息与书列表后到、用骨架占位。否则第一次打开是"全屏加载"，第二次因为 provider
+  有缓存才有动画（2026-11-19 修，见下方进度记录）。
 - **墨水屏**：关闭 Hero，转场为零。
-- **验收**：widget 测试断言 tag 唯一性；在模拟器上走查一遍。
+- **验收**：widget 测试断言 tag 唯一性；`series_detail_screen_test` 断言从书架首次进入时
+  源/目标两个 Hero 落点同时存在；`reading_now_test` 断言多份副本页上点哪一份就用哪一份的
+  tag；在模拟器上走查一遍。
 
 ### UI-P2-3 iOS 式页面转场与大标题
 - 非墨水屏主题的 `pageTransitionsTheme` 在两个平台上都改用 Cupertino 式侧滑，支持边缘右滑返回。
@@ -258,8 +267,12 @@ Panels 的高级感主要来自三点，和控件本身关系不大：
 - 排序补充 Komga 支持的字段，例如按书籍数量、按发行日期。新排序参数要对照 OpenAPI 补契约测试。
 
 ### UI-P2-8 骨架屏与状态过渡
-- 首屏的纯色骨架改成带微光（shimmer）的骨架；加载、内容、错误三态之间用 `AnimatedSwitcher` 交叉淡入。
-- **墨水屏**：不做 shimmer，用静态骨架。
+- 首屏的纯色骨架改成带微光（shimmer）的骨架；状态切换用 `PhaseFade` 做入场淡入
+  （sliver 不能像 box 那样交叉淡入）。
+- 系列详情页的头部**固定在三态之外**：它要在首帧就在（Hero 落点），不能跟着列表
+  一起淡出/淡入。
+- **墨水屏**：不做 shimmer，用静态骨架；骨架块本身要能看见（容器色在墨水屏会
+  退化成纸白，见 `SkeletonBox`）。
 
 **P2 出口**：书架、系列详情、新首页三套黄金图完整；在模拟器上能看到书架内容；
 `docs/series-queries.md` 同步更新排序部分。
@@ -271,7 +284,7 @@ Panels 的高级感主要来自三点，和控件本身关系不大：
 | P2-1 | `SeriesTile` 封面改 `AppShapes.cover` 连续圆角 + `AppShadows.cover` 柔和投影（墨水屏两者都退化）；已读角标改成半透明胶囊（等宽数字）；进度条挪到**封面内侧**底部；整张卡片包 `PressableScale`；新增 `CoverImage`（书架卡片 / 继续阅读 / 书末"下一本"三处共用），解码首帧淡入 |
 | P2-2 | 书架卡片 → 系列详情头部用同一个 `series-<id>` tag（`seriesHeroTag`），墨水屏不挂 Hero；`shelf_polish_test` 断言 tag 唯一、详情页接到同一个 tag |
 | P2-3 | 新增 `IosSlidePageTransitionsBuilder`（新页从左滑入 + 旧页 30% 视差），light/dark 主题在 Android 与 iOS 都用它，墨水屏保持零转场；书架与设置页改成 `SliverAppBar.large` 可折叠大标题，整页合成一条 `CustomScrollView`（继续阅读 / 搜索 / 筛选都成了 sliver） |
-| P2-8 | 新增 `SkeletonBox` + `Shimmer`（周期取 `AppMotion.shimmer`）；墨水屏与"减少动态效果"下**不画微光**（灰阶屏上就是拖影）；系列详情三态用 `AnimatedSwitcher` 交叉淡入，书架三态用 `PhaseFade`（sliver 不能重叠，只做入场淡入，理由见组件注释） |
+| P2-8 | 新增 `SkeletonBox` + `Shimmer`（周期取 `AppMotion.shimmer`）；墨水屏与"减少动态效果"下**不画微光**（灰阶屏上就是拖影）；书架与系列详情的状态切换都用 `PhaseFade` 做入场淡入（sliver 不能重叠；2026-11-19 起系列详情的头部固定在三态之外，理由见下一条进度）。**`PhaseFade` 的退化路径必须直接到终值**：曾经在 phase 变化时 `value = 0` 再 `forward()`，动画被禁用时这一步不推进，墨水屏书架整页停在 opacity 0（有数据但看不见，`library@eink` 与 `library_error@eink` 一度是两张一模一样的空白图）；现在由 `test/phase_fade_test.dart` 钉住 |
 
 **与计划的偏差（明说）**：
 - 边缘右滑返回**没有做**：`material_ui` 没有 Cupertino 的 transitions builder，而手势在
@@ -320,6 +333,31 @@ Panels 的高级感主要来自三点，和控件本身关系不大：
 | 底部导航从"书架 / 设置"变成"**正在读** / 书架 / 设置"，连接成功后的落地页也改成 `/reading`；平板侧边栏同样三项 |
 | 书架页移除原来的"继续阅读"横排（`continue_reading_row.dart` 与其测试删除）——同一件事只在一个地方做；继续阅读卡保留了"按系列查阅读方向"的行为（日漫从首页进去仍是 RTL） |
 | 新页面按约定补齐三张黄金图：`reading_now@phone_light` / `@tablet_dark` / `@eink`；`a11y_test` 的"继续阅读卡片"用例改到新页面（语义标签与 48 点按区不放宽） |
+
+**进度（2026-11-19）：首次打开系列详情的 Hero 一致性。**
+
+| 落地 |
+|---|
+| 问题：首次打开系列时 `seriesDetailProvider` / `seriesBooksProvider` 都没有缓存，整页被骨架占掉 → 详情页没有 Hero 落点，书架→详情的共享元素动画不播；第二次打开因为 provider 有缓存才正常（第一次只是一次全屏加载） |
+| `SeriesDetailScreen` 改成**头部第一帧就渲染**：`widgets/series_header_cover.dart` 抽出封面槽位（Hero + 模糊背景 + 封面占位）；`SeriesHeader` 接收 `metadataLoading` / `booksLoading`，未到的标题/作者/进度/主按钮用 `SkeletonBox` 占位；元信息与书列表各自异步到 |
+| 书列表三态从整页 `AnimatedSwitcher` 换成 `PhaseFade`（sliver 不能重叠），头部在动画之外、Hero 落点不会中途消失；`series_two_pane.dart` 只留两栏布局，列表三态/骨架/错误拆到 `widgets/series_book_list.dart`，书行拆到 `widgets/series_book_row.dart` |
+| `SkeletonBox` 在墨水屏改用 12% 墨色填充：墨水屏 `ColorScheme` 没定义 `surfaceContainerHighest`，会兜底成纸白，骨架在灰阶屏上原来是白底白块（`series_loading@eink` 黄金图抓到过） |
+| 测试：`series_detail_screen_test` 新增"首帧 Hero/占位"、"从书架首次进入时源/目标两个 Hero 同时存在"、"详情也失败不会永远停在骨架"；`shelf_polish_test` 改为断言头部不在 `PhaseFade` 内；`design_system_test` 钉住 `SkeletonBox` 在墨水屏的可视填充 |
+| 新增黄金图 `series_loading@{phone_light,tablet_two_pane,eink}`：这是首次打开（元信息与书列表都没回来）的新 UI 状态；`series@*` 四张基线未动，说明加载完成后的版式没有漂移 |
+
+基线变更原因：仅新增 `series_loading@*` 三张；`series@*` 与其它页面基线均未变。
+
+**进度（2026-11-19）：Hero tag 按货架加作用域（"正在读"页点的不是那一份）。**
+
+| 落地 |
+|---|
+| 现象："正在读"页点系列卡片进详情、退出时，封面从一个奇怪的位置飞。原因：该页"最近添加"（全库、按添加时间）与按库货架天然重叠，同一个系列在同一路由里出现两份相同 tag；Flutter 只会挑其中一个 Hero（release 静默选错、debug 断言），飞行起点/终点就变成另一份（常常在屏幕外）。书架页每个系列只有一份，所以一直是对的 |
+| 新增 `widgets/series_hero_tag.dart`：`seriesHeroTag(id, scope: …)` 生成 `series-<id>@<scope>`；"正在读"的每条货架传自己的 scope（`reading-now-recent` / `reading-now-library-<id>`），`SeriesShelfTile` / `SeriesShelfRow` 接受 `heroTag` |
+| 详情页新增 `SeriesDetailArgs.heroTag`（路由 extra）：源卡片把自己的 tag 带过去，头部（含首次打开的占位封面）都用它；深链/冷启动没有 extra 时退回默认 `series-<id>`（没有源卡片，本来也不飞）。长按菜单"查看详情"同样带 tag |
+| 顺带修掉一个只会出现在 debug 的断言：Hero 飞行层（Overlay）没有 `Material` 祖先，而书架卡片内部有 `InkWell`，退出时抛 "No Material widget found"。卡片外包一层 `Material(type: transparency)`，只补祖先、不画东西（黄金图未变） |
+| 测试：`reading_now_test` 新增"同页 Hero tag 唯一"与"点哪一份货架卡片，详情页就用那一份的 tag"（含退出回原页）；`shelf_polish_test` / `series_detail_screen_test` 的 tag 断言改从 `series_hero_tag.dart` 取 |
+
+基线变更原因：无（Hero tag 与透明 Material 都不改变绘制）。
 
 ---
 

@@ -72,12 +72,19 @@
 - 其余：保持原来的单栏（头部与书列表同一条滚动流）。
 
 阈值刻意用 `expanded` 而不是"非 compact"：758×1024 的墨水屏、844×390 的横屏手机
-放进两栏会把书列表挤成一条缝，竖向空间也不够。两栏实现拆在
+放进两栏会把书列表挤成一条缝，竖向空间也不够。两栏布局拆在
 `apps/app/lib/src/widgets/series_two_pane.dart`，`series_detail_screen.dart` 只负责
-选择布局与路由。
+选择布局与路由；书列表的三态（骨架 / 错误 / 内容）在
+`apps/app/lib/src/widgets/series_book_list.dart`，单本书行在
+`apps/app/lib/src/widgets/series_book_row.dart`。
+
+两栏模式的**头部第一帧就在**（封面 + Hero 落点），左侧与右侧各自渲染占位：
+元信息与书列表异步到，到了再填。占位骨架都包在 `ExcludeSemantics` 里，
+读屏不会念"空块"，只会念加载完成后的标题/进度/书行。
 
 黄金图：`series@tablet_dark`（1024×768，深色）按两栏重新生成；新增
 `series@tablet_two_pane`（同尺寸、浅色）。手机 / 墨水屏金图未变，说明窄屏路径没有漂移。
+首次打开的占位态单独三张：`series_loading@{phone_light,tablet_two_pane,eink}`。
 
 ## 墨水屏边界
 
