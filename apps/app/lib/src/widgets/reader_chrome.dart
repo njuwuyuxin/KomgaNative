@@ -1,5 +1,6 @@
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
+import 'package:komga_native/src/l10n/failure_text.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/widgets/reader_palette.dart';
 import 'package:komga_reader_engine/komga_reader_engine.dart';
@@ -44,14 +45,18 @@ class ReaderFailure extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.md),
               Text(
-                title ?? message?.message ?? l10n.readerOpenFailed,
+                title ??
+                    (message == null
+                        ? null
+                        : l10n.failureTitle(message.kind)) ??
+                    l10n.readerOpenFailed,
                 style: TextStyle(color: palette.onBackground),
                 textAlign: TextAlign.center,
               ),
-              if (message?.hint != null) ...<Widget>[
+              if (message != null) ...<Widget>[
                 const SizedBox(height: AppSpacing.sm),
                 Text(
-                  message!.hint!,
+                  l10n.failureHint(message.kind),
                   style: TextStyle(color: palette.onBackgroundMuted),
                   textAlign: TextAlign.center,
                 ),

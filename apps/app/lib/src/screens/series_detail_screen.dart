@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
+import 'package:komga_native/src/l10n/failure_text.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/book_read_provider.dart';
 import 'package:komga_native/src/providers/book_selection_provider.dart';
@@ -138,8 +139,13 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
       await ref.read(seriesReadProvider.notifier).setRead(seriesId, read: read);
     } on ShelfFailure catch (failure) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(failure.message)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context).failureTitle(failure.kind),
+          ),
+        ),
+      );
     }
   }
 

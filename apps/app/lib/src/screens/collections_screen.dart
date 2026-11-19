@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/data/shelf_failure.dart';
+import 'package:komga_native/src/l10n/failure_text.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/widgets/collection_covers.dart';
 import 'package:komga_native/src/widgets/load_more_footer.dart';
@@ -117,9 +117,7 @@ class _CollectionsTabState extends ConsumerState<_CollectionsTab> {
     if (async.hasError && !async.hasValue) {
       return _Error(
         topPadding: widget.topPadding,
-        message: async.error is ShelfFailure
-            ? (async.error! as ShelfFailure).message
-            : l10n.errorGeneric,
+        message: l10n.failureTitle(failureKindOf(async.error)),
         onRetry: () => ref.invalidate(provider),
       );
     }
@@ -304,9 +302,7 @@ class _ReadListsTabState extends ConsumerState<_ReadListsTab> {
     if (async.hasError && !async.hasValue) {
       return _Error(
         topPadding: widget.topPadding,
-        message: async.error is ShelfFailure
-            ? (async.error! as ShelfFailure).message
-            : l10n.errorGeneric,
+        message: l10n.failureTitle(failureKindOf(async.error)),
         onRetry: () => ref.invalidate(provider),
       );
     }

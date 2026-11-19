@@ -73,7 +73,7 @@
 | HIS-03 | Insights（连续天数/热力图/统计） | P2 | TODO | — |
 | HIS-04 | 阅读器内阅读时长 | P2 | DONE | `feat(reader): chrome 显示本次阅读时长` |
 | PLT-02 | iPad 默认双页/阅读布局 | P2 | DONE | `feat(reader): 平板默认排版（自动/单页/双页）` |
-| I18N-01 | 数据层错误文案本地化 | P2 | TODO | — |
+| I18N-01 | 数据层错误文案本地化 | P2 | DONE | `feat(i18n): 失败类型走 l10n` |
 | A11Y-01 | TalkBack/VoiceOver + Dynamic Type 2.0 | P2 | TODO | — |
 | UI-03 | 黄金图覆盖补齐 | P2 | TODO | — |
 
@@ -228,6 +228,24 @@
   `continueReadingProgress` 是 FIX-06 之后失效的）。
 - 验证：55 条阅读器测试 + 黄金图全部不变（零行为变更）；设备上打开第 114/227 页
   照常渲染，滑杆与"剩 113 页"一致。
+
+### I18N-01 数据层错误文案本地化
+
+- `ShelfFailure` 增加 `ShelfFailureKind`（auth / network / server / protocol /
+  certificate / unexpected），每个子类给出自己的 `kind`。数据层从此只保证"是什么错"，
+  **不再决定"怎么说"**。
+- 新增 `lib/src/l10n/failure_text.dart`：`l10n.failureTitle(kind)` / `failureHint(kind)`
+  两张 switch 表 + `failureKindOf(error)`（未知类型一律 `unexpected`，
+  **绝不把异常对象拼进界面**）。
+- 替换了 8 处直接显示 `failure.message` 的地方：书架错误页、收藏集/阅读列表/收藏详情、
+  系列详情 SnackBar、搜索刷新失败、阅读器打开失败页、下载失败状态。
+- 新词条 12 条（6 种类 × 标题/建议），中英各一套。
+- 测试：`failure_l10n_test.dart` 3 条——每种失败的中英标题都不为空且中文含汉字
+  （防止直接抄英文）、`KomgaError` → kind 映射逐个断言、未知错误归 unexpected
+  且文案里不含原始异常文本。
+- 设备走查：断网后书架显示"离线 · 显示已保存的内容 / 重试"（此前已本地化的横幅）。
+  "无缓存 + 请求失败"那种整页错误在真机上不好造（要清数据重登），
+  这条由上面 3 条单测覆盖；走查后已恢复网络（`wifi_on` 已确认）。
 
 ### PLT-02 平板默认排版
 

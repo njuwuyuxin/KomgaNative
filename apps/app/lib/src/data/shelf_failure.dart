@@ -7,8 +7,23 @@ import 'package:komga_api/komga_api.dart';
 /// 不是 HTTP 细节。由数据层在这里一次性翻译。
 ///
 /// 文案暂用英文，与其余 UI 一致；i18n 切片会连同 ARB 与中文字体一起处理。
+/// 失败的种类（I18N-01）：UI 按它查本地化文案，不再显示数据层写死的英文。
+///
+/// `unexpected` 是兜底：未知类型也必须有一句人话，不能把裸异常扔给用户。
+enum ShelfFailureKind {
+  auth,
+  network,
+  server,
+  protocol,
+  certificate,
+  unexpected,
+}
+
 sealed class ShelfFailure implements Exception {
   const ShelfFailure(this.message, {this.hint});
+
+  /// 本地化用的种类标签。
+  ShelfFailureKind get kind;
 
   /// 一句话说明，直接进 `StatusView.title`。
   final String message;
@@ -22,6 +37,9 @@ sealed class ShelfFailure implements Exception {
 
 /// 凭据失效：重试没用，必须重新连接。
 class AuthFailure extends ShelfFailure {
+  @override
+  ShelfFailureKind get kind => ShelfFailureKind.auth;
+
   const AuthFailure()
     : super(
         'Session expired',
@@ -31,6 +49,9 @@ class AuthFailure extends ShelfFailure {
 
 /// 网络不可达：可以重试，通常是地址/网络问题。
 class NetworkFailure extends ShelfFailure {
+  @override
+  ShelfFailureKind get kind => ShelfFailureKind.network;
+
   const NetworkFailure()
     : super(
         'Cannot reach the server',
@@ -40,6 +61,9 @@ class NetworkFailure extends ShelfFailure {
 
 /// 服务端 5xx：可退避重试。
 class ServerFailure extends ShelfFailure {
+  @override
+  ShelfFailureKind get kind => ShelfFailureKind.server;
+
   const ServerFailure()
     : super(
         'Server error',
@@ -49,6 +73,9 @@ class ServerFailure extends ShelfFailure {
 
 /// 请求被拒/响应不可解析：多半是版本或反向代理问题。
 class ProtocolFailure extends ShelfFailure {
+  @override
+  ShelfFailureKind get kind => ShelfFailureKind.protocol;
+
   const ProtocolFailure()
     : super(
         'Unexpected server response',
@@ -60,6 +87,9 @@ class ProtocolFailure extends ShelfFailure {
 ///
 /// 必须重新走一次连接流程让用户确认——静默接受新证书等于把 TOFU 作废。
 class CertificateFailure extends ShelfFailure {
+  @override
+  ShelfFailureKind get kind => ShelfFailureKind.certificate;
+
   const CertificateFailure()
     : super(
         'Server certificate changed',
@@ -69,6 +99,9 @@ class CertificateFailure extends ShelfFailure {
 
 /// 兜底：不该发生，但绝不让 UI 看到裸异常。
 class UnexpectedFailure extends ShelfFailure {
+  @override
+  ShelfFailureKind get kind => ShelfFailureKind.unexpected;
+
   const UnexpectedFailure(this.detail)
     : super('Failed to load', hint: 'Pull to refresh to try again.');
 
