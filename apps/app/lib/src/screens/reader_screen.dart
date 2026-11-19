@@ -15,6 +15,7 @@ import 'package:komga_native/src/widgets/reader_background.dart';
 import 'package:komga_native/src/widgets/reader_bottom_chrome.dart';
 import 'package:komga_native/src/widgets/reader_frame.dart';
 import 'package:komga_native/src/widgets/reader_layout.dart';
+import 'package:komga_native/src/widgets/reader_opening_hero.dart';
 import 'package:komga_native/src/widgets/reader_pages_gate.dart';
 import 'package:komga_native/src/widgets/reader_paged_view.dart';
 import 'package:komga_native/src/widgets/reader_palette.dart';
@@ -46,6 +47,7 @@ class ReaderScreen extends ConsumerStatefulWidget {
     required this.bookId,
     this.book,
     this.direction = ReadingDirection.unknown,
+    this.heroTag,
     this.onOpenNext,
     super.key,
   });
@@ -56,6 +58,9 @@ class ReaderScreen extends ConsumerStatefulWidget {
   final Book? book;
 
   final ReadingDirection direction;
+
+  /// 源卡片的封面 Hero tag（继续阅读卡片 → 阅读器开场，UI-P2-2）。
+  final String? heroTag;
 
   /// "下一本"的打开方式。
   ///
@@ -228,13 +233,31 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   @override
   Widget build(BuildContext context) {
     final isEink = ref.watch(settingsProvider).forceEink;
+    final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final openingHero = widget.heroTag;
     return VolumeKeyScope(
       onKey: _onVolumeKey,
-      child: ReaderPagesGate(
-        pages: ref.watch(readerPagesProvider(widget.bookId)),
-        palette: ReaderPalette.of(isEink: isEink),
-        onRetry: () => ref.invalidate(readerPagesProvider(widget.bookId)),
-        builder: (List<PageInfo> pages) => _buildPages(context, isEink, pages),
+      child: Stack(
+        fit: StackFit.expand,
+        children: <Widget>[
+          ReaderPagesGate(
+            pages: ref.watch(readerPagesProvider(widget.bookId)),
+            palette: ReaderPalette.of(isEink: isEink),
+            onRetry: () => ref.invalidate(readerPagesProvider(widget.bookId)),
+            builder: (List<PageInfo> pages) =>
+                _buildPages(context, isEink, pages),
+          ),
+          // 继续阅读卡片的封面先飞进来，落地后再由页图接管（UI-P2-2）。
+          // 没有源卡片、墨水屏、系统"减少动态效果"时都不建。
+          if (openingHero != null && !isEink && !reduceMotion)
+            Positioned.fill(
+              child: ReaderOpeningHero(
+                bookId: widget.bookId,
+                page: widget.book?.readProgress?.page ?? 1,
+                tag: openingHero,
+              ),
+            ),
+        ],
       ),
     );
   }

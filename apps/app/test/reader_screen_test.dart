@@ -1,13 +1,17 @@
 import 'dart:async';
 
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
+import 'package:komga_native/src/providers/library_providers.dart';
+import 'package:komga_native/src/widgets/book_hero_tag.dart';
 import 'package:komga_platform/komga_platform.dart';
 import 'package:material_ui/material_ui.dart';
 
+import 'support/fake_library.dart';
 import 'support/fake_reader.dart';
 import 'support/fakes.dart';
 import 'support/reader_harness.dart';
@@ -23,6 +27,45 @@ void main() {
     // 只看页图本身：chrome 里的缩略图滑条也是 `Image`，按类型数会把它算进来。
     expect(find.byKey(const Key('reader-image-0')), findsOneWidget);
     expect(repository.pageImageCalls, greaterThanOrEqualTo(1));
+  });
+
+  testWidgets('继续阅读开场：封面 Hero 先在场，转场后让位给页图', (WidgetTester tester) async {
+    final tag = bookHeroTag('b1');
+    final repository = FakeReaderRepository();
+    // 把首页图卡住：封面不能在页图还没到时先淡出（设备上会露出黑底转圈）。
+    final gate = Completer<void>();
+    repository.pageGates[1] = gate;
+    await pumpReader(
+      tester,
+      repository: repository,
+      book: demoReaderBook(),
+      heroTag: tag,
+      settle: false,
+      extraOverrides: <Override>[
+        libraryRepositoryProvider.overrideWithValue(
+          FakeLibraryRepository(ondeck: demoOndeck()),
+        ),
+      ],
+    );
+
+    // 第一帧：Hero 落点已经在，且和继续阅读卡片用同一个 tag。
+    expect(find.byKey(const Key('reader-opening-hero')), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (Widget widget) => widget is Hero && widget.tag == tag,
+      ),
+      findsOneWidget,
+    );
+
+    // 页图没来之前，封面必须还在。
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.byKey(const Key('reader-opening-hero')), findsOneWidget);
+
+    // 页图到了才淡出，页面图接管（不会一直盖着阅读区）。
+    gate.complete();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('reader-opening-hero')), findsNothing);
+    expect(find.byKey(const Key('reader-image-0')), findsOneWidget);
   });
 
   testWidgets('离线时顶栏出现缓存提示（阅读区不挤占）', (WidgetTester tester) async {

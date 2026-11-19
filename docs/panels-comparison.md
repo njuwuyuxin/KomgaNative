@@ -11,7 +11,7 @@
 
 ## 0. 结论先行
 
-1. **UI 细化计划本身已经做完大半**：P0 6/6、P1 7/7、P2 8/8 已落地；P2 有 3 处缩水；
+1. **UI 细化计划本身已经做完大半**：P0 6/6、P1 7/7、P2 8/8 已落地；P2 有 2 处缩水；
    **P3 的 14 项一项没做**。所以"还差哪些"的第一个答案就是 P3 清单（§4），
    而不是从零再列一遍。
 2. **阅读器核心体验已经和 Panels 对齐**：浮层毛玻璃 chrome、卷页（双页还铰接书脊）、
@@ -35,14 +35,13 @@
 |---|---|---|---|
 | P0 设计系统地基 | 拆 `reader_screen`、动效/材质/形状/字体 token、`PressableScale` / `AppHaptics` | 6/6 | [design-system.md](design-system.md) |
 | P1 阅读器体验 | chrome 动画 + 沉浸、缩略图滑条、适配、方向、动态背景、双击、书末卡片 | 7/7 | [reader.md](reader.md) |
-| P2 书架/详情 | 封面质感、Hero、iOS 转场与大标题、详情重做、长按菜单、Reading Now、视图选项、骨架 | 8/8（3 处缩水） | [ui-polish-plan.md](ui-polish-plan.md) |
+| P2 书架/详情 | 封面质感、Hero、iOS 转场与大标题、详情重做、长按菜单、Reading Now、视图选项、骨架 | 8/8（2 处缩水） | [ui-polish-plan.md](ui-polish-plan.md) |
 | P3 长尾 | 预设、按系列记忆、自动双页、锁定缩放、双页修正、分享页、渐变背景、收藏集/阅读列表、全局搜索、滤镜、键盘/遥控、隐身、下载管理、墨水屏探测 | **0/14** | §4 |
 
-### 1.2 P2 的 3 处缩水
+### 1.2 P2 的 2 处缩水
 
 | 编号 | 计划 | 现状 | 原因 / 影响 |
 |---|---|---|---|
-| P2-2 | 继续阅读卡片 → 阅读器首页 Hero | 只做了书架 → 详情 | 阅读器首页图异步解码，飞行途中首页可能还是转圈；目前只做详情。见 `ui-polish-plan.md` |
 | P2-3 | 边缘右滑返回 | 未做 | `material_ui` 没有 Cupertino 的 transitions builder，手势在 `PageRoute` 里；需要自定义 Route 并接管 go_router。Android 系统返回手势不受影响 |
 | P2-7 | 补"按书籍数量 / 发行日期"排序；平板捏合调封面 | 未做 | OpenAPI 不列可排序字段，且排序属性 ≠ DTO 字段；捏合会和网格滚动/下拉刷新抢手势。见 [series-queries.md](series-queries.md) |
 

@@ -337,6 +337,16 @@ Panels 的高级感主要来自三点，和控件本身关系不大：
 | 书架页移除原来的"继续阅读"横排（`continue_reading_row.dart` 与其测试删除）——同一件事只在一个地方做；继续阅读卡保留了"按系列查阅读方向"的行为（日漫从首页进去仍是 RTL） |
 | 新页面按约定补齐三张黄金图：`reading_now@phone_light` / `@tablet_dark` / `@eink`；`a11y_test` 的"继续阅读卡片"用例改到新页面（语义标签与 48 点按区不放宽） |
 
+**进度（2026-11-19）：P2-2 继续阅读卡片 → 阅读器开场 Hero（补齐缩水）。**
+
+| 落地 |
+|---|
+| 新增 `widgets/book_hero_tag.dart`（`book-<id>`）与 `widgets/reader_opening_hero.dart`；继续阅读卡片封面包 `Hero`，`ReaderArgs` 把 tag 带到阅读器 |
+| 阅读器第一帧不依赖页图：`ReaderOpeningHero` 先放一张封面落点（2:3 页面槽位），**等首屏页图字节真的到达**（404/失败或约 1.35s 超时兜底）再淡出，页图在下面接管。这样转场途中始终是封面，不会"封面飞过去变成一个转圈"。第一版固定 450ms 淡出，设备走查时在弱网/大页面上仍露出一次黑底转圈，所以改成等页图 |
+| 墨水屏与系统"减少动态效果"不建 Hero；系列详情/深链没有 `heroTag` 时也不建。退场仍是普通滑动：页图是异步的，反向 Hero 会从转圈起飞，暂不做 |
+| 测试：`reading_now_test` 断言继续阅读卡片用 `bookHeroTag('s1-b1')`；`reader_screen_test` 新增"页图没来时封面不淡出、页图到了才让位"（用 `pageGates` 卡住首页）；`pumpReader` 增加 `heroTag` / `settle` 参数 |
+| 黄金图不变（Hero 包装不改变静态像素，`reading_now@*` 与 `reader@*` 基线均未动） |
+
 **进度（2026-11-19）：首次打开系列详情的 Hero 一致性。**
 
 | 落地 |

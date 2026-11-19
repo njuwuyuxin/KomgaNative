@@ -11,6 +11,7 @@ import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/screens/reading_now_screen.dart';
 import 'package:komga_native/src/screens/series_detail_args.dart';
 import 'package:komga_native/src/screens/series_detail_screen.dart';
+import 'package:komga_native/src/widgets/book_hero_tag.dart';
 import 'package:komga_native/src/widgets/series_hero_tag.dart';
 import 'package:komga_native/src/widgets/series_shelf_tile.dart';
 import 'package:material_ui/material_ui.dart';
@@ -59,6 +60,13 @@ void main() {
     // demoOndeck 第一本读到第 5 页，共 12 页。
     expect(find.text('p. 5 / 12'), findsOneWidget);
     expect(find.text('Continue reading'), findsOneWidget);
+    // 封面是阅读器开场 Hero 的起点（UI-P2-2）。
+    expect(
+      find.byWidgetPredicate(
+        (Widget widget) => widget is Hero && widget.tag == bookHeroTag('s1-b1'),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('最近添加与按库分组各有一条货架', (WidgetTester tester) async {

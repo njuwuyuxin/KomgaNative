@@ -41,6 +41,8 @@ Future<InMemoryReaderPrefsStore> pumpReader(
   FakeHardwareKeys? hardwareKeys,
   ProgressStore? progressStore,
   bool offline = false,
+  String? heroTag,
+  bool settle = true,
   void Function(Book next)? onOpenNext,
   List<Override> extraOverrides = const <Override>[],
 }) async {
@@ -88,12 +90,13 @@ Future<InMemoryReaderPrefsStore> pumpReader(
           bookId: bookId,
           book: book,
           direction: direction,
+          heroTag: heroTag,
           onOpenNext: onOpenNext,
         ),
       ),
     ),
   );
-  await tester.pumpAndSettle();
+  if (settle) await tester.pumpAndSettle();
   return prefsStore;
 }
 

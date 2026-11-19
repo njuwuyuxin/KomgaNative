@@ -9,6 +9,7 @@ import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/screens/reader_screen.dart';
 import 'package:komga_native/src/screens/series_detail_args.dart';
+import 'package:komga_native/src/widgets/book_hero_tag.dart';
 import 'package:komga_native/src/widgets/cover_image.dart';
 import 'package:komga_native/src/widgets/series_hero_tag.dart';
 import 'package:komga_native/src/widgets/series_shelf_tile.dart';
@@ -131,6 +132,22 @@ class _ContinueCard extends ConsumerWidget {
         ? l10n.bookPages(book.pagesCount)
         : l10n.continueReadingProgress(progress.page, book.pagesCount);
     final shape = AppShapes.of(context, AppShapes.card);
+    // 墨水屏 / 减少动态效果不做 Hero；其余情况把 tag 一路带到阅读器开场。
+    final heroTag =
+        AppTheme.isEink(theme) ||
+            (MediaQuery.maybeDisableAnimationsOf(context) ?? false)
+        ? null
+        : bookHeroTag(book.id);
+    final cover = ClipPath(
+      clipper: ShapeBorderClipper(shape: shape),
+      child: SizedBox(
+        width: AppSizes.shelfCover.width,
+        height: AppSizes.shelfCover.height,
+        child: bytes == null
+            ? const ColoredBox(color: Colors.black12)
+            : CoverImage(bytes: bytes),
+      ),
+    );
 
     return Semantics(
       key: const Key('reading-now-continue'),
@@ -138,12 +155,12 @@ class _ContinueCard extends ConsumerWidget {
       button: true,
       // 整张卡片是一个按钮：读屏只念"书名 + 进度"，不逐条念封面/标签/页码。
       label: '${book.name}, $label',
-      onTap: () => unawaited(_open(context, book, direction)),
+      onTap: () => unawaited(_open(context, book, direction, heroTag)),
       child: ExcludeSemantics(
         child: PressableScale(
           child: InkWell(
             borderRadius: BorderRadius.circular(AppRadii.md),
-            onTap: () => unawaited(_open(context, book, direction)),
+            onTap: () => unawaited(_open(context, book, direction, heroTag)),
             child: DecoratedBox(
               decoration: ShapeDecoration(
                 color: theme.colorScheme.surfaceContainerHighest,
@@ -153,16 +170,7 @@ class _ContinueCard extends ConsumerWidget {
                 padding: const EdgeInsets.all(AppSpacing.md),
                 child: Row(
                   children: <Widget>[
-                    ClipPath(
-                      clipper: ShapeBorderClipper(shape: shape),
-                      child: SizedBox(
-                        width: AppSizes.shelfCover.width,
-                        height: AppSizes.shelfCover.height,
-                        child: bytes == null
-                            ? const ColoredBox(color: Colors.black12)
-                            : CoverImage(bytes: bytes),
-                      ),
-                    ),
+                    heroTag == null ? cover : Hero(tag: heroTag, child: cover),
                     const SizedBox(width: AppSpacing.md),
                     Expanded(
                       child: Column(
@@ -191,8 +199,9 @@ class _ContinueCard extends ConsumerWidget {
                           ),
                           const SizedBox(height: AppSpacing.sm),
                           FilledButton(
-                            onPressed: () =>
-                                unawaited(_open(context, book, direction)),
+                            onPressed: () => unawaited(
+                              _open(context, book, direction, heroTag),
+                            ),
                             child: Text(l10n.continueReading),
                           ),
                         ],
@@ -212,10 +221,11 @@ class _ContinueCard extends ConsumerWidget {
     BuildContext context,
     Book book,
     ReadingDirection direction,
+    String? heroTag,
   ) async {
     await context.push(
       '/reader/${book.id}',
-      extra: ReaderArgs(book: book, direction: direction),
+      extra: ReaderArgs(book: book, direction: direction, heroTag: heroTag),
     );
   }
 }

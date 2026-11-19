@@ -110,6 +110,7 @@ GoRouter createRouter({
             bookId: state.pathParameters['bookId'] ?? '',
             book: args?.book,
             direction: args?.direction ?? ReadingDirection.unknown,
+            heroTag: args?.heroTag,
           );
         },
       ),
