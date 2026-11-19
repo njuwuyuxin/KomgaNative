@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_native/src/data/settings_store.dart';
+import 'package:komga_platform/komga_platform.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 界面语言。
@@ -116,3 +117,14 @@ final Provider<SettingsStore> settingsStoreProvider = Provider<SettingsStore>(
 
 final NotifierProvider<SettingsController, SettingsState> settingsProvider =
     NotifierProvider<SettingsController, SettingsState>(SettingsController.new);
+
+/// 设备是不是墨水屏（UI-P3-14）。
+///
+/// Android 原生侧按厂商/型号做保守探测；没有实现（iOS/测试）时 [EinkProbe]
+/// 返回 unknown → false。探测失败只会让主题保持彩色，不阻塞启动。
+final FutureProvider<bool> einkDetectedProvider = FutureProvider<bool>((
+  Ref ref,
+) async {
+  final info = await EinkProbe().detect();
+  return info.isEink;
+});

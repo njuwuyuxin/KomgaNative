@@ -467,6 +467,15 @@ Panels 的高级感主要来自三点，和控件本身关系不大：
 | `ReaderPalette` 增加 `gradient`；`ReaderFrame` 的底色层从 `TweenAnimationBuilder<Color>` 换成 `AnimatedContainer` 的 `BoxDecoration`，可插值渐变；墨水屏仍只给纸色 |
 | 设置面板多一档"沉浸式"；新增 `reader_immersive@phone_dark` 黄金图（合成左右红/蓝页边） |
 
+**进度（2026-11-19）：P3-14 墨水屏自动探测。**
+
+| 落地 |
+|---|
+| Android `MainActivity` 的 `komganative/device` 通道实现 `eink`：按 Build 厂商/品牌/型号匹配常见墨水屏标记，返回 `{isEink, vendor}`；宁可漏判不误判 |
+| `einkDetectedProvider` 调 `EinkProbe`；`KomgaApp` 用 `settings.forceEink || detected` 选主题。探测失败只保持彩色，不阻塞启动；手动强制仍优先 |
+| 测试：`eink_probe_test` 覆盖正常返回、MissingPlugin、PlatformException、null；iOS/测试环境仍 unknown |
+| 未做：真实墨水屏设备上的探测命中率验证（模拟器无法伪造 Build 厂商）；需要 Boox/Kindle 真机走查 |
+
 ## 不做
 
 | 需求 | 理由 |

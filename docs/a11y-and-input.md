@@ -91,6 +91,10 @@
 已经有的：
 
 - e-ink 主题零动画、零阴影、无水波纹、纯黑白（`AppTheme.eink`）；
+- **自动探测**（UI-P3-14）：Android 原生侧按 `Build.MANUFACTURER/BRAND/MODEL` 匹配
+  Onyx/Boox、reMarkable、PocketBook、Kobo、Tolino、Boyue/LikeBook、Meebook、Supernote、Hisense
+  等标记；命中后 App 自动用 e-ink 主题。探测失败/未实现（iOS、测试）一律 unknown，
+  不阻塞启动；手动"墨水屏模式"开关仍然优先。
 - 阅读器在墨水屏上用白底黑字（黑底会触发整屏全刷），顶栏/底栏/错误页同一套配色；
 - 大尺寸点击目标（见上），避免小按钮在低刷新率屏幕上难按。
 

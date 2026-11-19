@@ -13,7 +13,7 @@ import io.flutter.plugin.common.MethodChannel
  *
  * 用 Window flag 而不是第三方插件：需求就是一个 flag，加插件只会多一层原生构建面。
  * 通道名与 `packages/komga_platform/lib/src/wakelock.dart`、
- * `hardware_keys.dart` 对应；`eink` 方法目前未实现（Dart 侧会退化成 EinkInfo.unknown）。
+ * `hardware_keys.dart` 对应；`eink` 方法按厂商/型号做一次保守探测（UI-P3-14）。
  *
  * 音量键：ACTION_DOWN 时通过同一通道发给 Dart，并**消费事件**（返回 true），
  * 否则按音量键会调系统音量。只在阅读器激活期间生效（Dart 侧
@@ -81,6 +81,17 @@ class MainActivity : FlutterActivity() {
                     volumeKeysEnabled = call.argument<Boolean>("active") ?: false
                     result.success(null)
                 }
+                // 墨水屏探测：只认厂商/品牌/型号里的已知标记，宁可漏判也不误判
+                // （误判会把普通平板的主题切成纯黑白）。
+                "eink" -> {
+                    val vendor = detectEinkVendor()
+                    result.success(
+                        mapOf(
+                            "isEink" to (vendor != null),
+                            "vendor" to (vendor ?: "unknown"),
+                        ),
+                    )
+                }
                 else -> result.notImplemented()
             }
         }
@@ -113,6 +124,32 @@ class MainActivity : FlutterActivity() {
         } else {
             window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
+    }
+
+    /**
+     * 墨水屏厂商/型号标记。
+     *
+     * 这些标记来自常见墨水屏设备的 Build 字段；不保证覆盖所有设备，
+     * 但误判代价（普通平板被切成黑白）比漏判高，所以只做保守的字符串匹配。
+     */
+    private fun detectEinkVendor(): String? {
+        val identity = listOf(Build.MANUFACTURER, Build.BRAND, Build.MODEL)
+            .joinToString(" ")
+            .lowercase()
+        val vendors = listOf(
+            "onyx" to "onyx",
+            "boox" to "onyx",
+            "remarkable" to "remarkable",
+            "pocketbook" to "pocketbook",
+            "kobo" to "kobo",
+            "tolino" to "tolino",
+            "boyue" to "boyue",
+            "likebook" to "boyue",
+            "meebook" to "meebook",
+            "supernote" to "supernote",
+            "hisense" to "hisense",
+        )
+        return vendors.firstOrNull { identity.contains(it.first) }?.second
     }
 
     companion object {
