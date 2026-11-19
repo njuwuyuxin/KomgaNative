@@ -85,6 +85,12 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
     (ReaderPrefs p) => p.copyWith(doubleTapZoom: enabled),
   );
 
+  /// 自动滚动速度 1–10（RDR-08）：跟着书走。
+  void setAutoScrollSpeed(int speed, {String? seriesId}) => _updateConfig(
+    seriesId,
+    (ReaderPrefs p) => p.copyWith(autoScrollSpeed: speed.clamp(1, 10)),
+  );
+
   /// 平板默认排版（PLT-02）：全局设置，不进系列覆盖。
   void setTabletLayout(TabletLayoutChoice choice) =>
       _update(state.copyWith(tabletLayout: choice));

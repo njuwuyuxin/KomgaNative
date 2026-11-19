@@ -173,6 +173,7 @@ class ReaderPrefs {
     this.tapZone = TapZonePreset.automatic,
     this.invertTapZones = false,
     this.doubleTapZoom = true,
+    this.autoScrollSpeed = 5,
     this.presets = const <ReaderPreset>[],
     this.seriesOverrides = const <String, ReaderPrefs>{},
   });
@@ -221,6 +222,9 @@ class ReaderPrefs {
 
   /// 双击放大（RDR-07）：关掉后中间区单击不再等双击窗口。
   final bool doubleTapZoom;
+
+  /// 自动滚动速度档位 1–10（RDR-08），只在纵向模式生效。
+  final int autoScrollSpeed;
 
   /// 用户保存的阅读预设（UI-P3-1）；按保存顺序排列。
   final List<ReaderPreset> presets;
@@ -298,6 +302,7 @@ class ReaderPrefs {
       tapZone: tapZone,
       invertTapZones: invertTapZones,
       doubleTapZoom: doubleTapZoom,
+      autoScrollSpeed: autoScrollSpeed,
       presets: presets,
       seriesOverrides: seriesOverrides,
     );
@@ -359,6 +364,7 @@ class ReaderPrefs {
     TapZonePreset? tapZone,
     bool? invertTapZones,
     bool? doubleTapZoom,
+    int? autoScrollSpeed,
     List<ReaderPreset>? presets,
     Map<String, ReaderPrefs>? seriesOverrides,
   }) => ReaderPrefs(
@@ -377,6 +383,7 @@ class ReaderPrefs {
     tapZone: tapZone ?? this.tapZone,
     invertTapZones: invertTapZones ?? this.invertTapZones,
     doubleTapZoom: doubleTapZoom ?? this.doubleTapZoom,
+    autoScrollSpeed: (autoScrollSpeed ?? this.autoScrollSpeed).clamp(1, 10),
     presets: presets ?? this.presets,
     seriesOverrides: seriesOverrides ?? this.seriesOverrides,
   );
@@ -398,6 +405,7 @@ class ReaderPrefs {
         'tapZone': tapZone.name,
         'invertTapZones': invertTapZones,
         'doubleTapZoom': doubleTapZoom,
+        'autoScrollSpeed': autoScrollSpeed,
         if (includePresets && presets.isNotEmpty)
           'presets': <Object?>[for (final preset in presets) preset.toJson()],
         if (includePresets && seriesOverrides.isNotEmpty)
@@ -472,6 +480,9 @@ class ReaderPrefs {
       ),
       invertTapZones: json['invertTapZones'] == true,
       doubleTapZoom: json['doubleTapZoom'] != false,
+      autoScrollSpeed:
+          (json['autoScrollSpeed'] is int ? json['autoScrollSpeed']! as int : 5)
+              .clamp(1, 10),
       presets: presets,
       seriesOverrides: overrides,
     );
@@ -518,6 +529,7 @@ class ReaderPrefs {
       other.tapZone == tapZone &&
       other.invertTapZones == invertTapZones &&
       other.doubleTapZoom == doubleTapZoom &&
+      other.autoScrollSpeed == autoScrollSpeed &&
       _samePresets(other.presets, presets) &&
       _sameOverrides(other.seriesOverrides, seriesOverrides);
 

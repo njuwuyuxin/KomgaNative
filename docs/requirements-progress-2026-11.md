@@ -82,7 +82,7 @@
 | ID | 需求 | P | 状态 | commit |
 |---|---|---|---|---|
 | RDR-07 | 点击区预设 + 反转 | P2 | DONE | `feat(reader): 点击区预设/反转/双击开关` |
-| RDR-08 | 条漫自动滚动 | P2 | TODO | — |
+| RDR-08 | 条漫自动滚动 | P2 | DONE | `feat(reader): 纵向自动滚动` |
 | SER-04 | 收藏集新建/编辑（API 验证后） | P2 | TODO | — |
 | I18N-02 | 语言扩展框架（日/繁中/西/法） | P2 | TODO | — |
 
@@ -228,6 +228,25 @@
   `continueReadingProgress` 是 FIX-06 之后失效的）。
 - 验证：55 条阅读器测试 + 黄金图全部不变（零行为变更）；设备上打开第 114/227 页
   照常渲染，滑杆与"剩 113 页"一致。
+
+### RDR-08 条漫自动滚动
+
+- 引擎两个纯函数：`autoScrollPixelsPerSecond(speed)`（1→60、10→240 px/s，越界夹回）
+  与 `autoScrollDeltaForFrame(speed, frame)`（按**真实帧间隔**算，速度与帧率无关）。
+- `ReaderVerticalView` 用 `Ticker` 自己推进，而不是 `animateTo(maxScrollExtent, 时长)`：
+  后者在用户中途暂停/恢复时接不上，长条漫画的时长还会算成几分钟。
+- 播放/暂停按钮在**右上角**（`reader-auto-scroll-toggle`）：一开始放右下角，
+  结果被页码滑条/缩略图栏这些 chrome 盖住了 —— 黄金图直接看出来了，改到右上角。
+- **触摸即暂停**：`Listener.onPointerDown` 一碰就停，手放在屏幕上还在自己滚很容易失控。
+- 到底自动停；退出阅读器/切页时 ticker 随 `dispose` 停。
+- **墨水屏不启用**：`autoScrollAllowed: !isEink`——每次滚动都是整屏刷新。
+- 速度档位持久化（`autoScrollSpeed` 1–10，默认 5），设置页"阅读"组有滑杆。
+- 测试：引擎 `auto_scroll_test.dart` 3 条（档位映射与夹取、60/120fps 下每秒位移一致、
+  零间隔不位移）+ 应用侧 1 条持久化（默认/往返/越界/坏值）。
+- 黄金图：`reader_vertical@phone_dark`（能看到右上角播放按钮）、`settings@*` 重生成。
+- 设备走查：装 release、进阅读器正常。**这台设备当前是双页模式**，
+  自动滚动按钮只在纵向模式出现，所以设备上没截到它——该按钮由黄金图覆盖，
+  "纵向模式点一下确实开始滚"这条留待下次走查。
 
 ### RDR-07 点击区预设 + 反转
 

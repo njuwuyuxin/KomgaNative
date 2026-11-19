@@ -121,6 +121,31 @@ void main() {
     });
   });
 
+  group('自动滚动速度持久化（RDR-08）', () {
+    test('默认 5，往返保留，越界夹回 1–10', () {
+      const defaults = ReaderPrefs();
+      expect(defaults.autoScrollSpeed, 5);
+
+      final saved = defaults.copyWith(autoScrollSpeed: 9);
+      expect(saved.toJson()['autoScrollSpeed'], 9);
+      expect(ReaderPrefs.fromJson(saved.toJson()).autoScrollSpeed, 9);
+
+      expect(defaults.copyWith(autoScrollSpeed: 0).autoScrollSpeed, 1);
+      expect(defaults.copyWith(autoScrollSpeed: 99).autoScrollSpeed, 10);
+      // 存档被改坏也夹回来。
+      expect(
+        ReaderPrefs.fromJson(<String, Object?>{'autoScrollSpeed': 42})
+            .autoScrollSpeed,
+        10,
+      );
+      expect(
+        ReaderPrefs.fromJson(<String, Object?>{'autoScrollSpeed': 'fast'})
+            .autoScrollSpeed,
+        5,
+      );
+    });
+  });
+
   group('偏好持久化', () {
     test('默认 auto，存档往返保留', () {
       const defaults = ReaderPrefs();

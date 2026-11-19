@@ -223,6 +223,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         jumpPage: _jumpPage,
         palette: palette,
         trimBorders: prefs.trimBorders,
+        // 自动滚动（RDR-08）：墨水屏不启用——每次滚动都是整屏刷新。
+        autoScrollSpeed: prefs.autoScrollSpeed,
+        autoScrollAllowed: !isEink,
         onPageChanged: (int p) => _setPage(p, total),
         onToggleChrome: _toggleChrome,
       ),

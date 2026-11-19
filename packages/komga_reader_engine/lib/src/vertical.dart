@@ -122,3 +122,19 @@ double scrollOffsetForPage(VerticalLayout layout, int index) {
   final clamped = index.clamp(0, layout.pageCount - 1);
   return layout.offsets[clamped];
 }
+
+/// 自动滚动速度档位（RDR-08）：1–10 档。
+///
+/// 映射成"每秒滚多少逻辑像素"：1 档 60 px/s（慢慢看跨页大图），
+/// 10 档 240 px/s（接近快速翻条漫）。范围故意压得保守——
+/// 快的档位交给人手动滑，自动滚动再快就只是晃眼。
+double autoScrollPixelsPerSecond(int speed) {
+  final clamped = speed.clamp(1, 10);
+  return 40 + clamped * 20;
+}
+
+/// 一帧应该滚多少（用真实帧间隔，滚动速度才不会随帧率变化）。
+double autoScrollDeltaForFrame(int speed, Duration frame) {
+  final seconds = frame.inMicroseconds / Duration.microsecondsPerSecond;
+  return autoScrollPixelsPerSecond(speed) * seconds;
+}

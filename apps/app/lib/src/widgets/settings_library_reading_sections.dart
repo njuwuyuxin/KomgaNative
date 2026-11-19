@@ -136,6 +136,28 @@ class SettingsReadingSection extends ConsumerWidget {
             ),
           ),
         ),
+        ListTile(
+          key: const Key('settings-auto-scroll-speed'),
+          title: Text(l10n.settingsAutoScrollSpeed),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Slider(
+                value: prefs.autoScrollSpeed.toDouble(),
+                min: 1,
+                max: 10,
+                divisions: 9,
+                label: '${prefs.autoScrollSpeed}',
+                onChanged: (double value) =>
+                    controller.setAutoScrollSpeed(value.round()),
+              ),
+              Text(
+                l10n.settingsAutoScrollSpeedHint,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
+        ),
         SwitchListTile(
           key: const Key('settings-invert-tap-zones'),
           value: prefs.invertTapZones,
