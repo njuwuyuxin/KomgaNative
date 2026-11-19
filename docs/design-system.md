@@ -53,9 +53,9 @@ chrome 永远压在漫画画面上：浅色模式下用浅色毛玻璃，白底�
 | `GlassPillButton` | 玻璃胶囊主按钮（继续阅读 / 开始阅读 / 连接 / 重试），可带图标、`expanded`、`busy` | 墨底纸字、直角 |
 | `GlassSegmentedControl` | 玻璃分段控件；`scrollable` 时按内容定宽并横向滚动（库筛选），否则等分（主题 / 语言 / 收藏集）。选中胶囊由 `SlidingSelectionTrack` 绘制，切换时从旧段弹到新段 | 选中反白、直角；不做滑动（直接到终值） |
 | `GlassSearchField` | 玻璃胶囊搜索框，左放大镜、有内容才出现清除键；边框/填充全关掉 | 纸底墨边、直角 |
-| `GlassMenuButton` | 玻璃图标 + `MenuAnchor` **玻璃菜单**（排序 / 筛选 / 视图 / 更多）；菜单项由调用方给 `GlassMenuItemButton`，key 挂在项上 | 纸底墨框菜单 |
+| `GlassMenuButton` | 玻璃图标 + `MenuAnchor` **玻璃菜单**（排序 / 筛选 / 视图 / 更多）；菜单项由调用方给 `GlassMenuItemButton`，key 挂在项上；`clipBehavior: Clip.none` 保证玻璃卡阴影不被面板矩形裁出方角 | 纸底墨框菜单 |
 | `GlassMenuItemButton` | 菜单里的一行：文本按菜单中线居中；对勾/图标用 `Positioned` 叠在左侧，不参与文本排版（不会把文字往右挤） | 同菜单 |
-| `GlassHeader` | 顶部悬浮玻璃标题栏内容行：`leading` 圆球 + 中间胶囊（标题/动作，或用 `bar` 整条替换）+ `trailing` 圆球 | 直角、纸底墨边、整条可见 |
+| `GlassHeader` | 顶部悬浮玻璃标题栏内容行：`leading` 圆球 + 中间胶囊（标题/动作，或用 `bar` 整条替换；标题与 `bar` 都不给时不画胶囊）+ `trailing` 圆球 | 直角、纸底墨边、整条可见 |
 | `GlassHeaderSliver` / `GlassTopBar` | 标题栏的两种落位：滚动页钉在顶部（占状态栏 + 72）；非滚动页作 `Scaffold.appBar`（`preferredSize` = 72，状态栏由 `SafeArea` 补） | 顶部状态栏区域用整块纸色 |
 | `AppListGroup` | iOS inset grouped 分组卡：一组行 + 卡外分组说明 + 行间细分割线 | 纸底 + 墨框、直角 |
 | `GlassPageBackground` | 表面色 + 两团 <16% 的主色/第三色光晕，给玻璃"可透的内容" | 直接透传（纸色底） |
@@ -113,7 +113,10 @@ chrome 永远压在漫画画面上：浅色模式下用浅色毛玻璃，白底�
 | 无 | 正在读、设置、收藏集 | 页面自己 `SafeArea(bottom: false)`，内容从顶部开始；收藏集只留一条分段控件（收藏集 / 阅读列表） |
 
 一行由三段组成：左边独立圆球（返回）、中间胶囊、右边独立圆球（更多）。
-中间胶囊默认是"标题 + 动作"；也可以整条替换：
+中间胶囊默认是"标题 + 动作"；也可以整条替换（`bar`），或者**什么都不放**：
+
+- **系列详情**：标题已经在头部（封面右边）出现，标题栏不再重复放标题，
+  只保留返回 / 更多两个独立圆球（`GlassHeader(leading: …, trailing: …)`）；
 
 - **书架**：`bar: Row(搜索框 + 三颗动作的玻璃胶囊)`——没有标题文字，
   搜索与动作合成一行，比"标题栏 + 搜索框"省掉整整一行；

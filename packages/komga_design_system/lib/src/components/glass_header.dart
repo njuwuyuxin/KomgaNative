@@ -11,7 +11,8 @@ import 'package:material_ui/material_ui.dart';
 /// 一行由三段组成：
 /// - [leading]：独立的玻璃圆球（返回），**不在**胶囊里；
 /// - 中间胶囊：默认放 [title] + [actions]；也可以用 [bar] 整条替换
-///   （搜索页放搜索框、收藏集放分段控件）；
+///   （搜索页放搜索框、收藏集放分段控件）；[title] 与 [bar] 都不给时不画胶囊
+///   （系列详情：标题已经在头部出现，标题栏只管返回 / 更多两个圆球）；
 /// - [trailing]：右侧独立的玻璃圆球（更多 / 搜索）。
 ///
 /// 只负责排版与材质，不认路由：返回键由调用方传 `GlassIconButton`。
@@ -23,10 +24,7 @@ class GlassHeader extends StatelessWidget {
     this.trailing,
     this.bar,
     super.key,
-  }) : assert(
-         title != null || bar != null,
-         'title 与 bar 至少要给一个（bar 为空时才画默认胶囊）',
-       );
+  });
 
   /// 默认胶囊里的标题；样式由 [GlassHeader] 统一给（调用方不要自己写 style）。
   final Widget? title;
@@ -48,31 +46,33 @@ class GlassHeader extends StatelessWidget {
     final typography = AppTypography.of(context);
     final bar =
         this.bar ??
-        GlassSurface(
-          shape: AppShapes.of(context, AppShapes.bar),
-          child: Padding(
-            padding: const EdgeInsets.only(
-              left: AppSpacing.md,
-              right: AppSpacing.sm,
-            ),
-            child: Row(
-              children: <Widget>[
-                Expanded(
-                  child: DefaultTextStyle.merge(
-                    style: typography.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    child: title ?? const SizedBox.shrink(),
+        (title == null && actions.isEmpty
+            ? const SizedBox.shrink()
+            : GlassSurface(
+                shape: AppShapes.of(context, AppShapes.bar),
+                child: Padding(
+                  padding: const EdgeInsets.only(
+                    left: AppSpacing.md,
+                    right: AppSpacing.sm,
+                  ),
+                  child: Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: DefaultTextStyle.merge(
+                          style: typography.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          child: title ?? const SizedBox.shrink(),
+                        ),
+                      ),
+                      for (final action in actions) ...<Widget>[
+                        const SizedBox(width: AppSpacing.xxs),
+                        action,
+                      ],
+                    ],
                   ),
                 ),
-                for (final action in actions) ...<Widget>[
-                  const SizedBox(width: AppSpacing.xxs),
-                  action,
-                ],
-              ],
-            ),
-          ),
-        );
+              ));
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),

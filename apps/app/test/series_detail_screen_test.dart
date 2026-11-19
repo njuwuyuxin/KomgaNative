@@ -193,7 +193,6 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.byKey(const Key('series-titlebar-skeleton')), findsOneWidget);
     expect(find.byKey(const Key('series-title-skeleton')), findsOneWidget);
     expect(find.byKey(const Key('series-action-skeleton')), findsOneWidget);
     expect(find.byKey(const Key('series-skeleton')), findsOneWidget);
@@ -207,7 +206,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('5 of 12 read'), findsOneWidget);
-    expect(find.byKey(const Key('series-titlebar-skeleton')), findsNothing);
     expect(find.byKey(const Key('series-title-skeleton')), findsNothing);
     expect(find.byKey(const Key('series-action-skeleton')), findsNothing);
     expect(find.byKey(const Key('series-skeleton')), findsNothing);

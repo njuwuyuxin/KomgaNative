@@ -13,6 +13,12 @@ import 'package:material_ui/material_ui.dart';
 ///
 /// 菜单面板自己也是液态玻璃（[GlassSurface]）：`MenuAnchor` 的 Material 底
 /// 设成全透明，真正画出来的是里面那块玻璃卡——二级菜单也要和一级控件同材质。
+///
+/// **`clipBehavior: Clip.none` 不能省**：`MenuAnchor` 默认 `Clip.hardEdge`，
+/// 会按 `MenuStyle.shape`（这里是零圆角的矩形）裁掉玻璃卡自己的阴影，
+/// 圆角外就露出一块方形的硬边阴影（真机上很明显）。玻璃卡内部已经由
+/// [FrostedSurface] 自己按形状裁剪，这里再包一层透明 Material 承接水波纹，
+/// 让点击反馈仍然裁在圆角内。
 class GlassMenuButton extends StatelessWidget {
   const GlassMenuButton({
     required this.icon,
@@ -40,6 +46,8 @@ class GlassMenuButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return MenuAnchor(
       alignmentOffset: const Offset(0, AppSpacing.xs),
+      // 不裁面板：见类注释。玻璃卡自己会裁内容，阴影必须能画到面板矩形外。
+      clipBehavior: Clip.none,
       // 面板本体透明：可见的玻璃底由下面 menuChildren 里的 GlassSurface 画。
       // 不用 Material 的 elevation 阴影（测试渲染器上高 elevation 会画成一圈
       // 生硬黑边），浮起感交给 GlassSurface 的 AppShadows.floating。
@@ -56,12 +64,17 @@ class GlassMenuButton extends StatelessWidget {
         GlassSurface(
           shape: AppShapes.of(context, AppShapes.panel),
           shadows: AppShadows.floating,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: menuChildren,
+          child: Material(
+            // 透明的内层 Material 只负责接住 MenuItemButton 的水波纹：
+            // 它在外层 Clip.none 之后、玻璃卡裁剪之内，反馈不会溢出圆角。
+            type: MaterialType.transparency,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: menuChildren,
+              ),
             ),
           ),
         ),

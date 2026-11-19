@@ -326,6 +326,30 @@ void main() {
       expect(taps, 1);
     });
 
+    testWidgets('不给 title / bar 时中间不画胶囊，只留两端圆球', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        host(
+          GlassHeader(
+            leading: GlassIconButton(
+              icon: Icons.chevron_left,
+              label: 'Back',
+              onPressed: () {},
+            ),
+            trailing: GlassIconButton(
+              icon: Icons.done_all,
+              label: 'More',
+              onPressed: () {},
+            ),
+          ),
+        ),
+      );
+
+      // 只剩两端圆球的玻璃底；中间标题胶囊不存在（系列详情标题已在头部）。
+      expect(find.byType(GlassSurface), findsNWidgets(2));
+      expect(find.byType(GlassIconButton), findsNWidgets(2));
+      expect(find.text('Series'), findsNothing);
+    });
+
     testWidgets('自定义 bar 整条替换（搜索页 / 收藏集分段）', (WidgetTester tester) async {
       await tester.pumpWidget(
         host(

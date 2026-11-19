@@ -110,13 +110,8 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
               label: MaterialLocalizations.of(context).backButtonTooltip,
               onPressed: () => context.pop(),
             ),
-            title: metadataLoading
-                ? const _AppBarTitleSkeleton()
-                : Text(
-                    series?.title ?? l10n.seriesFallbackTitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+            // 刻意不放标题：系列名在头部（封面右边）已经有了，标题栏再重复一次
+            // 既挤占宽度又显得多余。这里只留返回 / 更多两个圆球。
             trailing: GlassMenuButton(
               key: const Key('series-mark-menu'),
               orb: true,
@@ -169,23 +164,6 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// 元信息未到时顶部 AppBar 的标题占位，避免先显示 "Series" 再跳成真实标题。
-class _AppBarTitleSkeleton extends StatelessWidget {
-  const _AppBarTitleSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    return const ExcludeSemantics(
-      child: SizedBox(
-        key: Key('series-titlebar-skeleton'),
-        width: AppSpacing.xxl * 3,
-        height: AppSpacing.md,
-        child: SkeletonBox(),
       ),
     );
   }
