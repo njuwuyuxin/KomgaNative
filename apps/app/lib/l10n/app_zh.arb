@@ -23,6 +23,8 @@
   "continueReading": "继续阅读",
   "seriesCount": "{count} 个系列",
   "shelfSortTooltip": "排序",
+  "clearFilters": "清除筛选",
+  "libraryFilterTitle": "库",
   "shelfFilterTooltip": "筛选",
   "defaultOrder": "默认顺序",
   "sortTitleAsc": "标题 A-Z",

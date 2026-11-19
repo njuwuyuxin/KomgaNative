@@ -27,6 +27,8 @@
     }
   },
   "shelfSortTooltip": "Sort",
+  "clearFilters": "Clear filters",
+  "libraryFilterTitle": "Library",
   "shelfFilterTooltip": "Filter",
   "defaultOrder": "Default order",
   "sortTitleAsc": "Title A-Z",

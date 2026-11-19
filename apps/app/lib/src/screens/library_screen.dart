@@ -11,6 +11,7 @@ import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/session/session_controller.dart';
 import 'package:komga_native/src/widgets/offline_banner.dart';
 import 'package:komga_native/src/widgets/phase_fade.dart';
+import 'package:komga_native/src/widgets/shelf_active_filters.dart';
 import 'package:komga_native/src/widgets/shelf_query_buttons.dart';
 import 'package:komga_native/src/widgets/shelf_pinch_detector.dart';
 import 'package:komga_native/src/widgets/shelf_views.dart';
@@ -118,6 +119,42 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                         ),
                       ),
                     ),
+                    // 大标题 + 系列数（LIB-01）：跟内容一起滚走，不常驻占高度。
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.md,
+                          AppSpacing.md,
+                          AppSpacing.md,
+                          AppSpacing.xs,
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: <Widget>[
+                            Flexible(
+                              child: Text(
+                                l10n.libraryTitle,
+                                style: AppTypography.of(context).largeTitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            Text(
+                              l10n.seriesCount(state.totalElements),
+                              key: const Key('shelf-count'),
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                     // 断网时提示"看的是缓存"，并给一次重新联网的机会。
                     SliverToBoxAdapter(
                       child: OfflineBanner(
@@ -130,6 +167,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                         onSelected: controller.selectLibrary,
                       ),
                     ),
+                    // 生效中的筛选条件（排序/状态/库），可单独清除（LIB-01）。
+                    const SliverToBoxAdapter(child: ShelfActiveFilters()),
                     const SliverToBoxAdapter(
                       child: SizedBox(height: AppSpacing.sm),
                     ),
@@ -260,26 +299,20 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
 
 /// 书架顶部右侧的三颗动作：排序 / 筛选 / 视图。
 ///
-/// 装进一条与搜索框同高的玻璃胶囊，和搜索框并排悬浮；没有标题文字，
-/// 视觉重心留给封面。三条动作各 44×44，加起来仍比原来的整条标题栏省一行。
+/// 不再套一层独立玻璃底（UI-01/LIB-01）：搜索框是这一行唯一的玻璃元素，
+/// 三颗动作直接浮在背景上，页面顶部从"两层玻璃"降到一层。
 class _LibraryActions extends StatelessWidget {
   const _LibraryActions();
 
   @override
   Widget build(BuildContext context) {
-    return GlassSurface(
-      shape: AppShapes.of(context, AppShapes.bar),
-      child: const Padding(
-        padding: EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            ShelfSortButton(),
-            ShelfFilterButton(),
-            ShelfViewButton(),
-          ],
-        ),
-      ),
+    return const Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        ShelfSortButton(),
+        ShelfFilterButton(),
+        ShelfViewButton(),
+      ],
     );
   }
 }
