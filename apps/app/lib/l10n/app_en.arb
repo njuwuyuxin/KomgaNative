@@ -141,6 +141,8 @@
   "unpinSeries": "Unpin",
   "pinned": "Pinned",
   "libraryFilterTitle": "Library",
+  "libraries": "Libraries",
+  "allSeries": "All series",
   "shelfFilterTooltip": "Filter",
   "defaultOrder": "Default order",
   "sortTitleAsc": "Title A-Z",

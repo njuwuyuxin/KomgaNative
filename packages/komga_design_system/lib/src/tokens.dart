@@ -120,6 +120,9 @@ abstract final class AppSizes {
   static const double fitPreviewWidth = 30;
   static const double fitPreviewHeight = 38;
 
+  /// 平板书架左侧库列表的宽度（PLT-01）。
+  static const double sideRailWidth = 240;
+
   /// 收藏集封面拼贴的边长（UI-02）。
   static const double collectionCoverSize = 56;
 

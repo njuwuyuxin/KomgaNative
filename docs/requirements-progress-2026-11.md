@@ -64,7 +64,7 @@
 | HIS-02 | History 页 + 最近阅读行 | P2 | DONE | `feat(history): 历史页与最近阅读横滑` |
 | SET-02 | 本地偏好导出/导入 | P2 | DONE | `feat(settings): 偏好导出/导入（剪贴板）` |
 | UI-02 | 收藏集封面拼贴/描述/搜索 | P2 | DONE | `feat(collections): 封面拼贴 + 搜索排序` |
-| PLT-01 | 平板书架两栏 | P2 | TODO | — |
+| PLT-01 | 平板书架两栏 | P2 | DONE | `feat(shelf): 平板两栏（库导航 + 书架）` |
 
 ## W5 深度/平台
 
@@ -228,6 +228,22 @@
   `continueReadingProgress` 是 FIX-06 之后失效的）。
 - 验证：55 条阅读器测试 + 黄金图全部不变（零行为变更）；设备上打开第 114/227 页
   照常渲染，滑杆与"剩 113 页"一致。
+
+### PLT-01 平板书架两栏
+
+- `WindowSizeClass.expanded`（≥1024）时书架变成两栏：左侧 `ShelfSideRail`
+  （全部系列 + 每个书库），右侧原来的书架内容。手机上完全不变。
+- 选中项直接调 `ShelfController.selectLibrary`，与搜索框旁的库筛选菜单**同一份状态**，
+  不会出现"左边选了一个库、右边筛选条还是旧的"。
+- 断点判断只在 `WindowSizeClass` 里做（AGENTS.md 不变量 6），页面里不再自己比宽度。
+- 与现有 NavigationRail 共存：导航栏在最左（全局导航），库导航在其次（书架内筛选），
+  两者语义不同，没有合并。
+- 测试：`shelf_two_pane_test.dart` 3 条（390 宽无左栏、1024 宽有左栏且点"Manga"会切换库、
+  1366 宽仍是两栏）。
+- 黄金图：`library@tablet_dark` 重生成并自查——左栏 Libraries/All series/Manga +
+  右侧四列封面，与设备截图一致。
+- 设备走查：`adb shell wm size 1024x1600 && density 160` 后重开应用，
+  书架页确实变成"库导航 + 书架"两栏，且 NavigationRail 仍在最左。走查后已 `wm size reset`。
 
 ### UI-02 收藏集封面拼贴 / 搜索 / 排序
 

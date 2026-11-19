@@ -17,6 +17,7 @@ import 'package:komga_native/src/widgets/shelf_active_filters.dart';
 import 'package:komga_native/src/widgets/shelf_query_buttons.dart';
 import 'package:komga_native/src/widgets/shelf_selection_bar.dart';
 import 'package:komga_native/src/widgets/shelf_pinch_detector.dart';
+import 'package:komga_native/src/widgets/shelf_side_rail.dart';
 import 'package:komga_native/src/widgets/shelf_views.dart';
 import 'package:komga_native/src/widgets/series_shelf_tile.dart';
 import 'package:komga_native/src/providers/series_read_provider.dart';
@@ -70,6 +71,14 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     ref.read(shelfProvider.notifier).setCoverSize(values[next]);
   }
 
+  /// 是否走平板两栏布局（PLT-01）：只在 `WindowSizeClass.expanded` 下。
+  ///
+  /// 断点判断只在 `WindowSizeClass` 里做一次（AGENTS.md 架构不变量 6），
+  /// 页面内部不再自己比宽度。
+  bool _twoPane(BuildContext context) =>
+      WindowSizeClass.of(MediaQuery.sizeOf(context).width) ==
+      WindowSizeClass.expanded;
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -96,137 +105,153 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                 ),
               ),
             ],
-      body: GlassPageBackground(
-        // Android 的拉伸过度滚动会给整条滚动层加一个 Transform，而液态玻璃
-        // 着色器按屏幕坐标采样背景；下拉刷新时就会读到被变换过的空图层，
-        // 玻璃变黑。这里关掉过度滚动的拉伸/辉光（下拉刷新由 RefreshIndicator
-        // 自己处理，不依赖那个效果）。
-        child: ScrollConfiguration(
-          behavior: ScrollConfiguration.of(context).copyWith(overscroll: false),
-          child: RefreshIndicator(
-            // 标题栏是钉住的浮层：下拉刷新的转圈要出现在它下面，不能被玻璃压住。
-            edgeOffset:
-                MediaQuery.paddingOf(context).top +
-                AppSizes.glassHeaderClearance,
-            onRefresh: _refresh,
-            child: NotificationListener<ScrollNotification>(
-              onNotification: (ScrollNotification notification) {
-                if (state.hasMore &&
-                    notification.metrics.extentAfter < _prefetchExtent) {
-                  unawaited(controller.loadMore());
-                }
-                return false;
-              },
-              child: ShelfPinchDetector(
-                enabled:
-                    state.view == ShelfView.grid && state.series.isNotEmpty,
-                onPinch: _pinchCover,
-                child: CustomScrollView(
-                  key: const Key('shelf-scroll'),
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  slivers: <Widget>[
-                    // 顶部只保留有用的东西：搜索框 + 右侧三颗动作。
-                    // 不再放页面标题——标题既不提供信息，又占掉一整行。
-                    GlassHeaderSliver(
-                      header: GlassHeader(
-                        bar: selection.active
-                            ? ShelfSelectionBar(
-                                count: selection.ids.length,
-                                total: state.series.length,
-                                allSelected:
-                                    state.series.isNotEmpty &&
-                                    selection.ids.length == state.series.length,
-                                onSelectAll: () => selecting.selectAll(
-                                  state.series.map((Series s) => s.id),
-                                ),
-                                onClose: selecting.exit,
-                              )
-                            : Row(
+      body: Row(
+        children: <Widget>[
+          // 平板（≥1024）才显示左侧库导航（PLT-01）：手机上它会挤掉两列封面。
+          if (_twoPane(context)) const ShelfSideRail(),
+          Expanded(
+            child: GlassPageBackground(
+              // Android 的拉伸过度滚动会给整条滚动层加一个 Transform，而液态玻璃
+              // 着色器按屏幕坐标采样背景；下拉刷新时就会读到被变换过的空图层，
+              // 玻璃变黑。这里关掉过度滚动的拉伸/辉光（下拉刷新由 RefreshIndicator
+              // 自己处理，不依赖那个效果）。
+              child: ScrollConfiguration(
+                behavior: ScrollConfiguration.of(context)
+                    .copyWith(overscroll: false),
+                child: RefreshIndicator(
+                  // 标题栏是钉住的浮层：下拉刷新的转圈要出现在它下面，不能被玻璃压住。
+                  edgeOffset:
+                      MediaQuery.paddingOf(context).top +
+                      AppSizes.glassHeaderClearance,
+                  onRefresh: _refresh,
+                  child: NotificationListener<ScrollNotification>(
+                    onNotification: (ScrollNotification notification) {
+                      if (state.hasMore &&
+                          notification.metrics.extentAfter < _prefetchExtent) {
+                        unawaited(controller.loadMore());
+                      }
+                      return false;
+                    },
+                    child: ShelfPinchDetector(
+                      enabled:
+                          state.view == ShelfView.grid &&
+                          state.series.isNotEmpty,
+                      onPinch: _pinchCover,
+                      child: CustomScrollView(
+                        key: const Key('shelf-scroll'),
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        slivers: <Widget>[
+                          // 顶部只保留有用的东西：搜索框 + 右侧三颗动作。
+                          // 不再放页面标题——标题既不提供信息，又占掉一整行。
+                          GlassHeaderSliver(
+                            header: GlassHeader(
+                              bar: selection.active
+                                  ? ShelfSelectionBar(
+                                      count: selection.ids.length,
+                                      total: state.series.length,
+                                      allSelected:
+                                          state.series.isNotEmpty &&
+                                          selection.ids.length ==
+                                              state.series.length,
+                                      onSelectAll: () => selecting.selectAll(
+                                        state.series.map((Series s) => s.id),
+                                      ),
+                                      onClose: selecting.exit,
+                                    )
+                                  : Row(
+                                      children: <Widget>[
+                                        Expanded(
+                                          child: GlassSearchField(
+                                            key: const Key(
+                                              'shelf-search-field',
+                                            ),
+                                            controller: _searchController,
+                                            hintText: l10n.searchSeriesHint,
+                                            clearLabel: l10n.closeSearch,
+                                            onChanged: controller.search,
+                                          ),
+                                        ),
+                                        const SizedBox(width: AppSpacing.sm),
+                                        const _LibraryActions(),
+                                      ],
+                                    ),
+                            ),
+                          ),
+                          // 大标题 + 系列数（LIB-01）：跟内容一起滚走，不常驻占高度。
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(
+                                AppSpacing.md,
+                                AppSpacing.md,
+                                AppSpacing.md,
+                                AppSpacing.xs,
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.baseline,
+                                textBaseline: TextBaseline.alphabetic,
                                 children: <Widget>[
-                                  Expanded(
-                                    child: GlassSearchField(
-                                      key: const Key('shelf-search-field'),
-                                      controller: _searchController,
-                                      hintText: l10n.searchSeriesHint,
-                                      clearLabel: l10n.closeSearch,
-                                      onChanged: controller.search,
+                                  Flexible(
+                                    child: Text(
+                                      l10n.libraryTitle,
+                                      style: AppTypography.of(context)
+                                          .largeTitle,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                   const SizedBox(width: AppSpacing.sm),
-                                  const _LibraryActions(),
+                                  Text(
+                                    l10n.seriesCount(state.totalElements),
+                                    key: const Key('shelf-count'),
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurfaceVariant,
+                                        ),
+                                  ),
                                 ],
                               ),
-                      ),
-                    ),
-                    // 大标题 + 系列数（LIB-01）：跟内容一起滚走，不常驻占高度。
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          AppSpacing.md,
-                          AppSpacing.md,
-                          AppSpacing.md,
-                          AppSpacing.xs,
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.baseline,
-                          textBaseline: TextBaseline.alphabetic,
-                          children: <Widget>[
-                            Flexible(
-                              child: Text(
-                                l10n.libraryTitle,
-                                style: AppTypography.of(context).largeTitle,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          // 断网时提示"看的是缓存"，并给一次重新联网的机会。
+                          SliverToBoxAdapter(
+                            child: OfflineBanner(
+                              onRetry: () => unawaited(_refresh()),
+                            ),
+                          ),
+                          SliverToBoxAdapter(
+                            child: LibraryFilterBar(
+                              selected: state.libraryId,
+                              onSelected: controller.selectLibrary,
+                            ),
+                          ),
+                          // 生效中的筛选条件（排序/状态/库），可单独清除（LIB-01）。
+                          const SliverToBoxAdapter(child: ShelfActiveFilters()),
+                          const SliverToBoxAdapter(
+                            child: SizedBox(height: AppSpacing.sm),
+                          ),
+                          PhaseFade(
+                            phase: _phaseOf(state),
+                            slivers: <Widget>[
+                              ..._shelfSlivers(l10n, state, controller),
+                              // 底部留白：悬浮导航条压在内容之上，最后一行要能让开它。
+                              const SliverToBoxAdapter(
+                                child: SizedBox(
+                                  height: AppSizes.navBarClearance,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: AppSpacing.sm),
-                            Text(
-                              l10n.seriesCount(state.totalElements),
-                              key: const Key('shelf-count'),
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant,
-                                  ),
-                            ),
-                          ],
-                        ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
-                    // 断网时提示"看的是缓存"，并给一次重新联网的机会。
-                    SliverToBoxAdapter(
-                      child: OfflineBanner(
-                        onRetry: () => unawaited(_refresh()),
-                      ),
-                    ),
-                    SliverToBoxAdapter(
-                      child: LibraryFilterBar(
-                        selected: state.libraryId,
-                        onSelected: controller.selectLibrary,
-                      ),
-                    ),
-                    // 生效中的筛选条件（排序/状态/库），可单独清除（LIB-01）。
-                    const SliverToBoxAdapter(child: ShelfActiveFilters()),
-                    const SliverToBoxAdapter(
-                      child: SizedBox(height: AppSpacing.sm),
-                    ),
-                    PhaseFade(
-                      phase: _phaseOf(state),
-                      slivers: <Widget>[
-                        ..._shelfSlivers(l10n, state, controller),
-                        // 底部留白：悬浮导航条压在内容之上，最后一行要能让开它。
-                        const SliverToBoxAdapter(
-                          child: SizedBox(height: AppSizes.navBarClearance),
-                        ),
-                      ],
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
