@@ -120,6 +120,9 @@ abstract final class AppSizes {
   static const double fitPreviewWidth = 30;
   static const double fitPreviewHeight = 38;
 
+  /// 收藏集封面拼贴的边长（UI-02）。
+  static const double collectionCoverSize = 56;
+
   /// Insights 热力图每格的边长（HIS-03）。
   static const double heatmapCell = 16;
 

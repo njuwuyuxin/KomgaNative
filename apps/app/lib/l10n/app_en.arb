@@ -22,6 +22,11 @@
   "noSearchMatchesHint": "Try a different keyword, or clear the search.",
   "continueReading": "Continue reading",
   "seriesCount": "{count} series",
+  "searchCollectionsHint": "Search collections",
+  "sort": "Sort",
+  "sortName": "Name",
+  "sortSeriesCount": "Most series",
+  "sortRecent": "Recently updated",
   "@seriesCount": {    "placeholders": {
       "count": {"type": "int"}
     }

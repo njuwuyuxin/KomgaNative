@@ -57,6 +57,9 @@ void main() {
     await revealFooter(tester);
     expect(find.text('Showing 30 of $total'), findsOneWidget);
 
+    // 收藏集页多了搜索行，页脚可能被顶到屏幕外——先确保它可见。
+    await tester.ensureVisible(find.byKey(const Key('load-more')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('load-more')));
     await tester.pumpAndSettle();
 
@@ -86,6 +89,9 @@ void main() {
     await revealFooter(tester);
     expect(find.text('Showing 30 of $total books'), findsOneWidget);
 
+    // 收藏集页多了搜索行，页脚可能被顶到屏幕外——先确保它可见。
+    await tester.ensureVisible(find.byKey(const Key('load-more')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('load-more')));
     await tester.pumpAndSettle();
     await tester.drag(find.byType(Scrollable).last, const Offset(0, -4000));
@@ -102,6 +108,9 @@ void main() {
     await revealFooter(tester);
     expect(find.text('Showing 30 of $total series'), findsOneWidget);
 
+    // 收藏集页多了搜索行，页脚可能被顶到屏幕外——先确保它可见。
+    await tester.ensureVisible(find.byKey(const Key('load-more')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('load-more')));
     await tester.pumpAndSettle();
     await tester.drag(find.byType(Scrollable).last, const Offset(0, -4000));

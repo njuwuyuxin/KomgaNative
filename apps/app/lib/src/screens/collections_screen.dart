@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:komga_design_system/komga_design_system.dart';
+import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
+import 'package:komga_native/src/widgets/collection_covers.dart';
 import 'package:komga_native/src/widgets/load_more_footer.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -95,9 +99,15 @@ class _CollectionsTab extends ConsumerStatefulWidget {
   ConsumerState<_CollectionsTab> createState() => _CollectionsTabState();
 }
 
+/// 收藏集列表的排序方式（UI-02）：都在本地排。
+enum CollectionSort { name, seriesCount, recent }
+
 class _CollectionsTabState extends ConsumerState<_CollectionsTab> {
   /// 已请求的条数；点"加载更多"加一页（FIX-08）。
   int _size = kListPageSize;
+
+  String _query = '';
+  CollectionSort _sort = CollectionSort.name;
 
   @override
   Widget build(BuildContext context) {
@@ -124,41 +134,154 @@ class _CollectionsTabState extends ConsumerState<_CollectionsTab> {
         text: l10n.collectionsEmpty,
       );
     }
-    return RefreshIndicator(
-      edgeOffset: widget.topPadding,
-      onRefresh: () async => ref.invalidate(provider),
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.only(
-          top: widget.topPadding + AppSpacing.xs,
-          bottom: AppSizes.navBarClearance,
-        ),
-        children: <Widget>[
-          AppListGroup(
+    final query = _query.trim().toLowerCase();
+    final visible =
+        <KomgaCollection>[
+          for (final collection in value.items)
+            if (query.isEmpty || collection.name.toLowerCase().contains(query))
+              collection,
+        ]..sort((KomgaCollection a, KomgaCollection b) {
+          switch (_sort) {
+            case CollectionSort.name:
+              return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+            case CollectionSort.seriesCount:
+              return b.seriesCount.compareTo(a.seriesCount);
+            case CollectionSort.recent:
+              final left = a.lastModifiedDate ?? a.createdDate;
+              final right = b.lastModifiedDate ?? b.createdDate;
+              if (left == null && right == null) return 0;
+              if (left == null) return 1;
+              if (right == null) return -1;
+              return right.compareTo(left);
+          }
+        });
+    return Column(
+      children: <Widget>[
+        Padding(
+          padding: EdgeInsets.only(
+            top: widget.topPadding + AppSpacing.xs,
+            left: AppSpacing.md,
+            right: AppSpacing.md,
+          ),
+          child: Row(
             children: <Widget>[
-              for (final collection in value.items)
-                ListTile(
-                  key: Key('collection-${collection.id}'),
-                  leading: const Icon(Icons.collections_bookmark_outlined),
-                  title: Text(collection.name),
-                  subtitle: Text(l10n.seriesCount(collection.seriesCount)),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => context.push(
-                    '/collections/${collection.id}',
-                    extra: collection.name,
+              Expanded(
+                child: TextField(
+                  key: const Key('collections-search'),
+                  onChanged: (String value) => setState(() => _query = value),
+                  decoration: InputDecoration(
+                    hintText: l10n.searchCollectionsHint,
+                    prefixIcon: const Icon(Icons.search),
+                    isDense: true,
                   ),
                 ),
+              ),
+              IconButton(
+                key: const Key('collections-sort'),
+                tooltip: l10n.sort,
+                onPressed: () => unawaited(_pickSort(context, l10n)),
+                icon: const Icon(Icons.sort),
+              ),
             ],
           ),
-          LoadMoreFooter(
-            loaded: value.items.length,
-            total: value.totalElements,
-            onLoadMore: () => setState(() => _size += kListPageSize),
+        ),
+        Expanded(
+          child: RefreshIndicator(
+            edgeOffset: widget.topPadding,
+            onRefresh: () async => ref.invalidate(provider),
+            child: visible.isEmpty
+                ? ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: <Widget>[
+                      SizedBox(height: widget.topPadding),
+                      _Empty(
+                        topPadding: 0,
+                        icon: Icons.search_off,
+                        text: l10n.noMatches,
+                      ),
+                    ],
+                  )
+                : ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.only(
+                      top: AppSpacing.xs,
+                      bottom: AppSizes.navBarClearance,
+                    ),
+                    children: <Widget>[
+                      AppListGroup(
+                        children: <Widget>[
+                          for (final collection in visible)
+                            ListTile(
+                              key: Key('collection-${collection.id}'),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.md,
+                              ),
+                              leading: CollectionCovers(
+                                collectionId: collection.id,
+                                name: collection.name,
+                                seriesIds: collection.seriesIds,
+                              ),
+                              title: Text(collection.name),
+                              subtitle: Text(
+                                l10n.seriesCount(collection.seriesCount),
+                              ),
+                              trailing: const Icon(Icons.chevron_right),
+                              onTap: () => context.push(
+                                '/collections/${collection.id}',
+                                extra: collection.name,
+                              ),
+                            ),
+                        ],
+                      ),
+                      LoadMoreFooter(
+                        loaded: value.items.length,
+                        total: value.totalElements,
+                        onLoadMore: () =>
+                            setState(() => _size += kListPageSize),
+                      ),
+                    ],
+                  ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
+
+  /// 搜索/排序菜单（UI-02）：本地对已加载的收藏集排序。
+  ///
+  /// 不调服务端排序：收藏集的"系列数""最近修改"都不在服务端排序字段里，
+  /// 与其发一个被静默忽略的参数，不如在本地排得明明白白。
+  Future<void> _pickSort(BuildContext context, AppLocalizations l10n) async {
+    final picked = await showModalBottomSheet<CollectionSort>(
+      context: context,
+      builder: (BuildContext context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            for (final option in CollectionSort.values)
+              ListTile(
+                key: Key('collections-sort-${option.name}'),
+                title: Text(_sortLabel(l10n, option)),
+                leading: Icon(
+                  option == _sort
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_off,
+                ),
+                onTap: () => Navigator.of(context).pop(option),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (picked != null && mounted) setState(() => _sort = picked);
+  }
+
+  String _sortLabel(AppLocalizations l10n, CollectionSort option) =>
+      switch (option) {
+        CollectionSort.name => l10n.sortName,
+        CollectionSort.seriesCount => l10n.sortSeriesCount,
+        CollectionSort.recent => l10n.sortRecent,
+      };
 }
 
 class _ReadListsTab extends ConsumerStatefulWidget {
