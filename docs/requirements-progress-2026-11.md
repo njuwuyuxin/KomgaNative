@@ -62,7 +62,7 @@
 |---|---|---|---|---|
 | HIS-01 | 阅读 session 数据模型 | P2 | DONE | `feat(history): 阅读会话记账与落库` |
 | HIS-02 | History 页 + 最近阅读行 | P2 | DONE | `feat(history): 历史页与最近阅读横滑` |
-| SET-02 | 本地偏好导出/导入 | P2 | TODO | — |
+| SET-02 | 本地偏好导出/导入 | P2 | DONE | `feat(settings): 偏好导出/导入（剪贴板）` |
 | UI-02 | 收藏集封面拼贴/描述/搜索 | P2 | TODO | — |
 | PLT-01 | 平板书架两栏 | P2 | TODO | — |
 
@@ -228,6 +228,24 @@
   `continueReadingProgress` 是 FIX-06 之后失效的）。
 - 验证：55 条阅读器测试 + 黄金图全部不变（零行为变更）；设备上打开第 114/227 页
   照常渲染，滑杆与"剩 113 页"一致。
+
+### SET-02 本地偏好导出/导入
+
+- `PrefsBackup`（纯逻辑）：`{version, kinds, exportedAt, reader, settings}`。
+  导出 = `ReaderPrefs.toJson()` + `AppSettings.toJson()`；导入严格校验
+  **顶层是对象 / 有 version / version 相等 / reader 与 settings 都是对象**，
+  任何一条不满足就抛 `PrefsBackupException`，**绝不部分应用**。
+- **不含凭据**：服务器地址、邮箱、API Key、密码、token 都在安全存储里，从不进备份。
+  有一条测试专门断言导出串里搜不到 `apikey/password/token/secret/@/http`。
+- 传输方式用**剪贴板**：不引入 `share_plus`/`file_picker`（新增依赖要先写 ADR），
+  手机上几千字节的 JSON 复制粘贴比找文件快，而且内容本来就不敏感。
+- 写盘时机：两份都**先解析成功再落盘**（`replaceAll` 先 save 再更新 state），
+  坏文件不会把当前设置改成半截。
+- 设置页新增"备份"组（导出/导入各一行，导入带确认框说明"服务器登录不受影响"）。
+- 测试：`prefs_backup_test.dart` 6 条（往返还原、无凭据字段、坏 JSON、缺 version/版本不兼容、
+  缺段、字段类型乱写回默认）。
+- 设备走查：设置 → 备份 → 导出偏好（提示"已复制到剪贴板"）→ 导入偏好（确认框文案正确）
+  → 提示"偏好已导入"。**导出↔导入往返在真机上跑通了**。
 
 ### HIS-04 阅读器内阅读时长
 

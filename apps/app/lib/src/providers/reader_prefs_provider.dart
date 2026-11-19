@@ -149,6 +149,13 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
     );
   }
 
+  /// 整份替换（SET-02 导入备份）：先落盘再更新 state，导入失败时不留半截。
+  Future<void> replaceAll(ReaderPrefs next) async {
+    _touched = true;
+    await _store.save(next);
+    state = next;
+  }
+
   void _update(ReaderPrefs next) {
     if (next == state) return;
     _touched = true;

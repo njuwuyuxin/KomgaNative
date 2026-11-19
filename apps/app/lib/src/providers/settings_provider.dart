@@ -93,6 +93,22 @@ class SettingsController extends Notifier<SettingsState> {
     );
   }
 
+  /// 整份替换（SET-02 导入备份）。
+  ///
+  /// 三个"用户手动改过"的标记一并置位：导入之后不该再被系统/墨水平板探测覆盖。
+  Future<void> replaceAll(AppSettings next) async {
+    _themeTouched = true;
+    _einkTouched = true;
+    _languageTouched = true;
+    await _store.update((AppSettings _) => next);
+    state = state.copyWith(
+      themeMode: next.themeMode,
+      forceEink: next.forceEink,
+      language: appLanguageFromCode(next.language),
+      haptics: next.haptics,
+    );
+  }
+
   void setThemeMode(ThemeMode mode) {
     if (mode == state.themeMode) return;
     _themeTouched = true;
