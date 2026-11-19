@@ -18,6 +18,7 @@ Future<void> showReaderSettingsSheet(
   required ReaderPalette palette,
   required int page,
   required int total,
+  String? seriesId,
   required ValueChanged<int> onJump,
 }) {
   return showModalBottomSheet<void>(
@@ -45,6 +46,7 @@ Future<void> showReaderSettingsSheet(
           palette: palette,
           page: page,
           total: total,
+          seriesId: seriesId,
           onJump: onJump,
         ),
       ),
@@ -58,6 +60,7 @@ class ReaderSettingsSheet extends ConsumerStatefulWidget {
     required this.page,
     required this.total,
     required this.onJump,
+    this.seriesId,
     super.key,
   });
 
@@ -65,6 +68,9 @@ class ReaderSettingsSheet extends ConsumerStatefulWidget {
   final int page;
   final int total;
   final ValueChanged<int> onJump;
+
+  /// 当前书的系列；为空（深链/书还没回来）时不显示"按系列记住"。
+  final String? seriesId;
 
   @override
   ConsumerState<ReaderSettingsSheet> createState() =>
@@ -101,11 +107,17 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final prefs = ref.watch(readerPrefsProvider);
+    final global = ref.watch(readerPrefsProvider);
     final controller = ref.read(readerPrefsProvider.notifier);
     final palette = widget.palette;
     final theme = Theme.of(context);
     final textStyle = theme.textTheme;
+    final seriesId = widget.seriesId;
+    final seriesOverridden =
+        seriesId != null && global.seriesOverrides.containsKey(seriesId);
+    // 开关关着时改的是全局；开着时才写这个系列的覆盖。
+    final writeSeriesId = seriesOverridden ? seriesId : null;
+    final prefs = global.forSeries(seriesId);
 
     return SafeArea(
       child: ConstrainedBox(
@@ -142,12 +154,35 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
                     .copyWith(color: palette.foreground),
               ),
               const SizedBox(height: AppSpacing.md),
+              if (seriesId != null) ...<Widget>[
+                SwitchListTile(
+                  key: const Key('reader-series-remember'),
+                  contentPadding: EdgeInsets.zero,
+                  value: seriesOverridden,
+                  onChanged: (bool value) =>
+                      controller.setSeriesOverride(seriesId, value),
+                  activeThumbColor: palette.foreground,
+                  title: Text(
+                    l10n.readerSeriesRemember,
+                    style: textStyle.bodyMedium?.copyWith(
+                      color: palette.foreground,
+                    ),
+                  ),
+                  subtitle: Text(
+                    l10n.readerSeriesRememberHint,
+                    style: textStyle.bodySmall?.copyWith(color: palette.muted),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+              ],
               ReaderPresetSection(
                 prefs: prefs,
                 palette: palette,
-                onApply: controller.applyPreset,
+                onApply: (String id) =>
+                    controller.applyPreset(id, seriesId: writeSeriesId),
                 onDelete: controller.deletePreset,
-                onSave: controller.savePreset,
+                onSave: (String name) =>
+                    controller.savePreset(name, seriesId: writeSeriesId),
               ),
               const SizedBox(height: AppSpacing.md),
               ReaderOptionSection<ReaderModeChoice>(
@@ -158,7 +193,8 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
                 hint: readerModeHint,
                 keyPrefix: 'reader-mode',
                 palette: palette,
-                onSelect: controller.setMode,
+                onSelect: (ReaderModeChoice value) =>
+                    controller.setMode(value, seriesId: writeSeriesId),
               ),
               const SizedBox(height: AppSpacing.md),
               ReaderOptionSection<ReaderFitChoice>(
@@ -169,7 +205,8 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
                 hint: readerFitHint,
                 keyPrefix: 'reader-fit',
                 palette: palette,
-                onSelect: controller.setFit,
+                onSelect: (ReaderFitChoice value) =>
+                    controller.setFit(value, seriesId: writeSeriesId),
               ),
               const SizedBox(height: AppSpacing.md),
               ReaderOptionSection<ReaderDirectionChoice>(
@@ -180,7 +217,8 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
                 hint: readerDirectionHint,
                 keyPrefix: 'reader-direction',
                 palette: palette,
-                onSelect: controller.setDirection,
+                onSelect: (ReaderDirectionChoice value) =>
+                    controller.setDirection(value, seriesId: writeSeriesId),
               ),
               // 墨水屏不给背景选项：它固定白底黑字（黑底会触发整屏全刷）。
               if (!palette.isEink) ...<Widget>[
@@ -193,7 +231,8 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
                   hint: readerBackgroundHint,
                   keyPrefix: 'reader-background',
                   palette: palette,
-                  onSelect: controller.setBackground,
+                  onSelect: (ReaderBackgroundChoice value) =>
+                      controller.setBackground(value, seriesId: writeSeriesId),
                 ),
               ],
               const SizedBox(height: AppSpacing.md),
@@ -213,7 +252,10 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
                       max: 1,
                       activeColor: palette.foreground,
                       inactiveColor: palette.outline,
-                      onChanged: controller.setBrightness,
+                      onChanged: (double value) => controller.setBrightness(
+                        value,
+                        seriesId: writeSeriesId,
+                      ),
                     ),
                   ),
                   SizedBox(
@@ -229,9 +271,11 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
                 ],
               ),
               SwitchListTile(
+                key: const Key('reader-keep-awake'),
                 contentPadding: EdgeInsets.zero,
                 value: prefs.keepAwake,
-                onChanged: controller.setKeepAwake,
+                onChanged: (bool value) =>
+                    controller.setKeepAwake(value, seriesId: writeSeriesId),
                 activeThumbColor: palette.foreground,
                 title: Text(
                   l10n.keepScreenAwake,

@@ -129,9 +129,17 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   void _onVolumeKey(PageTurnKey key) {
     final pages = ref.read(readerPagesProvider(widget.bookId)).value;
     if (pages == null || pages.isEmpty) return;
-    final mode = _modeFor(ref.read(readerPrefsProvider));
+    final mode = _modeFor(_effectivePrefs(ref.read(readerPrefsProvider)));
     _requestTurn(key == PageTurnKey.next ? 1 : -1, mode);
   }
+
+  /// 当前书的系列 id（按系列记忆设置用，UI-P3-2）。
+  String? get _seriesId =>
+      (widget.book ?? ref.read(readerBookProvider(widget.bookId)).value)
+          ?.seriesId;
+
+  /// 系列覆盖优先，其余用全局。
+  ReaderPrefs _effectivePrefs(ReaderPrefs prefs) => prefs.forSeries(_seriesId);
 
   /// 外部翻页（底栏箭头 / 音量键）统一入口：交给绘制层播动画，动画结束后
   /// 它再回调 `onTurn` 真正换页；绘制层还没建好时（页数据未到）什么也不做。
@@ -159,7 +167,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     if (pages == null || pages.isEmpty) return null;
     return ReaderLayout(
       pages: pages,
-      mode: _modeFor(ref.read(readerPrefsProvider)),
+      mode: _modeFor(_effectivePrefs(ref.read(readerPrefsProvider))),
       page: _resolvePage(pages.length),
     );
   }
@@ -267,7 +275,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 
   Widget _buildPages(BuildContext context, bool isEink, List<PageInfo> pages) {
     final l10n = AppLocalizations.of(context);
-    final prefs = ref.watch(readerPrefsProvider);
+    final prefs = _effectivePrefs(ref.watch(readerPrefsProvider));
     final book =
         widget.book ?? ref.watch(readerBookProvider(widget.bookId)).value;
     final total = pages.length;
@@ -295,6 +303,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 
     final readerBar = ReaderTopBar(
       bookId: widget.bookId,
+      seriesId: book?.seriesId,
       title: book?.name ?? l10n.readerBookFallback,
       pageLabel: layout.pageLabel(l10n),
       palette: palette,

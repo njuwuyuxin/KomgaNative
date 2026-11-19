@@ -30,42 +30,70 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
     }
   }
 
-  void setMode(ReaderModeChoice mode) => _update(state.copyWith(mode: mode));
+  void setMode(ReaderModeChoice mode, {String? seriesId}) =>
+      _updateConfig(seriesId, (ReaderPrefs p) => p.copyWith(mode: mode));
 
-  void setBrightness(double brightness) =>
-      _update(state.copyWith(brightness: brightness));
+  void setBrightness(double brightness, {String? seriesId}) => _updateConfig(
+    seriesId,
+    (ReaderPrefs p) => p.copyWith(brightness: brightness),
+  );
 
-  void setKeepAwake(bool enabled) =>
-      _update(state.copyWith(keepAwake: enabled));
+  void setKeepAwake(bool enabled, {String? seriesId}) => _updateConfig(
+    seriesId,
+    (ReaderPrefs p) => p.copyWith(keepAwake: enabled),
+  );
 
-  void setFit(ReaderFitChoice fit) => _update(state.copyWith(fit: fit));
+  void setFit(ReaderFitChoice fit, {String? seriesId}) =>
+      _updateConfig(seriesId, (ReaderPrefs p) => p.copyWith(fit: fit));
 
-  void setDirection(ReaderDirectionChoice direction) =>
-      _update(state.copyWith(direction: direction));
+  void setDirection(ReaderDirectionChoice direction, {String? seriesId}) =>
+      _updateConfig(
+        seriesId,
+        (ReaderPrefs p) => p.copyWith(direction: direction),
+      );
 
-  void setBackground(ReaderBackgroundChoice background) =>
-      _update(state.copyWith(background: background));
+  void setBackground(ReaderBackgroundChoice background, {String? seriesId}) =>
+      _updateConfig(
+        seriesId,
+        (ReaderPrefs p) => p.copyWith(background: background),
+      );
+
+  /// 打开/关闭"按系列记住"（UI-P3-2）。
+  ///
+  /// 打开时把**当前生效值**快照成这个系列的覆盖；关闭时删掉覆盖、回到全局。
+  void setSeriesOverride(String seriesId, bool enabled) {
+    if (!enabled) {
+      if (!state.seriesOverrides.containsKey(seriesId)) return;
+      _update(state.withSeriesOverride(seriesId, null));
+      return;
+    }
+    _update(state.withSeriesOverride(seriesId, state.forSeries(seriesId)));
+  }
 
   /// 把当前设置存成一个命名预设（UI-P3-1）。
   ///
   /// 空名字/只有空格忽略。ID 用微秒时间戳：本地单用户、不需要全局唯一，
   /// 也避免引入 uuid 依赖；同一微秒内连点两次的概率可以忽略。
-  void savePreset(String name) {
+  void savePreset(String name, {String? seriesId}) {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return;
     final preset = ReaderPreset(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       name: trimmed,
-      prefs: state.withoutPresets(),
+      prefs: state.forSeries(seriesId).configOnly(),
     );
     _update(state.copyWith(presets: <ReaderPreset>[...state.presets, preset]));
   }
 
   /// 应用一个预设：整体覆盖配置，但保留预设列表本身。
-  void applyPreset(String id) {
+  void applyPreset(String id, {String? seriesId}) {
     for (final preset in state.presets) {
       if (preset.id != id) continue;
       final config = preset.prefs;
+      if (seriesId != null) {
+        _update(state.withSeriesOverride(seriesId, config));
+        return;
+      }
       _update(
         state.copyWith(
           mode: config.mode,
@@ -87,6 +115,20 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
     ];
     if (next.length == state.presets.length) return;
     _update(state.copyWith(presets: next));
+  }
+
+  /// 有 seriesId 时只改这个系列的覆盖；没有时改全局。
+  void _updateConfig(
+    String? seriesId,
+    ReaderPrefs Function(ReaderPrefs current) change,
+  ) {
+    if (seriesId == null) {
+      _update(change(state));
+      return;
+    }
+    _update(
+      state.withSeriesOverride(seriesId, change(state.forSeries(seriesId))),
+    );
   }
 
   void _update(ReaderPrefs next) {

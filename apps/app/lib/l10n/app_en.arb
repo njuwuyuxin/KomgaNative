@@ -279,6 +279,8 @@
   "readerPresetEmpty": "No presets yet.",
   "readerPresetName": "Preset name",
   "readerPresetDelete": "Delete preset",
+  "readerSeriesRemember": "Remember for this series",
+  "readerSeriesRememberHint": "Changes apply to this series only; turn off to use the global settings again.",
   "readerPresetDefaultName": "Preset {number}",
   "@readerPresetDefaultName": {
     "placeholders": {

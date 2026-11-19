@@ -84,7 +84,7 @@ class ReaderPreset {
     }
     if (config is! Map) return null;
     final prefs = ReaderPrefs.fromJson(Map<String, Object?>.from(config))
-        .copyWith(presets: const <ReaderPreset>[]);
+        .configOnly();
     return ReaderPreset(id: id, name: name.trim(), prefs: prefs);
   }
 
@@ -115,6 +115,7 @@ class ReaderPrefs {
     this.direction = ReaderDirectionChoice.auto,
     this.background = ReaderBackgroundChoice.black,
     this.presets = const <ReaderPreset>[],
+    this.seriesOverrides = const <String, ReaderPrefs>{},
   });
 
   /// 亮度下限：再暗也要能看见字，所以不允许 0。
@@ -134,8 +135,50 @@ class ReaderPrefs {
   /// 用户保存的阅读预设（UI-P3-1）；按保存顺序排列。
   final List<ReaderPreset> presets;
 
-  /// 去掉预设后的"纯配置"，用于把当前设置存成预设（避免递归）。
-  ReaderPrefs withoutPresets() => copyWith(presets: const <ReaderPreset>[]);
+  /// 按系列覆盖的阅读设置（UI-P3-2）：seriesId → 纯配置。
+  ///
+  /// 值里不能带预设/覆盖（用 [configOnly] 生成），否则 JSON 会递归。
+  final Map<String, ReaderPrefs> seriesOverrides;
+
+  /// 去掉预设与系列覆盖后的"纯配置"（保存预设/系列覆盖时用）。
+  ReaderPrefs configOnly() => ReaderPrefs(
+    mode: mode,
+    brightness: brightness,
+    keepAwake: keepAwake,
+    fit: fit,
+    direction: direction,
+    background: background,
+  );
+
+  /// 某个系列实际生效的设置：有覆盖就用覆盖，否则用全局。
+  ///
+  /// 返回的对象仍带全局预设列表，方便设置面板继续读；系列覆盖本身不嵌套。
+  ReaderPrefs forSeries(String? seriesId) {
+    if (seriesId == null) return this;
+    final override = seriesOverrides[seriesId];
+    if (override == null) return this;
+    return ReaderPrefs(
+      mode: override.mode,
+      brightness: override.brightness,
+      keepAwake: override.keepAwake,
+      fit: override.fit,
+      direction: override.direction,
+      background: override.background,
+      presets: presets,
+      seriesOverrides: seriesOverrides,
+    );
+  }
+
+  /// 写入/删除某个系列的覆盖。传入 null 表示删除。
+  ReaderPrefs withSeriesOverride(String seriesId, ReaderPrefs? config) {
+    final next = Map<String, ReaderPrefs>.from(seriesOverrides);
+    if (config == null) {
+      next.remove(seriesId);
+    } else {
+      next[seriesId] = config.configOnly();
+    }
+    return copyWith(seriesOverrides: next);
+  }
 
   /// 遮罩的不透明度（亮度越低盖得越黑）。
   double get dimOpacity => (1 - brightness).clamp(0.0, 1 - minBrightness);
@@ -148,6 +191,7 @@ class ReaderPrefs {
     ReaderDirectionChoice? direction,
     ReaderBackgroundChoice? background,
     List<ReaderPreset>? presets,
+    Map<String, ReaderPrefs>? seriesOverrides,
   }) => ReaderPrefs(
     mode: mode ?? this.mode,
     brightness: brightness ?? this.brightness,
@@ -156,6 +200,7 @@ class ReaderPrefs {
     direction: direction ?? this.direction,
     background: background ?? this.background,
     presets: presets ?? this.presets,
+    seriesOverrides: seriesOverrides ?? this.seriesOverrides,
   );
 
   Map<String, Object?> toJson({bool includePresets = true}) =>
@@ -168,6 +213,11 @@ class ReaderPrefs {
         'background': background.name,
         if (includePresets && presets.isNotEmpty)
           'presets': <Object?>[for (final preset in presets) preset.toJson()],
+        if (includePresets && seriesOverrides.isNotEmpty)
+          'seriesOverrides': <String, Object?>{
+            for (final entry in seriesOverrides.entries)
+              entry.key: entry.value.toJson(includePresets: false),
+          },
       };
 
   /// 存档可能被旧版本/手工改过，所有字段先判类型再取值，坏值一律回默认，
@@ -183,6 +233,16 @@ class ReaderPrefs {
       for (final raw in rawPresets) {
         final preset = ReaderPreset.fromJson(raw);
         if (preset != null) presets.add(preset);
+      }
+    }
+    final rawOverrides = json['seriesOverrides'];
+    final overrides = <String, ReaderPrefs>{};
+    if (rawOverrides is Map) {
+      for (final entry in rawOverrides.entries) {
+        if (entry.key is! String || entry.value is! Map) continue;
+        overrides[entry.key as String] = ReaderPrefs.fromJson(
+          Map<String, Object?>.from(entry.value as Map),
+        ).configOnly();
       }
     }
     return ReaderPrefs(
@@ -205,6 +265,7 @@ class ReaderPrefs {
         ReaderBackgroundChoice.black,
       ),
       presets: presets,
+      seriesOverrides: overrides,
     );
   }
 
@@ -226,7 +287,20 @@ class ReaderPrefs {
       other.fit == fit &&
       other.direction == direction &&
       other.background == background &&
-      _samePresets(other.presets, presets);
+      _samePresets(other.presets, presets) &&
+      _sameOverrides(other.seriesOverrides, seriesOverrides);
+
+  static bool _sameOverrides(
+    Map<String, ReaderPrefs> a,
+    Map<String, ReaderPrefs> b,
+  ) {
+    if (a.length != b.length) return false;
+    for (final entry in a.entries) {
+      final other = b[entry.key];
+      if (other == null || other != entry.value) return false;
+    }
+    return true;
+  }
 
   static bool _samePresets(List<ReaderPreset> a, List<ReaderPreset> b) {
     if (a.length != b.length) return false;
@@ -245,10 +319,16 @@ class ReaderPrefs {
     direction,
     background,
     Object.hashAll(presets),
+    Object.hashAll(
+      seriesOverrides.entries.map(
+        (MapEntry<String, ReaderPrefs> e) => Object.hash(e.key, e.value),
+      ),
+    ),
   );
 
   @override
   String toString() =>
       'ReaderPrefs(${mode.name}, $brightness, $keepAwake, ${fit.name}, '
-      '${direction.name}, ${background.name}, presets: ${presets.length})';
+      '${direction.name}, ${background.name}, presets: ${presets.length}, '
+      'series: ${seriesOverrides.length})';
 }

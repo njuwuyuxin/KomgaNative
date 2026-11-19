@@ -17,6 +17,7 @@ import 'package:material_ui/material_ui.dart';
 class ReaderTopBar extends ConsumerWidget {
   const ReaderTopBar({
     required this.bookId,
+    this.seriesId,
     required this.title,
     required this.pageLabel,
     required this.palette,
@@ -28,6 +29,9 @@ class ReaderTopBar extends ConsumerWidget {
   });
 
   final String bookId;
+
+  /// 当前书的系列 id；设置面板用它决定是否显示"按系列记住"（UI-P3-2）。
+  final String? seriesId;
   final String title;
   final String pageLabel;
   final ReaderPalette palette;
@@ -65,6 +69,7 @@ class ReaderTopBar extends ConsumerWidget {
           palette: palette,
           page: page,
           total: total,
+          seriesId: seriesId,
           onJump: onJump,
         ),
         onClose: () => context.pop(),

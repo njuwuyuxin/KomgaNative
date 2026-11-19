@@ -138,6 +138,20 @@ void main() {
       });
       expect(parsed.presets.map((ReaderPreset p) => p.name), <String>['Good']);
     });
+
+    test('系列覆盖 JSON 往返：forSeries 优先，覆盖里不再嵌套', () {
+      const prefs = ReaderPrefs(
+        mode: ReaderModeChoice.single,
+        seriesOverrides: <String, ReaderPrefs>{
+          's1': ReaderPrefs(mode: ReaderModeChoice.double),
+        },
+      );
+      final parsed = ReaderPrefs.fromJson(prefs.toJson());
+      expect(parsed.forSeries('s1').mode, ReaderModeChoice.double);
+      expect(parsed.forSeries('s2').mode, ReaderModeChoice.single);
+      expect(parsed.seriesOverrides['s1']!.presets, isEmpty);
+      expect(parsed.seriesOverrides['s1']!.seriesOverrides, isEmpty);
+    });
   });
 
   group('ReaderFitChoice → FitMode', () {

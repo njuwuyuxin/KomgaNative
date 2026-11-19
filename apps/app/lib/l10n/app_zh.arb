@@ -180,6 +180,8 @@
   "readerPresetEmpty": "还没有预设。",
   "readerPresetName": "预设名称",
   "readerPresetDelete": "删除预设",
+  "readerSeriesRemember": "按系列记住",
+  "readerSeriesRememberHint": "只对这个系列生效；关闭后回到全局设置。",
   "readerPresetDefaultName": "预设 {number}",
   "bookMarkRead": "标记已读",
   "bookMarkUnread": "标记未读",

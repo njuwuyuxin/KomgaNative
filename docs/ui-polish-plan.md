@@ -414,6 +414,15 @@ Panels 的高级感主要来自三点，和控件本身关系不大：
 | 测试：`reader_presets_test` 覆盖保存→改设置→应用回来、删除；`data/reader_prefs_test` 覆盖预设 JSON 往返与坏条目；新增 `reader_settings_presets@phone_dark` 基线（chip 视觉），`reader_settings@phone_light` 也补上（浅色主题下面板仍是深色，见下） |
 | 设备走查时发现：浅色主题下 `FrostedSurface` 的 `sheet` 会跟随 Theme.brightness 变成浅灰底 + 白字，面板不可读。已在 `showReaderSettingsSheet` 显式传深色 sheet 材质（墨水屏仍走纸色），`reader_settings@phone_light` 基线钉住 |
 
+**进度（2026-11-19）：P3-2 按系列记住阅读设置。**
+
+| 落地 |
+|---|
+| `ReaderPrefs.seriesOverrides`（seriesId → 纯配置）+ `forSeries()`；存同一个 secure storage JSON，无 Drift；ADR 0005 说明取舍 |
+| 阅读器全链路用 `forSeries(book.seriesId)`：音量键、模式解析、布局、背景；不会出现"面板是系列设置、阅读区还是全局" |
+| 面板开关 `reader-series-remember`：打开快照当前生效值，之后改设置/应用预设只写覆盖；关闭删覆盖回全局。设置面板的 6 个 setter 全部带 `seriesId` |
+| 测试：`data/reader_prefs_test` 覆盖系列覆盖 JSON 往返与 `forSeries` 优先；`reader_series_prefs_test` 覆盖"打开开关只写覆盖、全局不变；关闭删除"；`reader_settings@*` 与 presets 基线更新（多了开关） |
+
 ## 不做
 
 | 需求 | 理由 |

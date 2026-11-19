@@ -124,7 +124,7 @@ void main() {
       expect(wakeLock.enabled, isFalse, reason: '默认不常亮');
 
       await openSettings(tester);
-      final toggle = find.byType(Switch);
+      final toggle = find.byKey(const Key('reader-keep-awake'));
       await revealInSheet(tester, toggle);
       await tester.tap(toggle);
       await tester.pumpAndSettle();
