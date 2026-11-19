@@ -4,6 +4,7 @@ import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/shelf_view_options.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
+import 'package:komga_native/src/providers/shelf_selection_provider.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 排序选项的界面文案。
@@ -58,6 +59,29 @@ class ShelfSortButton extends ConsumerWidget {
             onPressed: () => controller.setSort(option),
           ),
       ],
+    );
+  }
+}
+
+/// 进入多选（LIB-03）。
+///
+/// 用按钮而不是长按：长按在书架上是**系列菜单**（标记已读/置顶/详情）。
+/// 一个手势不能同时做两件事，竞品（Panels）也是"长按出菜单、选择走按钮"。
+class ShelfSelectButton extends ConsumerWidget {
+  const ShelfSelectButton({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final selecting = ref.watch(
+      shelfSelectionProvider.select((ShelfSelectionState s) => s.active),
+    );
+    if (selecting) return const SizedBox.shrink();
+    return GlassIconButton(
+      key: const Key('shelf-select-button'),
+      icon: Icons.checklist,
+      label: l10n.selectSeries,
+      onPressed: () => ref.read(shelfSelectionProvider.notifier).enter(),
     );
   }
 }

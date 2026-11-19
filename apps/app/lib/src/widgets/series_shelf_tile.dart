@@ -35,12 +35,20 @@ class SeriesShelfTile extends ConsumerWidget {
   const SeriesShelfTile({
     required this.series,
     this.onTap,
+    this.onLongPress,
+    this.selected = false,
     this.heroTag,
     super.key,
   });
 
   final Series series;
   final VoidCallback? onTap;
+
+  /// 覆盖默认的长按菜单（多选模式下用来勾选，LIB-03）。
+  final VoidCallback? onLongPress;
+
+  /// 多选模式下这个系列是否被勾中。
+  final bool selected;
 
   /// 这张卡片的 Hero tag；null = 默认 `series-<id>`（页面上只有一份时）。
   final String? heroTag;
@@ -65,12 +73,18 @@ class SeriesShelfTile extends ConsumerWidget {
           '${series.title}, '
           '${l10n.readOfTotal(series.booksReadCount, series.booksCount)}',
       onTap: onTap,
-      onLongPress: () => unawaited(
-        showSeriesMenu(context, ref, series, heroTag: tag, pinned: pinned),
-      ),
+      onLongPress:
+          onLongPress ??
+          () => unawaited(
+            showSeriesMenu(context, ref, series, heroTag: tag, pinned: pinned),
+          ),
       cover: bytes == null || bytes.isEmpty ? null : CoverImage(bytes: bytes),
     );
-    final badged = _withUnreadBadge(series, tile);
+    final badged = _withSelection(
+      context,
+      _withUnreadBadge(series, tile),
+      selected,
+    );
 
     if (AppTheme.isEink(Theme.of(context))) return badged;
     // Hero 飞行时子组件会被放进 Overlay，而 Overlay 里**没有 Material 祖先**；
@@ -81,6 +95,25 @@ class SeriesShelfTile extends ConsumerWidget {
       child: Material(type: MaterialType.transparency, child: badged),
     );
   }
+}
+
+/// 多选模式下给卡片描一圈选中边（LIB-03）。
+///
+/// 只描边、不叠半透明遮罩：书架上的封面是用户辨认书的主要线索，
+/// 盖一层灰会让"选的是哪本"更难认。
+Widget _withSelection(BuildContext context, Widget child, bool selected) {
+  if (!selected) return child;
+  final eink = AppTheme.isEink(Theme.of(context));
+  return DecoratedBox(
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(AppRadii.md),
+      border: Border.all(
+        color: eink ? AppTheme.einkInk : Theme.of(context).colorScheme.primary,
+        width: AppSizes.hairline,
+      ),
+    ),
+    child: child,
+  );
 }
 
 /// 有未读时在封面左上角叠一个未读数（LIB-02）。
@@ -109,6 +142,8 @@ class SeriesShelfRow extends ConsumerWidget {
     required this.series,
     required this.coverSize,
     this.onTap,
+    this.onLongPress,
+    this.selected = false,
     this.heroTag,
     super.key,
   });
@@ -116,6 +151,12 @@ class SeriesShelfRow extends ConsumerWidget {
   final Series series;
   final ShelfCoverSize coverSize;
   final VoidCallback? onTap;
+
+  /// 覆盖默认的长按菜单（多选模式下用来勾选，LIB-03）。
+  final VoidCallback? onLongPress;
+
+  /// 多选模式下这一行是否被勾中。
+  final bool selected;
 
   /// 这张行的 Hero tag；null = 默认 `series-<id>`。
   final String? heroTag;
@@ -226,7 +267,11 @@ class SeriesShelfRow extends ConsumerWidget {
       ),
     );
 
-    final badged = _withUnreadBadge(series, row);
+    final badged = _withSelection(
+      context,
+      _withUnreadBadge(series, row),
+      selected,
+    );
     if (AppTheme.isEink(theme)) return badged;
     // 同上：退出时的飞行层没有 Material 祖先，而这一行里有 InkWell。
     return Hero(

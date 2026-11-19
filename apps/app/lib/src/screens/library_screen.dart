@@ -9,15 +9,21 @@ import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/data/shelf_view_options.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/providers/pinned_series_provider.dart';
+import 'package:komga_native/src/providers/shelf_selection_provider.dart';
 import 'package:komga_native/src/session/session_controller.dart';
 import 'package:komga_native/src/widgets/offline_banner.dart';
 import 'package:komga_native/src/widgets/phase_fade.dart';
 import 'package:komga_native/src/widgets/shelf_active_filters.dart';
 import 'package:komga_native/src/widgets/shelf_query_buttons.dart';
+import 'package:komga_native/src/widgets/shelf_selection_bar.dart';
 import 'package:komga_native/src/widgets/shelf_pinch_detector.dart';
 import 'package:komga_native/src/widgets/shelf_views.dart';
 import 'package:komga_native/src/widgets/series_shelf_tile.dart';
+import 'package:komga_native/src/providers/series_read_provider.dart';
 import 'package:material_ui/material_ui.dart';
+
+part 'library_screen_batch.dart';
+part 'library_screen_shelf.dart';
 
 /// 书架页：真实 `/api/v1/series` 数据 + 封面 + 分页 + 搜索 + 按库筛选。
 ///
@@ -34,7 +40,8 @@ class LibraryScreen extends ConsumerStatefulWidget {
   ConsumerState<LibraryScreen> createState() => _LibraryScreenState();
 }
 
-class _LibraryScreenState extends ConsumerState<LibraryScreen> {
+class _LibraryScreenState extends ConsumerState<LibraryScreen>
+    with _ShelfSlivers, _ShelfBatch {
   /// 距底部还有多少像素就开始预取下一页。太大浪费流量，太小时用户会感到"卡一下"。
   static const double _prefetchExtent = 600;
 
@@ -68,8 +75,27 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final l10n = AppLocalizations.of(context);
     final state = ref.watch(shelfProvider);
     final controller = ref.read(shelfProvider.notifier);
+    final selection = ref.watch(shelfSelectionProvider);
+    final selecting = ref.read(shelfSelectionProvider.notifier);
 
     return Scaffold(
+      // 多选的批量条放在 footer：它本来就该占布局位置，不该盖住最后一行封面。
+      persistentFooterButtons: !selection.active
+          ? null
+          : <Widget>[
+              Padding(
+                // 悬浮导航条压在内容之上：批量条要抬到它上面，否则点不到。
+                padding: const EdgeInsets.only(
+                  bottom: AppSizes.navBarClearance,
+                ),
+                child: ShelfBatchBar(
+                  count: selection.ids.length,
+                  busy: _batchBusy,
+                  onMarkRead: () => _markSelected(read: true),
+                  onMarkUnread: () => _markSelected(read: false),
+                ),
+              ),
+            ],
       body: GlassPageBackground(
         // Android 的拉伸过度滚动会给整条滚动层加一个 Transform，而液态玻璃
         // 着色器按屏幕坐标采样背景；下拉刷新时就会读到被变换过的空图层，
@@ -103,21 +129,33 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                     // 不再放页面标题——标题既不提供信息，又占掉一整行。
                     GlassHeaderSliver(
                       header: GlassHeader(
-                        bar: Row(
-                          children: <Widget>[
-                            Expanded(
-                              child: GlassSearchField(
-                                key: const Key('shelf-search-field'),
-                                controller: _searchController,
-                                hintText: l10n.searchSeriesHint,
-                                clearLabel: l10n.closeSearch,
-                                onChanged: controller.search,
+                        bar: selection.active
+                            ? ShelfSelectionBar(
+                                count: selection.ids.length,
+                                total: state.series.length,
+                                allSelected:
+                                    state.series.isNotEmpty &&
+                                    selection.ids.length == state.series.length,
+                                onSelectAll: () => selecting.selectAll(
+                                  state.series.map((Series s) => s.id),
+                                ),
+                                onClose: selecting.exit,
+                              )
+                            : Row(
+                                children: <Widget>[
+                                  Expanded(
+                                    child: GlassSearchField(
+                                      key: const Key('shelf-search-field'),
+                                      controller: _searchController,
+                                      hintText: l10n.searchSeriesHint,
+                                      clearLabel: l10n.closeSearch,
+                                      onChanged: controller.search,
+                                    ),
+                                  ),
+                                  const SizedBox(width: AppSpacing.sm),
+                                  const _LibraryActions(),
+                                ],
                               ),
-                            ),
-                            const SizedBox(width: AppSpacing.sm),
-                            const _LibraryActions(),
-                          ],
-                        ),
                       ),
                     ),
                     // 大标题 + 系列数（LIB-01）：跟内容一起滚走，不常驻占高度。
@@ -192,162 +230,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       ),
     );
   }
-
-  /// 三态的稳定标识：只有它变了才播一次入场淡入。
-  ///
-  /// 用"加载中/空/错/内容"四档而不是整份 state：列表滚动、追加下一页
-  /// 都不该触发一次全屏淡入。
-  String _phaseOf(ShelfState state) {
-    if (state.loading && state.series.isEmpty) return 'loading';
-    if (state.failure != null && state.series.isEmpty) return 'error';
-    if (state.isEmpty) return 'empty';
-    return 'content';
-  }
-
-  /// 骨架 / 空错 / 内容三态，各自是 sliver（三态之间交叉淡入，UI-P2-8）。
-  List<Widget> _shelfSlivers(
-    AppLocalizations l10n,
-    ShelfState state,
-    ShelfController controller,
-  ) {
-    if (state.loading && state.series.isEmpty) {
-      return <Widget>[const SliverFillRemaining(child: ShelfSkeleton())];
-    }
-    final failure = state.failure;
-    if (failure != null && state.series.isEmpty) {
-      final needsSignIn = failure is AuthFailure;
-      return <Widget>[
-        SliverFillRemaining(
-          hasScrollBody: false,
-          child: StatusView(
-            key: const Key('shelf-error'),
-            icon: Icons.cloud_off_outlined,
-            title: failure.message,
-            message: failure.hint,
-            actionLabel: needsSignIn ? l10n.signOut : l10n.retry,
-            onAction: needsSignIn
-                ? () => ref.read(sessionProvider.notifier).signOut()
-                : () => unawaited(_refresh()),
-          ),
-        ),
-      ];
-    }
-    if (state.isEmpty) {
-      return <Widget>[
-        SliverFillRemaining(
-          hasScrollBody: false,
-          child: StatusView(
-            key: const Key('shelf-empty'),
-            icon: Icons.auto_stories_outlined,
-            title: state.query.isEmpty ? l10n.noSeriesYet : l10n.noMatches,
-            message: state.query.isEmpty
-                ? l10n.emptyShelfHint
-                : l10n.noSearchMatchesHint,
-          ),
-        ),
-      ];
-    }
-    // 置顶区（LIB-02）：单独取这几本的元数据排在前面，主列表里把它们剔掉，
-    // 免得同一个系列在屏幕上出现两次。
-    final pinned = ref.watch(pinnedSeriesProvider).value ?? const <Series>[];
-    final pinnedIds = <String>{for (final series in pinned) series.id};
-    final series = <Series>[
-      for (final item in state.series)
-        if (!pinnedIds.contains(item.id)) item,
-    ];
-    return <Widget>[
-      if (pinned.isNotEmpty) ...<Widget>[
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.md,
-              AppSpacing.sm,
-              AppSpacing.md,
-              AppSpacing.xs,
-            ),
-            child: Row(
-              children: <Widget>[
-                Icon(
-                  Icons.push_pin,
-                  size: AppSizes.iconSm,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                Text(
-                  l10n.pinned,
-                  key: const Key('shelf-pinned-header'),
-                  style: Theme.of(context).textTheme.labelLarge,
-                ),
-              ],
-            ),
-          ),
-        ),
-        SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-          sliver: SliverGrid(
-            gridDelegate: shelfGridDelegate(state.coverSize),
-            delegate: SliverChildBuilderDelegate((
-              BuildContext context,
-              int index,
-            ) {
-              final item = pinned[index];
-              return SeriesShelfTile(
-                series: item,
-                onTap: () => unawaited(_openSeries(item)),
-              );
-            }, childCount: pinned.length),
-          ),
-        ),
-        const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.md)),
-      ],
-      // 网格 / 列表（UI-P2-7）：两种视图共用同一份列表，
-      // 切换只是换 sliver 的类型，不重新请求。
-      if (state.view == ShelfView.grid)
-        SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-          sliver: SliverGrid(
-            gridDelegate: shelfGridDelegate(state.coverSize),
-            delegate: SliverChildBuilderDelegate((
-              BuildContext context,
-              int index,
-            ) {
-              final item = series[index];
-              return SeriesShelfTile(
-                series: item,
-                onTap: () => unawaited(_openSeries(item)),
-              );
-            }, childCount: series.length),
-          ),
-        )
-      else
-        SliverList(
-          delegate: SliverChildBuilderDelegate((
-            BuildContext context,
-            int index,
-          ) {
-            final item = series[index];
-            return SeriesShelfRow(
-              key: Key('series-${item.id}'),
-              series: item,
-              coverSize: state.coverSize,
-              onTap: () => unawaited(_openSeries(item)),
-            );
-          }, childCount: series.length),
-        ),
-      SliverToBoxAdapter(
-        child: ShelfPagingFooter(
-          state: state,
-          onRetry: () => controller.loadMore(),
-        ),
-      ),
-    ];
-  }
-
-  /// 进系列页；回来时原地刷新进度（别把列表清空跳回顶部）。
-  Future<void> _openSeries(Series series) async {
-    await context.push('/series/${series.id}');
-    await ref.read(shelfProvider.notifier).refreshInPlace();
-  }
 }
 
 /// 书架顶部右侧的三颗动作：排序 / 筛选 / 视图。
@@ -362,6 +244,7 @@ class _LibraryActions extends StatelessWidget {
     return const Row(
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
+        ShelfSelectButton(),
         ShelfSortButton(),
         ShelfFilterButton(),
         ShelfViewButton(),

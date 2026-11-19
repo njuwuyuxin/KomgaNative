@@ -131,6 +131,24 @@ void main() {
     );
   });
 
+  /// 多选态（LIB-03）：顶部换成"已选 N / 全选 / 取消"，底部出批量条。
+  testWidgets('library_selection@phone_light', (WidgetTester tester) async {
+    await pumpShelfGolden(
+      tester,
+      name: 'library_selection@phone_light',
+      size: GoldenSizes.phone,
+      theme: AppTheme.light(),
+      act: (WidgetTester tester) async {
+        await tester.tap(find.byKey(const Key('shelf-select-button')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('series-s1')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('series-s2')));
+        await tester.pumpAndSettle();
+      },
+    );
+  });
+
   /// 真实首页形态：书架 + 底部悬浮玻璃导航条。
   ///
   /// 页面基线本身不带外壳（外壳在 `AdaptiveShell` 里），这一张专门钉住

@@ -37,13 +37,22 @@ class _PressableScaleState extends State<PressableScale>
     value: 1,
   );
 
+  /// 已经被移出树并 dispose 了。
+  ///
+  /// 指针事件是**异步**送达的：按住一张卡片时它可能已经因为重建/跳页被销毁，
+  /// 松手（pointerUp）仍会派发到这个已经 dispose 的 State 上。
+  /// 不挡住这一步 `AnimationController` 会直接断言崩溃。
+  bool _disposed = false;
+
   @override
   void dispose() {
+    _disposed = true;
     _controller.dispose();
     super.dispose();
   }
 
   void _animateTo(double target, AppMotion motion) {
+    if (_disposed || !mounted) return;
     if (!motion.enabled) {
       _controller.value = 1;
       return;

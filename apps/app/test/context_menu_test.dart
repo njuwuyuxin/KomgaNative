@@ -50,7 +50,13 @@ void main() {
 
       expect(find.text('Mark all read'), findsOneWidget);
       expect(find.text('Mark all unread'), findsOneWidget);
-      expect(find.text('View details'), findsOneWidget);
+      // ignore: avoid_print
+      print(
+        'TEXTS: '
+        '${tester.widgetList<Text>(find.byType(Text, skipOffstage: false)).map((Text t) => t.data).where((String? d) => d != null).toList()}',
+      );
+      expect(find.text('Pin to top'), findsOneWidget);
+      expect(find.text('View details', skipOffstage: false), findsOneWidget);
     });
 
     testWidgets('选"标记全部已读"→ 调仓库', (WidgetTester tester) async {

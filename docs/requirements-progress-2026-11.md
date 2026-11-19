@@ -38,7 +38,7 @@
 |---|---|---|---|---|
 | LIB-01 | 书架标题/计数/筛选状态/toolbar 收敛 | P1 | TODO | — |
 | LIB-02 | 未读角标 + 置顶 | P1 | DONE | `feat(shelf): 未读角标 + 系列置顶` |
-| LIB-03 | 书架多选/批量 | P1 | TODO | — |
+| LIB-03 | 书架多选/批量 | P1 | DONE | `feat(shelf): 多选与批量标记` |
 | LIB-04 | 排序补充 + 保存筛选组合 | P1 | TODO | — |
 | SER-01 | 系列书列表排序/筛选 | P1 | TODO | — |
 | SER-02 | 系列书多选/批量/标记之前所有 | P1 | TODO | — |
@@ -228,6 +228,33 @@
   `continueReadingProgress` 是 FIX-06 之后失效的）。
 - 验证：55 条阅读器测试 + 黄金图全部不变（零行为变更）；设备上打开第 114/227 页
   照常渲染，滑杆与"剩 113 页"一致。
+
+### LIB-03 书架多选 / 批量
+
+- **入口是顶部工具条的"选择"按钮，不是长按**。计划里写的是"长按进入多选"，
+  但长按在书架上已经是系列菜单（标记已读/置顶/详情），一个手势不能同时做两件事；
+  竞品 Panels 也是"长按出菜单、多选走按钮"。这一处是**有意的偏离**，理由记录在此。
+- `ShelfSelectionState { active, ids }`：把"在多选态"和"选了几项"分开——
+  刚进多选时一项都没选，用"非空即多选"会让批量条一进来就消失。
+- 顶部换成 `ShelfSelectionBar`（✕ / 已选 N / 全选），底部 `persistentFooterButtons`
+  放 `ShelfBatchBar`（标记已读 / 未读），并抬到悬浮导航条之上（否则点不到）。
+- 批量标记逐个调用（Komga 的"整系列已读"本身就是按系列的），失败项不中断，
+  结束后统一提示"已更新 N 个"或"N 个成功，M 个失败"。下载按计划等 SER-03。
+- **把页面拆开了**：`library_screen.dart` 在 LIB-02 后已 371 行（超 350 上限），
+  现在拆成 `library_screen_shelf.dart`（内容区三态与网格/列表）+
+  `library_screen_batch.dart`（批量操作 mixin），页面本体 250 行左右。
+- 顺带修掉两个真 bug：
+  1. `PressableScale` 在卡片被重建/销毁后收到 pointerUp 会用已 dispose 的
+     `AnimationController` 播放动画 → 直接断言崩溃（真机上"点一下就跳页"的卡片必踩）；
+  2. `showContextMenu` 的 `RelativeRect.fromLTRB(dx, dy, dx, dy)` 等于告诉
+     `showMenu`"可用空间为 0"，菜单会被裁到只剩前两项；现在按屏幕剩余空间算。
+- 测试：`shelf_selection_test.dart` 4 条（进入多选后点卡片是勾选、全选/取消、
+  批量标记逐个调用并退出、失败项不影响其余项）；`context_menu_test` 更新为
+  四项菜单并改用 `skipOffstage: false` 之外的正常断言（菜单不再被裁）。
+- 黄金图：新增 `library_selection@phone_light`（多选态 + 底部批量条），
+  `library*` 因新增"选择"按钮重生成。
+- 设备走查：点"选择"→ 顶部变"✕ 已选 1 个 / 全选"，选中行带描边，
+  底部批量条在导航条之上显示正常。
 
 ### LIB-02 未读角标 + 置顶
 

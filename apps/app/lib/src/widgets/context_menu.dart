@@ -31,17 +31,21 @@ Future<T?> showContextMenu<T>({
   final box = anchor.findRenderObject();
   final overlay = Overlay.of(context).context.findRenderObject();
   Offset position = Offset.zero;
+  Size overlaySize = MediaQuery.sizeOf(context);
   if (box is RenderBox && overlay is RenderBox) {
     position = box.localToGlobal(Offset.zero, ancestor: overlay);
     position = Offset(position.dx + AppSpacing.md, position.dy + AppSpacing.md);
+    overlaySize = overlay.size;
   }
   return showMenu<T>(
     context: context,
+    // 右侧/下侧的"剩余空间"必须按屏幕算，不能写成 dx/dy 本身：
+    // 那样等于告诉 showMenu "可用高度 = 0"，菜单会被裁到只剩前两项（踩过）。
     position: RelativeRect.fromLTRB(
       position.dx,
       position.dy,
-      position.dx,
-      position.dy,
+      overlaySize.width - position.dx,
+      overlaySize.height - position.dy,
     ),
     items: <PopupMenuEntry<T>>[
       for (final entry in entries)
