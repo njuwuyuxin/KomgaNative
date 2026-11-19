@@ -23,9 +23,11 @@ import 'package:komga_native/src/providers/reader_prefs_provider.dart';
 import 'package:komga_native/src/providers/reader_providers.dart';
 import 'package:komga_native/src/providers/settings_provider.dart';
 import 'package:komga_native/src/screens/collections_screen.dart';
+import 'package:komga_native/src/screens/collection_detail_screen.dart';
 import 'package:komga_native/src/screens/connection_screen.dart';
 import 'package:komga_native/src/screens/downloads_screen.dart';
 import 'package:komga_native/src/screens/library_screen.dart';
+import 'package:komga_native/src/screens/readlist_detail_screen.dart';
 import 'package:komga_native/src/screens/reader_screen.dart';
 import 'package:komga_native/src/screens/reading_now_screen.dart';
 import 'package:komga_native/src/screens/search_screen.dart';
@@ -395,6 +397,119 @@ void main() {
     );
     await expectGolden(tester, name);
   }
+
+  Future<void> pumpCollectionDetailGolden(
+    WidgetTester tester, {
+    required String name,
+    required Size size,
+    required ThemeData theme,
+  }) async {
+    final series = demoShelf();
+    final library = FakeLibraryRepository(series: series);
+    final covers = <Uint8List>[];
+    for (final s in series.take(2)) {
+      final bytes = await library.seriesCover(s.id);
+      if (bytes != null) covers.add(bytes);
+    }
+    await pumpGoldenScreen(
+      tester,
+      screen: const CollectionDetailScreen(
+        collectionId: 'c1',
+        title: 'Reading order',
+      ),
+      size: size,
+      theme: theme,
+      overrides: <Override>[
+        libraryRepositoryProvider.overrideWithValue(library),
+      ],
+      precacheImages: covers,
+      realTimeSettle: true,
+    );
+    await expectGolden(tester, name);
+  }
+
+  testWidgets('collection_detail@phone_light', (WidgetTester tester) async {
+    await pumpCollectionDetailGolden(
+      tester,
+      name: 'collection_detail@phone_light',
+      size: GoldenSizes.phone,
+      theme: AppTheme.light(),
+    );
+  });
+
+  testWidgets('collection_detail@tablet_dark', (WidgetTester tester) async {
+    await pumpCollectionDetailGolden(
+      tester,
+      name: 'collection_detail@tablet_dark',
+      size: GoldenSizes.tablet,
+      theme: AppTheme.dark(),
+    );
+  });
+
+  testWidgets('collection_detail@eink', (WidgetTester tester) async {
+    await pumpCollectionDetailGolden(
+      tester,
+      name: 'collection_detail@eink',
+      size: GoldenSizes.eink,
+      theme: AppTheme.eink(),
+    );
+  });
+
+  Future<void> pumpReadListGolden(
+    WidgetTester tester, {
+    required String name,
+    required Size size,
+    required ThemeData theme,
+  }) async {
+    final library = FakeLibraryRepository(ondeck: demoOndeck());
+    final covers = <Uint8List>[];
+    for (final b in demoOndeck()) {
+      final bytes = await library.bookCover(b.id);
+      if (bytes != null) covers.add(bytes);
+    }
+    await pumpGoldenScreen(
+      tester,
+      screen: const ReadListDetailScreen(
+        readListId: 'r1',
+        title: 'Weekend reading',
+      ),
+      size: size,
+      theme: theme,
+      overrides: <Override>[
+        libraryRepositoryProvider.overrideWithValue(library),
+      ],
+      precacheImages: covers,
+      realTimeSettle: true,
+    );
+    await expectGolden(tester, name);
+  }
+
+  testWidgets('readlist_detail@phone_light', (WidgetTester tester) async {
+    await pumpReadListGolden(
+      tester,
+      name: 'readlist_detail@phone_light',
+      size: GoldenSizes.phone,
+      theme: AppTheme.light(),
+    );
+  });
+
+  testWidgets('readlist_detail@tablet_dark', (WidgetTester tester) async {
+    await pumpReadListGolden(
+      tester,
+      name: 'readlist_detail@tablet_dark',
+      size: GoldenSizes.tablet,
+      theme: AppTheme.dark(),
+    );
+  });
+
+  testWidgets('readlist_detail@eink', (WidgetTester tester) async {
+    await pumpReadListGolden(
+      tester,
+      name: 'readlist_detail@eink',
+      size: GoldenSizes.eink,
+      theme: AppTheme.eink(),
+    );
+  });
 
   Future<void> pumpSearchGolden(
     WidgetTester tester, {
