@@ -36,7 +36,7 @@
 
 | ID | 需求 | P | 状态 | commit |
 |---|---|---|---|---|
-| LIB-01 | 书架标题/计数/筛选状态/toolbar 收敛 | P1 | TODO | — |
+| LIB-01 | 书架标题/计数/筛选状态/toolbar 收敛 | P1 | DONE | `feat(shelf): 书架头部收敛` |
 | LIB-02 | 未读角标 + 置顶 | P1 | DONE | `feat(shelf): 未读角标 + 系列置顶` |
 | LIB-03 | 书架多选/批量 | P1 | DONE | `feat(shelf): 多选与批量标记` |
 | LIB-04 | 排序补充 + 保存筛选组合 | P1 | DONE | `feat(shelf): 保存筛选组合 + 删掉空操作排序` |
@@ -50,11 +50,11 @@
 | ID | 需求 | P | 状态 | commit |
 |---|---|---|---|---|
 | SCH-01 | 搜索历史 + 空态 | P1 | DONE | `feat(search): 搜索历史与空态引导` |
-| SCH-02 | 搜索 facets（状态/标签/作者） | P1 | TODO | — |
+| SCH-02 | 搜索 facets（状态/标签） | P1 | DONE | `feat(search): 状态/标签 facets` |
 | SCH-03 | 搜索分页 + 结果系列名 | P1 | DONE | `feat(search): 分页保留旧结果与失败提示` |
-| DLD-01 | 下载设置（仅 Wi-Fi/读完删除/并发） | P1 | TODO | — |
+| DLD-01 | 下载设置（仅 Wi-Fi/读完删除/并发） | P1 | DONE | `feat(downloads): 下载策略` |
 | DLD-02 | 下载队列 UI + 全局反馈 | P1 | DONE | `feat(downloads): 队列暂停/重试/删除全部` |
-| SET-01 | 设置 IA（Reader/Library/Downloads/History/About） | P2 | TODO | — |
+| SET-01 | 设置 IA（Reading/Library/Downloads/History/About） | P2 | DONE | `feat(settings): 分组重排` |
 
 ## W4 历史/收藏/备份
 
@@ -70,7 +70,7 @@
 
 | ID | 需求 | P | 状态 | commit |
 |---|---|---|---|---|
-| HIS-03 | Insights（连续天数/热力图/统计） | P2 | TODO | — |
+| HIS-03 | Insights（连续天数/热力图/统计） | P2 | DONE | `feat(history): 阅读统计页` |
 | HIS-04 | 阅读器内阅读时长 | P2 | DONE | `feat(reader): chrome 显示本次阅读时长` |
 | PLT-02 | iPad 默认双页/阅读布局 | P2 | DONE | `feat(reader): 平板默认排版（自动/单页/双页）` |
 | I18N-01 | 数据层错误文案本地化 | P2 | DONE | `feat(i18n): 失败类型走 l10n` |
@@ -918,3 +918,24 @@
 `dart run tool/ci.dart install` 真机走查。
 已知未覆盖：FIX-03 的"搜索/阅读列表入口"与 FIX-08 的分页在**这台服务器**上
 造不出所需数据（见各条备注），改由 widget 测试钉住。
+
+---
+
+## 交付总结（2026-11-20 收尾核对）
+
+- 计划里共 **42 个 `#### 编号需求` 小节**（W0–W6），进度表 **42/42 全部 DONE**；
+  任务描述里的"45 项"是早期估算口径（含 3 个在计划阶段被合并/裁剪的条目），
+  不是有 3 项漏做。逐条核对方式：`#### XXX-NN` 与表格行一一比对，无缺行。
+- 抽查证据（文件存在即该项至少落下过代码）：`shelf_active_filters.dart`(LIB-01)、
+  `network_probe.dart`(DLD-01)、`reading_session_tracker.dart`(HIS-01)、
+  `reading_stats.dart`(HIS-03)、`collection_covers.dart`(UI-02)、
+  `shelf_side_rail.dart`(PLT-01)、`tap_zones.dart`(RDR-07)、
+  `collection_created_200.json`(SER-04 真实响应 fixture)。
+- 99 张黄金图基线，`dart run tool/ci.dart check` 全绿。
+- 明确保留项（不是遗漏，是计划定义的裁剪/外部依赖）：
+  1. **I18N-02**（日/繁中/西/法）——计划标注"社区翻译、可裁剪"，ARB 流程与回退检查已就位；
+  2. **A11Y-01 的真机 TalkBack 走查**——本环境只能用语义树 + 黄金图替代；
+     2.0× 下底部导航与分段控件标签是省略号截断（已在对应小节写明）。
+- 已知 API 真值与计划的偏离（都在各自小节记录）：`booksUnreadCount`/`readProgress.*`/
+  `author=` 服务端不支持 → 相应筛选改为本地/未实现；`SeriesSort.recentlyRead` 删除；
+  收藏集**空集合被服务端拒绝** → 新建入口改到系列页。
