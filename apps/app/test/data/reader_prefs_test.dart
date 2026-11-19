@@ -236,6 +236,37 @@ void main() {
       );
     });
 
+    test('auto 横屏自动双页；条漫仍纵向；显式选择不受横屏影响', () {
+      expect(
+        ReaderModeChoice.auto.resolve(
+          ReadingDirection.rightToLeft,
+          landscape: true,
+        ),
+        ReadingMode.doublePage,
+      );
+      expect(
+        ReaderModeChoice.auto.resolve(
+          ReadingDirection.webtoon,
+          landscape: true,
+        ),
+        ReadingMode.verticalScroll,
+      );
+      expect(
+        ReaderModeChoice.single.resolve(
+          ReadingDirection.rightToLeft,
+          landscape: true,
+        ),
+        ReadingMode.paged,
+      );
+      expect(
+        ReaderModeChoice.vertical.resolve(
+          ReadingDirection.rightToLeft,
+          landscape: true,
+        ),
+        ReadingMode.verticalScroll,
+      );
+    });
+
     test('每种选择都有中英文标签与说明（面板上不能出现空行）', () {
       final en = lookupAppLocalizations(const Locale('en'));
       final zh = lookupAppLocalizations(const Locale('zh'));

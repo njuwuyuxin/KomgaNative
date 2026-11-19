@@ -8,6 +8,7 @@ import 'package:komga_native/src/data/reader_prefs.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/widgets/book_hero_tag.dart';
+import 'package:komga_native/src/widgets/reader_paged_view.dart';
 import 'package:komga_platform/komga_platform.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -66,6 +67,17 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('reader-opening-hero')), findsNothing);
     expect(find.byKey(const Key('reader-image-0')), findsOneWidget);
+  });
+
+  testWidgets('横屏自动双页（auto 模式）', (WidgetTester tester) async {
+    await pumpReader(
+      tester,
+      book: demoReaderBook(),
+      viewSize: const Size(844 * 3, 390 * 3),
+    );
+
+    final view = tester.widget<ReaderPagedView>(find.byType(ReaderPagedView));
+    expect(view.doublePage, isTrue);
   });
 
   testWidgets('离线时顶栏出现缓存提示（阅读区不挤占）', (WidgetTester tester) async {

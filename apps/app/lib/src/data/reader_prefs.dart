@@ -9,13 +9,20 @@ enum ReaderModeChoice { auto, single, double, vertical }
 
 extension ReaderModeChoiceX on ReaderModeChoice {
   /// 解析成引擎的阅读模式。
-  ReadingMode resolve(ReadingDirection direction) => switch (this) {
-    ReaderModeChoice.auto =>
-      direction.isScroll ? ReadingMode.verticalScroll : ReadingMode.paged,
-    ReaderModeChoice.single => ReadingMode.paged,
-    ReaderModeChoice.double => ReadingMode.doublePage,
-    ReaderModeChoice.vertical => ReadingMode.verticalScroll,
-  };
+  ///
+  /// `auto` 在竖屏跟随系列方向（条漫/竖向 → 纵向，其余单页）；
+  /// **横屏时普通漫画自动双页**（Panels 的 Standard 预设行为，UI-P3-3）。
+  /// 用户显式选过单页/双页/纵向则不受横竖屏影响。
+  ReadingMode resolve(ReadingDirection direction, {bool landscape = false}) =>
+      switch (this) {
+        ReaderModeChoice.auto =>
+          direction.isScroll
+              ? ReadingMode.verticalScroll
+              : (landscape ? ReadingMode.doublePage : ReadingMode.paged),
+        ReaderModeChoice.single => ReadingMode.paged,
+        ReaderModeChoice.double => ReadingMode.doublePage,
+        ReaderModeChoice.vertical => ReadingMode.verticalScroll,
+      };
 }
 
 /// 适配方式（UI-P1-3）。

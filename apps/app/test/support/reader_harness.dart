@@ -43,10 +43,11 @@ Future<InMemoryReaderPrefsStore> pumpReader(
   bool offline = false,
   String? heroTag,
   bool settle = true,
+  Size? viewSize,
   void Function(Book next)? onOpenNext,
   List<Override> extraOverrides = const <Override>[],
 }) async {
-  tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+  tester.view.physicalSize = viewSize ?? const Size(390 * 3, 844 * 3);
   tester.view.devicePixelRatio = 3;
   addTearDown(tester.view.reset);
 

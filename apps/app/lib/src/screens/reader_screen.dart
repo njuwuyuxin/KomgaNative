@@ -103,6 +103,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   int _page = 0;
   bool _chromeVisible = true;
 
+  /// 横屏自动双页用；由 `_buildPages` 每次布局时更新（UI-P3-3）。
+  bool _landscape = false;
+
   /// 设置面板里的"跳页"：纵向模式靠 token 变化触发滚动跳转。
   int _jumpToken = 0;
   int _jumpPage = 1;
@@ -158,8 +161,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     unawaited(_progress.flush(_resolvePage(total)));
   }
 
-  ReadingMode _modeFor(ReaderPrefs prefs) =>
-      prefs.mode.resolve(widget.direction);
+  ReadingMode _modeFor(ReaderPrefs prefs, {bool? landscape}) =>
+      prefs.mode.resolve(widget.direction, landscape: landscape ?? _landscape);
 
   /// 用当前状态现算一份布局；页数据还没到时为 null。
   ReaderLayout? _currentLayout() {
@@ -279,6 +282,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     final book =
         widget.book ?? ref.watch(readerBookProvider(widget.bookId)).value;
     final total = pages.length;
+    _landscape = MediaQuery.orientationOf(context) == Orientation.landscape;
     final layout = ReaderLayout(
       pages: pages,
       mode: _modeFor(prefs),

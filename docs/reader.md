@@ -55,8 +55,9 @@
 
 ## 默认模式：跟随书
 
-`ReaderModeChoice.auto` 是默认值：系列 `readingDirection` 为 `WEBTOON`/`VERTICAL` 时进纵向，
-其余单页。**双页没有元数据可依**，只能用户选，所以模式是"偏好"而不是"每本书的属性"。
+`ReaderModeChoice.auto` 是默认值：系列 `readingDirection` 为 `WEBTOON`/`VERTICAL` 时进纵向；
+其余**竖屏单页、横屏自动双页**（UI-P3-3）。**双页没有元数据可依**，只能用户选，
+所以模式是"偏好"而不是"每本书的属性"；用户显式选过单页/双页/纵向时，横竖屏不再改模式。
 
 ## 设置与持久化
 

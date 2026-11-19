@@ -144,7 +144,7 @@
     }
   },
   "readerModeAuto": "Follow the book",
-  "readerModeAutoHint": "Webtoon books scroll, the rest open page by page",
+  "readerModeAutoHint": "Webtoon books scroll; comics open page by page, and as a spread in landscape",
   "readerModeSingle": "Single page",
   "readerModeSingleHint": "One page at a time",
   "readerModeDouble": "Double page",

@@ -423,6 +423,14 @@ Panels 的高级感主要来自三点，和控件本身关系不大：
 | 面板开关 `reader-series-remember`：打开快照当前生效值，之后改设置/应用预设只写覆盖；关闭删覆盖回全局。设置面板的 6 个 setter 全部带 `seriesId` |
 | 测试：`data/reader_prefs_test` 覆盖系列覆盖 JSON 往返与 `forSeries` 优先；`reader_series_prefs_test` 覆盖"打开开关只写覆盖、全局不变；关闭删除"；`reader_settings@*` 与 presets 基线更新（多了开关） |
 
+**进度（2026-11-19）：P3-3 横屏自动双页。**
+
+| 落地 |
+|---|
+| `ReaderModeChoice.resolve(direction, {landscape})`：`auto` 仍是条漫→纵向；普通漫画竖屏单页、横屏双页；显式 single/double/vertical 不受横屏影响 |
+| `ReaderScreen` 在每次布局时用 `MediaQuery.orientationOf` 更新 `_landscape`，模式/布局/预取/音量键共用；`readerModeAutoHint` 文案同步说明 |
+| 测试：`data/reader_prefs_test` 覆盖 auto 横屏/条漫/显式选择的组合；`reader_screen_test` 用 844×390 视口断言 `ReaderPagedView.doublePage == true`；`reader_settings@*` 基线因 hint 文案更新 |
+
 ## 不做
 
 | 需求 | 理由 |

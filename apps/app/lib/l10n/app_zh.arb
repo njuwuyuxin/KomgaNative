@@ -77,7 +77,7 @@
   "currentSpread": "第 {from}–{to} 页",
   "continueReadingProgress": "第 {page} / {total} 页",
   "readerModeAuto": "跟随书籍",
-  "readerModeAutoHint": "条漫自动纵向滚动，其余逐页打开",
+  "readerModeAutoHint": "条漫自动纵向滚动；普通漫画逐页打开，横屏自动双页",
   "readerModeSingle": "单页",
   "readerModeSingleHint": "一次显示一页",
   "readerModeDouble": "双页",
