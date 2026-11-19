@@ -136,6 +136,7 @@ class ReaderPrefs {
     this.lockZoom = false,
     this.trimBorders = false,
     this.pageTurn = ReaderPageTurnChoice.curl,
+    this.spreadFrom = const <String, int>{},
     this.presets = const <ReaderPreset>[],
     this.seriesOverrides = const <String, ReaderPrefs>{},
   });
@@ -162,6 +163,13 @@ class ReaderPrefs {
 
   /// 翻页动画（RDR-05）。
   final ReaderPageTurnChoice pageTurn;
+
+  /// 双页模式的手动分组起点（RDR-06）：bookId → 0 基页码。
+  ///
+  /// 按**书**记：同一系列的不同卷可能排版不同；换书不会串。
+  /// 不进预设/系列覆盖（[configOnly] 会丢掉它）——它是"这本书的排版修正"，
+  /// 不是一套可复用的阅读风格。
+  final Map<String, int> spreadFrom;
 
   /// 用户保存的阅读预设（UI-P3-1）；按保存顺序排列。
   final List<ReaderPreset> presets;
@@ -233,6 +241,7 @@ class ReaderPrefs {
       lockZoom: override.lockZoom,
       trimBorders: override.trimBorders,
       pageTurn: override.pageTurn,
+      spreadFrom: spreadFrom,
       presets: presets,
       seriesOverrides: seriesOverrides,
     );
@@ -252,6 +261,17 @@ class ReaderPrefs {
     lockZoom: config.lockZoom,
     trimBorders: config.trimBorders,
   );
+
+  /// 记住/清除某本书的双页分组起点（RDR-06）。[index] 为 null 表示恢复自动。
+  ReaderPrefs withSpreadFrom(String bookId, int? index) {
+    final next = Map<String, int>.of(spreadFrom);
+    if (index == null || index < 0) {
+      next.remove(bookId);
+    } else {
+      next[bookId] = index;
+    }
+    return copyWith(spreadFrom: next);
+  }
 
   /// 写入/删除某个系列的覆盖。传入 null 表示删除。
   ReaderPrefs withSeriesOverride(String seriesId, ReaderPrefs? config) {
@@ -277,6 +297,7 @@ class ReaderPrefs {
     bool? lockZoom,
     bool? trimBorders,
     ReaderPageTurnChoice? pageTurn,
+    Map<String, int>? spreadFrom,
     List<ReaderPreset>? presets,
     Map<String, ReaderPrefs>? seriesOverrides,
   }) => ReaderPrefs(
@@ -289,6 +310,7 @@ class ReaderPrefs {
     lockZoom: lockZoom ?? this.lockZoom,
     trimBorders: trimBorders ?? this.trimBorders,
     pageTurn: pageTurn ?? this.pageTurn,
+    spreadFrom: spreadFrom ?? this.spreadFrom,
     presets: presets ?? this.presets,
     seriesOverrides: seriesOverrides ?? this.seriesOverrides,
   );
@@ -304,6 +326,7 @@ class ReaderPrefs {
         'lockZoom': lockZoom,
         'trimBorders': trimBorders,
         'pageTurn': pageTurn.name,
+        if (spreadFrom.isNotEmpty) 'spreadFrom': spreadFrom,
         if (includePresets && presets.isNotEmpty)
           'presets': <Object?>[for (final preset in presets) preset.toJson()],
         if (includePresets && seriesOverrides.isNotEmpty)
@@ -364,9 +387,24 @@ class ReaderPrefs {
         ReaderPageTurnChoice.values,
         ReaderPageTurnChoice.curl,
       ),
+      spreadFrom: _parseSpreadFrom(json['spreadFrom']),
       presets: presets,
       seriesOverrides: overrides,
     );
+  }
+
+  /// 解析"每本书的分组起点"：只收非负 int，坏条目直接丢（存档可能被改坏）。
+  static Map<String, int> _parseSpreadFrom(Object? raw) {
+    if (raw is! Map) return const <String, int>{};
+    final result = <String, int>{};
+    for (final entry in raw.entries) {
+      final key = entry.key;
+      final value = entry.value;
+      if (key is! String || key.isEmpty) continue;
+      if (value is! int || value < 0) continue;
+      result[key] = value;
+    }
+    return result;
   }
 
   /// 按名字解析枚举；不是已知名字（旧版本 / 手工改坏）就回默认值。
@@ -390,8 +428,17 @@ class ReaderPrefs {
       other.lockZoom == lockZoom &&
       other.trimBorders == trimBorders &&
       other.pageTurn == pageTurn &&
+      _sameSpreadFrom(other.spreadFrom, spreadFrom) &&
       _samePresets(other.presets, presets) &&
       _sameOverrides(other.seriesOverrides, seriesOverrides);
+
+  static bool _sameSpreadFrom(Map<String, int> a, Map<String, int> b) {
+    if (a.length != b.length) return false;
+    for (final entry in a.entries) {
+      if (b[entry.key] != entry.value) return false;
+    }
+    return true;
+  }
 
   static bool _sameOverrides(
     Map<String, ReaderPrefs> a,
@@ -424,6 +471,11 @@ class ReaderPrefs {
     lockZoom,
     trimBorders,
     pageTurn,
+    Object.hashAll(
+      spreadFrom.entries.map(
+        (MapEntry<String, int> e) => Object.hash(e.key, e.value),
+      ),
+    ),
     Object.hashAll(presets),
     Object.hashAll(
       seriesOverrides.entries.map(

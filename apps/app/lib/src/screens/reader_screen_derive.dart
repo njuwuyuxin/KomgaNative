@@ -36,8 +36,13 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
   /// 横屏自动双页用；由 `_buildPages` 每次布局时更新（UI-P3-3）。
   bool _landscape = false;
 
-  /// 手动修正双页分组的起点（0 基；null = 自动，UI-P3-5）。
-  int? _spreadFrom;
+  /// 手动修正双页分组的起点（0 基；null = 自动）。
+  ///
+  /// 从偏好里按**书**读（RDR-06）：以前是会话内字段，退出阅读器就丢了。
+  /// 用 `read` 而不是 `watch`：这个 getter 也会在事件回调 / 进度回写里被调用，
+  /// 那里不能 watch；重建由 `ReaderScreen.build` 对同一个 provider 的 watch 负责。
+  int? get _spreadFrom =>
+      ref.read(readerPrefsProvider).spreadFrom[widget.bookId];
 
   /// 最近一次 build 解析出的**有效**阅读方向。
   ///
@@ -231,11 +236,13 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
   void _groupFromPage(int page, int total) {
     final index = page.clamp(1, total) - 1;
     final next = _spreadFrom == index ? null : index;
-    setState(() {
-      _spreadFrom = next;
-      if (next != null) _page = page.clamp(1, total);
-    });
-    if (next != null) _scheduleProgress(page.clamp(1, total));
+    // 落盘而不是只改会话状态：退出重进还要保持分组（RDR-06）。
+    ref.read(readerPrefsProvider.notifier).setSpreadFrom(widget.bookId, next);
+    if (next != null) {
+      // 跳到手动分组的起点，并照常回写进度。
+      _page = page.clamp(1, total);
+      _scheduleProgress(_page);
+    }
     unawaited(AppHaptics.selection());
     final l10n = AppLocalizations.of(context);
     ScaffoldMessenger.of(context).showSnackBar(

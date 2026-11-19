@@ -69,6 +69,10 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
   void setPageTurn(ReaderPageTurnChoice choice, {String? seriesId}) =>
       _updateConfig(seriesId, (ReaderPrefs p) => p.copyWith(pageTurn: choice));
 
+  /// 记住/清除某本书的双页分组起点（RDR-06）；[index] 为 null 表示恢复自动。
+  void setSpreadFrom(String bookId, int? index) =>
+      _update(state.withSpreadFrom(bookId, index));
+
   /// 把某一组设置恢复默认（RDR-04）：只动这一组，其它组不受影响。
   void resetGroup(ReaderSettingsGroup group, {String? seriesId}) =>
       _updateConfig(seriesId, (ReaderPrefs p) => p.resetGroup(group));
