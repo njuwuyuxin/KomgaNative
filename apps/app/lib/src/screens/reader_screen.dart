@@ -118,6 +118,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   /// 手动修正双页分组的起点（0 基；null = 自动，UI-P3-5）。
   int? _spreadFrom;
 
+  /// 本次阅读不回写进度（UI-P3-12）；不落盘，退出即恢复。
+  bool _incognito = false;
+
   /// 设置面板里的"跳页"：纵向模式靠 token 变化触发滚动跳转。
   int _jumpToken = 0;
   int _jumpPage = 1;
@@ -178,6 +181,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     final total =
         ref.read(readerPagesProvider(widget.bookId)).value?.length ?? 0;
     if (total == 0) return;
+    if (_incognito) return;
     unawaited(_progress.flush(_resolvePage(total)));
   }
 
@@ -225,7 +229,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     if (page == _page) return;
     setState(() => _page = page);
     // 预取不用在这里排：`build` 里的 `_schedulePreload` 会看到页码变化重排。
-    _progress.schedule(page);
+    _scheduleProgress(page);
   }
 
   /// 打开下一本：**替换**当前页而不是压栈（连读十本不必按十次返回）。
@@ -249,7 +253,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       _jumpPage = target;
       _jumpToken++;
     });
-    _progress.schedule(target);
+    _scheduleProgress(target);
   }
 
   /// 分享当前页（UI-P3-6）：取页图字节 → 写临时文件 → 系统分享面板。
@@ -280,7 +284,25 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         .showSnackBar(SnackBar(content: Text(message)));
   }
 
-  /// 长按缩略图：从这一页开始重新配对（UI-P3-5）；再长按同一页恢复自动。
+  void _scheduleProgress(int page) {
+    if (_incognito) return;
+    _progress.schedule(page);
+  }
+
+  /// 隐身模式：本次阅读不回写进度（UI-P3-12）。
+  void _toggleIncognito() {
+    setState(() => _incognito = !_incognito);
+    final l10n = AppLocalizations.of(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          _incognito ? l10n.incognitoEnabled : l10n.incognitoDisabled,
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   void _groupFromPage(int page, int total) {
     final index = page.clamp(1, total) - 1;
     final next = _spreadFrom == index ? null : index;
@@ -288,7 +310,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       _spreadFrom = next;
       if (next != null) _page = page.clamp(1, total);
     });
-    if (next != null) _progress.schedule(page.clamp(1, total));
+    if (next != null) _scheduleProgress(page.clamp(1, total));
     unawaited(AppHaptics.selection());
     final l10n = AppLocalizations.of(context);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -391,6 +413,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       onGroupFrom: mode == ReadingMode.doublePage
           ? (int p) => _groupFromPage(p, total)
           : null,
+      incognito: _incognito,
+      onToggleIncognito: _toggleIncognito,
     );
     final content = switch (mode) {
       ReadingMode.verticalScroll => ReaderVerticalView(

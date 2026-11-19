@@ -151,6 +151,24 @@ void main() {
     expect(find.text('3 / 3'), findsOneWidget);
   });
 
+  testWidgets('隐身模式：本次阅读不回写进度，关闭后恢复', (WidgetTester tester) async {
+    final repository = FakeReaderRepository();
+    await pumpReader(tester, repository: repository, book: demoReaderBook());
+    repository.saved.clear();
+
+    await tester.tap(find.byKey(const Key('reader-incognito-button')));
+    await tester.pumpAndSettle();
+    await tapRight(tester);
+    await tester.pump(const Duration(milliseconds: 700));
+    expect(repository.saved, isEmpty);
+
+    await tester.tap(find.byKey(const Key('reader-incognito-button')));
+    await tester.pumpAndSettle();
+    await tapRight(tester);
+    await tester.pump(const Duration(milliseconds: 700));
+    expect(repository.saved.last.page, 3);
+  });
+
   testWidgets('离线时顶栏出现缓存提示（阅读区不挤占）', (WidgetTester tester) async {
     await pumpReader(tester, book: demoReaderBook(), offline: true);
 

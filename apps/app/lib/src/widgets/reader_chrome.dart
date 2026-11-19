@@ -113,6 +113,8 @@ class ReaderBar extends StatelessWidget {
     required this.mode,
     required this.onOpenSettings,
     required this.onOpenPages,
+    this.incognito = false,
+    this.onToggleIncognito,
     this.offline = false,
     super.key,
   });
@@ -131,6 +133,10 @@ class ReaderBar extends StatelessWidget {
 
   /// 打开缩略图跳页面板。
   final VoidCallback onOpenPages;
+
+  /// 本次阅读是否不回写进度（UI-P3-12）。
+  final bool incognito;
+  final VoidCallback? onToggleIncognito;
 
   /// 当前内容可能来自缓存（断网/服务端不可用）。只在顶栏放一个小图标：
   /// 阅读区里放横幅会挤掉画面，而翻页本身照常。
@@ -176,6 +182,18 @@ class ReaderBar extends StatelessWidget {
             const SizedBox(width: AppSpacing.xs),
           ],
           Text(pageLabel, style: TextStyle(color: palette.muted)),
+          if (onToggleIncognito != null)
+            IconButton(
+              key: const Key('reader-incognito-button'),
+              onPressed: onToggleIncognito,
+              icon: Icon(
+                incognito
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
+              ),
+              color: incognito ? palette.foreground : palette.muted,
+              tooltip: incognito ? l10n.incognitoOn : l10n.incognitoOff,
+            ),
           IconButton(
             key: const Key('reader-pages-button'),
             onPressed: onOpenPages,

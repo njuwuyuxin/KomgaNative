@@ -484,6 +484,15 @@ Panels 的高级感主要来自三点，和控件本身关系不大：
 | 与点击区/音量键共用 `_requestTurn`，所以页码、进度、预取、RTL 完全一致；蓝牙翻页器/遥控器映射成方向键或 PageUp/Down 即可 |
 | 测试：`reader_screen_test` 覆盖右箭头→第 2 页、左箭头→第 1 页、PageDown→第 2 页、空格→第 3 页 |
 
+**进度（2026-11-19）：P3-12 隐身模式。**
+
+| 落地 |
+|---|
+| 顶栏 `reader-incognito-button`（眼睛图标）切换 `_incognito`；`_scheduleProgress` 与切后台 flush 都短路，不发请求、不写 outbox |
+| 会话级，不落盘；退出阅读器自动恢复。SnackBar 明确"本次不保存进度" |
+| 与 Panels 语义不同：Panels 只隐藏 Reading Now，我们是完全不回写 Komga（服务端无 hidden 标记） |
+| 测试：`reader_screen_test` 覆盖"开启后翻页 700ms 无 saved；关闭后恢复 saved" |
+
 ## 不做
 
 | 需求 | 理由 |

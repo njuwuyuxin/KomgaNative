@@ -292,6 +292,10 @@
     }
   },
   "readerGroupAutomatic": "Back to automatic grouping",
+  "incognitoOff": "Incognito: off",
+  "incognitoOn": "Incognito: on",
+  "incognitoEnabled": "Incognito on · progress won't be saved",
+  "incognitoDisabled": "Incognito off · progress will be saved",
   "sharePage": "Share page",
   "sharePageFailed": "Could not share this page",
   "groupFromPage": "Group from this page",

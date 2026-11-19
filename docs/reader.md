@@ -135,6 +135,14 @@
   插件本身靠模拟器/真机走查。选型与代价见 [ADR 0006](adr/0006-share-page-with-share-plus.md)。
 - 分享失败（页图错误/平台异常）只弹 SnackBar，不影响继续阅读。
 
+### 隐身模式（UI-P3-12）
+
+- 顶栏眼睛图标切换；**本次阅读**不回写进度（`_scheduleProgress` 与生命周期 flush
+  都被 `_incognito` 短路），也不落盘，退出阅读器自动恢复。
+- 不发请求、不写 outbox；已经写过的进度不撤销。SnackBar 明确提示"本次不保存进度"。
+- 与 Panels 的语义不同：Panels 是"会话记录但不出现在 Reading Now"，
+  我们是"这次阅读完全不写回 Komga"，因为服务端没有 hidden 标记。
+
 坏存档必须回默认值（`ReaderPrefs.fromJson` 逐字段判类型 + 夹取），
 亮度下限 0.2：存档里出现 0 也不能变成黑屏。
 
