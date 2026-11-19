@@ -40,7 +40,7 @@
 | LIB-02 | 未读角标 + 置顶 | P1 | DONE | `feat(shelf): 未读角标 + 系列置顶` |
 | LIB-03 | 书架多选/批量 | P1 | DONE | `feat(shelf): 多选与批量标记` |
 | LIB-04 | 排序补充 + 保存筛选组合 | P1 | DONE | `feat(shelf): 保存筛选组合 + 删掉空操作排序` |
-| SER-01 | 系列书列表排序/筛选 | P1 | TODO | — |
+| SER-01 | 系列书列表排序/筛选 | P1 | DONE | `feat(series): 书列表排序与筛选` |
 | SER-02 | 系列书多选/批量/标记之前所有 | P1 | TODO | — |
 | SER-03 | 系列下载全部/未读 N 本 | P1 | TODO | — |
 | UI-01 | 玻璃层级/阴影/字体克制 | P1 | TODO | — |
@@ -228,6 +228,26 @@
   `continueReadingProgress` 是 FIX-06 之后失效的）。
 - 验证：55 条阅读器测试 + 黄金图全部不变（零行为变更）；设备上打开第 114/227 页
   照常渲染，滑杆与"剩 113 页"一致。
+
+### SER-01 系列书列表排序 / 筛选
+
+- 先 spike 再上线（同一个对照组方法）：`metadata.numberSort,asc|desc` **验证通过**
+  （正反序对称）；`createdDate` / `metadata.releaseDate` 在本机库上无法与默认顺序区分
+  （同系列几本书 createdDate 相同），按 API 真值规则**暂不上线**；
+  `read_status=UNREAD|READ|IN_PROGRESS` 在 `/series/{id}/books` 上**验证通过**。
+- 新工具条 `SeriesBooksToolbar`：左边"N 本"，右边排序 + 筛选两个玻璃菜单，
+  带筛选时多一个"清除"。窄屏/宽屏共用同一个工具条（`toolbar` 传进两个 pane）。
+- `SeriesBooksQuery` 从 `(seriesId, size)` 扩成 `(seriesId, size, sort, readStatus)`：
+  任意一项变化就是一个新的 family key，自动重新请求，不需要手动 invalidate。
+- 空态区分：有筛选时是"没有符合筛选的书 / 清除筛选可以看到这个系列的全部书"，
+  而不是"这个系列还没有书"。
+- 测试：`series_books_toolbar_test.dart` 4 条（总本数、按卷号降序**查数据层顺序**、
+  筛选未读后条数变 2、筛到空结果的文案与清除）。这里踩了个坑：
+  书行标题其实是 `#1 · Vol. 1` 一个 Text，`find.text('Vol. 1')` 永远匹配不到——
+  排序断言改成直接读 provider 的数据。
+- 黄金图：`series@*` 因新增工具条重生成，`series@phone_light` 已自查（"6 books" + 两个图标）。
+- 设备走查：系列页工具条在（"10 本" + 排序/筛选图标）。**筛选/排序的下拉在设备上没点通**
+  （两次点在图标之间的空隙），交互行为由上面 4 条 widget 测试覆盖。
 
 ### LIB-04 排序补充 + 保存筛选组合
 

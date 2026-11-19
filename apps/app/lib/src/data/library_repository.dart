@@ -64,6 +64,8 @@ abstract interface class LibraryRepository {
     String seriesId, {
     int page = 0,
     int size = 100,
+    BooksSort? sort,
+    SeriesReadStatus? readStatus,
   });
 
   /// "继续阅读"（Komga 的 ondeck：在读过、还没读完的书）。
@@ -231,6 +233,8 @@ class KomgaLibraryRepository implements LibraryRepository {
     String seriesId, {
     int page = 0,
     int size = 100,
+    BooksSort? sort,
+    SeriesReadStatus? readStatus,
   }) async {
     try {
       final result = await _session.fetchSeriesBooks(

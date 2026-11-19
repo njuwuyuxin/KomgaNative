@@ -12,6 +12,7 @@ import 'package:komga_native/src/screens/reader_screen.dart';
 import 'package:komga_native/src/widgets/edge_swipe_back.dart';
 import 'package:komga_native/src/widgets/offline_banner.dart';
 import 'package:komga_native/src/widgets/series_hero_tag.dart';
+import 'package:komga_native/src/widgets/series_books_toolbar.dart';
 import 'package:komga_native/src/widgets/series_two_pane.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -50,7 +51,12 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
   /// 封面 Hero tag：源卡片带来的优先，否则按默认 `series-<id>`。
   String get heroTag => widget.heroTag ?? seriesHeroTag(seriesId);
 
-  SeriesBooksQuery get _booksQuery => (seriesId: seriesId, size: _size);
+  /// 排序与筛选（SER-01）：null = 服务端默认顺序 / 不筛选。
+  BooksSort? _sort;
+  SeriesReadStatus? _readStatus;
+
+  SeriesBooksQuery get _booksQuery =>
+      (seriesId: seriesId, size: _size, sort: _sort, readStatus: _readStatus);
 
   Future<void> _refresh() async {
     ref.invalidate(seriesDetailProvider(seriesId));
@@ -95,6 +101,17 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
     // 用 `AsyncError` 模式匹配会掉进 loading 分支（踩过）。这里按 hasError/value 判断。
     // hasError 也算"元信息已就绪"：请求失败时头部退回兜底标题，不能永远停在骨架上。
     final metadataLoading = !detail.hasValue && !detail.hasError;
+
+    // 排序 / 筛选（SER-01）：放在书列表上方，窄屏宽屏共用同一个工具条。
+    final filtered = _sort != null || _readStatus != null;
+    final toolbar = SeriesBooksToolbar(
+      total: page?.totalElements ?? 0,
+      sort: _sort,
+      readStatus: _readStatus,
+      onSort: (BooksSort? value) => setState(() => _sort = value),
+      onReadStatus: (SeriesReadStatus? value) =>
+          setState(() => _readStatus = value),
+    );
 
     // 宽屏两栏；窄屏一条滚动流。断点判断只在这里做一次（WindowSizeClass）。
     final wide =
@@ -148,6 +165,8 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                       onRetry: () => unawaited(_refresh()),
                       onLoadMore: _loadMore,
                       onOpenBook: _openBook,
+                      toolbar: toolbar,
+                      filtered: filtered,
                     )
                   : SeriesSinglePane(
                       series: series,
@@ -160,6 +179,8 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                       onRetry: () => unawaited(_refresh()),
                       onLoadMore: _loadMore,
                       onOpenBook: _openBook,
+                      toolbar: toolbar,
+                      filtered: filtered,
                     ),
             ),
           ],

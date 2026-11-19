@@ -23,6 +23,8 @@ class SeriesSinglePane extends StatelessWidget {
     required this.onRefresh,
     required this.onRetry,
     required this.onOpenBook,
+    this.toolbar,
+    this.filtered = false,
     this.onLoadMore,
     super.key,
   });
@@ -38,6 +40,12 @@ class SeriesSinglePane extends StatelessWidget {
   final Future<void> Function() onRefresh;
   final VoidCallback onRetry;
   final OpenSeriesBook onOpenBook;
+
+  /// 书列表上方的工具条（SER-01）；为空时不占高度。
+  final Widget? toolbar;
+
+  /// 当前是否带筛选（决定空态文案）。
+  final bool filtered;
 
   /// 书比当前加载的多时"加载更多"（UI-P2-4）。
   final VoidCallback? onLoadMore;
@@ -76,6 +84,8 @@ class SeriesSinglePane extends StatelessWidget {
               onOpenBook: onOpenBook,
               onRetry: onRetry,
               onLoadMore: onLoadMore,
+              toolbar: toolbar,
+              filtered: filtered,
             ),
           ),
         ],
@@ -99,6 +109,8 @@ class SeriesTwoPane extends StatelessWidget {
     required this.onRefresh,
     required this.onRetry,
     required this.onOpenBook,
+    this.toolbar,
+    this.filtered = false,
     this.onLoadMore,
     super.key,
   });
@@ -114,6 +126,12 @@ class SeriesTwoPane extends StatelessWidget {
   final Future<void> Function() onRefresh;
   final VoidCallback onRetry;
   final OpenSeriesBook onOpenBook;
+
+  /// 书列表上方的工具条（SER-01）；为空时不占高度。
+  final Widget? toolbar;
+
+  /// 当前是否带筛选（决定空态文案）。
+  final bool filtered;
 
   /// 书比当前加载的多时"加载更多"（UI-P2-4）。
   final VoidCallback? onLoadMore;

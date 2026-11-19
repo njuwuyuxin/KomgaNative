@@ -50,11 +50,27 @@ class KomgaUrls {
     return _withQuery('$_base/api/v1/series', q);
   }
 
-  String seriesBooks(String seriesId, {int page = 0, int size = 100}) =>
-      _withQuery('$_base/api/v1/series/$seriesId/books', {
-        'page': '$page',
-        'size': '$size',
-      });
+  String seriesBooks(
+    String seriesId, {
+    int page = 0,
+    int size = 100,
+    BooksSort? sort,
+    SeriesReadStatus? readStatus,
+  }) => _withQuery('$_base/api/v1/series/$seriesId/books', {
+    'page': '$page',
+    'size': '$size',
+    if (sort != null) 'sort': booksSortWireValue(sort),
+    if (readStatus != null) 'read_status': readStatusWireValue(readStatus),
+  });
+
+  /// `BooksSort` → Komga `sort` 参数值（对真实 1.30.1 验证过，见 docs/series-queries.md）。
+  ///
+  /// 对照组方法：不存在的属性（`bogusField`）返回 200 但顺序不变，
+  /// 所以"200"不能证明排序生效，必须看顺序是否真的变了。
+  String booksSortWireValue(BooksSort sort) => switch (sort) {
+    BooksSort.numberAsc => 'metadata.numberSort,asc',
+    BooksSort.numberDesc => 'metadata.numberSort,desc',
+  };
 
   /// 收藏集列表（`GET /api/v1/collections`）。
   String collections({int page = 0, int size = 20}) => _withQuery(

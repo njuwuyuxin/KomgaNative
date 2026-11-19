@@ -63,7 +63,15 @@ final seriesDetailProvider = FutureProvider.family<Series?, String>((
 /// 不需要在客户端拼列表，也不会出现两份不一致的书列表。
 ///
 /// 默认仍取 100 本（绝大多数系列够用）；超过时详情页出现"加载更多"。
-typedef SeriesBooksQuery = ({String seriesId, int size});
+/// 系列内书列表的查询（SER-01）：seriesId + 请求条数 + 排序 + 阅读状态筛选。
+///
+/// 用记录做 family 的 key：任意一项变化都会重新请求，不需要手动 invalidate。
+typedef SeriesBooksQuery = ({
+  String seriesId,
+  int size,
+  BooksSort? sort,
+  SeriesReadStatus? readStatus,
+});
 
 /// 一次"加载更多"多要多少本。
 const int kSeriesBooksPageSize = 50;
@@ -75,7 +83,12 @@ final seriesBooksProvider =
     ) {
       return ref
           .watch(libraryRepositoryProvider)
-          .books(query.seriesId, size: query.size);
+          .books(
+            query.seriesId,
+            size: query.size,
+            sort: query.sort,
+            readStatus: query.readStatus,
+          );
     });
 
 /// 收藏集列表（UI-P3-8）。

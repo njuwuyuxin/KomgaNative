@@ -88,6 +88,10 @@ class FakeLibraryRepository implements LibraryRepository {
   int coverCalls = 0;
   int seriesByIdCalls = 0;
   int booksCalls = 0;
+
+  /// 最近一次 `books()` 收到的排序 / 筛选（SER-01 断言用）。
+  BooksSort? lastBooksSort;
+  SeriesReadStatus? lastBooksReadStatus;
   int bookCoverCalls = 0;
 
   /// 设成非 null 后，`series()` 会等它完成——用来稳定观察 loading 态。
@@ -348,8 +352,12 @@ class FakeLibraryRepository implements LibraryRepository {
     String seriesId, {
     int page = 0,
     int size = 100,
+    BooksSort? sort,
+    SeriesReadStatus? readStatus,
   }) async {
     booksCalls++;
+    lastBooksSort = sort;
+    lastBooksReadStatus = readStatus;
     final pending = booksGate;
     if (pending != null) await pending.future;
     final failure = booksFailure;
@@ -384,17 +392,37 @@ class FakeLibraryRepository implements LibraryRepository {
                           : null)),
         ),
     ];
+    // 排序 / 筛选和真实服务端一样作用在**全量**上，再切片。
+    final filtered = <Book>[
+      for (final book in all)
+        if (_matchesBookReadStatus(book, readStatus)) book,
+    ];
+    final ordered = sort == BooksSort.numberDesc
+        ? filtered.reversed.toList()
+        : filtered;
     final start = page * size;
-    final items = start >= all.length
+    final items = start >= ordered.length
         ? const <Book>[]
-        : all.sublist(start, math.min(start + size, all.length));
+        : ordered.sublist(start, math.min(start + size, ordered.length));
 
     return PageResult<Book>(
       items: items,
-      totalElements: all.length,
+      totalElements: ordered.length,
       page: page,
       size: size,
     );
+  }
+
+  /// 与真实服务端一致：`read_status` 只看"这本书自己"，不是整个系列。
+  static bool _matchesBookReadStatus(Book book, SeriesReadStatus? status) {
+    if (status == null) return true;
+    final progress = book.readProgress;
+    return switch (status) {
+      SeriesReadStatus.unread => progress == null || progress.page == 0,
+      SeriesReadStatus.read => progress?.completed ?? false,
+      SeriesReadStatus.inProgress =>
+        progress != null && progress.page > 0 && !progress.completed,
+    };
   }
 
   @override

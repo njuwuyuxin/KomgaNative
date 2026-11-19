@@ -121,7 +121,13 @@ class _ReaderTocSheetState extends ConsumerState<ReaderTocSheet> {
     final l10n = AppLocalizations.of(context);
     final palette = widget.palette;
     final textStyle = AppTypography.of(context);
-    final query = (seriesId: widget.seriesId, size: _size);
+    // 目录只要"按卷号的书单"，不需要排序/筛选。
+    final query = (
+      seriesId: widget.seriesId,
+      size: _size,
+      sort: null,
+      readStatus: null,
+    );
     final async = ref.watch(seriesBooksProvider(query));
 
     final body = _buildBody(context, l10n, palette, textStyle, async);

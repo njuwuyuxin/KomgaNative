@@ -43,3 +43,12 @@ enum SeriesReadStatus {
   /// 全部读完。
   read,
 }
+
+/// 系列内书列表的排序（SER-01）。
+///
+/// 只收录**对真实 Komga 1.30.1 验证过**的属性（见 `docs/series-queries.md`）：
+/// - `metadata.numberSort,asc|desc`：按卷号，已验证正反序对称。
+///
+/// "按添加时间 / 发行日期"在本机库里无法验证（同一系列的几本书 createdDate 相同，
+/// 结果与随机属性对照组一致），按 API 真值规则暂不上线。
+enum BooksSort { numberAsc, numberDesc }

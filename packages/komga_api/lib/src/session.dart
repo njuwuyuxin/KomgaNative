@@ -169,9 +169,19 @@ class KomgaSession {
     String seriesId, {
     int page = 0,
     int size = 100,
+    BooksSort? sort,
+    SeriesReadStatus? readStatus,
   }) async {
     final data = _requireMap(
-      await _getJson(_urls.seriesBooks(seriesId, page: page, size: size)),
+      await _getJson(
+        _urls.seriesBooks(
+          seriesId,
+          page: page,
+          size: size,
+          sort: sort,
+          readStatus: readStatus,
+        ),
+      ),
       '书籍列表',
     );
     return pageResultFromJson(data, bookFromJson);

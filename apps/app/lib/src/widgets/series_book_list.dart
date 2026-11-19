@@ -36,6 +36,8 @@ List<Widget> seriesBookPhaseSlivers(
   required OpenSeriesBook onOpenBook,
   required VoidCallback onRetry,
   VoidCallback? onLoadMore,
+  Widget? toolbar,
+  bool filtered = false,
 }) {
   // 失败优先：与改造前一致（刷新失败也会显示错误态，不静默保留旧列表）。
   if (failure != null) {
@@ -56,6 +58,8 @@ List<Widget> seriesBookPhaseSlivers(
     series: series,
     onOpenBook: onOpenBook,
     onLoadMore: onLoadMore,
+    toolbar: toolbar,
+    filtered: filtered,
   );
 }
 
@@ -66,6 +70,8 @@ List<Widget> _seriesBookSlivers(
   required Series? series,
   required OpenSeriesBook onOpenBook,
   VoidCallback? onLoadMore,
+  Widget? toolbar,
+  bool filtered = false,
 }) {
   final l10n = AppLocalizations.of(context);
   final theme = Theme.of(context);
@@ -73,14 +79,16 @@ List<Widget> _seriesBookSlivers(
   final direction = series?.readingDirection ?? ReadingDirection.unknown;
 
   return <Widget>[
+    if (toolbar != null) SliverToBoxAdapter(child: toolbar),
     if (books.items.isEmpty)
       SliverFillRemaining(
         hasScrollBody: false,
         child: StatusView(
           key: const Key('series-empty'),
           icon: Icons.menu_book_outlined,
-          title: l10n.noBooksYet,
-          message: l10n.noBooksHint,
+          // 有筛选时"这个系列还没有书"是错的：书在，只是被筛掉了。
+          title: filtered ? l10n.noMatchingBooks : l10n.noBooksYet,
+          message: filtered ? l10n.noMatchingBooksHint : l10n.noBooksHint,
         ),
       )
     else
