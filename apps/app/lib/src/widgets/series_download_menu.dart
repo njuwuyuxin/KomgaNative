@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
+import 'package:komga_native/src/providers/download_policy_gate.dart';
 import 'package:komga_native/src/providers/download_providers.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -83,6 +84,13 @@ class SeriesDownloadMenu extends ConsumerWidget {
       ),
     );
     if (confirmed != true) return;
+
+    // 仅 Wi-Fi（DLD-01）：蜂窝下直接拦下来并说明原因。
+    final blocked = await downloadBlockReason(ref, l10n);
+    if (blocked != null) {
+      messenger.showSnackBar(SnackBar(content: Text(blocked)));
+      return;
+    }
 
     final ids = <String>[for (final book in targets) book.id];
     final result = await ref

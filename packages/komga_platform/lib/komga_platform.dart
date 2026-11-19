@@ -6,4 +6,5 @@ library;
 
 export 'src/device_profile.dart';
 export 'src/hardware_keys.dart';
+export 'src/network_probe.dart';
 export 'src/wakelock.dart';

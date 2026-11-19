@@ -6,6 +6,7 @@ import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/providers/book_read_provider.dart';
+import 'package:komga_native/src/providers/download_policy_gate.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/widgets/book_download_button.dart';
 import 'package:komga_native/src/widgets/context_menu.dart';
@@ -175,6 +176,10 @@ class SeriesBookRow extends ConsumerWidget {
         // 书列表是"本地进度叠加"出来的，改完要让详情重新取一遍。
         ref.invalidate(seriesBooksProvider);
         ref.invalidate(seriesDetailProvider(book.seriesId));
+        // "读完自动删除"（DLD-01）：标记已读后按策略删掉这一本的下载。
+        if (action == BookMenuAction.markRead) {
+          await maybeDeleteReadDownload(ref, book);
+        }
     }
   }
 }

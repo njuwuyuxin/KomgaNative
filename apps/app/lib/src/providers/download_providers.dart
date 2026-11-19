@@ -7,8 +7,36 @@ import 'package:komga_native/src/data/cache/http_cache_database.dart';
 import 'package:komga_native/src/data/download/download_service.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/cache_providers.dart';
+import 'package:komga_native/src/providers/settings_provider.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/session/session_controller.dart';
+import 'package:komga_platform/komga_platform.dart';
+
+/// 当前生效的下载策略（DLD-01）：仅 Wi-Fi、读完自动删除、并发数。
+///
+/// 单独一个 provider 而不是塞进 `SettingsState`：那里面只有外观/语言，
+/// 而下载策略的消费者是 `DownloadsController`（非 UI），用快照读更直接。
+/// 设置页改完会 `ref.invalidate(downloadPolicyProvider)`。
+typedef DownloadPolicy = ({
+  bool wifiOnly,
+  bool autoDeleteRead,
+  int concurrency,
+});
+
+final FutureProvider<DownloadPolicy> downloadPolicyProvider =
+    FutureProvider<DownloadPolicy>((Ref ref) async {
+      final settings = await ref.watch(settingsStoreProvider).load();
+      return (
+        wifiOnly: settings.downloadWifiOnly,
+        autoDeleteRead: settings.downloadAutoDeleteRead,
+        concurrency: settings.downloadConcurrency.clamp(1, 3),
+      );
+    });
+
+/// 网络探测（DLD-01）；测试里覆盖成固定值。
+final Provider<NetworkProbe> networkProbeProvider = Provider<NetworkProbe>(
+  (Ref ref) => const SystemNetworkProbe(),
+);
 
 /// 下载服务：跟着会话走（换服务器/重新登录就重建）。
 ///
@@ -105,7 +133,12 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
 
   /// 一次只跑一本：并发下载只会互相抢带宽，进度也更难解释。
   final List<Book> _queue = <Book>[];
-  String? _active;
+
+  /// 正在下载的（DLD-01 并发数 > 1 时会有多本）。
+  final Set<String> _running = <String>{};
+
+  /// 同时下载几本；uild() 里从设置读，缺省 1。
+  int _concurrency = 1;
 
   /// 恢复是否已经做过：`build` 会在每次被订阅时跑一次，恢复只做一次。
   bool _restored = false;
@@ -151,7 +184,7 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
     for (final entry in entries) {
       if (_disposed) return;
       // 用户可能在恢复落地前就点了下载：已经在跑/在排队的不要重复加。
-      if (entry.bookId == _active ||
+      if (_running.contains(entry.bookId) ||
           _queue.any((Book queued) => queued.id == entry.bookId)) {
         continue;
       }
@@ -183,10 +216,25 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
     if (_queue.isNotEmpty) await _pump();
   }
 
+  /// 入队前把策略读进来（DLD-01）。
+  ///
+  /// 为什么不只靠 `build()` 里的 `ref.listen`：应用刚启动时设置还没读完，
+  /// 用户立刻点下载就会按默认并发数跑。这里在每次入队前补一次，代价是一次
+  /// 内存里的快照读取。
+  /// 读一次策略（同步；读不到就保持当前值）。
+  ///
+  /// 为什么不用 `await .future`：那会让"点下载"卡在一次设置读取上，
+  /// 而设置读不出来（平台通道缺失、存档损坏）时下载仍应可用。
+  void _readPolicy() {
+    final policy = ref.read(downloadPolicyProvider).value;
+    if (policy != null) _concurrency = policy.concurrency;
+  }
+
   Future<void> start(Book book) async {
+    _readPolicy();
     if (state[book.id]?.isRunning ?? false) return;
     if (_queue.any((Book queued) => queued.id == book.id)) return;
-    if (_active == book.id) return;
+    if (_running.contains(book.id)) return;
 
     _queue.add(book);
     if (state[book.id] == null) {
@@ -210,13 +258,14 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
   /// 为什么要在这里判重而不是交给 [start]：批量时每本都走一遍 `start` 会反复
   /// `_pump`，而且"跳过了几本"这个数字要能回给用户看。
   Future<({int queued, int skipped})> startMany(List<Book> books) async {
+    _readPolicy();
     var queued = 0;
     var skipped = 0;
     for (final book in books) {
       final already =
           await _service.downloaded(book.id) != null ||
           _queue.any((Book q) => q.id == book.id) ||
-          _active == book.id ||
+          _running.contains(book.id) ||
           state[book.id]?.isRunning == true;
       if (already) {
         skipped++;
@@ -247,51 +296,53 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
   }
 
   Future<void> _pump() async {
-    if (_active != null) return;
-    while (_queue.isNotEmpty) {
+    // 并发：最多 _concurrency 本同时下（DLD-01）。每本跑在自己的 Future 里，
+    // 下完再由 _runOne 回过头来补位。
+    while (_queue.isNotEmpty && _running.length < _concurrency) {
       final book = _queue.removeAt(0);
-      _active = book.id;
-      _set(
-        book.id,
-        const DownloadStatus(progress: DownloadProgress(done: 0, total: 0)),
-      );
-      _persist(
-        _db.updateQueueEntry(
-          bookId: book.id,
-          state: 'active',
-          done: 0,
-          total: 0,
-        ),
-      );
-      try {
-        await _service.download(
-          book,
-          onProgress: (DownloadProgress progress) {
-            _set(book.id, DownloadStatus(progress: progress));
-            _persist(
-              _db.updateQueueEntry(
-                bookId: book.id,
-                state: 'active',
-                done: progress.done,
-                total: progress.total,
-              ),
-            );
-          },
-        );
-      } on ShelfFailure catch (failure) {
-        _set(book.id, DownloadStatus(error: failure.message));
-      } finally {
-        _active = null;
-        // 成功/取消/失败都要让"已下载"标记重新查一次，并且清掉队列行。
-        _persist(_db.dequeueDownload(book.id));
-        if (!_disposed) {
-          ref.invalidate(downloadedProvider(book.id));
-          ref.invalidate(downloadedBooksProvider);
-          ref.invalidate(downloadsUsageProvider);
-        }
-      }
-      _clear(book.id);
+      _running.add(book.id);
+      unawaited(_runOne(book));
     }
+  }
+
+  Future<void> _runOne(Book book) async {
+    _set(
+      book.id,
+      const DownloadStatus(progress: DownloadProgress(done: 0, total: 0)),
+    );
+    _persist(
+      _db.updateQueueEntry(bookId: book.id, state: 'active', done: 0, total: 0),
+    );
+    try {
+      await _service.download(
+        book,
+        onProgress: (DownloadProgress progress) {
+          _set(book.id, DownloadStatus(progress: progress));
+          _persist(
+            _db.updateQueueEntry(
+              bookId: book.id,
+              state: 'active',
+              done: progress.done,
+              total: progress.total,
+            ),
+          );
+        },
+      );
+    } on ShelfFailure catch (failure) {
+      _set(book.id, DownloadStatus(error: failure.message));
+    } finally {
+      _running.remove(book.id);
+      // 成功/取消/失败都要让"已下载"标记重新查一次，并且清掉队列行。
+      _persist(_db.dequeueDownload(book.id));
+      if (!_disposed) {
+        ref.invalidate(downloadedProvider(book.id));
+        ref.invalidate(downloadedBooksProvider);
+        ref.invalidate(downloadsUsageProvider);
+      }
+    }
+    _clear(book.id);
+    // 空出一个并发位，让排队的顶上。
+    unawaited(_pump());
   }
 
   void cancel(String bookId) {
@@ -310,8 +361,7 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
   /// 已经下完的书**不动**：用户的意图是"别再下了"，不是"删掉我的下载"。
   void cancelAll() {
     final pending = <String>{..._queue.map((Book book) => book.id)};
-    final active = _active;
-    if (active != null) pending.add(active);
+    pending.addAll(_running);
     _queue.clear();
     for (final id in pending) {
       _service.cancel(id);

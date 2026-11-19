@@ -27,6 +27,9 @@ class AppSettings {
     this.libraryFilters = const <String, String>{},
     this.filterPresets = const <String, List<ShelfFilterPreset>>{},
     this.searchHistory = const <String>[],
+    this.downloadWifiOnly = false,
+    this.downloadAutoDeleteRead = false,
+    this.downloadConcurrency = 1,
   });
 
   /// 全默认值（没有存档、存档写坏、字段缺失时都用它）。
@@ -63,6 +66,16 @@ class AppSettings {
   /// 最近搜索（最新的在前，最多 kSearchHistoryLimit 条）。空态展示与回填用。
   final List<String> searchHistory;
 
+  /// 只在 Wi-Fi 下下载（DLD-01）。
+  final bool downloadWifiOnly;
+
+  /// 读完一本就删掉它的下载（DLD-01）。
+  final bool downloadAutoDeleteRead;
+
+  /// 同时下载几本（1–3）。默认 1：并发下载会把单本的页图请求挤慢，
+  /// 而阅读体验的瓶颈通常在服务端而不是本地带宽。
+  final int downloadConcurrency;
+
   AppSettings copyWith({
     ThemeMode? themeMode,
     bool? forceEink,
@@ -75,6 +88,9 @@ class AppSettings {
     Map<String, String>? libraryFilters,
     Map<String, List<ShelfFilterPreset>>? filterPresets,
     List<String>? searchHistory,
+    bool? downloadWifiOnly,
+    bool? downloadAutoDeleteRead,
+    int? downloadConcurrency,
   }) => AppSettings(
     themeMode: themeMode ?? this.themeMode,
     forceEink: forceEink ?? this.forceEink,
@@ -89,6 +105,10 @@ class AppSettings {
     libraryFilters: libraryFilters ?? this.libraryFilters,
     filterPresets: filterPresets ?? this.filterPresets,
     searchHistory: searchHistory ?? this.searchHistory,
+    downloadWifiOnly: downloadWifiOnly ?? this.downloadWifiOnly,
+    downloadAutoDeleteRead:
+        downloadAutoDeleteRead ?? this.downloadAutoDeleteRead,
+    downloadConcurrency: downloadConcurrency ?? this.downloadConcurrency,
   );
 
   /// 记下某台服务器选的库；[libraryId] 为 null 表示"全部库"。
@@ -170,6 +190,9 @@ class AppSettings {
     if (readStatus != null) 'readStatus': readStatus!.name,
     if (libraryFilters.isNotEmpty) 'libraryFilters': libraryFilters,
     if (searchHistory.isNotEmpty) 'searchHistory': searchHistory,
+    if (downloadWifiOnly) 'downloadWifiOnly': true,
+    if (downloadAutoDeleteRead) 'downloadAutoDeleteRead': true,
+    if (downloadConcurrency != 1) 'downloadConcurrency': downloadConcurrency,
     if (filterPresets.isNotEmpty)
       'filterPresets': <String, Object?>{
         for (final entry in filterPresets.entries)
@@ -209,6 +232,14 @@ class AppSettings {
           : const <String, String>{},
       filterPresets: _parsePresets(json['filterPresets']),
       searchHistory: _parseHistory(json['searchHistory']),
+      downloadWifiOnly: _bool(json['downloadWifiOnly'], false),
+      downloadAutoDeleteRead: _bool(json['downloadAutoDeleteRead'], false),
+      // 越界的并发数（被改坏的存档）夹回 1–3。
+      downloadConcurrency:
+          (json['downloadConcurrency'] is int
+                  ? json['downloadConcurrency']! as int
+                  : 1)
+              .clamp(1, 3),
     );
   }
 

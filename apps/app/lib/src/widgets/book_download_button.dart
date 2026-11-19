@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
+import 'package:komga_native/src/providers/download_policy_gate.dart';
 import 'package:komga_native/src/providers/download_providers.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -65,9 +66,27 @@ class BookDownloadButton extends ConsumerWidget {
     return IconButton(
       key: Key('book-download-${book.id}'),
       tooltip: l10n.downloadForOffline,
-      onPressed: () => unawaited(controller.start(book)),
+      onPressed: () => unawaited(_start(ref, context, l10n, controller, book)),
       icon: const Icon(Icons.download_outlined),
     );
+  }
+
+  /// 开始下载前先过一遍"仅 Wi-Fi"策略（DLD-01）。
+  Future<void> _start(
+    WidgetRef ref,
+    BuildContext context,
+    AppLocalizations l10n,
+    DownloadsController controller,
+    Book book,
+  ) async {
+    final blocked = await downloadBlockReason(ref, l10n);
+    if (blocked != null) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(blocked)));
+      return;
+    }
+    await controller.start(book);
   }
 
   Future<void> _confirmDelete(
