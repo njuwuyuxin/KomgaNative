@@ -75,7 +75,7 @@
 | PLT-02 | iPad 默认双页/阅读布局 | P2 | DONE | `feat(reader): 平板默认排版（自动/单页/双页）` |
 | I18N-01 | 数据层错误文案本地化 | P2 | DONE | `feat(i18n): 失败类型走 l10n` |
 | A11Y-01 | TalkBack/VoiceOver + Dynamic Type 2.0 | P2 | TODO | — |
-| UI-03 | 黄金图覆盖补齐 | P2 | TODO | — |
+| UI-03 | 黄金图覆盖补齐 | P2 | DONE | `test(golden): 补齐 6 张矩阵缺口` |
 
 ## W6 可选增强
 
@@ -228,6 +228,19 @@
   `continueReadingProgress` 是 FIX-06 之后失效的）。
 - 验证：55 条阅读器测试 + 黄金图全部不变（零行为变更）；设备上打开第 114/227 页
   照常渲染，滑杆与"剩 113 页"一致。
+
+### UI-03 黄金图矩阵补齐
+
+- 补 6 张缺口：`settings@phone_light`、`settings@tablet_dark`、`reader@phone_light`、
+  `reader@tablet_dark`、`connection@tablet_dark`、`library@phone_light_zh`（中文关键页）。
+- 为让中文书架基线成立，`pumpShelfGolden` 增加 `locale` 参数（默认 en），
+  透传给 `pumpGoldenScreen`；`library@phone_light_zh` 已自查：
+  搜索框"搜索系列"、标题"书架 6 个系列"、筛选"全部/Comics/Manga" 都是真汉字，不是方块。
+- 清理了 `test/golden/failures/`（历史失败对比图，已进 `.gitignore`，但目录还在）。
+- 现状：**99 张基线**，覆盖 settings / reader / connection / library / series /
+  collections / search / downloads / insights / history 各页的
+  phone / tablet / eink / zh / 2.0× 组合；`ci.dart check` 全绿。
+- 设备走查：装 release 后启动正常、书架出内容（本次只改测试与基线，无行为变更）。
 
 ### A11Y-01 无障碍 + Dynamic Type 2.0
 

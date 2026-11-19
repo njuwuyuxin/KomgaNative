@@ -70,6 +70,7 @@ void main() {
     required Size size,
     required ThemeData theme,
     double textScale = 1.0,
+    Locale? locale,
     List<Series>? series,
     ShelfFailure? failure,
     bool offline = false,
@@ -115,6 +116,7 @@ void main() {
       size: size,
       theme: theme,
       textScale: textScale,
+      locale: locale ?? const Locale('en'),
       overrides: <Override>[
         libraryRepositoryProvider.overrideWithValue(repository),
         httpCacheProvider.overrideWithValue(cache),
@@ -192,6 +194,16 @@ void main() {
       size: GoldenSizes.phone,
       theme: AppTheme.light(),
       textScale: 2.0,
+    );
+  });
+
+  testWidgets('library@phone_light_zh', (WidgetTester tester) async {
+    await pumpShelfGolden(
+      tester,
+      name: 'library@phone_light_zh',
+      size: GoldenSizes.phone,
+      theme: AppTheme.light(),
+      locale: const Locale('zh'),
     );
   });
 
@@ -897,6 +909,38 @@ void main() {
     await expectGolden(tester, 'settings@phone_light_text2.0');
   });
 
+  testWidgets('settings@phone_light', (WidgetTester tester) async {
+    await pumpGoldenScreen(
+      tester,
+      screen: const SettingsScreen(),
+      size: GoldenSizes.phone,
+      theme: AppTheme.light(),
+      overrides: <Override>[
+        ...memorySession(connected: true),
+        httpCacheDatabaseProvider.overrideWithValue(
+          HttpCacheDatabase(NativeDatabase.memory()),
+        ),
+      ],
+    );
+    await expectGolden(tester, 'settings@phone_light');
+  });
+
+  testWidgets('settings@tablet_dark', (WidgetTester tester) async {
+    await pumpGoldenScreen(
+      tester,
+      screen: const SettingsScreen(),
+      size: GoldenSizes.tablet,
+      theme: AppTheme.dark(),
+      overrides: <Override>[
+        ...memorySession(connected: true),
+        httpCacheDatabaseProvider.overrideWithValue(
+          HttpCacheDatabase(NativeDatabase.memory()),
+        ),
+      ],
+    );
+    await expectGolden(tester, 'settings@tablet_dark');
+  });
+
   testWidgets('settings@eink', (WidgetTester tester) async {
     await pumpGoldenScreen(
       tester,
@@ -995,6 +1039,24 @@ void main() {
       tester,
       name: 'reader@phone_dark',
       size: GoldenSizes.phone,
+      theme: AppTheme.dark(),
+    );
+  });
+
+  testWidgets('reader@phone_light', (WidgetTester tester) async {
+    await pumpReaderGolden(
+      tester,
+      name: 'reader@phone_light',
+      size: GoldenSizes.phone,
+      theme: AppTheme.light(),
+    );
+  });
+
+  testWidgets('reader@tablet_dark', (WidgetTester tester) async {
+    await pumpReaderGolden(
+      tester,
+      name: 'reader@tablet_dark',
+      size: GoldenSizes.tablet,
       theme: AppTheme.dark(),
     );
   });
@@ -1263,6 +1325,17 @@ void main() {
       overrides: memorySession(),
     );
     await expectGolden(tester, 'connection@phone_light_zh');
+  });
+
+  testWidgets('connection@tablet_dark', (WidgetTester tester) async {
+    await pumpGoldenScreen(
+      tester,
+      screen: const ConnectionScreen(),
+      size: GoldenSizes.tablet,
+      theme: AppTheme.dark(),
+      overrides: memorySession(),
+    );
+    await expectGolden(tester, 'connection@tablet_dark');
   });
 
   testWidgets('connection@eink', (WidgetTester tester) async {
