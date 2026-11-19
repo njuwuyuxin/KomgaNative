@@ -21,6 +21,7 @@ abstract interface class LibraryRepository {
     int size = 30,
     SeriesSort? sort,
     SeriesReadStatus? readStatus,
+    String? tag,
   });
 
   /// 单个系列；已被删除时返回 null。
@@ -127,6 +128,7 @@ class KomgaLibraryRepository implements LibraryRepository {
     int size = 30,
     SeriesSort? sort,
     SeriesReadStatus? readStatus,
+    String? tag,
   }) async {
     try {
       return await _session.fetchSeries(
@@ -136,6 +138,7 @@ class KomgaLibraryRepository implements LibraryRepository {
         size: size,
         sort: sort,
         readStatus: readStatus,
+        tag: tag,
       );
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);

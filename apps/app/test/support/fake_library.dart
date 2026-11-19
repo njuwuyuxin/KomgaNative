@@ -89,6 +89,10 @@ class FakeLibraryRepository implements LibraryRepository {
   int seriesByIdCalls = 0;
   int booksCalls = 0;
 
+  /// 最近一次系列查询收到的标签筛选（SCH-02 断言用）。
+  String? lastSeriesTag;
+  SeriesReadStatus? lastSeriesReadStatus;
+
   /// 最近一次 `books()` 收到的排序 / 筛选（SER-01 断言用）。
   BooksSort? lastBooksSort;
   SeriesReadStatus? lastBooksReadStatus;
@@ -124,7 +128,10 @@ class FakeLibraryRepository implements LibraryRepository {
     int size = 30,
     SeriesSort? sort,
     SeriesReadStatus? readStatus,
+    String? tag,
   }) async {
+    lastSeriesTag = tag;
+    lastSeriesReadStatus = readStatus;
     seriesCalls.add((
       libraryId: libraryId,
       query: query,

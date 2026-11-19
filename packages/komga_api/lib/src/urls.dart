@@ -38,6 +38,7 @@ class KomgaUrls {
     String? search,
     SeriesSort? sort,
     SeriesReadStatus? readStatus,
+    String? tag,
   }) {
     final q = <String, String>{
       'page': '$page',
@@ -46,6 +47,7 @@ class KomgaUrls {
       if (search != null && search.isNotEmpty) 'search': search,
       if (sort != null) 'sort': sortWireValue(sort),
       if (readStatus != null) 'read_status': readStatusWireValue(readStatus),
+      if (tag != null && tag.isNotEmpty) 'tag': tag,
     };
     return _withQuery('$_base/api/v1/series', q);
   }

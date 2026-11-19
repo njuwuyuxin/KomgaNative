@@ -10,6 +10,7 @@ import 'package:komga_native/src/data/app_settings.dart';
 import 'package:komga_native/src/data/shelf_view_options.dart';
 import 'package:komga_native/src/providers/settings_provider.dart';
 import 'package:komga_native/src/widgets/search_empty_state.dart';
+import 'package:komga_native/src/widgets/search_facets.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/screens/reader_args.dart';
 import 'package:komga_native/src/widgets/load_more_footer.dart';
@@ -75,6 +76,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   List<String> _history = const <String>[];
+
+  /// 搜索筛选（SCH-02）：跟着这一次搜索走，换关键词不重置（用户可能想接着筛）。
+  SeriesReadStatus? _readStatus;
+  String? _tag;
 
   @override
   void initState() {
@@ -152,7 +157,18 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 ),
               )
             else
-              _SearchResults(query: _query),
+              _SearchResults(
+                query: _query,
+                readStatus: _readStatus,
+                tag: _tag,
+                onReadStatus: (SeriesReadStatus? value) =>
+                    setState(() => _readStatus = value),
+                onTag: (String? value) => setState(() => _tag = value),
+                onClearFacets: () => setState(() {
+                  _readStatus = null;
+                  _tag = null;
+                }),
+              ),
           ],
         ),
       ),
@@ -161,9 +177,23 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 }
 
 class _SearchResults extends ConsumerStatefulWidget {
-  const _SearchResults({required this.query});
+  const _SearchResults({
+    required this.query,
+    required this.readStatus,
+    required this.tag,
+    required this.onReadStatus,
+    required this.onTag,
+    required this.onClearFacets,
+  });
 
   final String query;
+
+  /// 筛选（SCH-02）：服务端已验证的只有 read_status 与 tag。
+  final SeriesReadStatus? readStatus;
+  final String? tag;
+  final ValueChanged<SeriesReadStatus?> onReadStatus;
+  final ValueChanged<String?> onTag;
+  final VoidCallback onClearFacets;
 
   @override
   ConsumerState<_SearchResults> createState() => _SearchResultsState();
@@ -183,7 +213,12 @@ class _SearchResultsState extends ConsumerState<_SearchResults> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final search = (query: widget.query, size: _size);
+    final search = (
+      query: widget.query,
+      size: _size,
+      readStatus: widget.readStatus,
+      tag: widget.tag,
+    );
     final series = ref.watch(searchSeriesProvider(search));
     final books = ref.watch(searchBooksProvider(search));
     final seriesItems = series.value?.items ?? const <Series>[];
@@ -218,6 +253,14 @@ class _SearchResultsState extends ConsumerState<_SearchResults> {
     return SliverList.list(
       // 悬浮导航条浮在内容上：结果列表末尾让开它。
       children: <Widget>[
+        SearchFacets(
+          query: widget.query,
+          readStatus: widget.readStatus,
+          tag: widget.tag,
+          onReadStatus: widget.onReadStatus,
+          onTag: widget.onTag,
+          onClear: widget.onClearFacets,
+        ),
         if (seriesItems.isNotEmpty) ...<Widget>[
           _Header(text: l10n.searchSeriesTab),
           for (final series in seriesItems)

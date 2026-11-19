@@ -148,6 +148,7 @@ class KomgaSession {
     String? search,
     SeriesSort? sort,
     SeriesReadStatus? readStatus,
+    String? tag,
   }) async {
     final data = _requireMap(
       await _getJson(
@@ -158,6 +159,7 @@ class KomgaSession {
           search: search,
           sort: sort,
           readStatus: readStatus,
+          tag: tag,
         ),
       ),
       '系列列表',

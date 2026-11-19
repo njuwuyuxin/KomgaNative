@@ -229,6 +229,26 @@
 - 验证：55 条阅读器测试 + 黄金图全部不变（零行为变更）；设备上打开第 114/227 页
   照常渲染，滑杆与"剩 113 页"一致。
 
+### SCH-02 搜索 facets
+
+- 先 spike（对照组方法，见 `docs/series-queries.md` 的判定方式）：
+  - `read_status` 与 `search` 组合**验证通过**（Frieren 已读 → UNREAD 返回 0、READ 返回 1）；
+  - `tag` **验证通过**：先 `PATCH /series/{id}/metadata` 写入 `tags:["VerifyTag"]`，
+    `tag=VerifyTag` 只返回那一部，`tag=NotATag` 返回 0（正负对照都成立）；
+  - `author` **不支持**：`author=Verify Author` 与 `author=NobodyHere` 返回完全一样（全部 5 部），
+    服务端静默忽略 → 按 API 真值规则**不做作者筛选**，代码注释与本文都写明了原因。
+- 搜索页新增 `SearchFacets`：阅读状态四颗 chip（全部/未读/在读/已读）+ **标签 chip**
+  （从"未加标签筛选"的结果里按出现次数聚合前 6 个，Komga 没有 facets 接口），
+  可单点筛选、再点取消、"清除"一键复位。
+- `SearchQuery` 扩成 `(query, size, readStatus, tag)`，任一变化自动重查；
+  `KomgaUrls.series(..., tag:)`、`fetchSeries`、`LibraryRepository.series` 都加了 `tag`。
+- 测试：`search_facets_test.dart` 3 条（URL 带 `tag` 且无 tag 时不写、阅读状态带到服务端并
+  可清除、标签 chip 来自聚合且可筛选/取消）。
+- **没有搜索结果态黄金图**：真搜一次会拉起 Drift 缓存，黄金图环境没有 `path_provider`
+  （`MissingPluginException`），强行 mock 一层不值得。facets 由上面 3 条 widget 测试覆盖，
+  这里如实记录缺一张基线。
+- 设备走查：搜 "e" → 顶部出现"筛选"与四颗状态 chip（全部带 ✓），下面正常出系列与书籍结果。
+
 ### SCH-01 搜索历史 + 空态
 
 - `AppSettings.searchHistory`（最多 10 条，最新的在前）+ `withSearchTerm/withoutSearchTerm/clearSearchHistory`；

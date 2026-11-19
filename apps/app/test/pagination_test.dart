@@ -222,5 +222,6 @@ class _PagedRepository extends FakeLibraryRepository {
     int size = 30,
     SeriesSort? sort,
     SeriesReadStatus? readStatus,
+    String? tag,
   }) async => _page(_series, page, size);
 }

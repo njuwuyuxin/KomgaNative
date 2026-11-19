@@ -140,7 +140,15 @@ final readListBooksProvider =
           .readListBooks(query.readListId, size: query.size);
     });
 
-typedef SearchQuery = ({String query, int size});
+/// 搜索查询（SCH-02）：关键词 + 条数 + 阅读状态/标签筛选。
+///
+/// 用记录做 family key：任一筛选变化就是一次新查询，不需要手动 invalidate。
+typedef SearchQuery = ({
+  String query,
+  int size,
+  SeriesReadStatus? readStatus,
+  String? tag,
+});
 
 /// 全局书搜索（UI-P3-9）；`query` 或 `size` 变化就是一次新查询。
 final searchBooksProvider =
@@ -154,6 +162,10 @@ final searchBooksProvider =
     });
 
 /// 全局系列搜索（复用书架查询的 `search` 参数）。
+///
+/// `read_status` / `tag` 都已对真实 Komga 1.30.1 验证过（见 docs/series-queries.md）；
+/// `author=` 参数被服务端**静默忽略**（同一个不存在的作者与真实作者返回完全一致），
+/// 所以不做作者筛选。
 final searchSeriesProvider =
     FutureProvider.family<PageResult<Series>, SearchQuery>((
       Ref ref,
@@ -161,7 +173,38 @@ final searchSeriesProvider =
     ) {
       return ref
           .watch(libraryRepositoryProvider)
-          .series(query: search.query, size: search.size);
+          .series(
+            query: search.query,
+            size: search.size,
+            readStatus: search.readStatus,
+            tag: search.tag,
+          );
+    });
+
+/// 搜索页可选的标签（SCH-02）：从**未加标签筛选**的结果里聚合。
+///
+/// 每次搜索多一个请求换"标签可选"这件事是值得的：Komga 没有 facets 接口，
+/// 客户端不聚合就只能让用户自己猜标签名。
+final searchTagFacetsProvider =
+    FutureProvider.family<List<String>, SearchQuery>((
+      Ref ref,
+      SearchQuery q,
+    ) async {
+      final page = await ref
+          .watch(libraryRepositoryProvider)
+          .series(query: q.query, size: 50);
+      final counts = <String, int>{};
+      for (final series in page.items) {
+        for (final tag in series.tags) {
+          counts[tag] = (counts[tag] ?? 0) + 1;
+        }
+      }
+      final tags = counts.keys.toList()
+        ..sort((String a, String b) {
+          final byCount = counts[b]!.compareTo(counts[a]!);
+          return byCount != 0 ? byCount : a.compareTo(b);
+        });
+      return tags.take(6).toList();
     });
 
 /// 单本书的封面。

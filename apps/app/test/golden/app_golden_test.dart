@@ -589,6 +589,7 @@ void main() {
     required Size size,
     required ThemeData theme,
     List<String> history = const <String>[],
+    String? query,
   }) async {
     await pumpGoldenScreen(
       tester,
@@ -607,6 +608,11 @@ void main() {
           ),
       ],
     );
+    if (query != null) {
+      await tester.enterText(find.byType(TextField), query);
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.pumpAndSettle();
+    }
     await expectGolden(tester, name);
   }
 
