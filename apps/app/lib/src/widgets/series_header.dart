@@ -195,17 +195,27 @@ class _TitleSkeleton extends StatelessWidget {
   }
 }
 
-class _TitleBlock extends StatelessWidget {
+class _TitleBlock extends StatefulWidget {
   const _TitleBlock({required this.series});
 
   final Series? series;
+
+  @override
+  State<_TitleBlock> createState() => _TitleBlockState();
+}
+
+class _TitleBlockState extends State<_TitleBlock> {
+  /// 最多先显示几个标签；多出来的收成 `+N`（FIX-09）。
+  static const int _visibleTags = 3;
+
+  bool _showAllTags = false;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final muted = theme.colorScheme.onSurfaceVariant;
-    final series = this.series;
+    final series = widget.series;
     final read = series?.booksReadCount ?? 0;
     final total = series?.booksCount ?? 0;
     final facts = <String>[
@@ -215,6 +225,9 @@ class _TitleBlock extends StatelessWidget {
         series!.publisher!.trim(),
       if (series?.releaseDate != null) '${series!.releaseDate!.year}',
     ];
+    final tags = series?.tags ?? const <String>[];
+    final hiddenTags = tags.length - _visibleTags;
+    final shownTags = _showAllTags ? tags : tags.take(_visibleTags);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -240,28 +253,19 @@ class _TitleBlock extends StatelessWidget {
             style: theme.textTheme.bodySmall?.copyWith(color: muted),
           ),
         ],
-        if (series != null && series.tags.isNotEmpty) ...<Widget>[
+        if (tags.isNotEmpty) ...<Widget>[
           const SizedBox(height: AppSpacing.sm),
           Wrap(
             spacing: AppSpacing.xs,
             runSpacing: AppSpacing.xs,
             children: <Widget>[
-              for (final tag in series.tags.take(4))
-                DecoratedBox(
-                  decoration: ShapeDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    shape: const StadiumBorder(),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.sm,
-                      vertical: AppSpacing.xxs,
-                    ),
-                    child: Text(
-                      tag,
-                      style: theme.textTheme.labelSmall?.copyWith(color: muted),
-                    ),
-                  ),
+              for (final tag in shownTags) _TagChip(label: tag),
+              // 标签很多时不再硬塞四个然后悄悄丢掉剩下的：给一个能点开的 +N。
+              if (!_showAllTags && hiddenTags > 0)
+                GestureDetector(
+                  key: const Key('series-tags-more'),
+                  onTap: () => setState(() => _showAllTags = true),
+                  child: _TagChip(label: '+$hiddenTags', highlighted: true),
                 ),
             ],
           ),
@@ -276,6 +280,38 @@ class _TitleBlock extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// 一个标签胶囊；`+N` 用同一种形状但换底色，表示"可以点"。
+class _TagChip extends StatelessWidget {
+  const _TagChip({required this.label, this.highlighted = false});
+
+  final String label;
+  final bool highlighted;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final muted = theme.colorScheme.onSurfaceVariant;
+    return DecoratedBox(
+      decoration: ShapeDecoration(
+        color: highlighted
+            ? theme.colorScheme.secondaryContainer
+            : theme.colorScheme.surfaceContainerHighest,
+        shape: const StadiumBorder(),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xxs,
+        ),
+        child: Text(
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(color: muted),
+        ),
+      ),
     );
   }
 }
@@ -297,31 +333,52 @@ class _SummaryState extends State<_Summary> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        GestureDetector(
-          key: const Key('series-summary'),
-          onTap: () => setState(() => _expanded = !_expanded),
-          child: Text(
+    final style = AppTypography.of(context).body
+        .copyWith(color: theme.colorScheme.onSurfaceVariant);
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        // 只有真的被截断时才给"展开"（FIX-09）：短简介下面挂一个永远没用的
+        // "展开"按钮，比没有更让人困惑。
+        final painter = TextPainter(
+          text: TextSpan(text: widget.text, style: style),
+          maxLines: SeriesHeader._summaryLines,
+          textDirection: Directionality.of(context),
+          textScaler: MediaQuery.textScalerOf(context),
+        )..layout(maxWidth: constraints.maxWidth);
+        final truncated = painter.didExceedMaxLines;
+        if (!truncated) {
+          return Text(
             widget.text,
-            maxLines: _expanded ? null : SeriesHeader._summaryLines,
-            overflow: _expanded ? null : TextOverflow.ellipsis,
-            style: AppTypography.of(context).body
-                .copyWith(color: theme.colorScheme.onSurfaceVariant),
-          ),
-        ),
-        TextButton(
-          key: const Key('series-summary-toggle'),
-          style: TextButton.styleFrom(
-            padding: EdgeInsets.zero,
-            minimumSize: const Size(AppSizes.minTouch, AppSizes.minTouch),
-            alignment: Alignment.centerLeft,
-          ),
-          onPressed: () => setState(() => _expanded = !_expanded),
-          child: Text(_expanded ? l10n.showLess : l10n.showMore),
-        ),
-      ],
+            key: const Key('series-summary'),
+            style: style,
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            GestureDetector(
+              key: const Key('series-summary'),
+              onTap: () => setState(() => _expanded = !_expanded),
+              child: Text(
+                widget.text,
+                maxLines: _expanded ? null : SeriesHeader._summaryLines,
+                overflow: _expanded ? null : TextOverflow.ellipsis,
+                style: style,
+              ),
+            ),
+            TextButton(
+              key: const Key('series-summary-toggle'),
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(AppSizes.minTouch, AppSizes.minTouch),
+                alignment: Alignment.centerLeft,
+              ),
+              onPressed: () => setState(() => _expanded = !_expanded),
+              child: Text(_expanded ? l10n.showLess : l10n.showMore),
+            ),
+          ],
+        );
+      },
     );
   }
 }

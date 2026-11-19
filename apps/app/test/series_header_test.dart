@@ -85,6 +85,58 @@ void main() {
     expect(find.text('Show less'), findsOneWidget);
   });
 
+  testWidgets('短简介：不显示"展开"按钮（FIX-09）', (WidgetTester tester) async {
+    await pumpDetail(
+      tester,
+      repository: FakeLibraryRepository(
+        series: <Series>[
+          const Series(
+            id: 's1',
+            libraryId: 'l1',
+            title: 'Frieren',
+            booksCount: 6,
+            summary: 'Short summary.',
+          ),
+        ],
+      ),
+    );
+
+    expect(find.byKey(const Key('series-summary')), findsOneWidget);
+    expect(
+      find.byKey(const Key('series-summary-toggle')),
+      findsNothing,
+      reason: '没被截断就不该挂一个永远用不上的展开按钮',
+    );
+  });
+
+  testWidgets('标签超过 3 个：收成 +N，点开看全部（FIX-09）', (WidgetTester tester) async {
+    await pumpDetail(
+      tester,
+      repository: FakeLibraryRepository(
+        series: <Series>[
+          const Series(
+            id: 's1',
+            libraryId: 'l1',
+            title: 'Frieren',
+            booksCount: 6,
+            tags: <String>['a', 'b', 'c', 'd', 'e', 'f'],
+          ),
+        ],
+      ),
+    );
+
+    expect(find.text('a'), findsOneWidget);
+    expect(find.text('c'), findsOneWidget);
+    expect(find.text('d'), findsNothing, reason: '前 3 个之后先收起来');
+    expect(find.text('+3'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('series-tags-more')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('+3'), findsNothing);
+    expect(find.text('f'), findsOneWidget);
+  });
+
   testWidgets('书在读：主按钮是"继续阅读第 N 本"', (WidgetTester tester) async {
     await pumpDetail(tester);
 

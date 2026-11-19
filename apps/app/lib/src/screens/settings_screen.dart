@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
+import 'package:komga_native/src/providers/app_info_provider.dart';
 import 'package:komga_native/src/providers/cache_providers.dart';
 import 'package:komga_native/src/providers/download_providers.dart';
 import 'package:komga_native/src/providers/settings_provider.dart';
@@ -28,6 +29,7 @@ class SettingsScreen extends ConsumerWidget {
     final usage = ref.watch(cacheUsageProvider);
     final downloads = ref.watch(downloadsUsageProvider).value;
     final cacheUsage = usage.value;
+    final appInfo = ref.watch(appInfoProvider).value;
     // 不用 AsyncValue.when：Riverpod 3 首次失败是 AsyncLoading + hasError，
     // 按值/错误位判断才不会把"算不出来"显示成永久 loading。
     final cacheSubtitle = cacheUsage != null
@@ -197,8 +199,11 @@ class SettingsScreen extends ConsumerWidget {
                       header: l10n.about,
                       children: <Widget>[
                         ListTile(
+                          key: const Key('settings-version'),
                           title: Text(l10n.version),
-                          trailing: const Text('0.1.0 (v1)'),
+                          // 真的版本号来自构建产物（ADR 0007）；还没读到/读不到时
+                          // 立刻回退到 pubspec 版本常量，不留一个 "—" 的空窗。
+                          trailing: Text(appInfo?.label ?? kFallbackAppVersion),
                         ),
                         ListTile(
                           key: const Key('settings-licenses'),
@@ -207,7 +212,8 @@ class SettingsScreen extends ConsumerWidget {
                           onTap: () => showLicensePage(
                             context: context,
                             applicationName: 'KomgaNative',
-                            applicationVersion: '0.1.0',
+                            applicationVersion:
+                                appInfo?.version ?? kFallbackAppVersion,
                           ),
                         ),
                       ],

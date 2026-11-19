@@ -18,7 +18,7 @@
 | FIX-06 | 列表层进度与系列名 | P0 | DONE | `feat: 书行页码与继续卡的系列名` |
 | FIX-07 | 下载队列持久化 | P0 | DONE | `feat(app): 下载队列落盘并恢复` |
 | FIX-08 | 搜索/收藏集/阅读列表分页 | P0 | DONE | `feat: 搜索/收藏集/阅读列表接分页` |
-| FIX-09 | 版本号/简介按钮/标签溢出 | P0 | TODO | — |
+| FIX-09 | 版本号/简介按钮/标签溢出 | P0 | DONE | `feat: 版本读构建产物、简介/标签按需展开` |
 
 ## W1 阅读器
 
@@ -197,3 +197,24 @@
 - 设备走查限制：当前服务器只有个位数收藏集/阅读列表、搜索命中也很少，
   造不出"超过一页"的数据，因此这条只做了 widget 测试；分页是纯客户端逻辑，
   服务端参数（`page`/`size`）已在 `docs/series-queries.md` 与契约测试里覆盖。
+
+### FIX-09 版本号 / 简介按钮 / 标签溢出
+
+- 版本号改读构建产物：新增 `package_info_plus`（ADR 0007），设置页"版本"行显示
+  `version (buildNumber)`，开源许可页用同一个版本；读不到/还没读到时回退到
+  `kFallbackAppVersion`，不显示空白。
+- 简介"展开"只在真的被截断时出现：`LayoutBuilder` + `TextPainter.didExceedMaxLines`，
+  短简介不再挂一个永远用不上的按钮。
+- 标签超过 3 个收成 `+N`（同形状胶囊），点一下展开全部——以前 `take(4)`
+  把剩下的悄悄丢掉。
+- 测试：`settings_version_test.dart`（有/无构建号）、`series_header_test.dart`
+  新增短简介无按钮、6 个标签显示 `+3` 并可展开；更新 `settings@eink` 黄金图。
+- 设备走查：设置页"版本"显示 `0.1.0 (1)`（连的是 APK 真实的 versionCode）。
+
+## W0 出口（P0 全绿）
+
+9 项 P0 全部完成并逐条推送：FIX-01…FIX-09。每项都过了
+`dart run tool/ci.dart check`（格式 + 分析 + 分层 + 全部测试 + 黄金图）与
+`dart run tool/ci.dart install` 真机走查。
+已知未覆盖：FIX-03 的"搜索/阅读列表入口"与 FIX-08 的分页在**这台服务器**上
+造不出所需数据（见各条备注），改由 widget 测试钉住。
