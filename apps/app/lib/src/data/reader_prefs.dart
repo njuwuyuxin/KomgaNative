@@ -121,6 +121,7 @@ class ReaderPrefs {
     this.fit = ReaderFitChoice.contain,
     this.direction = ReaderDirectionChoice.auto,
     this.background = ReaderBackgroundChoice.black,
+    this.lockZoom = false,
     this.presets = const <ReaderPreset>[],
     this.seriesOverrides = const <String, ReaderPrefs>{},
   });
@@ -139,6 +140,9 @@ class ReaderPrefs {
   final ReaderDirectionChoice direction;
   final ReaderBackgroundChoice background;
 
+  /// 翻页后保持缩放比例（UI-P3-4）。
+  final bool lockZoom;
+
   /// 用户保存的阅读预设（UI-P3-1）；按保存顺序排列。
   final List<ReaderPreset> presets;
 
@@ -155,6 +159,7 @@ class ReaderPrefs {
     fit: fit,
     direction: direction,
     background: background,
+    lockZoom: lockZoom,
   );
 
   /// 某个系列实际生效的设置：有覆盖就用覆盖，否则用全局。
@@ -171,6 +176,7 @@ class ReaderPrefs {
       fit: override.fit,
       direction: override.direction,
       background: override.background,
+      lockZoom: override.lockZoom,
       presets: presets,
       seriesOverrides: seriesOverrides,
     );
@@ -197,6 +203,7 @@ class ReaderPrefs {
     ReaderFitChoice? fit,
     ReaderDirectionChoice? direction,
     ReaderBackgroundChoice? background,
+    bool? lockZoom,
     List<ReaderPreset>? presets,
     Map<String, ReaderPrefs>? seriesOverrides,
   }) => ReaderPrefs(
@@ -206,6 +213,7 @@ class ReaderPrefs {
     fit: fit ?? this.fit,
     direction: direction ?? this.direction,
     background: background ?? this.background,
+    lockZoom: lockZoom ?? this.lockZoom,
     presets: presets ?? this.presets,
     seriesOverrides: seriesOverrides ?? this.seriesOverrides,
   );
@@ -218,6 +226,7 @@ class ReaderPrefs {
         'fit': fit.name,
         'direction': direction.name,
         'background': background.name,
+        'lockZoom': lockZoom,
         if (includePresets && presets.isNotEmpty)
           'presets': <Object?>[for (final preset in presets) preset.toJson()],
         if (includePresets && seriesOverrides.isNotEmpty)
@@ -271,6 +280,7 @@ class ReaderPrefs {
         ReaderBackgroundChoice.values,
         ReaderBackgroundChoice.black,
       ),
+      lockZoom: json['lockZoom'] == true,
       presets: presets,
       seriesOverrides: overrides,
     );
@@ -294,6 +304,7 @@ class ReaderPrefs {
       other.fit == fit &&
       other.direction == direction &&
       other.background == background &&
+      other.lockZoom == lockZoom &&
       _samePresets(other.presets, presets) &&
       _sameOverrides(other.seriesOverrides, seriesOverrides);
 
@@ -325,6 +336,7 @@ class ReaderPrefs {
     fit,
     direction,
     background,
+    lockZoom,
     Object.hashAll(presets),
     Object.hashAll(
       seriesOverrides.entries.map(
@@ -336,6 +348,7 @@ class ReaderPrefs {
   @override
   String toString() =>
       'ReaderPrefs(${mode.name}, $brightness, $keepAwake, ${fit.name}, '
-      '${direction.name}, ${background.name}, presets: ${presets.length}, '
+      '${direction.name}, ${background.name}, lockZoom: $lockZoom, '
+      'presets: ${presets.length}, '
       'series: ${seriesOverrides.length})';
 }

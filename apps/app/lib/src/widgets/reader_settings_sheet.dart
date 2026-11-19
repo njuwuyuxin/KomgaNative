@@ -271,6 +271,24 @@ class _ReaderSettingsSheetState extends ConsumerState<ReaderSettingsSheet> {
                 ],
               ),
               SwitchListTile(
+                key: const Key('reader-lock-zoom'),
+                contentPadding: EdgeInsets.zero,
+                value: prefs.lockZoom,
+                onChanged: (bool value) =>
+                    controller.setLockZoom(value, seriesId: writeSeriesId),
+                activeThumbColor: palette.foreground,
+                title: Text(
+                  l10n.readerLockZoom,
+                  style: textStyle.bodyMedium?.copyWith(
+                    color: palette.foreground,
+                  ),
+                ),
+                subtitle: Text(
+                  l10n.readerLockZoomHint,
+                  style: textStyle.bodySmall?.copyWith(color: palette.muted),
+                ),
+              ),
+              SwitchListTile(
                 key: const Key('reader-keep-awake'),
                 contentPadding: EdgeInsets.zero,
                 value: prefs.keepAwake,

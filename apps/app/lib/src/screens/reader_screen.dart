@@ -336,6 +336,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         palette: palette,
         fit: prefs.fit.fit,
         doublePage: mode == ReadingMode.doublePage,
+        lockZoom: prefs.lockZoom,
         nextSpread: layout.neighbour(1),
         previousSpread: layout.neighbour(-1),
         style: PageTurnStyle.resolve(

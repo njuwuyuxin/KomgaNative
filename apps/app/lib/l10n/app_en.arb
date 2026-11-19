@@ -281,6 +281,8 @@
   "readerPresetDelete": "Delete preset",
   "readerSeriesRemember": "Remember for this series",
   "readerSeriesRememberHint": "Changes apply to this series only; turn off to use the global settings again.",
+  "readerLockZoom": "Lock zoom",
+  "readerLockZoomHint": "Keep the zoom level when turning pages; page turns are allowed while zoomed.",
   "readerPresetDefaultName": "Preset {number}",
   "@readerPresetDefaultName": {
     "placeholders": {

@@ -47,6 +47,7 @@ class ReaderPagedView extends ConsumerStatefulWidget {
     this.nextSpread,
     this.previousSpread,
     this.style = const PageTurnStyle(),
+    this.lockZoom = false,
     super.key,
   });
 
@@ -78,6 +79,9 @@ class ReaderPagedView extends ConsumerStatefulWidget {
 
   final PageTurnStyle style;
 
+  /// 翻页后保持缩放比例（UI-P3-4）。
+  final bool lockZoom;
+
   @override
   ReaderPagedViewState createState() => ReaderPagedViewState();
 }
@@ -98,14 +102,22 @@ class ReaderPagedViewState extends ConsumerState<ReaderPagedView>
   @override
   void didUpdateWidget(ReaderPagedView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // 换了一屏、或换了适配方式就复位：上一屏的缩放/平移套到新页上会看到
-    // 莫名其妙的位置；适配方式变了，原来的平移区间也不再成立。
-    if (!_sameSpread(oldWidget.spread, widget.spread) ||
+    final spreadChanged = !_sameSpread(oldWidget.spread, widget.spread);
+    final layoutChanged =
         oldWidget.fit != widget.fit ||
-        oldWidget.doublePage != widget.doublePage) {
+        oldWidget.doublePage != widget.doublePage;
+    if (layoutChanged) {
+      // 适配方式/单双页变了，旧缩放/平移不再成立。
       _resetZoom();
-      _scheduleSheets();
+    } else if (spreadChanged) {
+      if (widget.lockZoom) {
+        // 保留缩放倍数，但把位置夹回中间：上一页的平移区间未必还成立。
+        setState(() => _pan = Offset.zero);
+      } else {
+        _resetZoom();
+      }
     }
+    if (spreadChanged || layoutChanged) _scheduleSheets();
   }
 
   static bool _sameSpread(List<int> a, List<int> b) {

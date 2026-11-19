@@ -71,11 +71,12 @@ mixin _PageTurn
   /// 由外部（底栏箭头 / 音量键 / 点击）触发的翻页：和拖动走同一套动画。
   ///
   /// 没有位图/不允许动画时直接翻页——宁可瞬切，也不要假装有动画。
-  /// **放大状态下忽略**（UI-P1-6）：用户这时是在看放大的局部，误触翻页很恼人
-  /// （iOS 图书 / Panels 都是这个行为）。
+  /// **放大状态下默认忽略**（UI-P1-6）：用户这时是在看放大的局部，误触翻页很恼人。
+  /// 但开了"锁定缩放"（UI-P3-4）时允许翻页——锁定缩放的意义就是"放大着看、
+  /// 翻页也不缩回去"，否则这个开关永远走不到翻页那一步。
   void turn(int delta) {
     if (_phase != _TurnPhase.idle) return;
-    if (_zoom > 1.0) return;
+    if (_zoom > 1.0 && !widget.lockZoom) return;
     final neighbour = delta > 0 ? widget.nextSpread : widget.previousSpread;
     if (neighbour == null || !_canAnimate) {
       widget.onTurn(delta);

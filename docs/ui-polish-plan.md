@@ -431,6 +431,15 @@ Panels 的高级感主要来自三点，和控件本身关系不大：
 | `ReaderScreen` 在每次布局时用 `MediaQuery.orientationOf` 更新 `_landscape`，模式/布局/预取/音量键共用；`readerModeAutoHint` 文案同步说明 |
 | 测试：`data/reader_prefs_test` 覆盖 auto 横屏/条漫/显式选择的组合；`reader_screen_test` 用 844×390 视口断言 `ReaderPagedView.doublePage == true`；`reader_settings@*` 基线因 hint 文案更新 |
 
+**进度（2026-11-19）：P3-4 锁定缩放。**
+
+| 落地 |
+|---|
+| `ReaderPrefs.lockZoom`（默认 false，进 JSON、预设、系列覆盖）；设置面板开关 `reader-lock-zoom` |
+| `ReaderPagedView` 换屏时：`lockZoom` 开 → 保留 `_zoom`、`_pan` 归零；关 → 照旧 `_resetZoom`。适配方式/单双页变化仍复位（旧比例对应旧布局） |
+| 放大状态下 `turn()` 默认仍忽略误触；`lockZoom` 开时放行，否则这个开关永远翻不了页 |
+| 测试：`reader_lock_zoom_test` 覆盖"放大→翻页比例保持"与"未锁定时不翻页"；`data/reader_prefs_test` 覆盖默认值/JSON/系列覆盖；`reader_settings@*` 基线更新 |
+
 ## 不做
 
 | 需求 | 理由 |

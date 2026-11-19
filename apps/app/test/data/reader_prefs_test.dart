@@ -152,6 +152,23 @@ void main() {
       expect(parsed.seriesOverrides['s1']!.presets, isEmpty);
       expect(parsed.seriesOverrides['s1']!.seriesOverrides, isEmpty);
     });
+
+    test('锁定缩放默认关、JSON 往返、系列覆盖可带', () {
+      expect(const ReaderPrefs().lockZoom, isFalse);
+      expect(
+        ReaderPrefs.fromJson(<String, Object?>{'lockZoom': true}).lockZoom,
+        isTrue,
+      );
+      const prefs = ReaderPrefs(
+        lockZoom: true,
+        seriesOverrides: <String, ReaderPrefs>{
+          's1': ReaderPrefs(lockZoom: true),
+        },
+      );
+      final parsed = ReaderPrefs.fromJson(prefs.toJson());
+      expect(parsed.lockZoom, isTrue);
+      expect(parsed.forSeries('s1').lockZoom, isTrue);
+    });
   });
 
   group('ReaderFitChoice → FitMode', () {

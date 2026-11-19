@@ -182,6 +182,8 @@
   "readerPresetDelete": "删除预设",
   "readerSeriesRemember": "按系列记住",
   "readerSeriesRememberHint": "只对这个系列生效；关闭后回到全局设置。",
+  "readerLockZoom": "锁定缩放",
+  "readerLockZoomHint": "翻页后保持当前缩放比例；放大状态下也可以翻页。",
   "readerPresetDefaultName": "预设 {number}",
   "bookMarkRead": "标记已读",
   "bookMarkUnread": "标记未读",
