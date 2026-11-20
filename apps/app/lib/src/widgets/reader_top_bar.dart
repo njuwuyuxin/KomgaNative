@@ -32,6 +32,7 @@ class ReaderTopBar extends ConsumerWidget {
     this.onGroupFrom,
     this.incognito = false,
     required this.onToggleIncognito,
+    this.onSavePage,
     this.onSharePage,
     super.key,
   });
@@ -61,6 +62,9 @@ class ReaderTopBar extends ConsumerWidget {
   final bool incognito;
   final VoidCallback onToggleIncognito;
 
+  /// 直接保存当前屏图片（单页存单张，双页拼接保存）。
+  final VoidCallback? onSavePage;
+
   /// 分享当前页（UI-P3-6）：菜单里的"分享本页"。
   final VoidCallback? onSharePage;
 
@@ -76,6 +80,7 @@ class ReaderTopBar extends ConsumerWidget {
         offline: offline,
         incognito: incognito,
         onToggleIncognito: onToggleIncognito,
+        onSavePage: onSavePage,
         onSharePage: onSharePage,
         // AA：只放读的时候真的会改的五项，改完立刻回到画面（RDR-03）。
         onOpenQuickSettings: () => showReaderQuickSettingsSheet(

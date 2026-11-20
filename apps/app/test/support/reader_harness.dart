@@ -39,6 +39,7 @@ Future<InMemoryReaderPrefsStore> pumpReader(
   ReaderPrefs? initialPrefs,
   FakeWakeLock? wakeLock,
   FakeHardwareKeys? hardwareKeys,
+  FakeImageSaver? imageSaver,
   ProgressStore? progressStore,
   bool offline = false,
   String? heroTag,
@@ -76,6 +77,7 @@ Future<InMemoryReaderPrefsStore> pumpReader(
         progressSyncProvider.overrideWithValue(sync),
         readerPrefsStoreProvider.overrideWithValue(prefsStore),
         wakeLockProvider.overrideWithValue(wakeLock ?? FakeWakeLock()),
+        imageSaverProvider.overrideWithValue(imageSaver ?? FakeImageSaver()),
         hardwareKeysProvider.overrideWithValue(
           hardwareKeys ?? FakeHardwareKeys(),
         ),

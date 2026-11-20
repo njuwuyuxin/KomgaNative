@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
+import 'package:komga_native/src/data/page_save.dart';
 import 'package:komga_native/src/data/page_share.dart';
 import 'package:komga_native/src/data/progress/progress_sync_service.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
@@ -243,6 +244,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
           : null,
       incognito: _incognito,
       onToggleIncognito: _toggleIncognito,
+      onSavePage: () => unawaited(_saveScreenImage(layout, rightToLeft)),
       onSharePage: () => unawaited(_sharePage(page)),
     );
     final content = switch (mode) {

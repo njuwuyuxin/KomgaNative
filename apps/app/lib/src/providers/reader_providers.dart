@@ -8,7 +8,13 @@ import 'package:komga_native/src/data/reader_repository.dart';
 import 'package:komga_native/src/providers/komga_session_provider.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/providers/progress_providers.dart';
+import 'package:komga_platform/komga_platform.dart';
 import 'package:komga_reader_engine/komga_reader_engine.dart';
+
+/// 系统相册 / 默认图片目录保存器：生产走原生通道，测试可替换为假实现。
+final Provider<ImageSaver> imageSaverProvider = Provider<ImageSaver>(
+  (Ref ref) => ChannelImageSaver(),
+);
 
 /// 阅读器仓库：复用共享 [komgaSessionProvider] 连接池（ARC-09）。
 final Provider<ReaderRepository> readerRepositoryProvider =

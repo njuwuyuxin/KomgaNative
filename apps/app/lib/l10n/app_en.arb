@@ -499,6 +499,10 @@
   "incognitoDisabled": "Incognito off · progress will be saved",
   "sharePage": "Share page",
   "sharePageFailed": "Could not share this page",
+  "savePageImage": "Save image",
+  "savePageImageSuccess": "Image saved",
+  "savePageImagePermissionDenied": "Storage permission denied",
+  "savePageImageFailed": "Could not save this image",
   "groupFromPage": "Group from this page",
   "readerPresetDefaultName": "Preset {number}",
   "@readerPresetDefaultName": {

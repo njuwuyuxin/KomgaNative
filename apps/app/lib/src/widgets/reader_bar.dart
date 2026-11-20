@@ -7,9 +7,8 @@ import 'package:material_ui/material_ui.dart';
 
 /// 顶栏菜单里的一项（RDR-03）。
 ///
-/// 顶栏只留 4 个槽位：返回 / 标题+页码 / AA / ⋯。目录、隐身、页面缩略图、
-/// 阅读设置、分享都收进这个菜单——6 颗图标挤在一条里，每颗的点击区都被压到
-/// 40pt 以下，比"少一次点击"更难受。
+/// 顶栏常驻槽位为：返回 / 标题+页码 / 保存图片 / AA / ⋯。目录、隐身、页面缩略图、
+/// 阅读设置、分享收进这个菜单，保证每颗顶栏按钮都有完整的 48pt 点击区。
 enum ReaderBarAction { toc, incognito, pages, settings, share }
 
 /// 阅读器顶栏。
@@ -29,6 +28,7 @@ class ReaderBar extends StatelessWidget {
     required this.incognito,
     required this.onToggleIncognito,
     this.onOpenToc,
+    this.onSavePage,
     this.onSharePage,
     this.offline = false,
     super.key,
@@ -51,6 +51,9 @@ class ReaderBar extends StatelessWidget {
 
   /// 目录（RDR-02）；系列未知时不出现。
   final VoidCallback? onOpenToc;
+
+  /// 直接保存当前屏图片（单页存单张，双页自动横向拼接后保存）。
+  final VoidCallback? onSavePage;
 
   /// 分享当前页（UI-P3-6）。
   final VoidCallback? onSharePage;
@@ -121,6 +124,14 @@ class ReaderBar extends StatelessWidget {
               ],
             ),
           ),
+          if (onSavePage != null)
+            IconButton(
+              key: const Key('reader-save-image-button'),
+              onPressed: onSavePage,
+              icon: const Icon(Icons.save_alt_outlined),
+              color: palette.foreground,
+              tooltip: l10n.savePageImage,
+            ),
           IconButton(
             key: const Key('reader-quick-settings-button'),
             onPressed: onOpenQuickSettings,

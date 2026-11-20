@@ -27,6 +27,15 @@ void main() {
       reason: 'Android 9+ 默认禁止明文，放开是连接页已提示过的有意取舍',
     );
   });
+
+  test('WRITE_EXTERNAL_STORAGE 严格限制在 API 28 及以下（Android 10+ 免权限存相册）', () {
+    expect(manifest, contains('android.permission.WRITE_EXTERNAL_STORAGE'));
+    expect(
+      manifest,
+      contains('android:maxSdkVersion="28"'),
+      reason: 'Android 10+ 走分区存储 MediaStore，不应向现代系统申请旧版外部存储权限',
+    );
+  });
 }
 
 /// 从当前目录向上找 main manifest：`flutter test` 可能以 `apps/app` 或仓库根为 cwd。

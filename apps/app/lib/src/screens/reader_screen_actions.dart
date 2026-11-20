@@ -1,10 +1,11 @@
 part of 'reader_screen.dart';
 
-/// 阅读器的会话计时、退出进度结算、分享、隐身、双页分组与物理按键命令混入（ARC-12）。
+/// 阅读器的会话计时、退出进度结算、保存/分享、隐身、双页分组与物理按键命令混入（ARC-12）。
 mixin _ReaderActions on ConsumerState<ReaderScreen>, _ReaderDerive {
   /// chrome 里"本次阅读时长"用（HIS-04）。30 秒一跳，只在分钟数变了才 setState。
   Timer? _sessionTicker;
   int _shownSessionMinutes = 0;
+  bool _savingImage = false;
 
   void startSessionTicker() {
     _sessionTicker?.cancel();
@@ -86,6 +87,54 @@ mixin _ReaderActions on ConsumerState<ReaderScreen>, _ReaderDerive {
     return _progress.hasWritten;
   }
 
+  Future<void> _saveScreenImage(ReaderLayout layout, bool rightToLeft) async {
+    if (_savingImage || layout.total <= 0) return;
+    _savingImage = true;
+    try {
+      final orderedPages = resolveSavePages(
+        mode: layout.mode,
+        currentPage: layout.page,
+        spread: layout.spread,
+        rightToLeft: rightToLeft,
+      );
+      final repo = ref.read(readerRepositoryProvider);
+      final prepared = await prepareScreenImageForSave(
+        bookId: widget.bookId,
+        orderedPages: orderedPages,
+        loadPage: (int p) => repo.pageImage(widget.bookId, p),
+      );
+      final result = await ref
+          .read(imageSaverProvider)
+          .saveImage(
+            prepared.bytes,
+            fileName: prepared.fileName,
+            mimeType: prepared.mimeType,
+          );
+      if (!mounted) return;
+      final l10n = AppLocalizations.of(context);
+      switch (result) {
+        case ImageSaveSuccess():
+          unawaited(AppHaptics.selection());
+          _showReaderToast(l10n.savePageImageSuccess);
+        case ImageSaveFailure(kind: ImageSaveFailureKind.permissionDenied):
+          _showReaderToast(l10n.savePageImagePermissionDenied);
+        case ImageSaveFailure(
+          kind: ImageSaveFailureKind.unsupported ||
+              ImageSaveFailureKind.ioError,
+        ):
+          _showReaderToast(l10n.savePageImageFailed);
+      }
+    } on ShelfFailure catch (failure) {
+      _showReaderToast(failure.message);
+    } on FormatException {
+      if (mounted) {
+        _showReaderToast(AppLocalizations.of(context).savePageImageFailed);
+      }
+    } finally {
+      _savingImage = false;
+    }
+  }
+
   Future<void> _sharePage(int page) async {
     final handler = widget.onSharePage;
     if (handler != null) {
@@ -101,18 +150,19 @@ mixin _ReaderActions on ConsumerState<ReaderScreen>, _ReaderDerive {
         fileName: 'komganative-${widget.bookId}-page-$page.png',
       );
     } on ShelfFailure catch (failure) {
-      _showShareError(failure.message);
+      _showReaderToast(failure.message);
     } on PlatformException {
       if (mounted) {
-        _showShareError(AppLocalizations.of(context).sharePageFailed);
+        _showReaderToast(AppLocalizations.of(context).sharePageFailed);
       }
     }
   }
 
-  void _showShareError(String message) {
+  void _showReaderToast(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _toggleIncognito() {

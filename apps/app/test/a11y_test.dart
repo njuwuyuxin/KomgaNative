@@ -136,10 +136,11 @@ void main() {
 
     await pumpReader(tester, book: demoReaderBook());
 
-    // 顶栏收成 4 槽后（RDR-03）：返回 / AA / 更多 是常驻按钮，
+    // 顶栏常驻按钮：返回 / 保存图片 / AA / 更多，
     // 目录/隐身/缩略图/设置/分享在"更多"菜单里。
     for (final (String key, String label) in <(String, String)>[
       ('reader-close-button', 'Close'),
+      ('reader-save-image-button', 'Save image'),
       ('reader-quick-settings-button', 'Quick settings'),
       ('reader-previous-button', 'Previous page'),
       ('reader-next-button', 'Next page'),

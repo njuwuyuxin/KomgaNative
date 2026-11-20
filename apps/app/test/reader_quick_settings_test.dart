@@ -65,10 +65,11 @@ void main() {
     expect(find.byKey(const Key('reader-preset-save')), findsOneWidget);
   });
 
-  testWidgets('顶栏只剩 4 个槽位（旧的 4 颗图标已收进菜单）', (WidgetTester tester) async {
+  testWidgets('顶栏常驻按钮齐全，旧的 4 颗图标已收进菜单', (WidgetTester tester) async {
     await pumpReader(tester, book: demoReaderBook());
 
     expect(find.byKey(const Key('reader-close-button')), findsOneWidget);
+    expect(find.byKey(const Key('reader-save-image-button')), findsOneWidget);
     expect(
       find.byKey(const Key('reader-quick-settings-button')),
       findsOneWidget,

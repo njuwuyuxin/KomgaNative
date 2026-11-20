@@ -1,26 +1,27 @@
 package dev.komganative.komga_native
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import java.util.concurrent.Executors
 
 /**
- * 屏幕常亮 + 音量键翻页 + 申请高刷新率。
+ * 屏幕常亮 + 音量键翻页 + 申请高刷新率 + 保存页图到系统相册。
  *
- * 用 Window flag 而不是第三方插件：需求就是一个 flag，加插件只会多一层原生构建面。
- * 通道名与 `packages/komga_platform/lib/src/wakelock.dart`、
- * `hardware_keys.dart` 对应；`eink` 方法按厂商/型号做一次保守探测（UI-P3-14）。
- *
- * 音量键：ACTION_DOWN 时通过同一通道发给 Dart，并**消费事件**（返回 true），
- * 否则按音量键会调系统音量。只在阅读器激活期间生效（Dart 侧
- * `HardwareKeys.setActive`），退出阅读器后音量键立刻交还系统。
+ * 用 Window flag / 系统 MediaStore 而不是第三方插件：需求收敛明确，不额外引入原生插件依赖。
+ * 通道名与 `packages/komga_platform` 下的抽象一一对应。
  */
 class MainActivity : FlutterActivity() {
     private var deviceChannel: MethodChannel? = null
+    private val ioExecutor = Executors.newSingleThreadExecutor()
+    private var pendingStoragePermissionCallback: ((Boolean) -> Unit)? = null
 
     /** 只有阅读器在前台时才消费音量键（由 Dart 侧 setActive 切换）。 */
     private var volumeKeysEnabled = false
@@ -30,11 +31,14 @@ class MainActivity : FlutterActivity() {
         requestHighestRefreshRate()
     }
 
+    override fun onDestroy() {
+        pendingStoragePermissionCallback = null
+        ioExecutor.shutdown()
+        super.onDestroy()
+    }
+
     /**
      * 主动申请设备支持的最高刷新率。
-     *
-     * 不申请时，不少 ROM（小米/OPPO/一加/vivo 等）会把 Flutter 的 SurfaceView 限制在 60Hz，
-     * 120Hz 屏上滑动明显不如其它应用顺（真机上撞到过：手动在系统设置里给本应用开 120Hz 后立刻顺滑）。
      *
      * 只在**分辨率与当前模式相同**的模式里挑最高刷新率，避免顺带切换分辨率；
      * 墨水屏通常只有一个模式，这里等于什么都不做。最终是否生效由系统决定（省电模式等仍可降频）。
@@ -53,10 +57,8 @@ class MainActivity : FlutterActivity() {
                     it.physicalHeight == current.physicalHeight
             }
             .maxByOrNull { it.refreshRate } ?: return
-        // 即使当前已是最高档也照样声明：不声明的话系统空闲时仍可能把本应用降回 60Hz。
         val params = window.attributes
         params.preferredDisplayModeId = best.modeId
-        // 部分 ROM 只认 preferredRefreshRate，两者一起设。
         params.preferredRefreshRate = best.refreshRate
         window.attributes = params
     }
@@ -72,17 +74,11 @@ class MainActivity : FlutterActivity() {
                     setKeepScreenOn(enabled)
                     result.success(null)
                 }
-                // 握手：Dart 侧在订阅音量键流时调用一次，用来判断平台有没有实现。
-                // 没有这个分支时 invokeMethod 会抛 MissingPluginException，
-                // Dart 侧会降级成空流（这正是 iOS/桌面的期望行为）。
                 "volumeKeys" -> result.success(null)
-                // 阅读器进入/退出时切换：关闭时音量键完全交还系统。
                 "volumeKeysEnabled" -> {
                     volumeKeysEnabled = call.argument<Boolean>("active") ?: false
                     result.success(null)
                 }
-                // 墨水屏探测：只认厂商/品牌/型号里的已知标记，宁可漏判也不误判
-                // （误判会把普通平板的主题切成纯黑白）。
                 "eink" -> {
                     val vendor = detectEinkVendor()
                     result.success(
@@ -92,9 +88,71 @@ class MainActivity : FlutterActivity() {
                         ),
                     )
                 }
+                "saveImage" -> handleSaveImage(call, result)
                 else -> result.notImplemented()
             }
         }
+    }
+
+    private fun handleSaveImage(call: MethodCall, result: MethodChannel.Result) {
+        val bytes = call.argument<ByteArray>("bytes")
+        val fileName = call.argument<String>("fileName") ?: "komganative-page.png"
+        val mimeType = call.argument<String>("mimeType") ?: "image/png"
+        if (bytes == null || bytes.isEmpty()) {
+            result.error("IO_ERROR", "Empty image bytes", null)
+            return
+        }
+        ensureLegacyWritePermissionIfNeeded { granted ->
+            if (!granted) {
+                result.error("PERMISSION_DENIED", "Storage permission denied", null)
+                return@ensureLegacyWritePermissionIfNeeded
+            }
+            val appContext = applicationContext
+            ioExecutor.execute {
+                try {
+                    val location = ImageStoreSaver.save(appContext, bytes, fileName, mimeType)
+                    runOnUiThread { result.success(mapOf("location" to location)) }
+                } catch (error: Exception) {
+                    runOnUiThread {
+                        result.error("IO_ERROR", error.message ?: "Failed to save image", null)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun ensureLegacyWritePermissionIfNeeded(onResult: (Boolean) -> Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            onResult(true)
+            return
+        }
+        val permission = Manifest.permission.WRITE_EXTERNAL_STORAGE
+        if (checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED) {
+            onResult(true)
+            return
+        }
+        if (pendingStoragePermissionCallback != null) {
+            onResult(false)
+            return
+        }
+        pendingStoragePermissionCallback = onResult
+        requestPermissions(arrayOf(permission), REQUEST_WRITE_STORAGE)
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ) {
+        if (requestCode == REQUEST_WRITE_STORAGE) {
+            val callback = pendingStoragePermissionCallback
+            pendingStoragePermissionCallback = null
+            val granted = grantResults.isNotEmpty() &&
+                grantResults[0] == PackageManager.PERMISSION_GRANTED
+            callback?.invoke(granted)
+            return
+        }
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
     }
 
     /**
@@ -128,9 +186,6 @@ class MainActivity : FlutterActivity() {
 
     /**
      * 墨水屏厂商/型号标记。
-     *
-     * 这些标记来自常见墨水屏设备的 Build 字段；不保证覆盖所有设备，
-     * 但误判代价（普通平板被切成黑白）比漏判高，所以只做保守的字符串匹配。
      */
     private fun detectEinkVendor(): String? {
         val identity = listOf(Build.MANUFACTURER, Build.BRAND, Build.MODEL)
@@ -154,5 +209,6 @@ class MainActivity : FlutterActivity() {
 
     companion object {
         private const val CHANNEL = "komganative/device"
+        private const val REQUEST_WRITE_STORAGE = 1042
     }
 }

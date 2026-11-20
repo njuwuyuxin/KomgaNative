@@ -1,4 +1,5 @@
 import Flutter
+import Photos
 import UIKit
 
 @main
@@ -12,5 +13,67 @@ import UIKit
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    let channel = FlutterMethodChannel(
+      name: "komganative/device",
+      binaryMessenger: engineBridge.applicationRegistrar.messenger()
+    )
+    channel.setMethodCallHandler { [weak self] (call: FlutterMethodCall, result: @escaping FlutterResult) in
+      switch call.method {
+      case "saveImage":
+        self?.handleSaveImage(call: call, result: result)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+  }
+
+  private func handleSaveImage(call: FlutterMethodCall, result: @escaping FlutterResult) {
+    guard
+      let args = call.arguments as? [String: Any],
+      let typedBytes = args["bytes"] as? FlutterStandardTypedData,
+      !typedBytes.data.isEmpty
+    else {
+      result(FlutterError(code: "IO_ERROR", message: "Empty image bytes", details: nil))
+      return
+    }
+    let rawName = (args["fileName"] as? String) ?? "komganative-page.png"
+    let cleanName = (rawName as NSString).lastPathComponent
+    let fileName = cleanName.isEmpty ? "komganative-page.png" : cleanName
+    let imageData = typedBytes.data
+
+    PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+      guard status == .authorized || status == .limited else {
+        DispatchQueue.main.async {
+          result(
+            FlutterError(
+              code: "PERMISSION_DENIED",
+              message: "Photo library add permission denied",
+              details: nil
+            )
+          )
+        }
+        return
+      }
+      PHPhotoLibrary.shared().performChanges({
+        let options = PHAssetResourceCreationOptions()
+        options.originalFilename = fileName
+        let request = PHAssetCreationRequest.forAsset()
+        request.addResource(with: .photo, data: imageData, options: options)
+      }) { success, error in
+        DispatchQueue.main.async {
+          if success {
+            result(["location": "Photos"])
+          } else {
+            result(
+              FlutterError(
+                code: "IO_ERROR",
+                message: error?.localizedDescription ?? "Failed to save image",
+                details: nil
+              )
+            )
+          }
+        }
+      }
+    }
   }
 }

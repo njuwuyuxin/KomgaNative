@@ -1009,6 +1009,7 @@ void main() {
           ),
         ),
         wakeLockProvider.overrideWithValue(FakeWakeLock()),
+        imageSaverProvider.overrideWithValue(FakeImageSaver()),
         // 阅读器配色跟着 settings.forceEink 走，与 AppTheme 必须成对换；
         // 只换主题的话基线会画成黑底（踩过一次）。
         if (forceEink) settingsProvider.overrideWith(EinkSettings.new),

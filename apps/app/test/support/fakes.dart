@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:komga_api/komga_api.dart';
 import 'package:komga_domain/komga_domain.dart';
@@ -34,6 +35,40 @@ class FakeHardwareKeys implements HardwareKeys {
   void emit(PageTurnKey key) => _controller.add(key);
 
   Future<void> close() => _controller.close();
+}
+
+/// 记录每次"保存图片"调用的字节、文件名与 MIME，并可按需返回失败结果。
+class SavedImageEntry {
+  const SavedImageEntry({
+    required this.bytes,
+    required this.fileName,
+    required this.mimeType,
+  });
+
+  final Uint8List bytes;
+  final String fileName;
+  final String mimeType;
+}
+
+class FakeImageSaver implements ImageSaver {
+  FakeImageSaver({
+    this.nextResult = const ImageSaveSuccess(location: 'memory'),
+  });
+
+  ImageSaveResult nextResult;
+  final List<SavedImageEntry> saved = <SavedImageEntry>[];
+
+  @override
+  Future<ImageSaveResult> saveImage(
+    Uint8List bytes, {
+    required String fileName,
+    required String mimeType,
+  }) async {
+    saved.add(
+      SavedImageEntry(bytes: bytes, fileName: fileName, mimeType: mimeType),
+    );
+    return nextResult;
+  }
 }
 
 /// 墨水屏档位的设置（默认设置是普通设备）。
