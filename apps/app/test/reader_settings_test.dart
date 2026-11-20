@@ -48,14 +48,20 @@ void main() {
       expect(find.text('1 / 3'), findsOneWidget);
       await tapRight(tester);
       expect(find.text('2–3 / 3'), findsOneWidget);
-      expect(store.prefs!.mode, ReaderModeChoice.double, reason: '设置要记住');
+      expect(
+        store.prefs!.global.mode,
+        ReaderModeChoice.double,
+        reason: '设置要记住',
+      );
     });
 
     testWidgets('已保存的模式在下次打开时生效', (WidgetTester tester) async {
       await pumpReader(
         tester,
         book: demoReaderBook(),
-        initialPrefs: const ReaderPrefs(mode: ReaderModeChoice.double),
+        initialPrefs: const ReaderPrefs(
+          global: ReaderConfig(mode: ReaderModeChoice.double),
+        ),
       );
 
       expect(find.text('1 / 3'), findsOneWidget);
@@ -68,7 +74,9 @@ void main() {
         tester,
         book: demoReaderBook(),
         direction: ReadingDirection.webtoon,
-        initialPrefs: const ReaderPrefs(mode: ReaderModeChoice.single),
+        initialPrefs: const ReaderPrefs(
+          global: ReaderConfig(mode: ReaderModeChoice.single),
+        ),
       );
 
       expect(find.byKey(const Key('reader-vertical-list')), findsNothing);
@@ -102,7 +110,7 @@ void main() {
       await pumpReader(
         tester,
         book: demoReaderBook(),
-        initialPrefs: const ReaderPrefs(brightness: 0.4),
+        initialPrefs: const ReaderPrefs(global: ReaderConfig(brightness: 0.4)),
       );
       expect(find.byKey(const Key('reader-dimmer')), findsOneWidget);
 
@@ -143,7 +151,7 @@ void main() {
       await pumpReader(
         tester,
         book: demoReaderBook(),
-        initialPrefs: const ReaderPrefs(keepAwake: true),
+        initialPrefs: const ReaderPrefs(global: ReaderConfig(keepAwake: true)),
         wakeLock: wakeLock,
       );
 
@@ -172,7 +180,9 @@ void main() {
       await pumpReader(
         tester,
         book: demoReaderBook(),
-        initialPrefs: const ReaderPrefs(mode: ReaderModeChoice.double),
+        initialPrefs: const ReaderPrefs(
+          global: ReaderConfig(mode: ReaderModeChoice.double),
+        ),
       );
 
       await openSettings(tester);

@@ -38,7 +38,7 @@
 | **B0 正确性止血** | `ARC-01` | #2 | 修复 `KomgaLibraryRepository` 漏传排序/筛选、404 空值契约与进度叠加 | P0 | S | — | [x] |
 | **B0 正确性止血** | `ARC-02` | #9, #10 | 修复列表行 `onLongPress` 失效、`build` 静态副作用、裸 `catch (_)` 与分析告警 | P2 | S | — | [x] |
 | **B0 正确性止血** | `ARC-03` | #6 | 修复 `badCertificate` 错误归类与进度 Outbox 404/400 队头永久阻塞 | P1 | S | — | [x] |
-| **B1 模式与数据流** | `ARC-04` | #3 | 抽离 `ReaderConfig` 值对象，根治 `ReaderPrefs` 原型拷贝漂移与系列覆盖失效 | P1 | M | — | [ ] |
+| **B1 模式与数据流** | `ARC-04` | #3 | 抽离 `ReaderConfig` 值对象，根治 `ReaderPrefs` 原型拷贝漂移与系列覆盖失效 | P1 | M | — | [x] |
 | **B1 模式与数据流** | `ARC-05` | #5 | 收敛 UI 层直接 I/O 与存储操作，补齐长按菜单异常捕获与搜索历史响应式同步 | P1 | M | `ARC-01` | [ ] |
 | **B2 存储与多服隔离** | `ARC-06` | #7 | 数据库职责归位：将 `PinnedSeriesRows` 与 `ReadingSessions` 迁回用户库 | P2 | M | — | [ ] |
 | **B2 存储与多服隔离** | `ARC-07` | #1 (前半) | 多服务器数据隔离闭环：进度、下载、队列、历史与阅读偏好补齐 `serverId` | P0 | L | `ARC-04`, `ARC-06` | [ ] |

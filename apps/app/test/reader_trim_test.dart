@@ -18,7 +18,7 @@ void main() {
         pageNames: const <String>['trim_border'],
       ),
       book: demoReaderBook(),
-      initialPrefs: const ReaderPrefs(trimBorders: true),
+      initialPrefs: const ReaderPrefs(global: ReaderConfig(trimBorders: true)),
     );
 
     // 边框检测是真实异步解码，假时钟推不动。
@@ -30,7 +30,7 @@ void main() {
     final container = ProviderScope.containerOf(
       tester.element(find.byType(ReaderPage).first),
     );
-    expect(container.read(readerPrefsProvider).trimBorders, isTrue);
+    expect(container.read(readerPrefsProvider).global.trimBorders, isTrue);
 
     expect(
       tester.widget<ReaderPagedView>(find.byType(ReaderPagedView)).trimBorders,

@@ -113,7 +113,9 @@ void main() {
     await pumpReader(
       tester,
       book: demoReaderBook(),
-      initialPrefs: const ReaderPrefs(fit: ReaderFitChoice.cover),
+      initialPrefs: const ReaderPrefs(
+        global: ReaderConfig(fit: ReaderFitChoice.cover),
+      ),
     );
     final cover = tester.getRect(find.byKey(const Key('reader-image-0')));
 

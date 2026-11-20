@@ -13,15 +13,15 @@ import 'package:komga_reader_engine/komga_reader_engine.dart';
 /// 单独成函数是为了让 `ReaderScreen` 只做编排——它已经贴着 350 行上限。
 ReaderPalette resolveReaderPalette({
   required bool isEink,
-  required ReaderPrefs prefs,
+  required ReaderConfig config,
   required ReaderLayout layout,
   required WidgetRef ref,
   required String bookId,
 }) {
   if (isEink) {
-    return ReaderPalette.resolve(isEink: true, choice: prefs.background);
+    return ReaderPalette.resolve(isEink: true, choice: config.background);
   }
-  if (prefs.background == ReaderBackgroundChoice.immersive) {
+  if (config.background == ReaderBackgroundChoice.immersive) {
     final gradients = <List<RgbColor>>[
       for (final index in layout.spread)
         ref
@@ -45,8 +45,8 @@ ReaderPalette resolveReaderPalette({
       immersive: merged,
     );
   }
-  if (prefs.background != ReaderBackgroundChoice.dynamic) {
-    return ReaderPalette.resolve(isEink: isEink, choice: prefs.background);
+  if (config.background != ReaderBackgroundChoice.dynamic) {
+    return ReaderPalette.resolve(isEink: isEink, choice: config.background);
   }
   final colors = <RgbColor?>[
     for (final index in layout.spread)

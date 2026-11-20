@@ -76,14 +76,17 @@ void main() {
     await tester.tap(mode);
     await tester.pumpAndSettle();
 
-    expect(container.read(readerPrefsProvider).mode, ReaderModeChoice.double);
+    expect(
+      container.read(readerPrefsProvider).global.mode,
+      ReaderModeChoice.double,
+    );
 
     final turn = find.byKey(const Key('settings-page-turn-fade'));
     await reveal(tester, turn);
     await tester.tap(turn);
     await tester.pumpAndSettle();
     expect(
-      container.read(readerPrefsProvider).pageTurn,
+      container.read(readerPrefsProvider).global.pageTurn,
       ReaderPageTurnChoice.fade,
     );
   });
@@ -93,14 +96,14 @@ void main() {
 
     final toggle = find.byKey(const Key('settings-show-session-time'));
     await reveal(tester, toggle);
-    expect(container.read(readerPrefsProvider).showSessionTime, isTrue);
+    expect(container.read(readerPrefsProvider).global.showSessionTime, isTrue);
 
     // 直接点开关本体：整行 ListTile 在滚动后可能被底部导航挡住一半。
     await tester.tap(
       find.descendant(of: toggle, matching: find.byType(Switch)),
     );
     await tester.pumpAndSettle();
-    expect(container.read(readerPrefsProvider).showSessionTime, isFalse);
+    expect(container.read(readerPrefsProvider).global.showSessionTime, isFalse);
   });
   testWidgets('书架默认值切换会同步到书架状态', (WidgetTester tester) async {
     final container = await pumpSettings(tester);

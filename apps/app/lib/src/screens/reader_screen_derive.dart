@@ -59,7 +59,9 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
 
   void _tickSession() {
     if (!mounted) return;
-    if (!ref.read(readerPrefsProvider).showSessionTime) return;
+    if (!_effectiveConfig(ref.read(readerPrefsProvider)).showSessionTime) {
+      return;
+    }
     final minutes = _session.elapsed.inMinutes;
     if (minutes == _shownSessionMinutes) return;
     setState(() => _shownSessionMinutes = minutes);
@@ -69,8 +71,12 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
   ///
   /// 和写进历史的那条会话同一口径（都来自 [ReadingSessionTracker]），
   /// 不会出现"阅读器里显示 12 分、历史里写着 9 分"。
-  String _pageLabelWithSession(String label, AppLocalizations l10n) {
-    if (!ref.watch(readerPrefsProvider).showSessionTime) return label;
+  String _pageLabelWithSession(
+    String label,
+    AppLocalizations l10n, {
+    required bool showSessionTime,
+  }) {
+    if (!showSessionTime) return label;
     if (_shownSessionMinutes <= 0) return label;
     return l10n.readerPageLabelWithSession(label, _shownSessionMinutes);
   }
@@ -139,7 +145,7 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
   void _onVolumeKey(PageTurnKey key) {
     final pages = ref.read(readerPagesProvider(widget.bookId)).value;
     if (pages == null || pages.isEmpty) return;
-    final mode = _modeFor(_effectivePrefs(ref.read(readerPrefsProvider)));
+    final mode = _modeFor(ref.read(readerPrefsProvider));
     _requestTurn(key == PageTurnKey.next ? 1 : -1, mode);
   }
 
@@ -149,7 +155,8 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
           ?.seriesId;
 
   /// 系列覆盖优先，其余用全局。
-  ReaderPrefs _effectivePrefs(ReaderPrefs prefs) => prefs.forSeries(_seriesId);
+  ReaderConfig _effectiveConfig(ReaderPrefs prefs) =>
+      prefs.forSeries(_seriesId);
 
   /// 外部翻页（底栏箭头 / 音量键）统一入口：交给绘制层播动画，动画结束后
   /// 它再回调 `onTurn` 真正换页；绘制层还没建好时（页数据未到）什么也不做。
@@ -177,7 +184,7 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
 
   ReadingMode _modeFor(ReaderPrefs prefs, {bool? landscape}) =>
       resolveReaderMode(
-        mode: prefs.mode,
+        mode: _effectiveConfig(prefs).mode,
         tabletLayout: prefs.tabletLayout,
         direction: _direction,
         landscape: landscape ?? _landscape,
@@ -205,7 +212,7 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
     if (pages == null || pages.isEmpty) return null;
     return ReaderLayout(
       pages: pages,
-      mode: _modeFor(_effectivePrefs(ref.read(readerPrefsProvider))),
+      mode: _modeFor(ref.read(readerPrefsProvider)),
       page: _resolvePage(pages.length),
       groupFrom: _spreadFrom,
     );
@@ -358,9 +365,10 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
     final pages = ref.read(readerPagesProvider(widget.bookId)).value;
     if (pages == null || pages.isEmpty) return KeyEventResult.ignored;
-    final prefs = _effectivePrefs(ref.read(readerPrefsProvider));
-    final mode = _modeFor(prefs);
-    final rightToLeft = prefs.direction.resolveRightToLeft(_direction);
+    final allPrefs = ref.read(readerPrefsProvider);
+    final config = _effectiveConfig(allPrefs);
+    final mode = _modeFor(allPrefs);
+    final rightToLeft = config.direction.resolveRightToLeft(_direction);
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.arrowRight) {
       _requestTurn(rightToLeft ? -1 : 1, mode);

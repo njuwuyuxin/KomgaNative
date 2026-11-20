@@ -23,6 +23,7 @@ class SettingsReadingSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final prefs = ref.watch(readerPrefsProvider);
+    final config = prefs.global;
     final controller = ref.read(readerPrefsProvider.notifier);
 
     return AppListGroup(
@@ -41,7 +42,7 @@ class SettingsReadingSection extends ConsumerWidget {
                   ChoiceChip(
                     key: Key('settings-reading-mode-${mode.name}'),
                     label: Text(_modeLabel(l10n, mode)),
-                    selected: prefs.mode == mode,
+                    selected: config.mode == mode,
                     onSelected: (bool selected) {
                       if (selected) controller.setMode(mode);
                     },
@@ -63,7 +64,7 @@ class SettingsReadingSection extends ConsumerWidget {
                   ChoiceChip(
                     key: Key('settings-page-turn-${choice.name}'),
                     label: Text(_turnLabel(l10n, choice)),
-                    selected: prefs.pageTurn == choice,
+                    selected: config.pageTurn == choice,
                     onSelected: (bool selected) {
                       if (selected) controller.setPageTurn(choice);
                     },
@@ -120,7 +121,7 @@ class SettingsReadingSection extends ConsumerWidget {
                       ChoiceChip(
                         key: Key('settings-tap-zone-${preset.name}'),
                         label: Text(_tapZoneLabel(l10n, preset)),
-                        selected: prefs.tapZone == preset,
+                        selected: config.tapZone == preset,
                         onSelected: (bool selected) {
                           if (selected) controller.setTapZone(preset);
                         },
@@ -143,11 +144,11 @@ class SettingsReadingSection extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Slider(
-                value: prefs.autoScrollSpeed.toDouble(),
+                value: config.autoScrollSpeed.toDouble(),
                 min: 1,
                 max: 10,
                 divisions: 9,
-                label: '${prefs.autoScrollSpeed}',
+                label: '${config.autoScrollSpeed}',
                 onChanged: (double value) =>
                     controller.setAutoScrollSpeed(value.round()),
               ),
@@ -160,19 +161,19 @@ class SettingsReadingSection extends ConsumerWidget {
         ),
         SwitchListTile(
           key: const Key('settings-invert-tap-zones'),
-          value: prefs.invertTapZones,
+          value: config.invertTapZones,
           title: Text(l10n.settingsInvertTapZones),
           onChanged: controller.setInvertTapZones,
         ),
         SwitchListTile(
           key: const Key('settings-double-tap-zoom'),
-          value: prefs.doubleTapZoom,
+          value: config.doubleTapZoom,
           title: Text(l10n.settingsDoubleTapZoom),
           onChanged: controller.setDoubleTapZoom,
         ),
         SwitchListTile(
           key: const Key('settings-show-session-time'),
-          value: prefs.showSessionTime,
+          value: config.showSessionTime,
           title: Text(l10n.settingsShowSessionTime),
           subtitle: Text(l10n.settingsShowSessionTimeHint),
           onChanged: controller.setShowSessionTime,

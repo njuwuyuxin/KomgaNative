@@ -25,15 +25,17 @@ void main() {
 
   /// 每个字段都不是默认值。
   const allChanged = ReaderPrefs(
-    mode: ReaderModeChoice.double,
-    brightness: 0.5,
-    keepAwake: true,
-    fit: ReaderFitChoice.cover,
-    direction: ReaderDirectionChoice.rightToLeft,
-    background: ReaderBackgroundChoice.white,
-    lockZoom: true,
-    trimBorders: true,
-    pageTurn: ReaderPageTurnChoice.fade,
+    global: ReaderConfig(
+      mode: ReaderModeChoice.double,
+      brightness: 0.5,
+      keepAwake: true,
+      fit: ReaderFitChoice.cover,
+      direction: ReaderDirectionChoice.rightToLeft,
+      background: ReaderBackgroundChoice.white,
+      lockZoom: true,
+      trimBorders: true,
+      pageTurn: ReaderPageTurnChoice.fade,
+    ),
   );
 
   test('「页面」组只重置模式，其它组不动', () async {
@@ -42,7 +44,7 @@ void main() {
         .read(readerPrefsProvider.notifier)
         .resetGroup(ReaderSettingsGroup.pages);
 
-    final prefs = container.read(readerPrefsProvider);
+    final prefs = container.read(readerPrefsProvider).global;
     expect(prefs.mode, ReaderModeChoice.auto);
     expect(prefs.fit, ReaderFitChoice.cover);
     expect(prefs.direction, ReaderDirectionChoice.rightToLeft);
@@ -59,7 +61,7 @@ void main() {
         .read(readerPrefsProvider.notifier)
         .resetGroup(ReaderSettingsGroup.layout);
 
-    final prefs = container.read(readerPrefsProvider);
+    final prefs = container.read(readerPrefsProvider).global;
     expect(prefs.fit, ReaderFitChoice.contain);
     expect(prefs.direction, ReaderDirectionChoice.auto);
     expect(prefs.trimBorders, isFalse);
@@ -76,7 +78,7 @@ void main() {
         .read(readerPrefsProvider.notifier)
         .resetGroup(ReaderSettingsGroup.color);
 
-    final prefs = container.read(readerPrefsProvider);
+    final prefs = container.read(readerPrefsProvider).global;
     expect(prefs.background, ReaderBackgroundChoice.black);
     expect(prefs.brightness, 1);
     expect(prefs.mode, ReaderModeChoice.double);
@@ -89,7 +91,7 @@ void main() {
         .read(readerPrefsProvider.notifier)
         .resetGroup(ReaderSettingsGroup.interaction);
 
-    final prefs = container.read(readerPrefsProvider);
+    final prefs = container.read(readerPrefsProvider).global;
     expect(prefs.lockZoom, isFalse);
     expect(prefs.keepAwake, isFalse);
     expect(prefs.pageTurn, ReaderPageTurnChoice.curl);
@@ -104,13 +106,13 @@ void main() {
     // 全改了：四组都不是默认。
     for (final group in ReaderSettingsGroup.values) {
       expect(
-        container.read(readerPrefsProvider).isGroupDefault(group),
+        container.read(readerPrefsProvider).global.isGroupDefault(group),
         isFalse,
         reason: '$group 应该是"已改过"',
       );
       controller.resetGroup(group);
       expect(
-        container.read(readerPrefsProvider).isGroupDefault(group),
+        container.read(readerPrefsProvider).global.isGroupDefault(group),
         isTrue,
         reason: '$group 重置后应该算默认',
       );
@@ -128,6 +130,6 @@ void main() {
     final prefs = container.read(readerPrefsProvider);
     expect(prefs.forSeries('s1').fit, ReaderFitChoice.contain);
     // 全局的 fit 仍是原来那个。
-    expect(prefs.fit, ReaderFitChoice.cover);
+    expect(prefs.global.fit, ReaderFitChoice.cover);
   });
 }

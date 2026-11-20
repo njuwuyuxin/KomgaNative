@@ -18,8 +18,8 @@ P3-2 要"按系列记住阅读设置"：同一个系列（例如日漫）用自�
 ## 决定
 
 **存现有 secure storage JSON 的 `seriesOverrides` 字段**：
-`seriesId → 纯配置`。读取走 `ReaderPrefs.forSeries(seriesId)`；
-打开"按系列记住"时把当前生效值快照进这个 map，关闭时删掉该 key。
+`seriesId → ReaderConfig`（独立纯配置值对象，见 `reader_config.dart`）。读取走 `ReaderPrefs.forSeries(seriesId)`（直接返回 `seriesOverrides[seriesId] ?? global`）；
+打开"按系列记住"时把当前生效 `ReaderConfig` 快照进这个 map，关闭时删掉该 key。
 
 不新增 Drift 表，也不新增依赖。
 
@@ -30,8 +30,7 @@ P3-2 要"按系列记住阅读设置"：同一个系列（例如日漫）用自�
 - **已有存储与迁移路径**：`ReaderPrefs.fromJson` 本来就逐字段容错；旧存档没有
   `seriesOverrides` 时按空 map 处理，不需要版本号迁移。
 - **原子性足够**：设置改动是低频用户操作，整份 JSON 重写一次（几 KB）比开事务便宜。
-- **没有递归**：写入前统一 `configOnly()`，值里不带 presets/overrides；
-  `ReaderPreset` 也用同一个 `configOnly()`。
+- **无递归与拷贝漂移**：`ReaderConfig` 只含纯阅读配置参数，`ReaderPreset` 与 `seriesOverrides` 直接持有 `ReaderConfig`，无需 `configOnly()` / `withConfig()` 原型裁剪。
 
 ## 代价
 

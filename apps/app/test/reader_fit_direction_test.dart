@@ -21,7 +21,7 @@ void main() {
       final store = await pumpReader(tester, book: demoReaderBook());
       await pickOption(tester, 'reader-fit-cover');
 
-      expect(store.prefs!.fit, ReaderFitChoice.cover);
+      expect(store.prefs!.global.fit, ReaderFitChoice.cover);
       // 800×1200 的页在 390×844 里填满 → 高度铺满（844），宽度溢出到 562。
       final page = tester.getRect(find.byKey(const Key('reader-image-0')));
       expect(page.width, greaterThan(390));
@@ -64,7 +64,9 @@ void main() {
       await pumpReader(
         tester,
         book: demoReaderBook(),
-        initialPrefs: const ReaderPrefs(fit: ReaderFitChoice.cover),
+        initialPrefs: const ReaderPrefs(
+          global: ReaderConfig(fit: ReaderFitChoice.cover),
+        ),
       );
 
       final page = tester.getRect(find.byKey(const Key('reader-image-0')));
@@ -76,8 +78,10 @@ void main() {
         tester,
         book: demoReaderBook(),
         initialPrefs: const ReaderPrefs(
-          mode: ReaderModeChoice.double,
-          fit: ReaderFitChoice.cover,
+          global: ReaderConfig(
+            mode: ReaderModeChoice.double,
+            fit: ReaderFitChoice.cover,
+          ),
         ),
       );
       await tapRight(tester);
@@ -99,7 +103,7 @@ void main() {
     testWidgets('手动选"从右到左"：LTR 的书也变成点左侧翻页', (WidgetTester tester) async {
       final store = await pumpReader(tester, book: demoReaderBook());
       await pickOption(tester, 'reader-direction-rightToLeft');
-      expect(store.prefs!.direction, ReaderDirectionChoice.rightToLeft);
+      expect(store.prefs!.global.direction, ReaderDirectionChoice.rightToLeft);
 
       await tapLeft(tester);
       expect(find.text('2 / 3'), findsOneWidget);

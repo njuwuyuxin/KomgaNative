@@ -97,19 +97,21 @@ void main() {
   group('点击区偏好持久化（RDR-07）', () {
     test('默认值与往返', () {
       const defaults = ReaderPrefs();
-      expect(defaults.tapZone, TapZonePreset.automatic);
-      expect(defaults.invertTapZones, isFalse);
-      expect(defaults.doubleTapZoom, isTrue);
+      expect(defaults.global.tapZone, TapZonePreset.automatic);
+      expect(defaults.global.invertTapZones, isFalse);
+      expect(defaults.global.doubleTapZoom, isTrue);
 
       final saved = defaults.copyWith(
-        tapZone: TapZonePreset.kindle,
-        invertTapZones: true,
-        doubleTapZoom: false,
+        global: defaults.global.copyWith(
+          tapZone: TapZonePreset.kindle,
+          invertTapZones: true,
+          doubleTapZoom: false,
+        ),
       );
       final restored = ReaderPrefs.fromJson(saved.toJson());
-      expect(restored.tapZone, TapZonePreset.kindle);
-      expect(restored.invertTapZones, isTrue);
-      expect(restored.doubleTapZoom, isFalse);
+      expect(restored.global.tapZone, TapZonePreset.kindle);
+      expect(restored.global.invertTapZones, isTrue);
+      expect(restored.global.doubleTapZoom, isFalse);
       expect(restored, saved);
     });
 
@@ -117,29 +119,33 @@ void main() {
       final restored = ReaderPrefs.fromJson(<String, Object?>{
         'tapZone': 'diagonal',
       });
-      expect(restored.tapZone, TapZonePreset.automatic);
+      expect(restored.global.tapZone, TapZonePreset.automatic);
     });
   });
 
   group('自动滚动速度持久化（RDR-08）', () {
     test('默认 5，往返保留，越界夹回 1–10', () {
       const defaults = ReaderPrefs();
-      expect(defaults.autoScrollSpeed, 5);
+      expect(defaults.global.autoScrollSpeed, 5);
 
-      final saved = defaults.copyWith(autoScrollSpeed: 9);
+      final saved = defaults.copyWith(
+        global: defaults.global.copyWith(autoScrollSpeed: 9),
+      );
       expect(saved.toJson()['autoScrollSpeed'], 9);
-      expect(ReaderPrefs.fromJson(saved.toJson()).autoScrollSpeed, 9);
+      expect(ReaderPrefs.fromJson(saved.toJson()).global.autoScrollSpeed, 9);
 
-      expect(defaults.copyWith(autoScrollSpeed: 0).autoScrollSpeed, 1);
-      expect(defaults.copyWith(autoScrollSpeed: 99).autoScrollSpeed, 10);
+      expect(defaults.global.copyWith(autoScrollSpeed: 0).autoScrollSpeed, 1);
+      expect(defaults.global.copyWith(autoScrollSpeed: 99).autoScrollSpeed, 10);
       // 存档被改坏也夹回来。
       expect(
         ReaderPrefs.fromJson(<String, Object?>{'autoScrollSpeed': 42})
+            .global
             .autoScrollSpeed,
         10,
       );
       expect(
         ReaderPrefs.fromJson(<String, Object?>{'autoScrollSpeed': 'fast'})
+            .global
             .autoScrollSpeed,
         5,
       );

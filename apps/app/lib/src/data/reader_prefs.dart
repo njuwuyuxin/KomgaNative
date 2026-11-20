@@ -1,126 +1,26 @@
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_reader_engine/komga_reader_engine.dart';
+import 'package:komga_native/src/data/reader_config.dart';
 
-/// 用户在阅读设置里选的模式。
-///
-/// 多一个 `auto` 是必要的：系列元数据能表达"条漫/竖向"，但表达不了"双页"。
-/// `auto` 让"没选过"的用户跟随服务端元数据，选过的用户才有稳定的个人偏好。
-enum ReaderModeChoice { auto, single, double, vertical }
-
-extension ReaderModeChoiceX on ReaderModeChoice {
-  /// 解析成引擎的阅读模式。
-  ///
-  /// `auto` 在竖屏跟随系列方向（条漫/竖向 → 纵向，其余单页）；
-  /// **横屏时普通漫画自动双页**（Panels 的 Standard 预设行为，UI-P3-3）。
-  /// 用户显式选过单页/双页/纵向则不受横竖屏影响。
-  ReadingMode resolve(ReadingDirection direction, {bool landscape = false}) =>
-      switch (this) {
-        ReaderModeChoice.auto =>
-          direction.isScroll
-              ? ReadingMode.verticalScroll
-              : (landscape ? ReadingMode.doublePage : ReadingMode.paged),
-        ReaderModeChoice.single => ReadingMode.paged,
-        ReaderModeChoice.double => ReadingMode.doublePage,
-        ReaderModeChoice.vertical => ReadingMode.verticalScroll,
-      };
-}
-
-/// 平板上的默认排版（PLT-02）。
-///
-/// `auto` = 横屏双页、竖屏单页（也就是现有行为）；`single`/`double` 强制一种。
-/// **只在平板上生效**：手机上保持"跟随书籍方向 + 横屏自动双页"的老规矩，
-/// 否则用户在设置里选过双页，回到手机就再也看不到单页了。
-enum TabletLayoutChoice { auto, single, double }
-
-/// 解析本次阅读真正用的模式（纯函数，单测直接钉住）。
-///
-/// 优先级（从高到低）：
-/// 1. 用户显式选过阅读模式（单页/双页/纵向）——不管在哪、横竖屏都不改；
-/// 2. 平板默认排版（`tabletLayout != auto`）；
-/// 3. `auto`：跟随方向，横屏双页。
-ReadingMode resolveReaderMode({
-  required ReaderModeChoice mode,
-  required TabletLayoutChoice tabletLayout,
-  required ReadingDirection direction,
-  required bool landscape,
-  required bool tablet,
-}) {
-  if (mode != ReaderModeChoice.auto) {
-    return mode.resolve(direction, landscape: landscape);
-  }
-  if (tablet && tabletLayout != TabletLayoutChoice.auto) {
-    return tabletLayout == TabletLayoutChoice.double
-        ? ReadingMode.doublePage
-        : ReadingMode.paged;
-  }
-  return mode.resolve(direction, landscape: landscape);
-}
-
-/// 适配方式（UI-P1-3）。
-///
-/// 直接对应引擎的 `FitMode`：`cover`（填满屏幕）会在溢出的方向允许平移，
-/// 双页模式一律按 `contain`（一跨页两页并排，任何"铺满"都会把另一页裁掉）。
-enum ReaderFitChoice { contain, cover, fitWidth, fitHeight }
-
-extension ReaderFitChoiceX on ReaderFitChoice {
-  FitMode get fit => switch (this) {
-    ReaderFitChoice.contain => FitMode.contain,
-    ReaderFitChoice.cover => FitMode.cover,
-    ReaderFitChoice.fitWidth => FitMode.fitWidth,
-    ReaderFitChoice.fitHeight => FitMode.fitHeight,
-  };
-}
-
-/// 阅读方向（UI-P1-4）。
-///
-/// `auto` 跟随系列元数据；另两项给"元数据没填 / 填错"的书兜底。
-enum ReaderDirectionChoice { auto, leftToRight, rightToLeft }
-
-extension ReaderDirectionChoiceX on ReaderDirectionChoice {
-  /// 解析成"是否右到左"。系列方向未知（`unknown`）时按从左到右。
-  bool resolveRightToLeft(ReadingDirection series) => switch (this) {
-    ReaderDirectionChoice.auto => series.isRightToLeft,
-    ReaderDirectionChoice.leftToRight => false,
-    ReaderDirectionChoice.rightToLeft => true,
-  };
-}
-
-/// 阅读区背景（UI-P1-5）。
-///
-/// `dynamic` 从当前页边缘提色，双页取两页的平均；墨水屏不提供这一项（固定白底）。
-enum ReaderBackgroundChoice { black, white, dynamic, immersive }
-
-/// 翻页动画（RDR-05）。
-///
-/// 四个档位对应"最真 → 最省"：卷页（着色器）→ 平移 → 淡入 → 瞬切。
-/// 墨水屏与系统"减少动态效果"一律按瞬切处理，不看这个设置。
-enum ReaderPageTurnChoice { curl, slide, fade, none }
-
-/// 阅读设置的分组（RDR-04）。
-///
-/// 完整面板按这四组排，并且**每组可以单独重置**：用户调坏了"颜色"，
-/// 不该把"布局"一起打回默认。
-enum ReaderSettingsGroup { pages, layout, color, interaction }
+export 'package:komga_native/src/data/reader_config.dart';
 
 /// 一组命名的阅读设置（UI-P3-1）。
 ///
-/// 预设是一个**快照**：保存时的模式/适配/方向/背景/亮度/常亮，之后应用就整体覆盖。
-/// `prefs` 本身不再带预设（避免递归），见 [ReaderPreset.fromJson]。
+/// 预设直接持有不可变 [ReaderConfig] 快照，天然不含预设列表与系列覆盖。
 class ReaderPreset {
   const ReaderPreset({
     required this.id,
     required this.name,
-    required this.prefs,
+    required this.config,
   });
 
   final String id;
   final String name;
-  final ReaderPrefs prefs;
+  final ReaderConfig config;
 
   Map<String, Object?> toJson() => <String, Object?>{
     'id': id,
     'name': name,
-    'prefs': prefs.toJson(includePresets: false),
+    // 保持字段名为 'prefs' 以兼容既有本地存档与备份导出。
+    'prefs': config.toJson(),
   };
 
   /// 坏条目返回 null（旧存档/手工改坏），调用方直接跳过，不让整份偏好失效。
@@ -128,14 +28,13 @@ class ReaderPreset {
     if (raw is! Map) return null;
     final id = raw['id'];
     final name = raw['name'];
-    final config = raw['prefs'];
+    final rawConfig = raw['prefs'] ?? raw['config'];
     if (id is! String || id.isEmpty || name is! String || name.trim().isEmpty) {
       return null;
     }
-    if (config is! Map) return null;
-    final prefs = ReaderPrefs.fromJson(Map<String, Object?>.from(config))
-        .configOnly();
-    return ReaderPreset(id: id, name: name.trim(), prefs: prefs);
+    if (rawConfig is! Map) return null;
+    final config = ReaderConfig.fromJson(Map<String, Object?>.from(rawConfig));
+    return ReaderPreset(id: id, name: name.trim(), config: config);
   }
 
   @override
@@ -143,185 +42,48 @@ class ReaderPreset {
       other is ReaderPreset &&
       other.id == id &&
       other.name == name &&
-      other.prefs == prefs;
+      other.config == config;
 
   @override
-  int get hashCode => Object.hash(id, name, prefs);
+  int get hashCode => Object.hash(id, name, config);
 
   @override
   String toString() => 'ReaderPreset($id, $name)';
 }
 
-/// 阅读器偏好（全局，不分书）。
+/// 阅读器偏好顶层聚合容器（ARC-04）。
 ///
-/// 为什么不分书：漫画是"一次读很多卷"的场景，每本都要重设模式反而烦；
-/// 而"条漫 vs 单行本"的差异已经由系列元数据 + [ReaderModeChoice.auto] 兜住了。
+/// 由全局 [ReaderConfig]、平板默认排版 [tabletLayout]、按书双页分组 [spreadFrom]、
+/// 命名预设列表 [presets] 与按系列覆盖 [seriesOverrides] 组成。
 class ReaderPrefs {
   const ReaderPrefs({
-    this.mode = ReaderModeChoice.auto,
-    this.brightness = 1,
-    this.keepAwake = false,
-    this.fit = ReaderFitChoice.contain,
-    this.direction = ReaderDirectionChoice.auto,
-    this.background = ReaderBackgroundChoice.black,
-    this.lockZoom = false,
-    this.trimBorders = false,
-    this.pageTurn = ReaderPageTurnChoice.curl,
-    this.spreadFrom = const <String, int>{},
-    this.showSessionTime = true,
+    this.global = const ReaderConfig(),
     this.tabletLayout = TabletLayoutChoice.auto,
-    this.tapZone = TapZonePreset.automatic,
-    this.invertTapZones = false,
-    this.doubleTapZoom = true,
-    this.autoScrollSpeed = 5,
+    this.spreadFrom = const <String, int>{},
     this.presets = const <ReaderPreset>[],
-    this.seriesOverrides = const <String, ReaderPrefs>{},
+    this.seriesOverrides = const <String, ReaderConfig>{},
   });
 
-  /// 亮度下限：再暗也要能看见字，所以不允许 0。
-  static const double minBrightness = 0.2;
+  static const double minBrightness = ReaderConfig.minBrightness;
 
-  final ReaderModeChoice mode;
+  /// 全局默认阅读配置。
+  final ReaderConfig global;
 
-  /// 1 = 不遮罩；小于 1 时在阅读区上盖一层半透明黑。
-  final double brightness;
-
-  final bool keepAwake;
-
-  final ReaderFitChoice fit;
-  final ReaderDirectionChoice direction;
-  final ReaderBackgroundChoice background;
-
-  /// 翻页后保持缩放比例（UI-P3-4）。
-  final bool lockZoom;
-
-  /// 自动裁掉页图四周的纯色白边/黑边（UI-P3-10）。
-  final bool trimBorders;
-
-  /// 翻页动画（RDR-05）。
-  final ReaderPageTurnChoice pageTurn;
-
-  /// 双页模式的手动分组起点（RDR-06）：bookId → 0 基页码。
-  ///
-  /// 按**书**记：同一系列的不同卷可能排版不同；换书不会串。
-  /// 不进预设/系列覆盖（[configOnly] 会丢掉它）——它是"这本书的排版修正"，
-  /// 不是一套可复用的阅读风格。
-  final Map<String, int> spreadFrom;
-
-  /// 阅读器 chrome 是否显示本次阅读时长（HIS-04）。
-  final bool showSessionTime;
-
-  /// 平板上的默认排版（PLT-02）：只在平板上生效，手机不受影响。
+  /// 平板上的默认排版（PLT-02）：全局设备级设置，不进系列覆盖。
   final TabletLayoutChoice tabletLayout;
 
-  /// 点击区预设（RDR-07）。
-  final TapZonePreset tapZone;
-
-  /// 交换前后页（RDR-07）：只翻转页方向，不挪动 chrome 区。
-  final bool invertTapZones;
-
-  /// 双击放大（RDR-07）：关掉后中间区单击不再等双击窗口。
-  final bool doubleTapZoom;
-
-  /// 自动滚动速度档位 1–10（RDR-08），只在纵向模式生效。
-  final int autoScrollSpeed;
+  /// 双页模式的手动分组起点（RDR-06）：bookId → 0 基页码。
+  final Map<String, int> spreadFrom;
 
   /// 用户保存的阅读预设（UI-P3-1）；按保存顺序排列。
   final List<ReaderPreset> presets;
 
-  /// 按系列覆盖的阅读设置（UI-P3-2）：seriesId → 纯配置。
-  ///
-  /// 值里不能带预设/覆盖（用 [configOnly] 生成），否则 JSON 会递归。
-  final Map<String, ReaderPrefs> seriesOverrides;
+  /// 按系列覆盖的阅读配置（UI-P3-2）：seriesId → [ReaderConfig]。
+  final Map<String, ReaderConfig> seriesOverrides;
 
-  /// 把某一组设置恢复默认（RDR-04），其它组原样保留。
-  ReaderPrefs resetGroup(ReaderSettingsGroup group) => switch (group) {
-    ReaderSettingsGroup.pages => copyWith(mode: ReaderModeChoice.auto),
-    ReaderSettingsGroup.layout => copyWith(
-      fit: ReaderFitChoice.contain,
-      direction: ReaderDirectionChoice.auto,
-      trimBorders: false,
-    ),
-    ReaderSettingsGroup.color => copyWith(
-      background: ReaderBackgroundChoice.black,
-      brightness: 1,
-    ),
-    ReaderSettingsGroup.interaction => copyWith(
-      lockZoom: false,
-      keepAwake: false,
-      pageTurn: ReaderPageTurnChoice.curl,
-    ),
-  };
-
-  /// 这一组是不是已经是默认值（决定"重置"按钮要不要亮）。
-  bool isGroupDefault(ReaderSettingsGroup group) => switch (group) {
-    ReaderSettingsGroup.pages => mode == ReaderModeChoice.auto,
-    ReaderSettingsGroup.layout =>
-      fit == ReaderFitChoice.contain &&
-          direction == ReaderDirectionChoice.auto &&
-          !trimBorders,
-    ReaderSettingsGroup.color =>
-      background == ReaderBackgroundChoice.black && brightness == 1,
-    ReaderSettingsGroup.interaction =>
-      !lockZoom && !keepAwake && pageTurn == ReaderPageTurnChoice.curl,
-  };
-
-  /// 去掉预设与系列覆盖后的"纯配置"（保存预设/系列覆盖时用）。
-  ReaderPrefs configOnly() => ReaderPrefs(
-    mode: mode,
-    brightness: brightness,
-    keepAwake: keepAwake,
-    fit: fit,
-    direction: direction,
-    background: background,
-    lockZoom: lockZoom,
-    trimBorders: trimBorders,
-    pageTurn: pageTurn,
-  );
-
-  /// 某个系列实际生效的设置：有覆盖就用覆盖，否则用全局。
-  ///
-  /// 返回的对象仍带全局预设列表，方便设置面板继续读；系列覆盖本身不嵌套。
-  ReaderPrefs forSeries(String? seriesId) {
-    if (seriesId == null) return this;
-    final override = seriesOverrides[seriesId];
-    if (override == null) return this;
-    return ReaderPrefs(
-      mode: override.mode,
-      brightness: override.brightness,
-      keepAwake: override.keepAwake,
-      fit: override.fit,
-      direction: override.direction,
-      background: override.background,
-      lockZoom: override.lockZoom,
-      trimBorders: override.trimBorders,
-      pageTurn: override.pageTurn,
-      spreadFrom: spreadFrom,
-      showSessionTime: showSessionTime,
-      tabletLayout: tabletLayout,
-      tapZone: tapZone,
-      invertTapZones: invertTapZones,
-      doubleTapZoom: doubleTapZoom,
-      autoScrollSpeed: autoScrollSpeed,
-      presets: presets,
-      seriesOverrides: seriesOverrides,
-    );
-  }
-
-  /// 用 [config] 的**纯配置**覆盖本对象，预设列表与系列覆盖保持不变。
-  ///
-  /// "应用预设"和"应用系列覆盖"都走这里：字段清单只写一遍，
-  /// 以后新增一个配置项就不可能只改到其中一条路径（FIX-04 曾漏掉锁定缩放/去白边）。
-  ReaderPrefs withConfig(ReaderPrefs config) => copyWith(
-    mode: config.mode,
-    brightness: config.brightness,
-    keepAwake: config.keepAwake,
-    fit: config.fit,
-    direction: config.direction,
-    background: config.background,
-    lockZoom: config.lockZoom,
-    trimBorders: config.trimBorders,
-  );
+  /// 某个系列实际生效的配置：有系列覆盖则直接返回该覆盖，否则返回 [global]。
+  ReaderConfig forSeries(String? seriesId) =>
+      seriesId == null ? global : (seriesOverrides[seriesId] ?? global);
 
   /// 记住/清除某本书的双页分组起点（RDR-06）。[index] 为 null 表示恢复自动。
   ReaderPrefs withSpreadFrom(String bookId, int? index) {
@@ -335,93 +97,46 @@ class ReaderPrefs {
   }
 
   /// 写入/删除某个系列的覆盖。传入 null 表示删除。
-  ReaderPrefs withSeriesOverride(String seriesId, ReaderPrefs? config) {
-    final next = Map<String, ReaderPrefs>.from(seriesOverrides);
+  ReaderPrefs withSeriesOverride(String seriesId, ReaderConfig? config) {
+    final next = Map<String, ReaderConfig>.from(seriesOverrides);
     if (config == null) {
       next.remove(seriesId);
     } else {
-      next[seriesId] = config.configOnly();
+      next[seriesId] = config;
     }
     return copyWith(seriesOverrides: next);
   }
 
-  /// 遮罩的不透明度（亮度越低盖得越黑）。
-  double get dimOpacity => (1 - brightness).clamp(0.0, 1 - minBrightness);
-
   ReaderPrefs copyWith({
-    ReaderModeChoice? mode,
-    double? brightness,
-    bool? keepAwake,
-    ReaderFitChoice? fit,
-    ReaderDirectionChoice? direction,
-    ReaderBackgroundChoice? background,
-    bool? lockZoom,
-    bool? trimBorders,
-    ReaderPageTurnChoice? pageTurn,
-    Map<String, int>? spreadFrom,
-    bool? showSessionTime,
+    ReaderConfig? global,
     TabletLayoutChoice? tabletLayout,
-    TapZonePreset? tapZone,
-    bool? invertTapZones,
-    bool? doubleTapZoom,
-    int? autoScrollSpeed,
+    Map<String, int>? spreadFrom,
     List<ReaderPreset>? presets,
-    Map<String, ReaderPrefs>? seriesOverrides,
+    Map<String, ReaderConfig>? seriesOverrides,
   }) => ReaderPrefs(
-    mode: mode ?? this.mode,
-    brightness: brightness ?? this.brightness,
-    keepAwake: keepAwake ?? this.keepAwake,
-    fit: fit ?? this.fit,
-    direction: direction ?? this.direction,
-    background: background ?? this.background,
-    lockZoom: lockZoom ?? this.lockZoom,
-    trimBorders: trimBorders ?? this.trimBorders,
-    pageTurn: pageTurn ?? this.pageTurn,
-    spreadFrom: spreadFrom ?? this.spreadFrom,
-    showSessionTime: showSessionTime ?? this.showSessionTime,
+    global: global ?? this.global,
     tabletLayout: tabletLayout ?? this.tabletLayout,
-    tapZone: tapZone ?? this.tapZone,
-    invertTapZones: invertTapZones ?? this.invertTapZones,
-    doubleTapZoom: doubleTapZoom ?? this.doubleTapZoom,
-    autoScrollSpeed: (autoScrollSpeed ?? this.autoScrollSpeed).clamp(1, 10),
+    spreadFrom: spreadFrom ?? this.spreadFrom,
     presets: presets ?? this.presets,
     seriesOverrides: seriesOverrides ?? this.seriesOverrides,
   );
 
-  Map<String, Object?> toJson({bool includePresets = true}) =>
-      <String, Object?>{
-        'mode': mode.name,
-        'brightness': brightness,
-        'keepAwake': keepAwake,
-        'fit': fit.name,
-        'direction': direction.name,
-        'background': background.name,
-        'lockZoom': lockZoom,
-        'trimBorders': trimBorders,
-        'pageTurn': pageTurn.name,
-        if (spreadFrom.isNotEmpty) 'spreadFrom': spreadFrom,
-        'showSessionTime': showSessionTime,
-        'tabletLayout': tabletLayout.name,
-        'tapZone': tapZone.name,
-        'invertTapZones': invertTapZones,
-        'doubleTapZoom': doubleTapZoom,
-        'autoScrollSpeed': autoScrollSpeed,
-        if (includePresets && presets.isNotEmpty)
-          'presets': <Object?>[for (final preset in presets) preset.toJson()],
-        if (includePresets && seriesOverrides.isNotEmpty)
-          'seriesOverrides': <String, Object?>{
-            for (final entry in seriesOverrides.entries)
-              entry.key: entry.value.toJson(includePresets: false),
-          },
-      };
+  /// 保持现有扁平顶层 JSON 字段格式兼容旧存档与 [PrefsBackup]。
+  Map<String, Object?> toJson() => <String, Object?>{
+    ...global.toJson(),
+    'tabletLayout': tabletLayout.name,
+    if (spreadFrom.isNotEmpty) 'spreadFrom': spreadFrom,
+    if (presets.isNotEmpty)
+      'presets': <Object?>[for (final preset in presets) preset.toJson()],
+    if (seriesOverrides.isNotEmpty)
+      'seriesOverrides': <String, Object?>{
+        for (final entry in seriesOverrides.entries)
+          entry.key: entry.value.toJson(),
+      },
+  };
 
-  /// 存档可能被旧版本/手工改过，所有字段先判类型再取值，坏值一律回默认，
-  /// 绝不让一条脏数据把阅读器变成黑屏或抛异常。
+  /// 兼容旧版扁平顶层 JSON，坏值一律回默认。
   static ReaderPrefs fromJson(Map<String, Object?> json) {
-    final rawBrightness = json['brightness'];
-    final brightness = rawBrightness is num
-        ? rawBrightness.toDouble().clamp(minBrightness, 1.0)
-        : 1.0;
     final rawPresets = json['presets'];
     final presets = <ReaderPreset>[];
     if (rawPresets is List) {
@@ -431,64 +146,28 @@ class ReaderPrefs {
       }
     }
     final rawOverrides = json['seriesOverrides'];
-    final overrides = <String, ReaderPrefs>{};
+    final overrides = <String, ReaderConfig>{};
     if (rawOverrides is Map) {
       for (final entry in rawOverrides.entries) {
         if (entry.key is! String || entry.value is! Map) continue;
-        overrides[entry.key as String] = ReaderPrefs.fromJson(
+        overrides[entry.key as String] = ReaderConfig.fromJson(
           Map<String, Object?>.from(entry.value as Map),
-        ).configOnly();
+        );
       }
     }
     return ReaderPrefs(
-      mode: _parse(
-        json['mode'],
-        ReaderModeChoice.values,
-        ReaderModeChoice.auto,
-      ),
-      brightness: brightness,
-      keepAwake: json['keepAwake'] == true,
-      fit: _parse(json['fit'], ReaderFitChoice.values, ReaderFitChoice.contain),
-      direction: _parse(
-        json['direction'],
-        ReaderDirectionChoice.values,
-        ReaderDirectionChoice.auto,
-      ),
-      background: _parse(
-        json['background'],
-        ReaderBackgroundChoice.values,
-        ReaderBackgroundChoice.black,
-      ),
-      lockZoom: json['lockZoom'] == true,
-      trimBorders: json['trimBorders'] == true,
-      pageTurn: _parse(
-        json['pageTurn'],
-        ReaderPageTurnChoice.values,
-        ReaderPageTurnChoice.curl,
-      ),
-      spreadFrom: _parseSpreadFrom(json['spreadFrom']),
-      showSessionTime: json['showSessionTime'] != false,
-      tabletLayout: _parse(
+      global: ReaderConfig.fromJson(json),
+      tabletLayout: parseReaderEnum(
         json['tabletLayout'],
         TabletLayoutChoice.values,
         TabletLayoutChoice.auto,
       ),
-      tapZone: _parse(
-        json['tapZone'],
-        TapZonePreset.values,
-        TapZonePreset.automatic,
-      ),
-      invertTapZones: json['invertTapZones'] == true,
-      doubleTapZoom: json['doubleTapZoom'] != false,
-      autoScrollSpeed:
-          (json['autoScrollSpeed'] is int ? json['autoScrollSpeed']! as int : 5)
-              .clamp(1, 10),
+      spreadFrom: _parseSpreadFrom(json['spreadFrom']),
       presets: presets,
       seriesOverrides: overrides,
     );
   }
 
-  /// 解析"每本书的分组起点"：只收非负 int，坏条目直接丢（存档可能被改坏）。
   static Map<String, int> _parseSpreadFrom(Object? raw) {
     if (raw is! Map) return const <String, int>{};
     final result = <String, int>{};
@@ -502,34 +181,12 @@ class ReaderPrefs {
     return result;
   }
 
-  /// 按名字解析枚举；不是已知名字（旧版本 / 手工改坏）就回默认值。
-  static T _parse<T extends Enum>(Object? raw, List<T> values, T fallback) {
-    if (raw is! String) return fallback;
-    for (final value in values) {
-      if (value.name == raw) return value;
-    }
-    return fallback;
-  }
-
   @override
   bool operator ==(Object other) =>
       other is ReaderPrefs &&
-      other.mode == mode &&
-      other.brightness == brightness &&
-      other.keepAwake == keepAwake &&
-      other.fit == fit &&
-      other.direction == direction &&
-      other.background == background &&
-      other.lockZoom == lockZoom &&
-      other.trimBorders == trimBorders &&
-      other.pageTurn == pageTurn &&
-      _sameSpreadFrom(other.spreadFrom, spreadFrom) &&
-      other.showSessionTime == showSessionTime &&
+      other.global == global &&
       other.tabletLayout == tabletLayout &&
-      other.tapZone == tapZone &&
-      other.invertTapZones == invertTapZones &&
-      other.doubleTapZoom == doubleTapZoom &&
-      other.autoScrollSpeed == autoScrollSpeed &&
+      _sameSpreadFrom(other.spreadFrom, spreadFrom) &&
       _samePresets(other.presets, presets) &&
       _sameOverrides(other.seriesOverrides, seriesOverrides);
 
@@ -542,8 +199,8 @@ class ReaderPrefs {
   }
 
   static bool _sameOverrides(
-    Map<String, ReaderPrefs> a,
-    Map<String, ReaderPrefs> b,
+    Map<String, ReaderConfig> a,
+    Map<String, ReaderConfig> b,
   ) {
     if (a.length != b.length) return false;
     for (final entry in a.entries) {
@@ -563,35 +220,23 @@ class ReaderPrefs {
 
   @override
   int get hashCode => Object.hash(
-    mode,
-    brightness,
-    keepAwake,
-    fit,
-    direction,
-    background,
-    lockZoom,
-    trimBorders,
-    pageTurn,
+    global,
+    tabletLayout,
     Object.hashAll(
       spreadFrom.entries.map(
         (MapEntry<String, int> e) => Object.hash(e.key, e.value),
       ),
     ),
-    tapZone,
-    invertTapZones,
-    doubleTapZoom,
     Object.hashAll(presets),
     Object.hashAll(
       seriesOverrides.entries.map(
-        (MapEntry<String, ReaderPrefs> e) => Object.hash(e.key, e.value),
+        (MapEntry<String, ReaderConfig> e) => Object.hash(e.key, e.value),
       ),
     ),
   );
 
   @override
   String toString() =>
-      'ReaderPrefs(${mode.name}, $brightness, $keepAwake, ${fit.name}, '
-      '${direction.name}, ${background.name}, lockZoom: $lockZoom, '
-      'presets: ${presets.length}, '
-      'series: ${seriesOverrides.length})';
+      'ReaderPrefs($global, tablet: ${tabletLayout.name}, '
+      'presets: ${presets.length}, series: ${seriesOverrides.length})';
 }

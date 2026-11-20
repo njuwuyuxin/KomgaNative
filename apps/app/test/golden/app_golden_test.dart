@@ -1141,7 +1141,9 @@ void main() {
       size: GoldenSizes.phone,
       theme: AppTheme.dark(),
       repository: FakeReaderRepository(pageNames: const <String>['edge_teal']),
-      prefs: const ReaderPrefs(background: ReaderBackgroundChoice.dynamic),
+      prefs: const ReaderPrefs(
+        global: ReaderConfig(background: ReaderBackgroundChoice.dynamic),
+      ),
     );
   });
 
@@ -1152,7 +1154,9 @@ void main() {
       size: GoldenSizes.phone,
       theme: AppTheme.dark(),
       repository: FakeReaderRepository(pageNames: const <String>['edge_split']),
-      prefs: const ReaderPrefs(background: ReaderBackgroundChoice.immersive),
+      prefs: const ReaderPrefs(
+        global: ReaderConfig(background: ReaderBackgroundChoice.immersive),
+      ),
       settleAfterActWithRealTime: true,
     );
   });
@@ -1166,7 +1170,7 @@ void main() {
       repository: FakeReaderRepository(
         pageNames: const <String>['trim_border'],
       ),
-      prefs: const ReaderPrefs(trimBorders: true),
+      prefs: const ReaderPrefs(global: ReaderConfig(trimBorders: true)),
       settleAfterActWithRealTime: true,
     );
   });
@@ -1263,12 +1267,12 @@ void main() {
           ReaderPreset(
             id: 'p1',
             name: 'Manga',
-            prefs: ReaderPrefs(mode: ReaderModeChoice.double),
+            config: ReaderConfig(mode: ReaderModeChoice.double),
           ),
           ReaderPreset(
             id: 'p2',
             name: 'Webtoon',
-            prefs: ReaderPrefs(mode: ReaderModeChoice.vertical),
+            config: ReaderConfig(mode: ReaderModeChoice.vertical),
           ),
         ],
       ),

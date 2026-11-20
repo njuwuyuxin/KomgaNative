@@ -13,7 +13,9 @@ void main() {
       tester,
       repository: FakeReaderRepository(),
       book: demoReaderBook(),
-      initialPrefs: const ReaderPrefs(mode: ReaderModeChoice.single),
+      initialPrefs: const ReaderPrefs(
+        global: ReaderConfig(mode: ReaderModeChoice.single),
+      ),
     );
 
     // 保存当前（single）为预设。
@@ -28,13 +30,13 @@ void main() {
 
     // 改成 double，再从预设切回 single。
     await pickMode(tester, ReaderModeChoice.double);
-    expect(store.prefs?.mode, ReaderModeChoice.double);
+    expect(store.prefs?.global.mode, ReaderModeChoice.double);
 
     await openSettings(tester);
     await tester.tap(find.byType(ReaderPresetChip));
     await tester.pumpAndSettle();
     await closeSheet(tester);
-    expect(store.prefs?.mode, ReaderModeChoice.single);
+    expect(store.prefs?.global.mode, ReaderModeChoice.single);
   });
 
   testWidgets('点 × 删除预设，不回答预设本身', (WidgetTester tester) async {
@@ -42,7 +44,9 @@ void main() {
       tester,
       repository: FakeReaderRepository(),
       book: demoReaderBook(),
-      initialPrefs: const ReaderPrefs(mode: ReaderModeChoice.single),
+      initialPrefs: const ReaderPrefs(
+        global: ReaderConfig(mode: ReaderModeChoice.single),
+      ),
     );
 
     await openSettings(tester);

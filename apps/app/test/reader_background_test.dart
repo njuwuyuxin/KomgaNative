@@ -45,7 +45,7 @@ void main() {
       repository: FakeReaderRepository(pageNames: const <String>['edge_split']),
       book: demoReaderBook(),
       initialPrefs: const ReaderPrefs(
-        background: ReaderBackgroundChoice.immersive,
+        global: ReaderConfig(background: ReaderBackgroundChoice.immersive),
       ),
     );
     await settleEdgeColor(tester);
@@ -67,7 +67,9 @@ void main() {
     await pumpReader(
       tester,
       book: demoReaderBook(),
-      initialPrefs: const ReaderPrefs(background: ReaderBackgroundChoice.white),
+      initialPrefs: const ReaderPrefs(
+        global: ReaderConfig(background: ReaderBackgroundChoice.white),
+      ),
     );
 
     expect(backgroundOf(tester), ReaderPalette.white.background);
@@ -82,7 +84,7 @@ void main() {
       repository: FakeReaderRepository(pageNames: const <String>['edge_teal']),
       book: demoReaderBook(),
       initialPrefs: const ReaderPrefs(
-        background: ReaderBackgroundChoice.dynamic,
+        global: ReaderConfig(background: ReaderBackgroundChoice.dynamic),
       ),
     );
     await settleEdgeColor(tester);
@@ -105,7 +107,7 @@ void main() {
       repository: FakeReaderRepository(pageNames: const <String>['edge_teal']),
       book: demoReaderBook(),
       initialPrefs: const ReaderPrefs(
-        background: ReaderBackgroundChoice.dynamic,
+        global: ReaderConfig(background: ReaderBackgroundChoice.dynamic),
       ),
     );
     // 还没跑真实时间：颜色还没算出来，此时必须是确定的黑色。
@@ -116,7 +118,7 @@ void main() {
     final store = await pumpReader(tester, book: demoReaderBook());
     await pickOption(tester, 'reader-background-dynamic');
 
-    expect(store.prefs!.background, ReaderBackgroundChoice.dynamic);
+    expect(store.prefs!.global.background, ReaderBackgroundChoice.dynamic);
   });
 
   testWidgets('换背景色是交叉渐变，不是瞬切', (WidgetTester tester) async {
@@ -153,7 +155,7 @@ void main() {
       book: demoReaderBook(),
       forceEink: true,
       initialPrefs: const ReaderPrefs(
-        background: ReaderBackgroundChoice.dynamic,
+        global: ReaderConfig(background: ReaderBackgroundChoice.dynamic),
       ),
     );
     await settleEdgeColor(tester);

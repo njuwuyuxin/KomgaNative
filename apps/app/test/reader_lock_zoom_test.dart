@@ -11,7 +11,7 @@ void main() {
     await pumpReader(
       tester,
       book: demoReaderBook(),
-      initialPrefs: const ReaderPrefs(lockZoom: true),
+      initialPrefs: const ReaderPrefs(global: ReaderConfig(lockZoom: true)),
     );
     final base = tester.getRect(find.byKey(const Key('reader-image-0')));
 

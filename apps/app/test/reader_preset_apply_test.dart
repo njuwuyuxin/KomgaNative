@@ -4,9 +4,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
 import 'package:komga_native/src/data/reader_prefs_store.dart';
 import 'package:komga_native/src/providers/reader_prefs_provider.dart';
+import 'package:komga_reader_engine/komga_reader_engine.dart'
+    show TapZonePreset;
 
-/// FIX-04：预设是"完整快照"。应用时漏抄一个字段，用户会看到
-/// "套了预设但锁定缩放/去白边没生效"——而且只有一部分人开着这两项，很难被报上来。
+/// FIX-04 & ARC-04：`ReaderConfig` 值对象全字段往返、预设应用与系列覆盖不漂移。
 void main() {
   Future<ProviderContainer> containerWith(ReaderPrefs? initial) async {
     final container = ProviderContainer(
@@ -18,24 +19,31 @@ void main() {
     );
     addTearDown(container.dispose);
     container.read(readerPrefsProvider);
-    // 让 build() 里的异步恢复落地。
     for (var i = 0; i < 5; i++) {
       await Future<void>.delayed(Duration.zero);
     }
     return container;
   }
 
-  /// 一份"每个字段都不是默认值"的配置，漏抄任何一个都会被测出来。
-  const full = ReaderPrefs(
+  /// 一份"全部 14 个 ReaderConfig 字段都不是默认值"的配置。
+  const fullConfig = ReaderConfig(
     mode: ReaderModeChoice.double,
-    brightness: 0.5,
+    brightness: 0.45,
     keepAwake: true,
     fit: ReaderFitChoice.cover,
     direction: ReaderDirectionChoice.rightToLeft,
-    background: ReaderBackgroundChoice.white,
+    background: ReaderBackgroundChoice.immersive,
     lockZoom: true,
     trimBorders: true,
+    pageTurn: ReaderPageTurnChoice.fade,
+    tapZone: TapZonePreset.kindle,
+    invertTapZones: true,
+    doubleTapZoom: false,
+    autoScrollSpeed: 8,
+    showSessionTime: false,
   );
+
+  const fullPrefs = ReaderPrefs(global: fullConfig);
 
   String savePresetAndGetId(ProviderContainer container, {String? seriesId}) {
     final controller = container.read(readerPrefsProvider.notifier);
@@ -43,12 +51,12 @@ void main() {
     return container.read(readerPrefsProvider).presets.last.id;
   }
 
-  test('全局应用预设：逐字段覆盖，锁定缩放/去白边不丢', () async {
-    final container = await containerWith(full);
+  test('全部 14 个非默认字段：保存为预设 → 应用到全局 → 逐字段与 hashCode 全等', () async {
+    final container = await containerWith(fullPrefs);
     final id = savePresetAndGetId(container);
     final controller = container.read(readerPrefsProvider.notifier);
 
-    // 全部改回相反值。
+    // 全部改回相反/默认值。
     controller
       ..setMode(ReaderModeChoice.single)
       ..setBrightness(1)
@@ -57,36 +65,59 @@ void main() {
       ..setDirection(ReaderDirectionChoice.leftToRight)
       ..setBackground(ReaderBackgroundChoice.black)
       ..setLockZoom(false)
-      ..setTrimBorders(false);
+      ..setTrimBorders(false)
+      ..setPageTurn(ReaderPageTurnChoice.curl)
+      ..setTapZone(TapZonePreset.automatic)
+      ..setInvertTapZones(false)
+      ..setDoubleTapZoom(true)
+      ..setAutoScrollSpeed(5)
+      ..setShowSessionTime(true);
 
     controller.applyPreset(id);
 
     final applied = container.read(readerPrefsProvider);
-    expect(applied.configOnly(), full, reason: '应用后必须与保存时的快照完全一致');
-    // 预设列表本身不能被应用动作改掉。
+    expect(applied.global, fullConfig, reason: '14 个字段含 pageTurn 等必须一字不漏还原');
+    expect(applied.global.hashCode, fullConfig.hashCode);
     expect(applied.presets, hasLength(1));
   });
 
-  test('按系列应用预设：同样完整，且不影响全局', () async {
-    final container = await containerWith(full);
-    final id = savePresetAndGetId(container);
+  test('全部 14 个非默认字段：应用到系列覆盖 → forSeries 全等，且不影响全局', () async {
+    final container = await containerWith(const ReaderPrefs());
     final controller = container.read(readerPrefsProvider.notifier);
 
-    controller.applyPreset(id, seriesId: 's1');
+    // 在系列 s1 上构造全非默认配置并存成预设。
+    controller
+      ..setSeriesOverride('s1', true)
+      ..setMode(fullConfig.mode, seriesId: 's1')
+      ..setBrightness(fullConfig.brightness, seriesId: 's1')
+      ..setKeepAwake(fullConfig.keepAwake, seriesId: 's1')
+      ..setFit(fullConfig.fit, seriesId: 's1')
+      ..setDirection(fullConfig.direction, seriesId: 's1')
+      ..setBackground(fullConfig.background, seriesId: 's1')
+      ..setLockZoom(fullConfig.lockZoom, seriesId: 's1')
+      ..setTrimBorders(fullConfig.trimBorders, seriesId: 's1')
+      ..setPageTurn(fullConfig.pageTurn, seriesId: 's1')
+      ..setTapZone(fullConfig.tapZone, seriesId: 's1')
+      ..setInvertTapZones(fullConfig.invertTapZones, seriesId: 's1')
+      ..setDoubleTapZoom(fullConfig.doubleTapZoom, seriesId: 's1')
+      ..setAutoScrollSpeed(fullConfig.autoScrollSpeed, seriesId: 's1')
+      ..setShowSessionTime(fullConfig.showSessionTime, seriesId: 's1');
+
+    final id = savePresetAndGetId(container, seriesId: 's1');
+    controller.applyPreset(id, seriesId: 's2');
 
     final state = container.read(readerPrefsProvider);
-    expect(state.forSeries('s1').configOnly(), full);
-    // 全局保持原样（这里全局本来就是 full，所以要显式验证覆盖确实写进去了）。
-    expect(state.seriesOverrides['s1']?.configOnly(), full);
+    expect(state.forSeries('s1'), fullConfig);
+    expect(state.forSeries('s2'), fullConfig);
+    expect(state.seriesOverrides['s2'], fullConfig);
+    expect(state.global, const ReaderConfig(), reason: '全局保持默认值不变');
   });
 
   test('删掉系列覆盖后回到全局；全局也完整', () async {
-    // 全局用一份和预设不同的配置，才能看出"回全局"到底回到了什么。
     final container = await containerWith(
-      const ReaderPrefs(mode: ReaderModeChoice.vertical),
+      const ReaderPrefs(global: ReaderConfig(mode: ReaderModeChoice.vertical)),
     );
     final controller = container.read(readerPrefsProvider.notifier);
-    // 先在系列里做出 full，并保存成预设。
     controller
       ..setMode(ReaderModeChoice.double, seriesId: 's1')
       ..setLockZoom(true, seriesId: 's1')
@@ -107,15 +138,16 @@ void main() {
 
     state = container.read(readerPrefsProvider);
     expect(state.seriesOverrides, isEmpty);
-    // 回全局：全局是 vertical、没开锁定缩放/去白边。
     expect(state.forSeries('s1').mode, ReaderModeChoice.vertical);
     expect(state.forSeries('s1').lockZoom, isFalse);
     expect(state.forSeries('s1').trimBorders, isFalse);
   });
 
-  test('旧存档的预设没有锁定缩放/去白边字段：按 false 应用，不崩', () async {
-    // 模拟"预设是在这两个开关出现之前存的"。
+  test('旧存档扁平 JSON 与旧预设反序列化兼容', () async {
     final legacy = ReaderPrefs.fromJson(const <String, Object?>{
+      'mode': 'double',
+      'pageTurn': 'slide',
+      'tabletLayout': 'single',
       'presets': <Object?>[
         <String, Object?>{
           'id': 'old-1',
@@ -124,6 +156,10 @@ void main() {
         },
       ],
     });
+    expect(legacy.global.mode, ReaderModeChoice.double);
+    expect(legacy.global.pageTurn, ReaderPageTurnChoice.slide);
+    expect(legacy.tabletLayout, TabletLayoutChoice.single);
+
     final container = await containerWith(legacy);
     final controller = container.read(readerPrefsProvider.notifier);
 
@@ -133,13 +169,35 @@ void main() {
       ..applyPreset('old-1');
 
     final applied = container.read(readerPrefsProvider);
-    expect(applied.mode, ReaderModeChoice.single);
-    expect(applied.lockZoom, isFalse);
-    expect(applied.trimBorders, isFalse);
+    expect(applied.global.mode, ReaderModeChoice.single);
+    expect(applied.global.lockZoom, isFalse);
+    expect(applied.global.trimBorders, isFalse);
+  });
+
+  test('hashCode 覆盖 showSessionTime / autoScrollSpeed / tabletLayout 变更', () {
+    const base = ReaderPrefs();
+    expect(
+      base.copyWith(global: base.global.copyWith(showSessionTime: false)),
+      isNot(equals(base)),
+    );
+    expect(
+      base
+          .copyWith(global: base.global.copyWith(showSessionTime: false))
+          .hashCode,
+      isNot(equals(base.hashCode)),
+    );
+    expect(
+      base.copyWith(global: base.global.copyWith(autoScrollSpeed: 9)).hashCode,
+      isNot(equals(base.hashCode)),
+    );
+    expect(
+      base.copyWith(tabletLayout: TabletLayoutChoice.double).hashCode,
+      isNot(equals(base.hashCode)),
+    );
   });
 
   test('应用不存在的预设 id：什么也不改', () async {
-    final container = await containerWith(full);
+    final container = await containerWith(fullPrefs);
     final before = container.read(readerPrefsProvider);
 
     container.read(readerPrefsProvider.notifier).applyPreset('missing');

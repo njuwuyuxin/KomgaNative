@@ -65,7 +65,9 @@ void main() {
       overrides: <Override>[
         readerPrefsStoreProvider.overrideWithValue(
           InMemoryReaderPrefsStore(
-            const ReaderPrefs(pageTurn: ReaderPageTurnChoice.fade),
+            const ReaderPrefs(
+              global: ReaderConfig(pageTurn: ReaderPageTurnChoice.fade),
+            ),
           ),
         ),
       ],
@@ -76,7 +78,7 @@ void main() {
       await Future<void>.delayed(Duration.zero);
     }
     expect(
-      container.read(readerPrefsProvider).pageTurn,
+      container.read(readerPrefsProvider).global.pageTurn,
       ReaderPageTurnChoice.fade,
     );
   });
@@ -95,9 +97,9 @@ void main() {
         .setPageTurn(ReaderPageTurnChoice.fade);
     await Future<void>.delayed(Duration.zero);
 
-    expect(store.prefs?.pageTurn, ReaderPageTurnChoice.fade);
+    expect(store.prefs?.global.pageTurn, ReaderPageTurnChoice.fade);
     expect(
-      container.read(readerPrefsProvider).pageTurn,
+      container.read(readerPrefsProvider).global.pageTurn,
       ReaderPageTurnChoice.fade,
     );
   });
@@ -106,11 +108,13 @@ void main() {
     final store = await pumpReader(
       tester,
       book: demoReaderBook(),
-      initialPrefs: const ReaderPrefs(pageTurn: ReaderPageTurnChoice.fade),
+      initialPrefs: const ReaderPrefs(
+        global: ReaderConfig(pageTurn: ReaderPageTurnChoice.fade),
+      ),
     );
 
     expect(
-      store.prefs?.pageTurn,
+      store.prefs?.global.pageTurn,
       ReaderPageTurnChoice.fade,
       reason: '存档里是 fade',
     );
@@ -126,7 +130,9 @@ void main() {
       tester,
       book: demoReaderBook(),
       forceEink: true,
-      initialPrefs: const ReaderPrefs(pageTurn: ReaderPageTurnChoice.curl),
+      initialPrefs: const ReaderPrefs(
+        global: ReaderConfig(pageTurn: ReaderPageTurnChoice.curl),
+      ),
     );
 
     final view = tester.widget<ReaderPagedView>(find.byType(ReaderPagedView));

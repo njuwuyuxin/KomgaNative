@@ -9,9 +9,11 @@ import 'package:komga_native/src/data/shelf_view_options.dart';
 /// SET-02：偏好导出/导入。
 void main() {
   const reader = ReaderPrefs(
-    mode: ReaderModeChoice.double,
-    pageTurn: ReaderPageTurnChoice.fade,
-    showSessionTime: false,
+    global: ReaderConfig(
+      mode: ReaderModeChoice.double,
+      pageTurn: ReaderPageTurnChoice.fade,
+      showSessionTime: false,
+    ),
     spreadFrom: <String, int>{'b1': 3},
   );
 
@@ -30,9 +32,9 @@ void main() {
     final backup = PrefsBackup.decode(encoded);
 
     final restoredReader = backup.toReaderPrefs();
-    expect(restoredReader.mode, ReaderModeChoice.double);
-    expect(restoredReader.pageTurn, ReaderPageTurnChoice.fade);
-    expect(restoredReader.showSessionTime, isFalse);
+    expect(restoredReader.global.mode, ReaderModeChoice.double);
+    expect(restoredReader.global.pageTurn, ReaderPageTurnChoice.fade);
+    expect(restoredReader.global.showSessionTime, isFalse);
     expect(restoredReader.spreadFrom, <String, int>{'b1': 3});
 
     final restoredSettings = backup.toAppSettings();
@@ -115,7 +117,7 @@ void main() {
       }),
     );
     // 解析得出（不抛），坏字段回默认。
-    expect(backup.toReaderPrefs().mode, isA<ReaderModeChoice>());
+    expect(backup.toReaderPrefs().global.mode, isA<ReaderModeChoice>());
     expect(backup.toAppSettings().language, isA<String>());
     expect(backup.toAppSettings().view, isA<ShelfView>());
   });

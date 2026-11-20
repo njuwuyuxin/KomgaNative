@@ -144,7 +144,7 @@ class ReaderSettingsSheet extends ConsumerWidget {
                 const SizedBox(height: AppSpacing.sm),
               ],
               ReaderPresetSection(
-                prefs: prefs,
+                presets: global.presets,
                 palette: palette,
                 onApply: (String id) =>
                     controller.applyPreset(id, seriesId: writeSeriesId),
@@ -341,7 +341,7 @@ class ReaderSettingsSheet extends ConsumerWidget {
   /// 顶部摘要：模式 · 适配 · 方向（+ 非墨水屏时的背景）。
   String _summary(
     AppLocalizations l10n,
-    ReaderPrefs prefs,
+    ReaderConfig prefs,
     ReaderPalette palette,
   ) {
     return <String>[

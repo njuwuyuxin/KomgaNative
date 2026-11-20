@@ -125,9 +125,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     _direction = _resolveDirection();
     // 偏好与书都在**本 build** 里 watch：写在 gate 的 builder 里时，
     // 偏好恢复/换书不一定会让这一层重建（RDR-05 踩到过）。
-    final prefs = _effectivePrefs(ref.watch(readerPrefsProvider));
+    final allPrefs = ref.watch(readerPrefsProvider);
     final book =
         widget.book ?? ref.watch(readerBookProvider(widget.bookId)).value;
+    final config = allPrefs.forSeries(book?.seriesId ?? _seriesId);
     final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     final openingHero = widget.heroTag;
     return EdgeSwipeBack(
@@ -140,8 +141,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
               pages: ref.watch(readerPagesProvider(widget.bookId)),
               palette: ReaderPalette.of(isEink: isEink),
               onRetry: () => ref.invalidate(readerPagesProvider(widget.bookId)),
-              builder: (List<PageInfo> pages) =>
-                  _buildPages(context, isEink, pages, prefs, book),
+              builder: (List<PageInfo> pages) => _buildPages(
+                context,
+                isEink,
+                pages,
+                allPrefs.tabletLayout,
+                config,
+                book,
+              ),
             ),
             // 继续阅读卡片的封面先飞进来，落地后再由页图接管（UI-P2-2）。
             // 没有源卡片、墨水屏、系统"减少动态效果"时都不建。
@@ -163,7 +170,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     BuildContext context,
     bool isEink,
     List<PageInfo> pages,
-    ReaderPrefs prefs,
+    TabletLayoutChoice tabletLayout,
+    ReaderConfig config,
     Book? book,
   ) {
     final l10n = AppLocalizations.of(context);
@@ -175,14 +183,20 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         WindowSizeClass.expanded;
     final layout = ReaderLayout(
       pages: pages,
-      mode: _modeFor(prefs),
+      mode: resolveReaderMode(
+        mode: config.mode,
+        tabletLayout: tabletLayout,
+        direction: _direction,
+        landscape: _landscape,
+        tablet: _tablet,
+      ),
       page: _resolvePage(total),
       groupFrom: _spreadFrom,
     );
     // 配色在这一屏才算得出来：动态背景要读当前屏各页的页边主色（UI-P1-5）。
     final palette = resolveReaderPalette(
       isEink: isEink,
-      prefs: prefs,
+      config: config,
       layout: layout,
       ref: ref,
       bookId: widget.bookId,
@@ -193,14 +207,18 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     _schedulePreload(page, mode);
     // 阅读方向：设置优先，`auto` 时才跟随系列（UI-P1-4）。
     // 点击区、底栏箭头、缩略图滑条、卷页方向都从这一个值派生。
-    final rightToLeft = prefs.direction.resolveRightToLeft(_direction);
+    final rightToLeft = config.direction.resolveRightToLeft(_direction);
     final nextBook = _nextBookFor(layout, book);
 
     final readerBar = ReaderTopBar(
       bookId: widget.bookId,
       seriesId: book?.seriesId,
       title: book?.name ?? l10n.readerBookFallback,
-      pageLabel: _pageLabelWithSession(layout.pageLabel(l10n), l10n),
+      pageLabel: _pageLabelWithSession(
+        layout.pageLabel(l10n),
+        l10n,
+        showSessionTime: config.showSessionTime,
+      ),
       palette: palette,
       mode: mode,
       page: page,
@@ -222,9 +240,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         jumpToken: _jumpToken,
         jumpPage: _jumpPage,
         palette: palette,
-        trimBorders: prefs.trimBorders,
+        trimBorders: config.trimBorders,
         // 自动滚动（RDR-08）：墨水屏不启用——每次滚动都是整屏刷新。
-        autoScrollSpeed: prefs.autoScrollSpeed,
+        autoScrollSpeed: config.autoScrollSpeed,
         autoScrollAllowed: !isEink,
         onPageChanged: (int p) => _setPage(p, total),
         onToggleChrome: _toggleChrome,
@@ -236,14 +254,17 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         spread: layout.spread,
         rightToLeft: rightToLeft,
         palette: palette,
-        fit: prefs.fit.fit,
+        fit: config.fit.fit,
         doublePage: mode == ReadingMode.doublePage,
-        lockZoom: prefs.lockZoom,
-        trimBorders: prefs.trimBorders,
+        lockZoom: config.lockZoom,
+        trimBorders: config.trimBorders,
+        tapZone: config.tapZone,
+        invertTapZones: config.invertTapZones,
+        doubleTapZoom: config.doubleTapZoom,
         nextSpread: layout.neighbour(1),
         previousSpread: layout.neighbour(-1),
         style: PageTurnStyle.resolve(
-          choice: prefs.pageTurn,
+          choice: config.pageTurn,
           eink: isEink,
           disableAnimations:
               MediaQuery.maybeDisableAnimationsOf(context) ?? false,
@@ -269,14 +290,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       autofocus: true,
       onKeyEvent: _onKeyEvent,
       child: WakeLockScope(
-        enabled: prefs.keepAwake,
+        enabled: config.keepAwake,
         // chrome 显隐同时驱动两件事：浮层动画（ReaderFrame）与系统栏（ReaderSystemUi）。
         child: ReaderSystemUi(
           immersive: !_chromeVisible,
           child: ReaderFrame(
             palette: palette,
             chromeVisible: _chromeVisible,
-            dimOpacity: prefs.dimOpacity,
+            dimOpacity: config.dimOpacity,
             topBar: readerBar,
             content: content,
             bottomBar: ReaderBottomChrome(

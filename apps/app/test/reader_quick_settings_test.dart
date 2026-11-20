@@ -24,7 +24,7 @@ void main() {
 
     await tapPill(tester, 'quick-background-white');
 
-    expect(store.prefs?.background, ReaderBackgroundChoice.white);
+    expect(store.prefs?.global.background, ReaderBackgroundChoice.white);
     // 完整设置面板没有被打开（面板里的"阅读预设"不在这层）。
     expect(find.byKey(const Key('reader-preset-save')), findsNothing);
   });
@@ -37,9 +37,9 @@ void main() {
     await tapPill(tester, 'quick-fit-cover');
     await tapPill(tester, 'quick-lock-zoom');
 
-    expect(store.prefs?.direction, ReaderDirectionChoice.rightToLeft);
-    expect(store.prefs?.fit, ReaderFitChoice.cover);
-    expect(store.prefs?.lockZoom, isTrue);
+    expect(store.prefs?.global.direction, ReaderDirectionChoice.rightToLeft);
+    expect(store.prefs?.global.fit, ReaderFitChoice.cover);
+    expect(store.prefs?.global.lockZoom, isTrue);
   });
 
   testWidgets('墨水屏不提供背景选项（固定白底）', (WidgetTester tester) async {

@@ -53,9 +53,9 @@ void main() {
       expect(notMap.spreadFrom, isEmpty);
     });
 
-    test('不进预设快照：configOnly 丢掉按书的分组', () {
+    test('不进预设快照：ReaderConfig 天然不含 spreadFrom', () {
       final prefs = const ReaderPrefs().withSpreadFrom('b1', 2);
-      expect(prefs.configOnly().spreadFrom, isEmpty);
+      expect(prefs.global.toJson().containsKey('spreadFrom'), isFalse);
     });
 
     test('系列覆盖不影响按书的分组', () {
@@ -63,9 +63,10 @@ void main() {
           .withSpreadFrom('b1', 2)
           .withSeriesOverride(
             's1',
-            const ReaderPrefs(mode: ReaderModeChoice.single),
+            const ReaderConfig(mode: ReaderModeChoice.single),
           );
-      expect(prefs.forSeries('s1').spreadFrom['b1'], 2);
+      expect(prefs.spreadFrom['b1'], 2);
+      expect(prefs.forSeries('s1').mode, ReaderModeChoice.single);
     });
   });
 
@@ -93,7 +94,9 @@ void main() {
         tester,
         repository: FakeReaderRepository(pageCount: 6),
         book: demoReaderBook(),
-        initialPrefs: const ReaderPrefs(mode: ReaderModeChoice.double),
+        initialPrefs: const ReaderPrefs(
+          global: ReaderConfig(mode: ReaderModeChoice.double),
+        ),
       );
 
       // 先跳到第 3 页（默认它在 [1,2] 这一屏里）。

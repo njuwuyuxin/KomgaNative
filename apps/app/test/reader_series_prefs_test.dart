@@ -12,7 +12,9 @@ void main() {
       tester,
       repository: FakeReaderRepository(),
       book: demoReaderBook(),
-      initialPrefs: const ReaderPrefs(mode: ReaderModeChoice.single),
+      initialPrefs: const ReaderPrefs(
+        global: ReaderConfig(mode: ReaderModeChoice.single),
+      ),
     );
 
     await openSettings(tester);
@@ -25,7 +27,7 @@ void main() {
     await tester.tap(find.byKey(const Key('reader-mode-double')));
     await tester.pumpAndSettle();
     expect(store.prefs?.seriesOverrides['s1']?.mode, ReaderModeChoice.double);
-    expect(store.prefs?.mode, ReaderModeChoice.single);
+    expect(store.prefs?.global.mode, ReaderModeChoice.single);
     await closeSheet(tester);
 
     // 再打开，关掉开关：覆盖被删掉。
@@ -33,6 +35,6 @@ void main() {
     await tester.tap(find.byKey(const Key('reader-series-remember')));
     await tester.pumpAndSettle();
     expect(store.prefs?.seriesOverrides, isEmpty);
-    expect(store.prefs?.mode, ReaderModeChoice.single);
+    expect(store.prefs?.global.mode, ReaderModeChoice.single);
   });
 }

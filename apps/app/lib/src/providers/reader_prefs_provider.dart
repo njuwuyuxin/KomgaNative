@@ -3,11 +3,11 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
 import 'package:komga_native/src/data/reader_prefs_store.dart';
+import 'package:komga_platform/komga_platform.dart';
 import 'package:komga_reader_engine/komga_reader_engine.dart'
     show TapZonePreset;
-import 'package:komga_platform/komga_platform.dart';
 
-/// 阅读偏好：模式 / 亮度 / 常亮。
+/// 阅读偏好：模式 / 亮度 / 常亮 / 预设 / 系列覆盖。
 ///
 /// 改动即落盘（用户改设置的频率很低，不必攒批）。
 /// 恢复期间如果用户已经动过设置，不能被"旧存档"覆盖回去。
@@ -33,72 +33,74 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
   }
 
   void setMode(ReaderModeChoice mode, {String? seriesId}) =>
-      _updateConfig(seriesId, (ReaderPrefs p) => p.copyWith(mode: mode));
+      _updateConfig(seriesId, (ReaderConfig c) => c.copyWith(mode: mode));
 
   void setBrightness(double brightness, {String? seriesId}) => _updateConfig(
     seriesId,
-    (ReaderPrefs p) => p.copyWith(brightness: brightness),
+    (ReaderConfig c) => c.copyWith(brightness: brightness),
   );
 
   void setKeepAwake(bool enabled, {String? seriesId}) => _updateConfig(
     seriesId,
-    (ReaderPrefs p) => p.copyWith(keepAwake: enabled),
+    (ReaderConfig c) => c.copyWith(keepAwake: enabled),
   );
 
   void setFit(ReaderFitChoice fit, {String? seriesId}) =>
-      _updateConfig(seriesId, (ReaderPrefs p) => p.copyWith(fit: fit));
+      _updateConfig(seriesId, (ReaderConfig c) => c.copyWith(fit: fit));
 
   void setDirection(ReaderDirectionChoice direction, {String? seriesId}) =>
       _updateConfig(
         seriesId,
-        (ReaderPrefs p) => p.copyWith(direction: direction),
+        (ReaderConfig c) => c.copyWith(direction: direction),
       );
 
   void setBackground(ReaderBackgroundChoice background, {String? seriesId}) =>
       _updateConfig(
         seriesId,
-        (ReaderPrefs p) => p.copyWith(background: background),
+        (ReaderConfig c) => c.copyWith(background: background),
       );
 
-  void setLockZoom(bool enabled, {String? seriesId}) =>
-      _updateConfig(seriesId, (ReaderPrefs p) => p.copyWith(lockZoom: enabled));
+  void setLockZoom(bool enabled, {String? seriesId}) => _updateConfig(
+    seriesId,
+    (ReaderConfig c) => c.copyWith(lockZoom: enabled),
+  );
 
   void setTrimBorders(bool enabled, {String? seriesId}) => _updateConfig(
     seriesId,
-    (ReaderPrefs p) => p.copyWith(trimBorders: enabled),
+    (ReaderConfig c) => c.copyWith(trimBorders: enabled),
   );
 
   void setPageTurn(ReaderPageTurnChoice choice, {String? seriesId}) =>
-      _updateConfig(seriesId, (ReaderPrefs p) => p.copyWith(pageTurn: choice));
+      _updateConfig(seriesId, (ReaderConfig c) => c.copyWith(pageTurn: choice));
 
-  /// 点击区预设 / 反转 / 双击缩放（RDR-07）：都跟着书走。
+  /// 点击区预设 / 反转 / 双击缩放（RDR-07）：都随 [ReaderConfig] 支持按系列覆盖。
   void setTapZone(TapZonePreset preset, {String? seriesId}) =>
-      _updateConfig(seriesId, (ReaderPrefs p) => p.copyWith(tapZone: preset));
+      _updateConfig(seriesId, (ReaderConfig c) => c.copyWith(tapZone: preset));
 
   void setInvertTapZones(bool enabled, {String? seriesId}) => _updateConfig(
     seriesId,
-    (ReaderPrefs p) => p.copyWith(invertTapZones: enabled),
+    (ReaderConfig c) => c.copyWith(invertTapZones: enabled),
   );
 
   void setDoubleTapZoom(bool enabled, {String? seriesId}) => _updateConfig(
     seriesId,
-    (ReaderPrefs p) => p.copyWith(doubleTapZoom: enabled),
+    (ReaderConfig c) => c.copyWith(doubleTapZoom: enabled),
   );
 
-  /// 自动滚动速度 1–10（RDR-08）：跟着书走。
+  /// 自动滚动速度 1–10（RDR-08）：随 [ReaderConfig] 走。
   void setAutoScrollSpeed(int speed, {String? seriesId}) => _updateConfig(
     seriesId,
-    (ReaderPrefs p) => p.copyWith(autoScrollSpeed: speed.clamp(1, 10)),
+    (ReaderConfig c) => c.copyWith(autoScrollSpeed: speed.clamp(1, 10)),
   );
 
   /// 平板默认排版（PLT-02）：全局设置，不进系列覆盖。
   void setTabletLayout(TabletLayoutChoice choice) =>
       _update(state.copyWith(tabletLayout: choice));
 
-  /// chrome 是否显示本次阅读时长（HIS-04）：跟着书走，不是全局开关。
+  /// chrome 是否显示本次阅读时长（HIS-04）：随 [ReaderConfig] 走。
   void setShowSessionTime(bool enabled, {String? seriesId}) => _updateConfig(
     seriesId,
-    (ReaderPrefs p) => p.copyWith(showSessionTime: enabled),
+    (ReaderConfig c) => c.copyWith(showSessionTime: enabled),
   );
 
   /// 记住/清除某本书的双页分组起点（RDR-06）；[index] 为 null 表示恢复自动。
@@ -107,11 +109,11 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
 
   /// 把某一组设置恢复默认（RDR-04）：只动这一组，其它组不受影响。
   void resetGroup(ReaderSettingsGroup group, {String? seriesId}) =>
-      _updateConfig(seriesId, (ReaderPrefs p) => p.resetGroup(group));
+      _updateConfig(seriesId, (ReaderConfig c) => c.resetGroup(group));
 
   /// 打开/关闭"按系列记住"（UI-P3-2）。
   ///
-  /// 打开时把**当前生效值**快照成这个系列的覆盖；关闭时删掉覆盖、回到全局。
+  /// 打开时把**当前生效配置**快照成这个系列的覆盖；关闭时删掉覆盖、回到全局。
   void setSeriesOverride(String seriesId, bool enabled) {
     if (!enabled) {
       if (!state.seriesOverrides.containsKey(seriesId)) return;
@@ -121,32 +123,26 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
     _update(state.withSeriesOverride(seriesId, state.forSeries(seriesId)));
   }
 
-  /// 把当前设置存成一个命名预设（UI-P3-1）。
-  ///
-  /// 空名字/只有空格忽略。ID 用微秒时间戳：本地单用户、不需要全局唯一，
-  /// 也避免引入 uuid 依赖；同一微秒内连点两次的概率可以忽略。
+  /// 把当前配置存成一个命名预设（UI-P3-1）。
   void savePreset(String name, {String? seriesId}) {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return;
     final preset = ReaderPreset(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       name: trimmed,
-      prefs: state.forSeries(seriesId).configOnly(),
+      config: state.forSeries(seriesId),
     );
     _update(state.copyWith(presets: <ReaderPreset>[...state.presets, preset]));
   }
 
-  /// 应用一个预设：整体覆盖配置，但保留预设列表本身。
-  ///
-  /// 全局与"按系列"两条路径都只调 [ReaderPrefs.withConfig] /
-  /// [ReaderPrefs.withSeriesOverride]，字段不会各自漏抄一份（FIX-04）。
+  /// 应用一个预设：直接替换全局 [ReaderConfig] 或指定系列的覆盖。
   void applyPreset(String id, {String? seriesId}) {
     for (final preset in state.presets) {
       if (preset.id != id) continue;
       if (seriesId != null) {
-        _update(state.withSeriesOverride(seriesId, preset.prefs));
+        _update(state.withSeriesOverride(seriesId, preset.config));
       } else {
-        _update(state.withConfig(preset.prefs));
+        _update(state.copyWith(global: preset.config));
       }
       return;
     }
@@ -161,13 +157,13 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
     _update(state.copyWith(presets: next));
   }
 
-  /// 有 seriesId 时只改这个系列的覆盖；没有时改全局。
+  /// 有 seriesId 时只改这个系列的覆盖；没有时改全局 [ReaderConfig]。
   void _updateConfig(
     String? seriesId,
-    ReaderPrefs Function(ReaderPrefs current) change,
+    ReaderConfig Function(ReaderConfig current) change,
   ) {
     if (seriesId == null) {
-      _update(change(state));
+      _update(state.copyWith(global: change(state.global)));
       return;
     }
     _update(

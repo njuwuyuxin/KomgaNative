@@ -11,7 +11,7 @@ import 'package:material_ui/material_ui.dart';
 /// 面板里再塞一个输入流程会把它撑得更长；名字保存时就能起对。
 class ReaderPresetSection extends StatelessWidget {
   const ReaderPresetSection({
-    required this.prefs,
+    required this.presets,
     required this.palette,
     required this.onApply,
     required this.onDelete,
@@ -19,7 +19,7 @@ class ReaderPresetSection extends StatelessWidget {
     super.key,
   });
 
-  final ReaderPrefs prefs;
+  final List<ReaderPreset> presets;
   final ReaderPalette palette;
   final ValueChanged<String> onApply;
   final ValueChanged<String> onDelete;
@@ -48,14 +48,14 @@ class ReaderPresetSection extends StatelessWidget {
             ),
           ],
         ),
-        if (prefs.presets.isEmpty)
+        if (presets.isEmpty)
           Text(l10n.readerPresetEmpty, style: muted)
         else
           Wrap(
             spacing: AppSpacing.sm,
             runSpacing: AppSpacing.xs,
             children: <Widget>[
-              for (final preset in prefs.presets)
+              for (final preset in presets)
                 ReaderPresetChip(
                   key: Key('reader-preset-${preset.id}'),
                   preset: preset,
@@ -70,7 +70,7 @@ class ReaderPresetSection extends StatelessWidget {
   }
 
   Future<void> _promptName(BuildContext context, AppLocalizations l10n) async {
-    var name = l10n.readerPresetDefaultName(prefs.presets.length + 1);
+    var name = l10n.readerPresetDefaultName(presets.length + 1);
     final saved = await showDialog<String>(
       context: context,
       builder: (BuildContext context) => AlertDialog(

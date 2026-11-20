@@ -9,81 +9,93 @@ import 'package:komga_native/src/widgets/reader_settings_rows.dart';
 import 'package:komga_reader_engine/komga_reader_engine.dart';
 
 void main() {
-  group('ReaderPrefs', () {
+  group('ReaderPrefs & ReaderConfig', () {
     test('默认跟随书（auto）、不调暗、不常亮', () {
       const prefs = ReaderPrefs();
-      expect(prefs.mode, ReaderModeChoice.auto);
-      expect(prefs.brightness, 1);
-      expect(prefs.dimOpacity, 0);
-      expect(prefs.keepAwake, isFalse);
+      expect(prefs.global.mode, ReaderModeChoice.auto);
+      expect(prefs.global.brightness, 1);
+      expect(prefs.global.dimOpacity, 0);
+      expect(prefs.global.keepAwake, isFalse);
     });
 
     test('亮度越低遮罩越黑，且不允许全黑', () {
-      expect(const ReaderPrefs(brightness: 0.5).dimOpacity, closeTo(0.5, 1e-9));
       expect(
-        const ReaderPrefs(brightness: ReaderPrefs.minBrightness).dimOpacity,
+        const ReaderConfig(brightness: 0.5).dimOpacity,
+        closeTo(0.5, 1e-9),
+      );
+      expect(
+        const ReaderConfig(brightness: ReaderPrefs.minBrightness).dimOpacity,
         closeTo(0.8, 1e-9),
       );
-      // 就算存档里是 0，也不能变成全黑屏。
-      expect(const ReaderPrefs(brightness: 0).dimOpacity, closeTo(0.8, 1e-9));
+      expect(const ReaderConfig(brightness: 0).dimOpacity, closeTo(0.8, 1e-9));
     });
 
     test('copyWith 只改指定字段', () {
-      const prefs = ReaderPrefs(keepAwake: true);
-      final next = prefs.copyWith(brightness: 0.6);
+      const config = ReaderConfig(keepAwake: true);
+      final next = config.copyWith(brightness: 0.6);
       expect(next.brightness, 0.6);
       expect(next.keepAwake, isTrue);
       expect(next.mode, ReaderModeChoice.auto);
     });
 
-    test('JSON 往返', () {
+    test('JSON 往返保持扁平顶层兼容格式', () {
       const prefs = ReaderPrefs(
-        mode: ReaderModeChoice.double,
-        brightness: 0.7,
-        keepAwake: true,
+        global: ReaderConfig(
+          mode: ReaderModeChoice.double,
+          brightness: 0.7,
+          keepAwake: true,
+        ),
       );
-      expect(ReaderPrefs.fromJson(prefs.toJson()), prefs);
+      final json = prefs.toJson();
+      expect(json['mode'], 'double');
+      expect(ReaderPrefs.fromJson(json), prefs);
     });
 
     test('坏存档一律回默认，不让设置把阅读器弄坏', () {
       final prefs = ReaderPrefs.fromJson(<String, Object?>{
-        'mode': 'triple', // 不认识的模式
-        'brightness': '0.3', // 类型不对
-        'keepAwake': 'yes', // 类型不对
+        'mode': 'triple',
+        'brightness': '0.3',
+        'keepAwake': 'yes',
       });
-      expect(prefs.mode, ReaderModeChoice.auto);
-      expect(prefs.brightness, 1);
-      expect(prefs.keepAwake, isFalse);
+      expect(prefs.global.mode, ReaderModeChoice.auto);
+      expect(prefs.global.brightness, 1);
+      expect(prefs.global.keepAwake, isFalse);
     });
 
     test('亮度越界夹到 [min, 1]', () {
       expect(
-        ReaderPrefs.fromJson(<String, Object?>{'brightness': 5}).brightness,
+        ReaderPrefs.fromJson(<String, Object?>{'brightness': 5})
+            .global
+            .brightness,
         1,
       );
       expect(
-        ReaderPrefs.fromJson(<String, Object?>{'brightness': -2}).brightness,
+        ReaderPrefs.fromJson(<String, Object?>{'brightness': -2})
+            .global
+            .brightness,
         ReaderPrefs.minBrightness,
       );
     });
 
     test('适配 / 方向 / 背景的默认值：适应屏幕、跟随系列、黑色', () {
       const prefs = ReaderPrefs();
-      expect(prefs.fit, ReaderFitChoice.contain);
-      expect(prefs.direction, ReaderDirectionChoice.auto);
-      expect(prefs.background, ReaderBackgroundChoice.black);
+      expect(prefs.global.fit, ReaderFitChoice.contain);
+      expect(prefs.global.direction, ReaderDirectionChoice.auto);
+      expect(prefs.global.background, ReaderBackgroundChoice.black);
     });
 
     test('适配 / 方向 / 背景一起往返', () {
       const prefs = ReaderPrefs(
-        fit: ReaderFitChoice.cover,
-        direction: ReaderDirectionChoice.rightToLeft,
-        background: ReaderBackgroundChoice.dynamic,
+        global: ReaderConfig(
+          fit: ReaderFitChoice.cover,
+          direction: ReaderDirectionChoice.rightToLeft,
+          background: ReaderBackgroundChoice.dynamic,
+        ),
       );
       final parsed = ReaderPrefs.fromJson(prefs.toJson());
-      expect(parsed.fit, ReaderFitChoice.cover);
-      expect(parsed.direction, ReaderDirectionChoice.rightToLeft);
-      expect(parsed.background, ReaderBackgroundChoice.dynamic);
+      expect(parsed.global.fit, ReaderFitChoice.cover);
+      expect(parsed.global.direction, ReaderDirectionChoice.rightToLeft);
+      expect(parsed.global.background, ReaderBackgroundChoice.dynamic);
     });
 
     test('未知的适配/方向/背景值回默认（旧版本存档不会崩）', () {
@@ -92,24 +104,26 @@ void main() {
         'direction': 'sideways',
         'background': 42,
       });
-      expect(prefs.fit, ReaderFitChoice.contain);
-      expect(prefs.direction, ReaderDirectionChoice.auto);
-      expect(prefs.background, ReaderBackgroundChoice.black);
+      expect(prefs.global.fit, ReaderFitChoice.contain);
+      expect(prefs.global.direction, ReaderDirectionChoice.auto);
+      expect(prefs.global.background, ReaderBackgroundChoice.black);
     });
 
     test('沉浸式背景 JSON 往返', () {
-      const prefs = ReaderPrefs(background: ReaderBackgroundChoice.immersive);
+      const prefs = ReaderPrefs(
+        global: ReaderConfig(background: ReaderBackgroundChoice.immersive),
+      );
       expect(
-        ReaderPrefs.fromJson(prefs.toJson()).background,
+        ReaderPrefs.fromJson(prefs.toJson()).global.background,
         ReaderBackgroundChoice.immersive,
       );
     });
 
-    test('预设 JSON 往返：预设里的 prefs 不再带预设（不递归）', () {
+    test('预设 JSON 往返：预设直接持有 ReaderConfig', () {
       const preset = ReaderPreset(
         id: 'p1',
         name: 'Manga',
-        prefs: ReaderPrefs(
+        config: ReaderConfig(
           mode: ReaderModeChoice.double,
           fit: ReaderFitChoice.cover,
         ),
@@ -119,8 +133,7 @@ void main() {
       expect(parsed, prefs);
       expect(parsed.presets, hasLength(1));
       expect(parsed.presets.single.name, 'Manga');
-      expect(parsed.presets.single.prefs.mode, ReaderModeChoice.double);
-      expect(parsed.presets.single.prefs.presets, isEmpty);
+      expect(parsed.presets.single.config.mode, ReaderModeChoice.double);
     });
 
     test('坏预设条目跳过，好的保留', () {
@@ -147,52 +160,53 @@ void main() {
       expect(parsed.presets.map((ReaderPreset p) => p.name), <String>['Good']);
     });
 
-    test('系列覆盖 JSON 往返：forSeries 优先，覆盖里不再嵌套', () {
+    test('系列覆盖 JSON 往返：forSeries 优先返回对应 ReaderConfig', () {
       const prefs = ReaderPrefs(
-        mode: ReaderModeChoice.single,
-        seriesOverrides: <String, ReaderPrefs>{
-          's1': ReaderPrefs(mode: ReaderModeChoice.double),
+        global: ReaderConfig(mode: ReaderModeChoice.single),
+        seriesOverrides: <String, ReaderConfig>{
+          's1': ReaderConfig(mode: ReaderModeChoice.double),
         },
       );
       final parsed = ReaderPrefs.fromJson(prefs.toJson());
       expect(parsed.forSeries('s1').mode, ReaderModeChoice.double);
       expect(parsed.forSeries('s2').mode, ReaderModeChoice.single);
-      expect(parsed.seriesOverrides['s1']!.presets, isEmpty);
-      expect(parsed.seriesOverrides['s1']!.seriesOverrides, isEmpty);
     });
 
     test('锁定缩放默认关、JSON 往返、系列覆盖可带', () {
-      expect(const ReaderPrefs().lockZoom, isFalse);
+      expect(const ReaderPrefs().global.lockZoom, isFalse);
       expect(
-        ReaderPrefs.fromJson(<String, Object?>{'lockZoom': true}).lockZoom,
+        ReaderPrefs.fromJson(<String, Object?>{'lockZoom': true})
+            .global
+            .lockZoom,
         isTrue,
       );
       const prefs = ReaderPrefs(
-        lockZoom: true,
-        seriesOverrides: <String, ReaderPrefs>{
-          's1': ReaderPrefs(lockZoom: true),
+        global: ReaderConfig(lockZoom: true),
+        seriesOverrides: <String, ReaderConfig>{
+          's1': ReaderConfig(lockZoom: true),
         },
       );
       final parsed = ReaderPrefs.fromJson(prefs.toJson());
-      expect(parsed.lockZoom, isTrue);
+      expect(parsed.global.lockZoom, isTrue);
       expect(parsed.forSeries('s1').lockZoom, isTrue);
     });
 
     test('去白边默认关、JSON 往返、系列覆盖可带', () {
-      expect(const ReaderPrefs().trimBorders, isFalse);
+      expect(const ReaderPrefs().global.trimBorders, isFalse);
       expect(
         ReaderPrefs.fromJson(<String, Object?>{'trimBorders': true})
+            .global
             .trimBorders,
         isTrue,
       );
       const prefs = ReaderPrefs(
-        trimBorders: true,
-        seriesOverrides: <String, ReaderPrefs>{
-          's1': ReaderPrefs(trimBorders: true),
+        global: ReaderConfig(trimBorders: true),
+        seriesOverrides: <String, ReaderConfig>{
+          's1': ReaderConfig(trimBorders: true),
         },
       );
       final parsed = ReaderPrefs.fromJson(prefs.toJson());
-      expect(parsed.trimBorders, isTrue);
+      expect(parsed.global.trimBorders, isTrue);
       expect(parsed.forSeries('s1').trimBorders, isTrue);
     });
   });
@@ -224,7 +238,6 @@ void main() {
         ),
         isFalse,
       );
-      // 系列没填方向时按从左到右（LTR 是阅读器里最常见的默认）。
       expect(
         ReaderDirectionChoice.auto.resolveRightToLeft(ReadingDirection.unknown),
         isFalse,

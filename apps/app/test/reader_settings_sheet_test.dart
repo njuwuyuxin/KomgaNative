@@ -13,10 +13,12 @@ void main() {
       tester,
       book: demoReaderBook(),
       initialPrefs: const ReaderPrefs(
-        mode: ReaderModeChoice.double,
-        fit: ReaderFitChoice.cover,
-        direction: ReaderDirectionChoice.rightToLeft,
-        background: ReaderBackgroundChoice.white,
+        global: ReaderConfig(
+          mode: ReaderModeChoice.double,
+          fit: ReaderFitChoice.cover,
+          direction: ReaderDirectionChoice.rightToLeft,
+          background: ReaderBackgroundChoice.white,
+        ),
       ),
     );
     await openSettings(tester);
@@ -51,7 +53,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('reader-background-white')));
     await tester.pumpAndSettle();
-    expect(store.prefs?.background, ReaderBackgroundChoice.white);
+    expect(store.prefs?.global.background, ReaderBackgroundChoice.white);
 
     await tester.ensureVisible(find.byKey(const Key('reader-reset-color')));
     await tester.pumpAndSettle();
@@ -75,9 +77,11 @@ void main() {
       tester,
       book: demoReaderBook(),
       initialPrefs: const ReaderPrefs(
-        mode: ReaderModeChoice.double,
-        background: ReaderBackgroundChoice.white,
-        brightness: 0.6,
+        global: ReaderConfig(
+          mode: ReaderModeChoice.double,
+          background: ReaderBackgroundChoice.white,
+          brightness: 0.6,
+        ),
       ),
     );
     await openSettings(tester);
@@ -87,9 +91,13 @@ void main() {
     await tester.tap(find.byKey(const Key('reader-reset-color')));
     await tester.pumpAndSettle();
 
-    expect(store.prefs?.background, ReaderBackgroundChoice.black);
-    expect(store.prefs?.brightness, 1);
-    expect(store.prefs?.mode, ReaderModeChoice.double, reason: '页面组不该被重置');
+    expect(store.prefs?.global.background, ReaderBackgroundChoice.black);
+    expect(store.prefs?.global.brightness, 1);
+    expect(
+      store.prefs?.global.mode,
+      ReaderModeChoice.double,
+      reason: '页面组不该被重置',
+    );
   });
 
   testWidgets('适配方式是 4 个小示意图', (WidgetTester tester) async {
@@ -114,7 +122,7 @@ void main() {
     // 走公共 pickOption：打开面板 → 滚到该行 → 点 → 关面板。
     await pickOption(tester, 'reader-turn-fade');
 
-    expect(store.prefs?.pageTurn, ReaderPageTurnChoice.fade);
+    expect(store.prefs?.global.pageTurn, ReaderPageTurnChoice.fade);
   });
 
   testWidgets('墨水屏：示意图拿到线框调色板，且没有背景组', (WidgetTester tester) async {

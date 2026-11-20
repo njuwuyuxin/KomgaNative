@@ -88,7 +88,9 @@ void main() {
       tester,
       repository: FakeReaderRepository(pageCount: 6),
       book: demoReaderBook(),
-      initialPrefs: const ReaderPrefs(mode: ReaderModeChoice.double),
+      initialPrefs: const ReaderPrefs(
+        global: ReaderConfig(mode: ReaderModeChoice.double),
+      ),
     );
 
     // 先跳到第 3 页：默认它在 [1,2] 这一屏里。
