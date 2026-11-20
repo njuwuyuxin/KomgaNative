@@ -242,12 +242,50 @@ void main() {
       expect(key, startsWith('TESTONLY'));
     });
 
+    test(
+      '在读列表：/books?read_status=IN_PROGRESS&sort=readProgress.readDate,desc',
+      () async {
+        final session = _sessionWith(
+          _replay(fixture('books-in-progress.json')),
+        );
+        final page = await session.fetchInProgressBooks();
+
+        expect(page.totalElements, 2);
+        expect(page.items, hasLength(2));
+        expect(page.items.first.name, 'Sunny v01');
+        expect(page.items.last.name, 'Akira v01');
+        for (final book in page.items) {
+          expect(book.readProgress, isNotNull);
+          expect(book.readProgress!.completed, isFalse);
+        }
+        expect(
+          page.items.first.readProgress!.lastModified.isAfter(
+            page.items.last.readProgress!.lastModified,
+          ),
+          isTrue,
+        );
+      },
+    );
+
     test('ondeck 空页也能解析（空态 UI 用）', () async {
       final session = _sessionWith(_replay(fixture('ondeck.json')));
       final page = await session.fetchOndeck();
 
       expect(page.totalElements, 0);
       expect(page.items, isEmpty);
+    });
+
+    test('ondeck 有数据时返回上一卷已读完系列的首本未读（readProgress 为 null）', () async {
+      final session = _sessionWith(_replay(fixture('ondeck-next.json')));
+      final page = await session.fetchOndeck();
+
+      expect(page.totalElements, 1);
+      final next = page.items.single;
+      expect(next.seriesTitle, 'Frieren');
+      expect(next.name, 'Frieren v02');
+      expect(next.number, '2');
+      expect(next.readProgress, isNull);
+      expect(next.isUnread, isTrue);
     });
 
     test('read_status=UNREAD 的真实响应可解析，且确实全是未读', () async {

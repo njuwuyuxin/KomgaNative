@@ -8,6 +8,7 @@ import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/page_share.dart';
+import 'package:komga_native/src/data/progress/progress_sync_service.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
 import 'package:komga_native/src/data/reading_session_tracker.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
@@ -18,6 +19,7 @@ import 'package:komga_native/src/providers/progress_providers.dart';
 import 'package:komga_native/src/providers/reading_history_provider.dart';
 import 'package:komga_native/src/providers/reader_prefs_provider.dart';
 import 'package:komga_native/src/providers/reader_providers.dart';
+import 'package:komga_native/src/providers/series_read_provider.dart';
 import 'package:komga_native/src/providers/settings_provider.dart';
 import 'package:komga_native/src/widgets/edge_swipe_back.dart';
 import 'package:komga_native/src/widgets/page_curl.dart';
@@ -97,10 +99,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // 阅读会话从这里开始计时（HIS-01）。起点页码用书自带的进度，
-    // 页列表还没回来也不影响——`_setPage` 之后会把 endPage 更新上去。
+    // 阅读会话与进度收尾服务在 initState 预取（dispose 里不能再碰 ref）。
     _session.start(page: widget.book?.readProgress?.page ?? 1);
     _recorder = ref.read(readingSessionRecorderProvider);
+    _progressSync = ref.read(progressSyncProvider);
+    _committer = ref.read(readerProgressCommitterProvider);
     startSessionTicker();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _keyboardFocus.requestFocus();
@@ -109,10 +112,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
 
   @override
   void dispose() {
-    // 退出阅读器时结算本次会话（HIS-01）。`ref` 在 dispose 里不能再用，
-    // 所以 recorder 在 initState 就取好了。
     stopSessionTicker();
     _settleSession(completed: false);
+    _settleProgressOnLeave();
     WidgetsBinding.instance.removeObserver(this);
     _keyboardFocus.dispose();
     _progress.dispose();
@@ -137,36 +139,40 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     );
     final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     final openingHero = widget.heroTag;
-    return EdgeSwipeBack(
-      child: VolumeKeyScope(
-        onKey: _onVolumeKey,
-        child: Stack(
-          fit: StackFit.expand,
-          children: <Widget>[
-            ReaderPagesGate(
-              pages: ref.watch(readerPagesProvider(widget.bookId)),
-              palette: ReaderPalette.of(isEink: isEink),
-              onRetry: () => ref.invalidate(readerPagesProvider(widget.bookId)),
-              builder: (List<PageInfo> pages) => _buildPages(
-                context,
-                isEink,
-                pages,
-                allPrefs.tabletLayout,
-                config,
-                book,
-              ),
-            ),
-            // 继续阅读卡片的封面先飞进来，落地后再由页图接管（UI-P2-2）。
-            // 没有源卡片、墨水屏、系统"减少动态效果"时都不建。
-            if (openingHero != null && !isEink && !reduceMotion)
-              Positioned.fill(
-                child: ReaderOpeningHero(
-                  bookId: widget.bookId,
-                  page: widget.book?.readProgress?.page ?? 1,
-                  tag: openingHero,
+    return PopScope(
+      onPopInvokedWithResult: (bool didPop, Object? _) {
+        if (didPop) _settleProgressOnLeave();
+      },
+      child: EdgeSwipeBack(
+        child: VolumeKeyScope(
+          onKey: _onVolumeKey,
+          child: Stack(
+            fit: StackFit.expand,
+            children: <Widget>[
+              ReaderPagesGate(
+                pages: ref.watch(readerPagesProvider(widget.bookId)),
+                palette: ReaderPalette.of(isEink: isEink),
+                onRetry: () =>
+                    ref.invalidate(readerPagesProvider(widget.bookId)),
+                builder: (List<PageInfo> pages) => _buildPages(
+                  context,
+                  isEink,
+                  pages,
+                  allPrefs.tabletLayout,
+                  config,
+                  book,
                 ),
               ),
-          ],
+              if (openingHero != null && !isEink && !reduceMotion)
+                Positioned.fill(
+                  child: ReaderOpeningHero(
+                    bookId: widget.bookId,
+                    page: widget.book?.readProgress?.page ?? 1,
+                    tag: openingHero,
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -199,6 +205,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       page: _resolvePage(total),
       groupFrom: _spreadFrom,
     );
+    _noteBookAndLayout(book, layout);
     // 配色在这一屏才算得出来：动态背景要读当前屏各页的页边主色（UI-P1-5）。
     final palette = resolveReaderPalette(
       isEink: isEink,

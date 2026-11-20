@@ -6,14 +6,18 @@ part of 'reader_screen.dart';
 /// 分屏起点、隐身开关等私有状态，拆出去只会变成一长串回调参数。part 与宿主
 /// 同属一个 library，私有成员照常可见，宿主文件也回到 350 行以内。
 mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
+  late ProgressSyncService _progressSync;
+  late ReaderProgressCommitter _committer;
+
   late final ReaderProgressWriter _progress = ReaderProgressWriter(
-    write: (int page) => ref
-        .read(progressSyncProvider)
-        .save(
-          widget.bookId,
-          page: page,
-          completed: _currentLayout()?.isCompletedAt(page) ?? false,
-        ),
+    write: (int page) => _progressSync.save(
+      widget.bookId,
+      page: page,
+      completed:
+          ((!_settledLeave && mounted ? _currentLayout() : null) ?? _lastLayout)
+              ?.isCompletedAt(page) ??
+          false,
+    ),
   );
 
   late final ReaderPreloader _preloader = ReaderPreloader(
@@ -33,76 +37,37 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
   int _page = 0;
   bool _chromeVisible = true;
 
+  /// 最近一次布局与书元信息缓存：供退出阅读器（`dispose` 不能碰 `ref`）时落盘。
+  ReaderLayout? _lastLayout;
+  Book? _lastBook;
+  bool? _initialBookUnread;
+  bool _settledLeave = false;
+
   /// 本次阅读的时长/页数统计（HIS-01）。
   final ReadingSessionTracker _session = ReadingSessionTracker();
 
   /// 会话落库用；在 `initState` 里取好，`dispose` 里不能再碰 `ref`。
   late ReadingSessionRecorder _recorder;
 
-  /// chrome 里"本次阅读时长"用（HIS-04）。30 秒一跳，且**只在分钟数变了**
-  /// 才 setState——每秒重建整页会把长条漫画的滚动拖垮。
-  Timer? _sessionTicker;
-  int _shownSessionMinutes = 0;
-
-  void startSessionTicker() {
-    _sessionTicker?.cancel();
-    _sessionTicker = Timer.periodic(
-      const Duration(seconds: 30),
-      (Timer _) => _tickSession(),
-    );
-  }
-
-  void stopSessionTicker() {
-    _sessionTicker?.cancel();
-    _sessionTicker = null;
-  }
-
-  void _tickSession() {
-    if (!mounted) return;
-    if (!_effectiveConfig(ref.read(readerPrefsProvider)).showSessionTime) {
-      return;
+  void _noteBookAndLayout(Book? book, ReaderLayout layout) {
+    _lastLayout = layout;
+    if (book != null) {
+      _lastBook = book;
+      _initialBookUnread ??= book.isUnread;
+      _progressSync.noteBook(book);
     }
-    final minutes = _session.elapsed.inMinutes;
-    if (minutes == _shownSessionMinutes) return;
-    setState(() => _shownSessionMinutes = minutes);
   }
 
-  /// 页码文案后面挂上"本次 12 分"（可关）。
-  ///
-  /// 和写进历史的那条会话同一口径（都来自 [ReadingSessionTracker]），
-  /// 不会出现"阅读器里显示 12 分、历史里写着 9 分"。
-  String _pageLabelWithSession(
-    String label,
-    AppLocalizations l10n, {
-    required bool showSessionTime,
-  }) {
-    if (!showSessionTime) return label;
-    if (_shownSessionMinutes <= 0) return label;
-    return l10n.readerPageLabelWithSession(label, _shownSessionMinutes);
-  }
-
-  /// 结算本次会话并写库；太短（<10s）直接丢掉。
-  ///
-  /// 隐身模式下不记：用户开隐身就是想"这次阅读别留痕"。
-  void _settleSession({required bool completed}) {
-    if (_incognito) {
-      _session.finish(
-        bookId: widget.bookId,
-        seriesId: widget.book?.seriesId ?? widget.bookId,
-        bookName: widget.book?.name ?? widget.bookId,
-        completed: completed,
-      );
-      return;
+  /// 计算切后台或退出阅读器时应当补写的页码（不需要补写时返回 null）。
+  int? _exitProgressPage() {
+    final pending = _progress.pendingPage;
+    if (pending != null) return pending;
+    if (_page > 0) return _page;
+    final layout = _lastLayout;
+    if ((_initialBookUnread ?? false) && layout != null && layout.total > 0) {
+      return layout.page;
     }
-    final draft = _session.finish(
-      bookId: widget.bookId,
-      seriesId: widget.book?.seriesId ?? widget.bookId,
-      bookName: widget.book?.name ?? widget.bookId,
-      completed: completed,
-      page: _page > 0 ? _page : null,
-    );
-    if (draft == null) return;
-    unawaited(_recorder.record(draft));
+    return null;
   }
 
   /// 横屏自动双页用；由 `_buildPages` 每次布局时更新（UI-P3-3）。
@@ -153,9 +118,13 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
     _requestTurn(key == PageTurnKey.next ? 1 : -1, mode);
   }
 
-  /// 当前书的系列 id（按系列记忆设置用，UI-P3-2）。
+  /// 当前书的系列 id（按系列记忆设置与退出联动刷新用，UI-P3-2）。
   String? get _seriesId =>
-      (widget.book ?? ref.read(readerBookProvider(widget.bookId)).value)
+      (_lastBook ??
+              widget.book ??
+              (!_settledLeave && mounted
+                  ? ref.read(readerBookProvider(widget.bookId)).value
+                  : null))
           ?.seriesId;
 
   /// 系列覆盖优先，其余用全局。
@@ -179,11 +148,9 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
     }
     // 切后台：先把已读时长钉住，避免后台挂着继续算。
     _session.pause();
-    final total =
-        ref.read(readerPagesProvider(widget.bookId)).value?.length ?? 0;
-    if (total == 0) return;
     if (_incognito) return;
-    unawaited(_progress.flush(_resolvePage(total)));
+    final page = _exitProgressPage();
+    if (page != null) unawaited(_progress.flush(page));
   }
 
   ReadingMode _modeFor(ReaderPrefs prefs, {bool? landscape}) =>

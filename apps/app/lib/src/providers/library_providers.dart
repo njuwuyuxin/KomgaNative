@@ -126,7 +126,7 @@ class ReadStatusEpoch extends Notifier<int> {
 final NotifierProvider<ReadStatusEpoch, int> readStatusEpochProvider =
     NotifierProvider<ReadStatusEpoch, int>(ReadStatusEpoch.new);
 
-/// 继续阅读（在读过、还没读完的书）。
+/// 继续阅读（优先 `IN_PROGRESS` 在读书籍，无在读书时兜底 Komga `ondeck` 下一卷未读）。
 final ondeckProvider = FutureProvider<PageResult<Book>>((Ref ref) {
   return ref.watch(libraryRepositoryProvider).ondeck();
 });

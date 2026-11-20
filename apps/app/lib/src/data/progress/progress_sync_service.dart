@@ -34,8 +34,23 @@ class ProgressSyncService {
 
   Future<void>? _inFlight;
   final Set<String> _authBlockedScopes = <String>{};
+  static const int _maxKnownBooksPerScope = 256;
+  final Map<String, Map<String, Book>> _knownBooks =
+      <String, Map<String, Book>>{};
 
   ProgressStore get store => _store;
+
+  /// 记住一本书的基础元信息（供离线/同步失败时把本地 pending 书补进"继续阅读"）。
+  void noteBook(Book book, {String? scope}) {
+    final key = scope ?? _activeScope();
+    final bucket = _knownBooks.putIfAbsent(key, () => <String, Book>{});
+    bucket
+      ..remove(book.id)
+      ..[book.id] = book;
+    if (bucket.length > _maxKnownBooksPerScope) {
+      bucket.remove(bucket.keys.first);
+    }
+  }
 
   /// 用户显式改了阅读状态（标记已读/未读）后调用：本地那份 pending 已过期。
   Future<void> forceAdopt(String bookId, ReadProgress? remote) =>
@@ -114,6 +129,7 @@ class ProgressSyncService {
 
     final merged = <Book>[];
     for (final book in books) {
+      noteBook(book, scope: scope);
       final record = records[book.id];
       final decision = _decide(record, book.readProgress);
 
@@ -139,6 +155,40 @@ class ProgressSyncService {
   Future<Book?> overlayOne(Book? book) async {
     if (book == null) return null;
     return (await overlay(<Book>[book])).single;
+  }
+
+  /// 当前服务器分区中"尚未同步成功且仍在读"的本地书籍（按最近写入倒序）。
+  ///
+  /// 解决"服务端同步失败/离线时，刚打开或翻过的书没有进入服务端 IN_PROGRESS 列表"：
+  /// 优先用内存已知元信息构造 [Book]，未知时再尝试 [loadBook]（命中 HTTP 缓存或在线补查）。
+  Future<List<Book>> pendingInProgressBooks({
+    Future<Book?> Function(String bookId)? loadBook,
+  }) async {
+    final scope = _activeScope();
+    final pending = await _store.pending(scope: scope);
+    if (pending.isEmpty) return const <Book>[];
+
+    final known = _knownBooks[scope];
+    final records = await _store.records(
+      pending.map((PendingProgress p) => p.target.bookId),
+      scope: scope,
+    );
+    final result = <Book>[];
+    for (final item in pending.reversed) {
+      final target = item.target;
+      if (target.completed || target.page <= 0) continue;
+      final base = known?[target.bookId] ?? await loadBook?.call(target.bookId);
+      if (base == null) continue;
+      final progress =
+          records[target.bookId]?.toReadProgress() ??
+          ReadProgress(
+            page: target.page,
+            completed: false,
+            lastModified: DateTime.now().toUtc(),
+          );
+      result.add(base.withProgress(progress));
+    }
+    return result;
   }
 
   SyncDecision _decide(ProgressRecord? record, ReadProgress? remote) {

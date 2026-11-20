@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_native/src/data/progress/progress_sync_service.dart';
+import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/providers/progress_providers.dart';
 import 'package:komga_native/src/session/session_controller.dart';
 import 'package:material_ui/material_ui.dart';
@@ -40,7 +41,15 @@ class _ProgressSyncScopeState extends ConsumerState<ProgressSyncScope>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) return;
-    unawaited(_sync.flush());
+    unawaited(_flushAndRefreshReadingNow());
+  }
+
+  Future<void> _flushAndRefreshReadingNow() async {
+    await _sync.flush();
+    if (!mounted) return;
+    // 回到前台时顺带刷新"继续阅读"（多端进度对账 + 本地补交后的最新结果）；
+    // 未挂载监听者时 invalidate 是零开销空操作。
+    ref.invalidate(ondeckProvider);
   }
 
   @override

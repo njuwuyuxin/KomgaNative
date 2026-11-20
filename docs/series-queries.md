@@ -141,3 +141,4 @@ Komga 对**不存在的** sort 属性不会报错，而是静默忽略、返回�
 - "未读数 / 阅读进度 / 最近打开"三种排序**没有服务端支持**，因此 LIB-04 不新增排序项；
   想要这些视图只能用 `read_status` 筛选（已验证）配合现有排序。
 - 判定方法以后按本文的**对照组**做法执行：返回 200 不等于参数被接受。
+- 注意区分 `/api/v1/series` 与 `/api/v1/books` 两张实体表：`readProgress.readDate,desc` 在 `/api/v1/series` 上无效，但在 `/api/v1/books?read_status=IN_PROGRESS` 上经对照组验证**生效**（见 `docs/komga-api-verification.md` §3.9 与 `books-in-progress.json`）。

@@ -16,21 +16,40 @@ class ReaderProgressWriter {
   final Duration delay;
 
   int _lastSaved = 0;
+  int? _pendingPage;
+  bool _hasWritten = false;
   Timer? _timer;
+
+  /// 本次阅读器生命周期内是否成功落盘过至少一次进度。
+  bool get hasWritten => _hasWritten;
+
+  /// 当前防抖队列中尚未落盘的页码（无待写项时为 null）。
+  int? get pendingPage => _pendingPage;
 
   /// 防抖写入第 [page] 页。
   void schedule(int page) {
+    _pendingPage = page;
     _timer?.cancel();
     _timer = Timer(delay, () => unawaited(flush(page)));
   }
 
-  /// 立即写入（切后台/锁屏）：只靠防抖会丢掉"看完就退出"的那一页。
+  /// 取消尚未触发的防抖写入（如开启隐身模式）。
+  void cancel() {
+    _timer?.cancel();
+    _timer = null;
+    _pendingPage = null;
+  }
+
+  /// 立即写入（切后台/锁屏/退出阅读器）：只靠防抖会丢掉"看完就退出"的那一页。
   Future<void> flush(int page) async {
     _timer?.cancel();
-    if (page == _lastSaved) return;
+    _timer = null;
+    _pendingPage = null;
+    if (page <= 0 || page == _lastSaved) return;
     try {
       await write(page);
       _lastSaved = page;
+      _hasWritten = true;
     } on Object {
       // 本地库打不开（磁盘满/库损坏/测试环境没有 path_provider 通道）也
       // 不能把阅读打断：这一页只是没落盘，下一次翻页会再试。
@@ -38,5 +57,5 @@ class ReaderProgressWriter {
     }
   }
 
-  void dispose() => _timer?.cancel();
+  void dispose() => cancel();
 }

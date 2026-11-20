@@ -100,7 +100,19 @@ extension KomgaSessionCatalog on KomgaSession {
     return pageResultFromJson(data, bookFromJson);
   }
 
-  /// "继续阅读"列表（Komga 的 ondeck）。
+  /// 在读中的书（Komga 的 Keep Reading：按最近阅读时间倒序）。
+  Future<PageResult<Book>> fetchInProgressBooks({
+    int page = 0,
+    int size = 20,
+  }) async {
+    final data = _requireMap(
+      await _getJson(_urls.inProgressBooks(page: page, size: size)),
+      '在读书籍列表',
+    );
+    return pageResultFromJson(data, bookFromJson);
+  }
+
+  /// 待读下一本列表（Komga 的 ondeck：已读过至少一本且当前无在读书的系列的首本未读）。
   Future<PageResult<Book>> fetchOndeck({int size = 20}) async {
     final data = _requireMap(
       await _getJson(_urls.ondeck(size: size)),

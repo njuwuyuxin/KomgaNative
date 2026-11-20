@@ -16,7 +16,7 @@ import 'package:material_ui/material_ui.dart';
 /// "正在读"首页（UI-P2-6）。
 ///
 /// 三块内容，从上到下：
-/// 1. **大号继续阅读卡片**：Komga 的 ondeck 第一本（"上次看到哪"）；
+/// 1. **大号继续阅读卡片**：优先当前在读（`IN_PROGRESS` 最近阅读），无在读书时兜底 Komga `ondeck`（下一卷未读）；
 /// 2. **最近添加**：按 `createdDate,desc` 的系列横向货架；
 /// 3. **按库分组**：每个库一条横向货架。
 ///

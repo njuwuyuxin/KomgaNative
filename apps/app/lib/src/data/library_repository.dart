@@ -45,7 +45,7 @@ abstract interface class LibraryRepository {
     SeriesReadStatus? readStatus,
   });
 
-  /// "继续阅读"（Komga 的 ondeck：在读过、还没读完的书）。
+  /// "继续阅读"：优先返回在读中的书（`IN_PROGRESS`），再用 Komga `ondeck`（下一卷未读）兜底。
   Future<PageResult<Book>> ondeck({int size = 20});
 
   /// 系列封面。返回 `null` 表示"没有封面"——装饰性资源**不允许**让整页报错。
@@ -162,11 +162,70 @@ class KomgaLibraryRepository implements LibraryRepository {
 
   @override
   Future<PageResult<Book>> ondeck({int size = 20}) async {
+    // 先尽力把本地积压的进度推上服务端，避免刚退出阅读器就拉到旧列表；
+    // 断网时 flush 内部吞掉 ShelfFailure 立即返回，不阻塞离线回退。
+    await _sync.flush();
+
+    final PageResult<Book> inProgressRaw;
     try {
-      final result = await _session.fetchOndeck(size: size);
-      return await overlayBooksPage(_sync, result);
+      inProgressRaw = await _session.fetchInProgressBooks(size: size);
     } on KomgaError catch (error) {
+      if (error is KomgaNetworkError || error is KomgaServerError) {
+        final localOnly = await _sync.pendingInProgressBooks(
+          loadBook: _tryLoadBook,
+        );
+        if (localOnly.isNotEmpty) {
+          final items = localOnly.take(size).toList(growable: false);
+          return PageResult<Book>(
+            items: items,
+            totalElements: localOnly.length,
+            page: 0,
+            size: size,
+          );
+        }
+      }
       throw shelfFailureOf(error);
+    }
+
+    PageResult<Book>? nextUnreadRaw;
+    try {
+      nextUnreadRaw = await _session.fetchOndeck(size: size);
+    } on KomgaError catch (error) {
+      if (inProgressRaw.items.isEmpty) {
+        final localOnly = await _sync.pendingInProgressBooks(
+          loadBook: _tryLoadBook,
+        );
+        if (localOnly.isEmpty) throw shelfFailureOf(error);
+      }
+    }
+
+    final inProgressOverlay = await _sync.overlay(inProgressRaw.items);
+    final nextOverlay = nextUnreadRaw == null
+        ? const <Book>[]
+        : await _sync.overlay(nextUnreadRaw.items);
+    final pendingLocal = await _sync.pendingInProgressBooks(
+      loadBook: _tryLoadBook,
+    );
+
+    final merged = _mergeContinueReading(
+      pendingLocal: pendingLocal,
+      inProgress: inProgressOverlay,
+      ondeck: nextOverlay,
+    );
+    final items = merged.take(size).toList(growable: false);
+    return PageResult<Book>(
+      items: items,
+      totalElements: merged.length,
+      page: 0,
+      size: size,
+    );
+  }
+
+  Future<Book?> _tryLoadBook(String bookId) async {
+    try {
+      return await _session.fetchBook(bookId);
+    } on KomgaError {
+      return null;
     }
   }
 
@@ -205,3 +264,36 @@ Future<PageResult<Book>> overlayBooksPage(
   page: result.page,
   size: result.size,
 );
+
+List<Book> _mergeContinueReading({
+  required List<Book> pendingLocal,
+  required List<Book> inProgress,
+  required List<Book> ondeck,
+}) {
+  final seen = <String>{};
+  final active = <Book>[];
+  final upNext = <Book>[];
+
+  for (final book in pendingLocal) {
+    if (!book.isCompleted && !book.isUnread && seen.add(book.id)) {
+      active.add(book);
+    }
+  }
+  for (final book in inProgress) {
+    if (!book.isCompleted && !book.isUnread && seen.add(book.id)) {
+      active.add(book);
+    }
+  }
+
+  final activeSeries = <String>{for (final b in active) b.seriesId};
+  for (final book in ondeck) {
+    if (book.isCompleted || !seen.add(book.id)) continue;
+    if (!book.isUnread) {
+      active.add(book);
+      activeSeries.add(book.seriesId);
+    } else if (!activeSeries.contains(book.seriesId)) {
+      upNext.add(book);
+    }
+  }
+  return <Book>[...active, ...upNext];
+}

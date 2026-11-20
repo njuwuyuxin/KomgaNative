@@ -243,5 +243,91 @@ void main() {
         expect(ondeck.items.single.readProgress?.page, 17);
       },
     );
+
+    test('ondeck 优先返回 IN_PROGRESS 在读书，不同系列的 ondeck 下一卷排在后面', () async {
+      final adapter = _Adapter((RequestOptions options) async {
+        if (options.uri.path == '/api/v1/books') {
+          expect(options.uri.queryParameters['read_status'], 'IN_PROGRESS');
+          expect(
+            options.uri.queryParameters['sort'],
+            'readProgress.readDate,desc',
+          );
+          return _rawJson(
+            '{"content":['
+            '{"id":"s1-b1","seriesId":"s1","seriesTitle":"Frieren","name":"Vol. 1","number":1,'
+            '"media":{"pagesCount":20},'
+            '"readProgress":{"page":4,"completed":false,"lastModified":"2026-11-20T00:00:00Z"}}'
+            '],"totalElements":1,"number":0,"size":20}',
+          );
+        }
+        if (options.uri.path == '/api/v1/books/ondeck') {
+          return _rawJson(
+            '{"content":['
+            '{"id":"s1-b2","seriesId":"s1","seriesTitle":"Frieren","name":"Vol. 2","number":2,'
+            '"media":{"pagesCount":20},"readProgress":null},'
+            '{"id":"s2-b2","seriesId":"s2","seriesTitle":"Akira","name":"Vol. 2","number":2,'
+            '"media":{"pagesCount":18},"readProgress":null}'
+            '],"totalElements":2,"number":0,"size":20}',
+          );
+        }
+        throw StateError('unexpected path: ${options.uri.path}');
+      });
+
+      final page = await _repository(adapter).ondeck();
+      // s1 已有在读书 s1-b1，同系列的 s1-b2 不重复占位；s2 无在读书，s2-b2 作为下一卷兜底。
+      expect(page.items.map((Book b) => b.id), <String>['s1-b1', 's2-b2']);
+    });
+
+    test('本地刚读完但尚未同步时，从继续阅读剔除已读本并放行下一卷', () async {
+      final store = InMemoryProgressStore();
+      await store.enqueue(
+        const ProgressTarget(bookId: 's1-b1', page: 20, completed: true),
+      );
+      final adapter = _Adapter((RequestOptions options) async {
+        if (options.uri.path == '/api/v1/books') {
+          return _rawJson(_bookPageJson(id: 's1-b1', remotePage: 19));
+        }
+        return _rawJson(
+          '{"content":['
+          '{"id":"s1-b2","seriesId":"s1","seriesTitle":"Frieren","name":"Vol. 2","number":2,'
+          '"media":{"pagesCount":20},"readProgress":null}'
+          '],"totalElements":1,"number":0,"size":20}',
+        );
+      });
+
+      final page = await _repository(adapter, store: store).ondeck();
+      expect(page.items.map((Book b) => b.id), <String>['s1-b2']);
+    });
+
+    test('同步失败时，本地刚打开的未读新书仍能出现在继续阅读首位', () async {
+      final store = InMemoryProgressStore();
+      final adapter = _Adapter((RequestOptions options) async {
+        if (options.uri.path == '/api/v1/series/s1/books') {
+          return _rawJson(
+            '{"content":['
+            '{"id":"s1-b1","seriesId":"s1","seriesTitle":"Frieren","name":"Vol. 1","number":1,'
+            '"media":{"pagesCount":12},"readProgress":null}'
+            '],"totalElements":1,"number":0,"size":100}',
+          );
+        }
+        // 服务端尚未收到 PATCH，IN_PROGRESS 与 ondeck 仍为空。
+        return _rawJson(
+          '{"content":[],"totalElements":0,"number":0,"size":20}',
+        );
+      });
+
+      final repository = _repository(adapter, store: store);
+      // 用户先在系列页浏览过该书（缓存了 Book 元信息），随后打开第 1 页但 PATCH 断网失败。
+      await repository.books('s1');
+      await store.enqueue(
+        const ProgressTarget(bookId: 's1-b1', page: 1, completed: false),
+      );
+
+      final page = await repository.ondeck();
+      expect(page.items, hasLength(1));
+      expect(page.items.single.id, 's1-b1');
+      expect(page.items.single.readProgress?.page, 1);
+      expect(page.items.single.readProgress?.completed, isFalse);
+    });
   });
 }

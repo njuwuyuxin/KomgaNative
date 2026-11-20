@@ -139,7 +139,22 @@ Invoke-WebRequest 'http://127.0.0.1:25600/api/v1/libraries/<libId>/scan' -Method
 | `GET /api/v1/readlists?page=0&size=20` | 分页对象；`content[]` 带 `id/name/summary/ordered/bookIds/...` | `readlists.json` |
 | `GET /api/v1/readlists/{id}/books?size=20` | 普通 `PageBookDto`，元素与系列书列表完全同形 | `readlist-books.json` |
 
-`GET /api/v1/books?search=akira&size=20` 也是普通 `PageBookDto`，`content[]` 带 `seriesTitle`（解析层暂不用）；响应存入 `books-search.json`，用于 P3-9 的全局书搜索。
+`GET /api/v1/books?search=akira&size=20` 也是普通 `PageBookDto`，`content[]` 带 `seriesTitle`；响应存入 `books-search.json`，用于 P3-9 的全局书搜索。
+
+### 3.9 继续阅读：`IN_PROGRESS` vs `ondeck`（2026-11-20 实测纠偏）
+
+官方 `openapi-1.30.1.json` 对 `/api/v1/books/ondeck` 的声明是：
+`Return first unread book of series with at least one book read and no books in progress.`
+在本地 1.30.1 实例上用对照组复验了"在读列表"与 `ondeck` 的真实语义：
+
+| 请求 | 真实行为 | fixture |
+|---|---|---|
+| `GET /api/v1/books/ondeck?size=20`（当 `Akira v01` 处于 `page=1, completed=false` 时） | **返回空列表 `[]`**（因为该系列存在 `IN_PROGRESS` 的书，且未读完过一整本） | `ondeck.json` |
+| `GET /api/v1/books/ondeck?size=20`（当 `Frieren v01` 已读完、`Frieren v02` 未读时） | 返回 `Frieren v02`（`readProgress: null`）——即"下一卷待读"，不含半读的书 | `ondeck-next.json` |
+| `GET /api/v1/books?page=0&size=20&read_status=IN_PROGRESS&sort=bogusField,desc`（对照组） | `Akira v01 (11-19)` → `Sunny v01 (11-20)`（默认顺序） | — |
+| `GET /api/v1/books?page=0&size=20&read_status=IN_PROGRESS&sort=readProgress.readDate,desc` | `Sunny v01 (11-20)` → `Akira v01 (11-19)`（`asc` 对称反转，`pageable.sort.sorted=true`） | `books-in-progress.json` |
+
+→ 影响：客户端"正在读"顶部的继续阅读卡片必须优先查 `GET /api/v1/books?read_status=IN_PROGRESS&sort=readProgress.readDate,desc`（真正的半读书），再用 `/api/v1/books/ondeck` 兜底刚读完上一卷后的下一本未读，并结合本地 Outbox 对未同步项兜底。
 
 → 影响：收藏集/阅读列表只需要两个新的列表解析器，系列与书不用另写一套；顺序以服务端 `content[]` 顺序为准（`ordered` 标记用户是否手工排序）。
 

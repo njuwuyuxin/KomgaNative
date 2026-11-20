@@ -56,6 +56,7 @@ List<_Call> _calls() {
     _Call('get', urls.readListBooks('R1')),
     _Call('get', urls.book('B1')),
     _Call('get', urls.books(search: 'akira')),
+    _Call('get', urls.inProgressBooks()),
     _Call('get', urls.bookPages('B1')),
     _Call('get', urls.pageImage('B1', 1)),
     _Call('get', urls.pageImage('B1', 1, convertToJpeg: true)),

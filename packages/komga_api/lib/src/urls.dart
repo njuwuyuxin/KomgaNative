@@ -146,6 +146,19 @@ class KomgaUrls {
   String seriesReadProgress(String seriesId) =>
       '$_base/api/v1/series/$seriesId/read-progress';
 
+  /// 在读中的书（Komga Keep Reading：`GET /api/v1/books?read_status=IN_PROGRESS&sort=readProgress.readDate,desc`）。
+  ///
+  /// 对真实 Komga 1.30.1 对照组验证过（见 `docs/komga-api-verification.md`）：
+  /// `readProgress.readDate,desc` 按最近阅读时间倒序生效（与 `asc` 对称、异于默认顺序）。
+  String inProgressBooks({int page = 0, int size = 20}) =>
+      _withQuery('$_base/api/v1/books', <String, String>{
+        'page': '$page',
+        'size': '$size',
+        'read_status': readStatusWireValue(SeriesReadStatus.inProgress),
+        'sort': 'readProgress.readDate,desc',
+      });
+
+  /// Komga 的 On Deck：已读过至少一本且当前无在读书的系列里的第一本未读。
   String ondeck({int size = 20}) =>
       _withQuery('$_base/api/v1/books/ondeck', {'size': '$size'});
 
