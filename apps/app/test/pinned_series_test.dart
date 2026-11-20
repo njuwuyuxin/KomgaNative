@@ -6,10 +6,10 @@ import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/l10n/l10n.dart';
-import 'package:komga_native/src/data/cache/http_cache_database.dart';
-import 'package:komga_native/src/providers/cache_providers.dart';
+import 'package:komga_native/src/data/progress/progress_database.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/providers/pinned_series_provider.dart';
+import 'package:komga_native/src/providers/progress_providers.dart';
 import 'package:komga_native/src/screens/library_screen.dart';
 import 'package:komga_native/src/widgets/unread_badge.dart';
 import 'package:material_ui/material_ui.dart';
@@ -19,9 +19,9 @@ import 'support/fake_library.dart';
 /// LIB-02：封面未读角标 + 系列置顶（按服务器分区、重启保持）。
 void main() {
   group('置顶表', () {
-    late HttpCacheDatabase db;
+    late ProgressDatabase db;
 
-    setUp(() => db = HttpCacheDatabase(NativeDatabase.memory()));
+    setUp(() => db = ProgressDatabase(NativeDatabase.memory()));
     tearDown(() => db.close());
 
     test('置顶/取消置顶，最近的排在前面', () async {
@@ -53,9 +53,9 @@ void main() {
   });
 
   group('书架上的角标与置顶', () {
-    late HttpCacheDatabase db;
+    late ProgressDatabase db;
 
-    setUp(() => db = HttpCacheDatabase(NativeDatabase.memory()));
+    setUp(() => db = ProgressDatabase(NativeDatabase.memory()));
     tearDown(() => db.close());
 
     Future<ProviderContainer> pumpShelf(WidgetTester tester) async {
@@ -68,7 +68,7 @@ void main() {
             libraryRepositoryProvider.overrideWithValue(
               FakeLibraryRepository(series: demoShelf()),
             ),
-            httpCacheDatabaseProvider.overrideWithValue(db),
+            progressDatabaseProvider.overrideWithValue(db),
             // 置顶按服务器分区：测试里没有会话，直接给一个固定 key。
             activeServerKeyProvider.overrideWithValue('server-a'),
           ],

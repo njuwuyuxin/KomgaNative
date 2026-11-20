@@ -1,51 +1,97 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:drift/drift.dart';
 import 'package:komga_domain/komga_domain.dart';
+import 'package:komga_native/src/data/progress/user_tables.dart';
 import 'package:komga_sync_engine/komga_sync_engine.dart';
+
+export 'package:komga_native/src/data/progress/user_tables.dart';
 
 part 'progress_database.g.dart';
 
-/// 本地进度 + 待提交队列（合一张表：一本书一行，pending 非空即可提交）。
+/// 用户本地资产数据库（`komga_native.sqlite`）：阅读进度、系列置顶与阅读会话统计。
 ///
-/// 拆成两张表也能做，但会引入"提交成功后本地记录和 outbox 谁是真相"的一致性问题。
-/// 一本书只有一条最新进度，合表后 `pending_seq` 就是唯一的状态位，简单且不会漂移。
-class LocalProgress extends Table {
-  TextColumn get bookId => text()();
-
-  IntColumn get page => integer()();
-
-  BoolColumn get completed => boolean()();
-
-  /// 本地写入时间：只用于展示/诊断，**不参与对账**（设备墙钟不可信）。
-  DateTimeColumn get updatedAt => dateTime()();
-
-  /// 上次确认过的服务端 `lastModified`；PATCH 成功后置空（见 ADR 0002 决策 4）。
-  DateTimeColumn get serverLastModified => dateTime().nullable()();
-
-  /// 非空 = 有未提交更新；提交回执 seq 与它相等才清空。
-  IntColumn get pendingSeq => integer().nullable()();
-
-  @override
-  Set<Column<Object>> get primaryKey => <Column<Object>>{bookId};
-}
-
-@DriftDatabase(tables: <Type>[LocalProgress])
+/// 与随时可清空重建的 `komga_cache.sqlite` 严格物理隔离（ARC-06）。
+@DriftDatabase(tables: <Type>[LocalProgress, PinnedSeriesRows, ReadingSessions])
 class ProgressDatabase extends _$ProgressDatabase {
-  ProgressDatabase(super.executor);
+  ProgressDatabase(super.executor, {this.legacyCacheDbPath});
+
+  /// 旧版 v5 `komga_cache.sqlite` 的文件路径提供器（首次升级平滑迁入置顶与阅读历史）。
+  final FutureOr<String?> Function()? legacyCacheDbPath;
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
-  /// 进程内的单调序号种子。
-  ///
-  /// 只用 `DateTime.now().microsecondsSinceEpoch` 不够：Windows/部分设备上
-  /// 时钟精度只有毫秒级，两次快速入队可能拿到同一个值，ack 就会误清新进度。
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+    onCreate: (Migrator m) async {
+      await m.createAll();
+    },
+    onUpgrade: (Migrator m, int from, int to) async {
+      if (from < 2) {
+        await m.createTable(pinnedSeriesRows);
+        await m.createTable(readingSessions);
+      }
+    },
+    beforeOpen: (OpeningDetails details) async {
+      await _migrateFromLegacyCacheIfNeeded();
+    },
+  );
+
+  /// 一次性平滑迁入旧缓存库里的 `pinned_series_rows` 与 `reading_sessions`。
+  Future<void> _migrateFromLegacyCacheIfNeeded() async {
+    final resolver = legacyCacheDbPath;
+    if (resolver == null) return;
+    try {
+      final path = await resolver();
+      if (path == null || path.isEmpty || !File(path).existsSync()) return;
+      final escaped = path.replaceAll("'", "''");
+      await customStatement("ATTACH DATABASE '$escaped' AS legacy_cache");
+      try {
+        final tablesRows = await customSelect(
+          "SELECT name FROM legacy_cache.sqlite_master "
+          "WHERE type = 'table' AND name IN ('pinned_series_rows', 'reading_sessions')",
+        ).get();
+        final legacyTables = <String>{
+          for (final row in tablesRows) row.read<String>('name'),
+        };
+        if (legacyTables.contains('pinned_series_rows')) {
+          await customStatement(
+            'INSERT OR IGNORE INTO pinned_series_rows (server_id, series_id, created_at) '
+            'SELECT server_id, series_id, created_at FROM legacy_cache.pinned_series_rows',
+          );
+          await _tryDropLegacy('pinned_series_rows');
+        }
+        if (legacyTables.contains('reading_sessions')) {
+          await customStatement(
+            'INSERT OR IGNORE INTO reading_sessions '
+            '(id, book_id, series_id, book_name, started_at, ended_at, duration_ms, start_page, end_page, completed) '
+            'SELECT id, book_id, series_id, book_name, started_at, ended_at, duration_ms, start_page, end_page, completed '
+            'FROM legacy_cache.reading_sessions',
+          );
+          await _tryDropLegacy('reading_sessions');
+        }
+      } finally {
+        await customStatement('DETACH DATABASE legacy_cache');
+      }
+    } on Object {
+      // 迁移失败（旧库损坏/锁竞争）绝不阻塞用户库打开。
+    }
+  }
+
+  Future<void> _tryDropLegacy(String table) async {
+    try {
+      await customStatement('DROP TABLE IF EXISTS legacy_cache.$table');
+    } on Object {
+      // 若缓存库正被后台连接写锁占用，下次打开仍可幂等重试。
+    }
+  }
+
   int _seqSeed = 0;
 
-  /// 入队并返回本次的 seq。
-  ///
-  /// seq 取写入时刻的微秒并保证**严格递增**；同书只保留最新一条。
+  // ---- 阅读进度 ----
+
   Future<int> enqueue(ProgressTarget target) async {
     final now = DateTime.now().toUtc();
     final micros = now.microsecondsSinceEpoch;
@@ -58,16 +104,11 @@ class ProgressDatabase extends _$ProgressDatabase {
         completed: target.completed,
         updatedAt: now,
         pendingSeq: Value<int>(seq),
-        // 新进度还没提交，服务端基准暂不更新，保留上一次已知的值。
       ),
     );
     return seq;
   }
 
-  /// 提交成功后的回执。
-  ///
-  /// 只有 seq 仍然匹配才清空：期间又翻页的话（seq 更大）必须保留新进度。
-  /// 返回 true 表示这条进度已经从队列里清掉。
   Future<bool> ack(String bookId, int seq) async {
     final updated =
         await (update(localProgress)..where(
@@ -77,8 +118,6 @@ class ProgressDatabase extends _$ProgressDatabase {
             .write(
               const LocalProgressCompanion(
                 pendingSeq: Value<int?>(null),
-                // PATCH 没有响应体，拿不到服务端新的 lastModified；
-                // 置空 → 下次 GET 时按 adoptRemote 重新建立基准。
                 serverLastModified: Value<DateTime?>(null),
               ),
             );
@@ -89,13 +128,11 @@ class ProgressDatabase extends _$ProgressDatabase {
     localProgress,
   )..where((t) => t.bookId.equals(bookId))).getSingleOrNull();
 
-  /// 批量读：书架一页 100 本，不能一本一次查询。
   Future<List<LocalProgressData>> records(List<String> bookIds) async {
     if (bookIds.isEmpty) return const <LocalProgressData>[];
     return (select(localProgress)..where((t) => t.bookId.isIn(bookIds))).get();
   }
 
-  /// 所有待提交项，按 seq 升序（先入队先提交）。
   Future<List<PendingProgress>> pending() async {
     final rows =
         await (select(localProgress)
@@ -117,15 +154,11 @@ class ProgressDatabase extends _$ProgressDatabase {
     ];
   }
 
-  /// 采纳服务端进度（别的设备读得更远 / 本地首次见到）。
-  ///
-  /// 有 pending 时**不写**：本地还有没提交的更新，服务端的旧值不能覆盖它。
   Future<void> adoptRemote(String bookId, ReadProgress? remote) async {
     final current = await record(bookId);
     if (current?.pendingSeq != null) return;
 
     if (remote == null) {
-      // 服务端把进度删了（标记未读）：本地也清掉。
       await (delete(localProgress)..where((t) => t.bookId.equals(bookId))).go();
       return;
     }
@@ -140,7 +173,6 @@ class ProgressDatabase extends _$ProgressDatabase {
     );
   }
 
-  /// 强制采纳：忽略本地 pending，直接覆盖（用户显式标记已读/未读之后用）。
   Future<void> forceAdopt(String bookId, ReadProgress? remote) async {
     if (remote == null) {
       await (delete(localProgress)..where((t) => t.bookId.equals(bookId))).go();
@@ -157,4 +189,110 @@ class ProgressDatabase extends _$ProgressDatabase {
       ),
     );
   }
+
+  // ---- 系列置顶（LIB-02 / ARC-06）----
+
+  Future<List<String>> pinnedSeries(String serverId) async {
+    final rows =
+        await (select(pinnedSeriesRows)
+              ..where((PinnedSeriesRows t) => t.serverId.equals(serverId))
+              ..orderBy(<OrderClauseGenerator<PinnedSeriesRows>>[
+                (PinnedSeriesRows t) => OrderingTerm(
+                  expression: t.createdAt,
+                  mode: OrderingMode.desc,
+                ),
+                (PinnedSeriesRows t) => OrderingTerm(expression: t.seriesId),
+              ]))
+            .get();
+    return <String>[for (final row in rows) row.seriesId];
+  }
+
+  Future<void> setPinned({
+    required String serverId,
+    required String seriesId,
+    required bool pinned,
+  }) async {
+    if (!pinned) {
+      await (delete(pinnedSeriesRows)..where(
+            (PinnedSeriesRows t) =>
+                t.serverId.equals(serverId) & t.seriesId.equals(seriesId),
+          ))
+          .go();
+      return;
+    }
+    await into(pinnedSeriesRows).insertOnConflictUpdate(
+      PinnedSeriesRowsCompanion.insert(
+        serverId: serverId,
+        seriesId: seriesId,
+        createdAt: DateTime.now().toUtc(),
+      ),
+    );
+  }
+
+  /// 整份替换指定服务器的置顶系列（备份导入用，保持传入顺序：排前面的时间戳更新）。
+  Future<void> replacePinnedSeries(
+    String serverId,
+    List<String> seriesIds,
+  ) async {
+    await transaction(() async {
+      await (delete(
+        pinnedSeriesRows,
+      )..where((PinnedSeriesRows t) => t.serverId.equals(serverId))).go();
+      final base = DateTime.now().toUtc();
+      final unique = seriesIds.toSet().toList(growable: false);
+      for (var i = 0; i < unique.length; i++) {
+        await into(pinnedSeriesRows).insertOnConflictUpdate(
+          PinnedSeriesRowsCompanion.insert(
+            serverId: serverId,
+            seriesId: unique[i],
+            createdAt: base.subtract(Duration(seconds: i)),
+          ),
+        );
+      }
+    });
+  }
+
+  // ---- 阅读会话历史（HIS-01 / ARC-06）----
+
+  Future<int> addReadingSession({
+    required String bookId,
+    required String seriesId,
+    required String bookName,
+    required DateTime startedAt,
+    required DateTime endedAt,
+    required int durationMs,
+    required int startPage,
+    required int endPage,
+    required bool completed,
+  }) {
+    return into(readingSessions).insert(
+      ReadingSessionsCompanion.insert(
+        bookId: bookId,
+        seriesId: seriesId,
+        bookName: Value<String>(bookName),
+        startedAt: startedAt,
+        endedAt: endedAt,
+        durationMs: durationMs,
+        startPage: Value<int>(startPage),
+        endPage: Value<int>(endPage),
+        completed: Value<bool>(completed),
+      ),
+    );
+  }
+
+  Future<List<ReadingSession>> readingSessionList({int limit = 200}) {
+    return (select(readingSessions)
+          ..orderBy(<OrderClauseGenerator<ReadingSessions>>[
+            (ReadingSessions t) =>
+                OrderingTerm(expression: t.startedAt, mode: OrderingMode.desc),
+          ])
+          ..limit(limit))
+        .get();
+  }
+
+  Future<void> deleteReadingSession(int id) => (delete(
+    readingSessions,
+  )..where((ReadingSessions t) => t.id.equals(id))).go();
+
+  Future<void> clearReadingSessions() => delete(readingSessions).go();
 }

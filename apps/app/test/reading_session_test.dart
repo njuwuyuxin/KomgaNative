@@ -1,6 +1,6 @@
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_native/src/data/cache/http_cache_database.dart';
+import 'package:komga_native/src/data/progress/progress_database.dart';
 import 'package:komga_native/src/data/reading_session_tracker.dart';
 
 /// HIS-01：阅读会话的记账规则与落库。
@@ -109,9 +109,9 @@ void main() {
   });
 
   group('reading_sessions 表', () {
-    late HttpCacheDatabase db;
+    late ProgressDatabase db;
 
-    setUp(() => db = HttpCacheDatabase(NativeDatabase.memory()));
+    setUp(() => db = ProgressDatabase(NativeDatabase.memory()));
     tearDown(() => db.close());
 
     test('写入后能按时间倒序列出，删除与清空生效', () async {

@@ -6,9 +6,9 @@ import 'package:go_router/go_router.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/l10n/l10n.dart';
-import 'package:komga_native/src/data/cache/http_cache_database.dart';
-import 'package:komga_native/src/providers/cache_providers.dart';
+import 'package:komga_native/src/data/progress/progress_database.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
+import 'package:komga_native/src/providers/progress_providers.dart';
 import 'package:komga_native/src/screens/history_screen.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -16,7 +16,7 @@ import 'support/fake_library.dart';
 
 /// HIS-02：阅读历史页（按天分组、删除单条、清空、空态）。
 void main() {
-  late HttpCacheDatabase db;
+  late ProgressDatabase db;
 
   Future<void> seed() async {
     Future<void> add(String bookId, DateTime startedAt, {int minutes = 12}) {
@@ -62,7 +62,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: <Override>[
-          httpCacheDatabaseProvider.overrideWithValue(db),
+          progressDatabaseProvider.overrideWithValue(db),
           libraryRepositoryProvider.overrideWithValue(
             FakeLibraryRepository(series: demoShelf()),
           ),
@@ -82,7 +82,7 @@ void main() {
     );
   }
 
-  setUp(() => db = HttpCacheDatabase(NativeDatabase.memory()));
+  setUp(() => db = ProgressDatabase(NativeDatabase.memory()));
   tearDown(() => db.close());
 
   testWidgets('按天分组显示：今天两条 + 昨天一条', (WidgetTester tester) async {

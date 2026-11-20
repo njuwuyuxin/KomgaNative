@@ -19,7 +19,13 @@ import 'package:path_provider/path_provider.dart';
 /// 就不会碰 sqlite，也不需要 path_provider 的平台通道。
 final Provider<ProgressDatabase> progressDatabaseProvider =
     Provider<ProgressDatabase>((Ref ref) {
-      final db = ProgressDatabase(_openConnection());
+      final db = ProgressDatabase(
+        _openConnection(),
+        legacyCacheDbPath: () async {
+          final dir = await getApplicationSupportDirectory();
+          return '${dir.path}/komga_cache.sqlite';
+        },
+      );
       ref.onDispose(db.close);
       return db;
     });

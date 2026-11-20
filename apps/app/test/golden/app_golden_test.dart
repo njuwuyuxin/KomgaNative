@@ -11,6 +11,7 @@ import 'package:komga_native/src/data/app_settings.dart';
 import 'package:komga_native/src/data/cache/drift_http_cache.dart';
 import 'package:komga_native/src/data/cache/http_cache_database.dart';
 import 'package:komga_native/src/data/download/download_service.dart';
+import 'package:komga_native/src/data/progress/progress_database.dart';
 import 'package:komga_native/src/data/progress/progress_store.dart';
 import 'package:komga_native/src/data/progress/progress_sync_service.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
@@ -480,10 +481,10 @@ void main() {
       theme: theme,
       overrides: <Override>[
         libraryRepositoryProvider.overrideWithValue(repository),
-        // "最近阅读"横滑条读本地会话表（HIS-02）：黄金图环境没有 path_provider，
+        // "最近阅读"横滑条读本地会话表（HIS-02 / ARC-06 用户库）：黄金图环境没有 path_provider，
         // 必须换成内存库，否则整页停在 MissingPluginException。
-        httpCacheDatabaseProvider.overrideWithValue(
-          HttpCacheDatabase(NativeDatabase.memory()),
+        progressDatabaseProvider.overrideWithValue(
+          ProgressDatabase(NativeDatabase.memory()),
         ),
       ],
       precacheImages: covers,
@@ -839,7 +840,7 @@ void main() {
     required ThemeData theme,
     bool empty = false,
   }) async {
-    final db = HttpCacheDatabase(NativeDatabase.memory());
+    final db = ProgressDatabase(NativeDatabase.memory());
     addTearDown(db.close);
     if (!empty) {
       final now = insightsNow;
@@ -865,7 +866,7 @@ void main() {
       screen: InsightsScreen(now: insightsNow),
       size: size,
       theme: theme,
-      overrides: <Override>[httpCacheDatabaseProvider.overrideWithValue(db)],
+      overrides: <Override>[progressDatabaseProvider.overrideWithValue(db)],
       realTimeSettle: true,
     );
     await expectGolden(tester, name);

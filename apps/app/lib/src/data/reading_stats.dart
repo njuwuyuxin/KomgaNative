@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import 'package:komga_native/src/data/cache/http_cache_database.dart';
+import 'package:komga_native/src/data/progress/progress_database.dart';
 
 /// 某一天的阅读量（Insights 热力图的一格）。
 class ReadingDay {

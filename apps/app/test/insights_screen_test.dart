@@ -5,8 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/l10n/l10n.dart';
-import 'package:komga_native/src/data/cache/http_cache_database.dart';
-import 'package:komga_native/src/providers/cache_providers.dart';
+import 'package:komga_native/src/data/progress/progress_database.dart';
+import 'package:komga_native/src/providers/progress_providers.dart';
 import 'package:komga_native/src/screens/insights_screen.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -19,10 +19,10 @@ import 'package:material_ui/material_ui.dart';
 void main() {
   // 与黄金图同一份数据形状：21 天里每 4 天休一天，每次读 18 分钟。
   final now = DateTime(2026, 11, 25, 20, 30);
-  late HttpCacheDatabase db;
+  late ProgressDatabase db;
 
   setUp(() async {
-    db = HttpCacheDatabase(NativeDatabase.memory());
+    db = ProgressDatabase(NativeDatabase.memory());
     for (var i = 0; i < 21; i++) {
       if (i % 4 == 0) continue;
       final startedAt = now.subtract(Duration(days: i, hours: 3));
@@ -47,7 +47,7 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       ProviderScope(
-        overrides: <Override>[httpCacheDatabaseProvider.overrideWithValue(db)],
+        overrides: <Override>[progressDatabaseProvider.overrideWithValue(db)],
         child: MaterialApp(
           locale: const Locale('en'),
           localizationsDelegates: appLocalizationsDelegates,

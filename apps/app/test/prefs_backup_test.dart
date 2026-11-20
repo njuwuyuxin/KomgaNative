@@ -27,8 +27,12 @@ void main() {
     downloadConcurrency: 3,
   );
 
-  test('导出 → 解析回来：阅读设置与应用设置都还原', () {
-    final encoded = PrefsBackup.of(reader: reader, settings: settings).encode();
+  test('导出 → 解析回来：阅读设置、应用设置与置顶列表都还原', () {
+    final encoded = PrefsBackup.of(
+      reader: reader,
+      settings: settings,
+      pinnedSeries: const <String>['s1', 's2'],
+    ).encode();
     final backup = PrefsBackup.decode(encoded);
 
     final restoredReader = backup.toReaderPrefs();
@@ -36,6 +40,7 @@ void main() {
     expect(restoredReader.global.pageTurn, ReaderPageTurnChoice.fade);
     expect(restoredReader.global.showSessionTime, isFalse);
     expect(restoredReader.spreadFrom, <String, int>{'b1': 3});
+    expect(backup.pinnedSeries, const <String>['s1', 's2']);
 
     final restoredSettings = backup.toAppSettings();
     expect(restoredSettings.language, 'zh');

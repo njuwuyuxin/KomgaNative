@@ -28,10 +28,17 @@ class PrefsBackupException implements Exception {
 /// 只做两件事：把 `ReaderPrefs` 与 `AppSettings` 序列化成一个带版本的 JSON，
 /// 以及反向解析并**校验**。不碰服务器、不碰安全存储、不联网。
 class PrefsBackup {
-  const PrefsBackup({required this.reader, required this.settings});
+  const PrefsBackup({
+    required this.reader,
+    required this.settings,
+    this.pinnedSeries,
+  });
 
   final Map<String, Object?> reader;
   final Map<String, Object?> settings;
+
+  /// 可选的当前服务器置顶系列 ID 列表（不含服务器地址，兼容无此段的旧版备份）。
+  final List<String>? pinnedSeries;
 
   /// 导出成可读 JSON（2 空格缩进：用户可以自己看一眼再决定要不要导入）。
   String encode() =>
@@ -41,6 +48,7 @@ class PrefsBackup {
         'exportedAt': DateTime.now().toUtc().toIso8601String(),
         'reader': reader,
         'settings': settings,
+        if (pinnedSeries != null) 'pinnedSeries': pinnedSeries,
       });
 
   /// 解析并校验。任何不认识的形状都抛 [PrefsBackupException]，
@@ -69,14 +77,30 @@ class PrefsBackup {
     if (reader is! Map<String, Object?> || settings is! Map<String, Object?>) {
       throw const PrefsBackupException('缺少 reader / settings 段');
     }
-    return PrefsBackup(reader: reader, settings: settings);
+    final rawPinned = raw['pinnedSeries'];
+    final List<String>? pinnedSeries = rawPinned is List
+        ? <String>[
+            for (final item in rawPinned)
+              if (item is String && item.trim().isNotEmpty) item.trim(),
+          ]
+        : null;
+    return PrefsBackup(
+      reader: reader,
+      settings: settings,
+      pinnedSeries: pinnedSeries,
+    );
   }
 
   /// 用当前状态造一份备份。
   factory PrefsBackup.of({
     required ReaderPrefs reader,
     required AppSettings settings,
-  }) => PrefsBackup(reader: reader.toJson(), settings: settings.toJson());
+    List<String>? pinnedSeries,
+  }) => PrefsBackup(
+    reader: reader.toJson(),
+    settings: settings.toJson(),
+    pinnedSeries: pinnedSeries,
+  );
 
   /// 把备份里的阅读偏好解析出来；形状不对就抛。
   ReaderPrefs toReaderPrefs() {

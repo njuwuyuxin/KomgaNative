@@ -1,12 +1,15 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_native/src/data/cache/http_cache_database.dart';
+import 'package:komga_native/src/data/progress/progress_database.dart';
 import 'package:komga_native/src/data/reading_session_tracker.dart';
-import 'package:komga_native/src/providers/cache_providers.dart';
+import 'package:komga_native/src/providers/progress_providers.dart';
 
-/// 最近的阅读会话（HIS-02 History 页用）。
+export 'package:komga_native/src/data/progress/progress_database.dart'
+    show ReadingSession;
+
+/// 最近的阅读会话（HIS-02 History 页用，存储于用户库 `komga_native.sqlite`）。
 final FutureProvider<List<ReadingSession>> readingSessionsProvider =
     FutureProvider<List<ReadingSession>>((Ref ref) {
-      return ref.watch(httpCacheDatabaseProvider).readingSessionList();
+      return ref.watch(progressDatabaseProvider).readingSessionList();
     });
 
 /// 写入一次阅读会话（HIS-01）。
@@ -22,20 +25,18 @@ class ReadingSessionRecorder {
 
   final Ref _ref;
 
-  /// 删一条历史；失败静默（跟写入同一套理由）。
   Future<void> delete(int id) async {
     try {
-      await _ref.read(httpCacheDatabaseProvider).deleteReadingSession(id);
+      await _ref.read(progressDatabaseProvider).deleteReadingSession(id);
       _ref.invalidate(readingSessionsProvider);
     } on Object {
       // 见 [record]。
     }
   }
 
-  /// 清空历史。
   Future<void> clear() async {
     try {
-      await _ref.read(httpCacheDatabaseProvider).clearReadingSessions();
+      await _ref.read(progressDatabaseProvider).clearReadingSessions();
       _ref.invalidate(readingSessionsProvider);
     } on Object {
       // 见 [record]。
@@ -45,7 +46,7 @@ class ReadingSessionRecorder {
   Future<void> record(ReadingSessionDraft draft) async {
     try {
       await _ref
-          .read(httpCacheDatabaseProvider)
+          .read(progressDatabaseProvider)
           .addReadingSession(
             bookId: draft.bookId,
             seriesId: draft.seriesId,
