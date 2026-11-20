@@ -49,9 +49,6 @@ class SeriesDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
-  /// 当前请求的书数；点"加载更多"加一页。
-  int _size = 100;
-
   String get seriesId => widget.seriesId;
 
   /// 封面 Hero tag：源卡片带来的优先，否则按默认 `series-<id>`。
@@ -62,7 +59,7 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
   SeriesReadStatus? _readStatus;
 
   SeriesBooksQuery get _booksQuery =>
-      (seriesId: seriesId, size: _size, sort: _sort, readStatus: _readStatus);
+      (seriesId: seriesId, sort: _sort, readStatus: _readStatus);
 
   Future<void> _refresh() async {
     ref.invalidate(seriesDetailProvider(seriesId));
@@ -70,8 +67,9 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
     await ref.read(seriesBooksProvider(_booksQuery).future);
   }
 
-  /// 加载更多：多要一页（`size` 变了就是一次新查询，客户端不拼列表）。
-  void _loadMore() => setState(() => _size += kSeriesBooksPageSize);
+  /// 加载更多：调用增量分页器请求下一页 `page = 1, 2...`（ARC-12）。
+  void _loadMore() =>
+      unawaited(ref.read(seriesBooksProvider(_booksQuery).notifier).loadMore());
 
   /// 进阅读器；回来时刷新进度。不刷新的话"读完还是 0 of N"（真机上撞到过）。
   Future<void> _openBook(Book book, ReadingDirection direction) async {

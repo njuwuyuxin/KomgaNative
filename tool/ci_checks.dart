@@ -1,0 +1,203 @@
+import 'dart:io';
+
+const int kMaxFileLines = 350;
+const int kMaxClassLines = 300;
+
+const List<String> _productionRoots = <String>[
+  'packages/komga_domain/lib',
+  'packages/komga_reader_engine/lib',
+  'packages/komga_sync_engine/lib',
+  'packages/komga_api/lib',
+  'packages/komga_platform/lib',
+  'packages/komga_design_system/lib',
+  'apps/app/lib',
+];
+
+/// 分层与代码规范规则（ADR-0001 + ARC-12 门禁加固）：
+/// - `komga_domain` / `*_engine` 不得依赖 Flutter、HTTP、数据库；
+/// - UI 层（screens/widgets）不得直接依赖 `komga_api`，只能经 Repository；
+/// - 非生成生产 `.dart` 文件严格 ≤ 350 行，单类 ≤ 300 行；
+/// - 非注释生产代码中禁止裸 `catch (_)`。
+Future<int> layerCheck() async {
+  final violations = <String>[];
+
+  final pureForbidden = <String>[
+    'package:flutter/',
+    'package:dio/',
+    'package:drift/',
+    'package:go_router/',
+  ];
+  for (final pkg in <String>[
+    'packages/komga_domain',
+    'packages/komga_reader_engine',
+    'packages/komga_sync_engine',
+  ]) {
+    violations.addAll(
+      _scanImports(pkg, pureForbidden, reason: '纯逻辑包不得依赖 UI / 网络 / 数据库'),
+    );
+  }
+
+  for (final dir in <String>[
+    'apps/app/lib/src/screens',
+    'apps/app/lib/src/widgets',
+  ]) {
+    violations.addAll(
+      _scanImports(dir, <String>[
+        'package:komga_api/',
+      ], reason: 'UI 不得直接访问 API 层'),
+    );
+    violations.addAll(
+      _scanCode(dir, <String>[
+        'BackdropFilter(',
+        'HapticFeedback.',
+      ], reason: '用 FrostedSurface / AppHaptics，保证墨水屏退化与设置开关生效'),
+    );
+  }
+
+  for (final root in _productionRoots) {
+    violations.addAll(_scanSizeAndBareCatch(root));
+  }
+
+  if (violations.isEmpty) {
+    stdout.writeln('分层与规范规则通过（含 ≤350 行文件、≤300 行类、零裸 catch (_)）');
+    return 0;
+  }
+  for (final v in violations) {
+    stderr.writeln('VIOLATION: $v');
+  }
+  return 1;
+}
+
+/// 黄金图里不得读系统时钟。
+Future<int> goldenDeterminismCheck() async {
+  const reason = '黄金图会随运行日期/时区漂移；把"今天"注入进页面，测试里传固定值';
+  final violations = _scanCode('apps/app/test/golden', <String>[
+    'DateTime.now(',
+  ], reason: reason);
+
+  if (violations.isEmpty) {
+    stdout.writeln('黄金图确定性检查通过');
+    return 0;
+  }
+  for (final v in violations) {
+    stderr.writeln('VIOLATION: $v');
+  }
+  return 1;
+}
+
+bool _isGeneratedDart(String path) {
+  final normalized = path.replaceAll(r'\', '/');
+  return normalized.endsWith('.g.dart') ||
+      normalized.contains('/l10n/app_localizations');
+}
+
+final RegExp _bareCatchPattern = RegExp(r'(^|[\s\}])catch\s*\(\s*_\s*\)');
+final RegExp _classHeaderPattern = RegExp(
+  r'^\s*(abstract\s+|sealed\s+|final\s+|base\s+|interface\s+|mixin\s+)*class\s+(\w+)',
+);
+
+List<String> _scanSizeAndBareCatch(String dir) {
+  final directory = Directory(dir);
+  if (!directory.existsSync()) return <String>[];
+  final violations = <String>[];
+  for (final entity in directory.listSync(recursive: true)) {
+    if (entity is! File || !entity.path.endsWith('.dart')) continue;
+    if (_isGeneratedDart(entity.path)) continue;
+
+    final lines = entity.readAsLinesSync();
+    if (lines.length > kMaxFileLines) {
+      violations.add(
+        '${entity.path} 共 ${lines.length} 行，超过单文件 $kMaxFileLines 行上限',
+      );
+    }
+
+    var inClass = false;
+    var className = '';
+    var classStart = 0;
+    var braceDepth = 0;
+
+    for (var i = 0; i < lines.length; i++) {
+      final raw = lines[i];
+      final trimmed = raw.trimLeft();
+      if (!trimmed.startsWith('//')) {
+        if (_bareCatchPattern.hasMatch(raw)) {
+          violations.add('${entity.path}:${i + 1} 禁止裸 catch (_)（会吞掉 Error）');
+        }
+        if (!inClass) {
+          final match = _classHeaderPattern.firstMatch(raw);
+          if (match != null && raw.contains('{')) {
+            inClass = true;
+            className = match.group(2)!;
+            classStart = i + 1;
+            braceDepth = 0;
+          }
+        }
+        if (inClass) {
+          for (var c = 0; c < raw.length; c++) {
+            final ch = raw[c];
+            if (ch == '{') braceDepth++;
+            if (ch == '}') braceDepth--;
+          }
+          if (braceDepth <= 0) {
+            final classLen = (i + 1) - classStart + 1;
+            if (classLen > kMaxClassLines) {
+              violations.add(
+                '${entity.path}:$classStart 类 $className 共 $classLen 行，超过单类 $kMaxClassLines 行上限',
+              );
+            }
+            inClass = false;
+          }
+        }
+      }
+    }
+  }
+  return violations;
+}
+
+List<String> _scanImports(
+  String dir,
+  List<String> forbidden, {
+  required String reason,
+}) {
+  final directory = Directory(dir);
+  if (!directory.existsSync()) return <String>[];
+  final violations = <String>[];
+  for (final entity in directory.listSync(recursive: true)) {
+    if (entity is! File || !entity.path.endsWith('.dart')) continue;
+    final lines = entity.readAsLinesSync();
+    for (var i = 0; i < lines.length; i++) {
+      final line = lines[i];
+      if (!line.contains('import ')) continue;
+      for (final f in forbidden) {
+        if (line.contains(f)) {
+          violations.add('${entity.path}:${i + 1} 禁止 import $f（$reason）');
+        }
+      }
+    }
+  }
+  return violations;
+}
+
+List<String> _scanCode(
+  String dir,
+  List<String> forbidden, {
+  required String reason,
+}) {
+  final directory = Directory(dir);
+  if (!directory.existsSync()) return <String>[];
+  final violations = <String>[];
+  for (final entity in directory.listSync(recursive: true)) {
+    if (entity is! File || !entity.path.endsWith('.dart')) continue;
+    final lines = entity.readAsLinesSync();
+    for (var i = 0; i < lines.length; i++) {
+      final line = lines[i].trimLeft();
+      if (line.startsWith('//')) continue;
+      for (final f in forbidden) {
+        if (line.contains(f)) {
+          violations.add('${entity.path}:${i + 1} 禁止直接使用 $f（$reason）');
+        }
+      }
+    }
+  }
+  return violations;
+}

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:komga_design_system/komga_design_system.dart';
@@ -9,28 +11,18 @@ import 'package:komga_native/src/widgets/load_more_footer.dart';
 import 'package:komga_native/src/widgets/series_book_row.dart';
 import 'package:material_ui/material_ui.dart';
 
-/// 阅读列表里的书（UI-P3-8）。
-///
-/// 支持"加载更多"（FIX-08）：长阅读列表之前只取 20 本。
-class ReadListDetailScreen extends ConsumerStatefulWidget {
+/// 阅读列表里的书（UI-P3-8 / ARC-12 增量分页）。
+class ReadListDetailScreen extends ConsumerWidget {
   const ReadListDetailScreen({required this.readListId, this.title, super.key});
 
   final String readListId;
   final String? title;
 
   @override
-  ConsumerState<ReadListDetailScreen> createState() =>
-      _ReadListDetailScreenState();
-}
-
-class _ReadListDetailScreenState extends ConsumerState<ReadListDetailScreen> {
-  int _size = kListPageSize;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    final query = (readListId: widget.readListId, size: _size);
-    final async = ref.watch(readListBooksProvider(query));
+    final provider = readListBooksProvider(readListId);
+    final async = ref.watch(provider);
     return Scaffold(
       body: GlassPageBackground(
         child: CustomScrollView(
@@ -42,7 +34,7 @@ class _ReadListDetailScreenState extends ConsumerState<ReadListDetailScreen> {
                   label: MaterialLocalizations.of(context).backButtonTooltip,
                   onPressed: () => context.pop(),
                 ),
-                title: Text(widget.title ?? l10n.readListFallback),
+                title: Text(title ?? l10n.readListFallback),
               ),
             ),
             Builder(
@@ -54,8 +46,7 @@ class _ReadListDetailScreenState extends ConsumerState<ReadListDetailScreen> {
                       icon: Icons.cloud_off_outlined,
                       title: l10n.failureTitle(failureKindOf(async.error)),
                       actionLabel: l10n.retry,
-                      onAction: () =>
-                          ref.invalidate(readListBooksProvider(query)),
+                      onAction: () => ref.invalidate(provider),
                     ),
                   );
                 }
@@ -86,14 +77,15 @@ class _ReadListDetailScreenState extends ConsumerState<ReadListDetailScreen> {
                             '/reader/${book.id}',
                             extra: ReaderArgs(book: book),
                           );
-                          ref.invalidate(readListBooksProvider(query));
+                          ref.invalidate(provider);
                         },
                       ),
                     LoadMoreFooter(
                       loaded: page.items.length,
                       total: page.totalElements,
                       unit: LoadMoreUnit.books,
-                      onLoadMore: () => setState(() => _size += kListPageSize),
+                      onLoadMore: () =>
+                          unawaited(ref.read(provider.notifier).loadMore()),
                     ),
                   ],
                 );

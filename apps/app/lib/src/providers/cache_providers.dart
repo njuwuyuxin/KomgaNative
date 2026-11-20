@@ -9,6 +9,9 @@ import 'package:komga_native/src/data/cache/http_cache_database.dart';
 import 'package:komga_native/src/session/session_controller.dart';
 import 'package:path_provider/path_provider.dart';
 
+export 'package:komga_native/src/data/cache/http_cache_database.dart'
+    show HttpCacheDownloadsDao;
+
 /// 内容缓存库（Drift，独立于进度库）。
 final Provider<HttpCacheDatabase> httpCacheDatabaseProvider =
     Provider<HttpCacheDatabase>((Ref ref) {

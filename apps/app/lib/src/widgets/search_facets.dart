@@ -44,7 +44,6 @@ class SearchFacets extends ConsumerWidget {
             .watch(
               searchTagFacetsProvider((
                 query: query,
-                size: kListPageSize,
                 readStatus: null,
                 tag: null,
               )),

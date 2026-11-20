@@ -280,77 +280,6 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
     _scheduleProgress(target);
   }
 
-  /// 分享当前页（UI-P3-6）：取页图字节 → 写临时文件 → 系统分享面板。
-  Future<void> _sharePage(int page) async {
-    final handler = widget.onSharePage;
-    if (handler != null) {
-      await handler(page);
-      return;
-    }
-    try {
-      final bytes = await ref
-          .read(readerRepositoryProvider)
-          .pageImage(widget.bookId, page);
-      await sharePageImage(
-        bytes,
-        fileName: 'komganative-${widget.bookId}-page-$page.png',
-      );
-    } on ShelfFailure catch (failure) {
-      _showShareError(failure.message);
-    } on PlatformException catch (_) {
-      _showShareError(AppLocalizations.of(context).sharePageFailed);
-    }
-  }
-
-  void _showShareError(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
-  }
-
-  void _scheduleProgress(int page) {
-    if (_incognito) return;
-    _progress.schedule(page);
-  }
-
-  /// 隐身模式：本次阅读不回写进度（UI-P3-12）。
-  void _toggleIncognito() {
-    setState(() => _incognito = !_incognito);
-    final l10n = AppLocalizations.of(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          _incognito ? l10n.incognitoEnabled : l10n.incognitoDisabled,
-        ),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
-  void _groupFromPage(int page, int total) {
-    final index = page.clamp(1, total) - 1;
-    final next = _spreadFrom == index ? null : index;
-    // 落盘而不是只改会话状态：退出重进还要保持分组（RDR-06）。
-    ref.read(readerPrefsProvider.notifier).setSpreadFrom(widget.bookId, next);
-    if (next != null) {
-      // 跳到手动分组的起点，并照常回写进度。
-      _page = page.clamp(1, total);
-      _scheduleProgress(_page);
-    }
-    unawaited(AppHaptics.selection());
-    final l10n = AppLocalizations.of(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          next == null
-              ? l10n.readerGroupAutomatic
-              : l10n.readerGroupFrom(page.clamp(1, total)),
-        ),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
   /// 只在完成态查"下一本"：没读完时多一次列表请求纯属浪费。
   Book? _nextBookFor(ReaderLayout layout, Book? book) {
     if (!layout.completed || book == null) return null;
@@ -361,39 +290,8 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
 
   void _toggleChrome() => setState(() => _chromeVisible = !_chromeVisible);
 
-  /// 键盘 / 蓝牙翻页器 / 遥控器（UI-P3-11）。
-  ///
-  /// 方向键与 PageUp/PageDown 走和点击区同一套 `_requestTurn`，
-  /// 所以 RTL 下"右"仍然是视觉上的下一页；Esc 退出阅读器。
-  KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent) return KeyEventResult.ignored;
-    final pages = ref.read(readerPagesProvider(widget.bookId)).value;
-    if (pages == null || pages.isEmpty) return KeyEventResult.ignored;
-    final allPrefs = ref.read(readerPrefsProvider);
-    final config = _effectiveConfig(allPrefs);
-    final mode = _modeFor(allPrefs);
-    final rightToLeft = config.direction.resolveRightToLeft(_direction);
-    final key = event.logicalKey;
-    if (key == LogicalKeyboardKey.arrowRight) {
-      _requestTurn(rightToLeft ? -1 : 1, mode);
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowLeft) {
-      _requestTurn(rightToLeft ? 1 : -1, mode);
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.pageDown || key == LogicalKeyboardKey.space) {
-      _requestTurn(1, mode);
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.pageUp) {
-      _requestTurn(-1, mode);
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.escape) {
-      unawaited(Navigator.of(context).maybePop());
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.ignored;
+  void _scheduleProgress(int page) {
+    if (_incognito) return;
+    _progress.schedule(page);
   }
 }

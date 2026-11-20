@@ -303,4 +303,35 @@ void main() {
     expect(repository.createdCollections.single.name, 'My shelf');
     expect(repository.createdCollections.single.seriesIds, hasLength(1));
   });
+
+  testWidgets('ARC-12：长系列（250 本）点击"加载更多"只请求增量页 page=1, 2，不重拉 page=0', (
+    WidgetTester tester,
+  ) async {
+    final repository = FakeLibraryRepository(series: demoShelf())
+      ..bookCount = 250;
+    await pumpDetail(tester, repository);
+    await tester.pumpAndSettle();
+
+    expect(repository.booksPageCalls, <({int page, int size})>[
+      (page: 0, size: 100),
+    ]);
+
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(SeriesDetailScreen)),
+    );
+    const query = (seriesId: 's1', sort: null, readStatus: null);
+
+    await container.read(seriesBooksProvider(query).notifier).loadMore();
+    await tester.pumpAndSettle();
+    expect(container.read(seriesBooksProvider(query)).value?.items.length, 200);
+
+    await container.read(seriesBooksProvider(query).notifier).loadMore();
+    await tester.pumpAndSettle();
+    expect(container.read(seriesBooksProvider(query)).value?.items.length, 250);
+    expect(repository.booksPageCalls, <({int page, int size})>[
+      (page: 0, size: 100),
+      (page: 1, size: 100),
+      (page: 2, size: 100),
+    ]);
+  });
 }

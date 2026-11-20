@@ -14,6 +14,9 @@ import 'package:komga_native/src/session/session_controller.dart';
 import 'package:komga_sync_engine/komga_sync_engine.dart';
 import 'package:path_provider/path_provider.dart';
 
+export 'package:komga_native/src/data/progress/progress_database.dart'
+    show ProgressUserDao;
+
 /// 本地用户资产数据库（Drift）。
 final Provider<ProgressDatabase> progressDatabaseProvider =
     Provider<ProgressDatabase>((Ref ref) {

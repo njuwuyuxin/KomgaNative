@@ -99,6 +99,8 @@ class FakeLibraryRepository
   /// 最近一次 `books()` 收到的排序 / 筛选（SER-01 断言用）。
   BooksSort? lastBooksSort;
   SeriesReadStatus? lastBooksReadStatus;
+  final List<({int page, int size})> booksPageCalls =
+      <({int page, int size})>[];
   int bookCoverCalls = 0;
 
   /// 设成非 null 后，`series()` 会等它完成——用来稳定观察 loading 态。
@@ -363,7 +365,7 @@ class FakeLibraryRepository
     int size = 20,
   }) async {
     final normalized = query.toLowerCase();
-    final items = <Book>[
+    final all = <Book>[
       ...ondeckData,
       for (var i = 0; i < bookCount; i++)
         Book(
@@ -374,9 +376,13 @@ class FakeLibraryRepository
           number: '${i + 1}',
         ),
     ].where((Book b) => b.name.toLowerCase().contains(normalized)).toList();
+    final start = page * size;
+    final items = start >= all.length
+        ? const <Book>[]
+        : all.sublist(start, math.min(start + size, all.length));
     return PageResult<Book>(
       items: items,
-      totalElements: items.length,
+      totalElements: all.length,
       page: page,
       size: size,
     );
@@ -405,6 +411,7 @@ class FakeLibraryRepository
     SeriesReadStatus? readStatus,
   }) async {
     booksCalls++;
+    booksPageCalls.add((page: page, size: size));
     lastBooksSort = sort;
     lastBooksReadStatus = readStatus;
     final pending = booksGate;

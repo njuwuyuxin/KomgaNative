@@ -6,6 +6,7 @@ import 'package:komga_native/src/data/cache/http_cache_tables.dart';
 export 'package:komga_native/src/data/cache/http_cache_tables.dart';
 
 part 'http_cache_database.g.dart';
+part 'http_cache_downloads_dao.dart';
 
 @DriftDatabase(
   tables: <Type>[CachedResponses, DownloadedBooks, DownloadQueueEntries],
@@ -22,8 +23,6 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
 
   final int maxImageBytes;
   final int maxJsonRows;
-
-  /// 旧单服下载表升级到 v6 复合主键时用于回填的活动服务器 `baseUrl`。
   final FutureOr<String> Function()? defaultLegacyScope;
 
   int? _seqSeed;
@@ -59,58 +58,6 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
       }
     },
   );
-
-  Future<void> _upgradeDownloadedBooksToV6(String escapedScope) async {
-    await customStatement('''
-      CREATE TABLE downloaded_books_v6 (
-        scope TEXT NOT NULL DEFAULT '',
-        book_id TEXT NOT NULL,
-        series_id TEXT NOT NULL,
-        page_count INTEGER NOT NULL,
-        bytes INTEGER NOT NULL,
-        saved_at INTEGER NOT NULL,
-        PRIMARY KEY (scope, book_id)
-      )
-    ''');
-    await customStatement(
-      'INSERT OR REPLACE INTO downloaded_books_v6 '
-      '(scope, book_id, series_id, page_count, bytes, saved_at) '
-      "SELECT '$escapedScope', book_id, series_id, page_count, bytes, saved_at "
-      'FROM downloaded_books',
-    );
-    await customStatement('DROP TABLE downloaded_books');
-    await customStatement(
-      'ALTER TABLE downloaded_books_v6 RENAME TO downloaded_books',
-    );
-  }
-
-  Future<void> _upgradeDownloadQueueToV6(String escapedScope) async {
-    await customStatement('''
-      CREATE TABLE download_queue_entries_v6 (
-        scope TEXT NOT NULL DEFAULT '',
-        book_id TEXT NOT NULL,
-        series_id TEXT NOT NULL,
-        name TEXT NOT NULL,
-        number TEXT NOT NULL DEFAULT '',
-        pages_count INTEGER NOT NULL,
-        state TEXT NOT NULL,
-        done INTEGER NOT NULL DEFAULT 0,
-        total INTEGER NOT NULL DEFAULT 0,
-        created_at INTEGER NOT NULL,
-        PRIMARY KEY (scope, book_id)
-      )
-    ''');
-    await customStatement(
-      'INSERT OR REPLACE INTO download_queue_entries_v6 '
-      '(scope, book_id, series_id, name, number, pages_count, state, done, total, created_at) '
-      "SELECT '$escapedScope', book_id, series_id, name, number, pages_count, state, done, total, created_at "
-      'FROM download_queue_entries',
-    );
-    await customStatement('DROP TABLE download_queue_entries');
-    await customStatement(
-      'ALTER TABLE download_queue_entries_v6 RENAME TO download_queue_entries',
-    );
-  }
 
   Future<CachedResponse?> read(String scope, String url) async {
     final row =
@@ -150,7 +97,6 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
           byteSize: Value<int>(body.length),
           body: Value<Uint8List>(body),
           lastUsedSeq: Value<int>(seq),
-          // 若该页本就已作为整本下载被钉住（pinned=true），在线重读不得把它降级为被动缓存。
           pinned: pinned ? const Value<bool>(true) : const Value<bool>.absent(),
         ),
       ),
@@ -162,7 +108,6 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
     }
   }
 
-  /// 被动浏览缓存占用（不含 `pinned = true` 的已整本下载页图，ARC-08）。
   Future<CacheUsage> usage({String? scope}) async {
     final byteSum = cachedResponses.byteSize.sum();
     final count = cachedResponses.url.count();
@@ -179,15 +124,12 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
     );
   }
 
-  /// 监听 `cached_responses` 表变动事件（广播流，无挂起 Timer，ARC-10）。
   Stream<Set<TableUpdate>> cachedResponsesUpdates() =>
       tableUpdates(TableUpdateQuery.onTable(cachedResponses));
 
-  /// 监听 `downloaded_books` 表变动事件（广播流，ARC-10）。
   Stream<Set<TableUpdate>> downloadedBooksUpdates() =>
       tableUpdates(TableUpdateQuery.onTable(downloadedBooks));
 
-  /// 清空被动浏览缓存（保留 `pinned = true` 的已下载书籍及其页图，ARC-08）。
   Future<void> clear({String? scope}) async {
     final statement = delete(cachedResponses)
       ..where(
@@ -196,145 +138,6 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
             : t.pinned.equals(false) & t.scope.equals(scope),
       );
     await statement.go();
-  }
-
-  /// 将某本书已缓存的页图标记/取消标记为受保护（ARC-08）。
-  Future<int> setBookPagesPinned({
-    required String scope,
-    required String bookId,
-    required bool pinned,
-  }) {
-    final fragment = '/books/$bookId/pages/';
-    return (update(cachedResponses)
-          ..where((t) => t.scope.equals(scope) & t.url.contains(fragment)))
-        .write(CachedResponsesCompanion(pinned: Value<bool>(pinned)));
-  }
-
-  // ---- 整本下载记录（按 scope 分区）----
-
-  Future<void> markDownloaded({
-    String scope = '',
-    required String bookId,
-    required String seriesId,
-    required int pageCount,
-    required int bytes,
-  }) async {
-    await setBookPagesPinned(scope: scope, bookId: bookId, pinned: true);
-    await into(downloadedBooks).insertOnConflictUpdate(
-      DownloadedBooksCompanion.insert(
-        scope: Value<String>(scope),
-        bookId: bookId,
-        seriesId: seriesId,
-        pageCount: pageCount,
-        bytes: bytes,
-        savedAt: _now(),
-      ),
-    );
-  }
-
-  Future<DownloadedBook?> download(String bookId, {String scope = ''}) {
-    return (select(downloadedBooks)
-          ..where((t) => t.scope.equals(scope) & t.bookId.equals(bookId)))
-        .getSingleOrNull();
-  }
-
-  Future<List<DownloadedBook>> downloads({String? scope}) {
-    final query = select(downloadedBooks);
-    if (scope != null) query.where((t) => t.scope.equals(scope));
-    return query.get();
-  }
-
-  Future<CacheUsage> downloadsUsage({String? scope}) async {
-    final byteSum = downloadedBooks.bytes.sum();
-    final count = downloadedBooks.bookId.count();
-    final query = selectOnly(downloadedBooks)
-      ..addColumns(<Expression<Object>>[byteSum, count]);
-    if (scope != null) query.where(downloadedBooks.scope.equals(scope));
-    final row = await query.getSingle();
-    return CacheUsage(
-      bytes: row.read(byteSum) ?? 0,
-      entries: row.read(count) ?? 0,
-    );
-  }
-
-  Future<void> removeDownload(String bookId, {String scope = ''}) async {
-    await (delete(
-      downloadedBooks,
-    )..where((t) => t.scope.equals(scope) & t.bookId.equals(bookId))).go();
-  }
-
-  // ---- 下载队列（按 scope 分区）----
-
-  Future<void> enqueueDownload({
-    String scope = '',
-    required String bookId,
-    required String seriesId,
-    required String name,
-    required String number,
-    required int pagesCount,
-  }) async {
-    await into(downloadQueueEntries).insertOnConflictUpdate(
-      DownloadQueueEntriesCompanion.insert(
-        scope: Value<String>(scope),
-        bookId: bookId,
-        seriesId: seriesId,
-        name: name,
-        number: Value<String>(number),
-        pagesCount: pagesCount,
-        state: 'queued',
-        createdAt: _now(),
-      ),
-    );
-  }
-
-  Future<void> updateQueueEntry({
-    String scope = '',
-    required String bookId,
-    required String state,
-    required int done,
-    required int total,
-  }) async {
-    await (update(
-      downloadQueueEntries,
-    )..where((t) => t.scope.equals(scope) & t.bookId.equals(bookId))).write(
-      DownloadQueueEntriesCompanion(
-        state: Value<String>(state),
-        done: Value<int>(done),
-        total: Value<int>(total),
-      ),
-    );
-  }
-
-  Future<void> dequeueDownload(String bookId, {String scope = ''}) async {
-    await (delete(
-      downloadQueueEntries,
-    )..where((t) => t.scope.equals(scope) & t.bookId.equals(bookId))).go();
-  }
-
-  Future<void> clearDownloadQueue({String? scope}) {
-    final stmt = delete(downloadQueueEntries);
-    if (scope != null) stmt.where((t) => t.scope.equals(scope));
-    return stmt.go();
-  }
-
-  Future<List<DownloadQueueEntry>> downloadQueue({String? scope}) {
-    final query = select(downloadQueueEntries);
-    if (scope != null) query.where((t) => t.scope.equals(scope));
-    query.orderBy(<OrderClauseGenerator<DownloadQueueEntries>>[
-      (t) => OrderingTerm(expression: t.createdAt),
-      (t) => OrderingTerm(expression: t.bookId),
-    ]);
-    return query.get();
-  }
-
-  Future<int> deleteCachedPages({
-    required String scope,
-    required String bookId,
-  }) {
-    final fragment = '/books/$bookId/pages/';
-    return (delete(
-      cachedResponses,
-    )..where((t) => t.scope.equals(scope) & t.url.contains(fragment))).go();
   }
 
   Future<void> _evictImages({required String keepUrl}) async {

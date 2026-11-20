@@ -44,6 +44,7 @@ export 'package:komga_native/src/screens/reader_args.dart';
 export 'package:komga_native/src/widgets/wake_lock_scope.dart';
 
 part 'reader_screen_derive.dart';
+part 'reader_screen_actions.dart';
 
 /// 漫画阅读器：单页 / 双页跨页 / 纵向连续。
 ///
@@ -89,7 +90,7 @@ class ReaderScreen extends ConsumerStatefulWidget {
 }
 
 class _ReaderScreenState extends ConsumerState<ReaderScreen>
-    with WidgetsBindingObserver, _ReaderDerive {
+    with WidgetsBindingObserver, _ReaderDerive, _ReaderActions {
   /// 进度回写：连续翻页时只写最后停下的那一页；先落盘再提交（ADR 0002）。
 
   @override

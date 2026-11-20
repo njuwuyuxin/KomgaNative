@@ -1,20 +1,9 @@
 #!/usr/bin/env dart
 
 // KomgaNative 的统一校验入口。
-//
-// 为什么用 Dart 写而不是 .sh / .ps1：
-//   1. Windows / macOS / Linux 同一份脚本（本项目双机开发，一台 Windows 一台可能不是）；
-//   2. PowerShell 执行策略（本机 MachinePolicy=RemoteSigned + 工作区 ACL）会拦 .ps1；
-//   3. Agent 只需要记住一个命令。
-//
-// 用法：
-//   dart run tool/ci.dart check     # 格式 + 分析 + 分层检查 + 全部测试（CI 门禁）
-//   dart run tool/ci.dart fix       # 自动格式化 + dart fix
-//   dart run tool/ci.dart analyze   # 只跑静态分析
-//   dart run tool/ci.dart test      # 只跑测试
-//   dart run tool/ci.dart golden    # 重新生成黄金图基线（Windows 平台）
-//   dart run tool/ci.dart contract  # 契约测试（M1 接入，当前只做占位）
 import 'dart:io';
+
+import 'ci_checks.dart';
 
 const List<String> _purePackages = <String>[
   'packages/komga_domain',
@@ -38,6 +27,7 @@ Future<void> main(List<String> args) async {
     'analyze' => await analyze(),
     'test' => await test(),
     'golden' => await golden(),
+    'layers' => await layerCheck(),
     'install' => await installApp(deviceId: args.length > 1 ? args[1] : null),
     'contract' => await contract(),
     'help' || '-h' || '--help' => await help(),
@@ -51,19 +41,18 @@ Future<int> help({String? unknown}) async {
   stdout.writeln('''
 KomgaNative CI
 
-  check     生成代码（按需）+ 格式检查 + 静态分析 + 分层规则 + 全部测试（默认）
+  check     生成代码（按需）+ 格式检查 + 静态分析 + 分层与规范规则 + 全部测试（默认）
   codegen   只跑生成代码（drift + l10n；生成物不入库，CI 上由 check 自动触发）
   fix       自动格式化 + dart fix --apply
   analyze   只跑静态分析
+  layers    只跑分层、单文件 ≤350 行、单类 ≤300 行与裸 catch (_) 检查
   test      只跑测试（纯 Dart 包用 dart test，Flutter 包用 flutter test）
   golden    重新生成黄金图基线（仅 Windows，与 CI 一致）
-  install [device]  构建 release、装到模拟器并启动（保留应用数据；提交后必跑）
+  install [device]  构建 release、装到模拟器并启动（保留应用数据；提交前必跑）
   contract  契约测试（M1）
 ''');
   return unknown == null ? 0 : 64;
 }
-
-// ---------------------------------------------------------------- commands
 
 Future<int> check() async {
   final steps = <({String name, Future<int> Function() run})>[
@@ -110,15 +99,6 @@ Future<int> formatCheck() => runProc('dart', <String>[
   '.',
 ]);
 
-/// 生成代码（drift + l10n）；只在需要时跑。
-///
-/// 仓库的 `.gitignore` 忽略 `*.g.dart`（生成物不入库），但 CI 是全新 clone，
-/// 不生成就编译不过。放在门禁里而不是加一个 CI step：本地与 CI 仍走同一条命令，
-/// 不会出现"CI 能过、本地不能"的双轨问题。
-///
-/// 判据是"生成物缺失 / 源文件更新"，不做无条件构建——build_runner 首次要 AOT 编译
-/// 构建器（约 40s），每次 check 都跑太浪费。l10n 的判断同理：ARB 或 l10n.yaml
-/// 比生成物新才跑 `flutter gen-l10n`，保证全新 clone 与改文案后的门禁都能过。
 Future<int> codegen() async {
   final l10nCode = await _codegenL10n();
   final driftCode = await _codegenDrift();
@@ -166,28 +146,39 @@ Future<int> _codegenL10n() async {
 }
 
 Future<int> _codegenDrift() async {
-  const driftSources = <({String source, String generated})>[
+  const driftGroups = <({List<String> sources, String generated})>[
     (
-      source: 'apps/app/lib/src/data/progress/progress_database.dart',
+      sources: <String>[
+        'apps/app/lib/src/data/progress/progress_database.dart',
+        'apps/app/lib/src/data/progress/progress_user_dao.dart',
+        'apps/app/lib/src/data/progress/user_tables.dart',
+      ],
       generated: 'apps/app/lib/src/data/progress/progress_database.g.dart',
     ),
     (
-      source: 'apps/app/lib/src/data/cache/http_cache_database.dart',
+      sources: <String>[
+        'apps/app/lib/src/data/cache/http_cache_database.dart',
+        'apps/app/lib/src/data/cache/http_cache_downloads_dao.dart',
+        'apps/app/lib/src/data/cache/http_cache_tables.dart',
+      ],
       generated: 'apps/app/lib/src/data/cache/http_cache_database.g.dart',
     ),
   ];
 
   var stale = false;
-  for (final pair in driftSources) {
-    final sourceFile = File(pair.source);
-    if (!sourceFile.existsSync()) continue;
-    final generatedFile = File(pair.generated);
-    final upToDate =
-        generatedFile.existsSync() &&
-        !sourceFile.lastModifiedSync().isAfter(
-          generatedFile.lastModifiedSync(),
-        );
-    if (!upToDate) stale = true;
+  for (final group in driftGroups) {
+    final generatedFile = File(group.generated);
+    if (!generatedFile.existsSync()) {
+      stale = true;
+      break;
+    }
+    final genTime = generatedFile.lastModifiedSync();
+    for (final src in group.sources) {
+      final srcFile = File(src);
+      if (srcFile.existsSync() && srcFile.lastModifiedSync().isAfter(genTime)) {
+        stale = true;
+      }
+    }
   }
   if (!stale) {
     stdout.writeln('drift 生成物已是最新，跳过 codegen');
@@ -229,24 +220,10 @@ Future<int> golden() async {
 }
 
 Future<int> contract() async {
-  stdout.writeln('契约测试在 M1 接入：');
-  stdout.writeln('  1. docker run -d -p 25600:25600 gotson/komga');
-  stdout.writeln('  2. POST /api/v1/claim 初始化管理员');
-  stdout.writeln('  3. 录制夹具到 test/fixtures/，再用真实响应跑分页/进度/页图用例');
+  stdout.writeln('契约测试见 packages/komga_api/test/contract_test.dart');
   return 0;
 }
 
-/// 构建 release 包、装到已连接的设备并启动。
-///
-/// 规则写在 AGENTS.md「提交后：装到模拟器」：每次代码提交后都要跑一次，
-/// 用真包确认能启动。
-///
-/// 为什么用 `flutter run --release --no-resident` 而不是 `flutter install`：
-/// 后者会**先卸载再安装**，每次提交都把登录态、缓存、阅读进度清空；
-/// `--no-resident` 装完启动就退出，不挂着一个日志进程。
-///
-/// 不传 [deviceId] 时交给 Flutter 选（只有一台设备时最省事）；多设备用
-/// `dart run tool/ci.dart install emulator-5554`。
 Future<int> installApp({String? deviceId}) async {
   final args = <String>['run', '--release', '--no-resident'];
   if (deviceId != null && deviceId.isNotEmpty) {
@@ -254,139 +231,6 @@ Future<int> installApp({String? deviceId}) async {
   }
   return runProc('flutter', args, workingDirectory: 'apps/app');
 }
-
-// ---------------------------------------------------------------- layer rules
-
-/// 分层规则（ADR-0001）：
-/// - `komga_domain` / `*_engine` 不得依赖 Flutter、HTTP、数据库；
-/// - UI 层（screens/widgets）不得直接依赖 `komga_api`，只能经 Repository。
-Future<int> layerCheck() async {
-  final violations = <String>[];
-
-  final pureForbidden = <String>[
-    'package:flutter/',
-    'package:dio/',
-    'package:drift/',
-    'package:go_router/',
-  ];
-  for (final pkg in <String>[
-    'packages/komga_domain',
-    'packages/komga_reader_engine',
-    'packages/komga_sync_engine',
-  ]) {
-    violations.addAll(
-      _scanImports(pkg, pureForbidden, reason: '纯逻辑包不得依赖 UI / 网络 / 数据库'),
-    );
-  }
-
-  violations.addAll(
-    _scanImports('apps/app/lib/src/screens', <String>[
-      'package:komga_api/',
-    ], reason: 'UI 不得直接访问 API 层'),
-  );
-  violations.addAll(
-    _scanImports('apps/app/lib/src/widgets', <String>[
-      'package:komga_api/',
-    ], reason: 'UI 不得直接访问 API 层'),
-  );
-
-  // 材质与触感反馈必须经设计系统（FrostedSurface / AppHaptics），
-  // 否则墨水屏退化和"触感反馈"开关会被绕开。
-  for (final dir in <String>[
-    'apps/app/lib/src/screens',
-    'apps/app/lib/src/widgets',
-  ]) {
-    violations.addAll(
-      _scanCode(dir, <String>[
-        'BackdropFilter(',
-        'HapticFeedback.',
-      ], reason: '用 FrostedSurface / AppHaptics，保证墨水屏退化与设置开关生效'),
-    );
-  }
-
-  if (violations.isEmpty) {
-    stdout.writeln('分层规则通过');
-    return 0;
-  }
-  for (final v in violations) {
-    stderr.writeln('VIOLATION: $v');
-  }
-  return 1;
-}
-
-/// 黄金图里不得读系统时钟。
-///
-/// 为什么单独拦一条：周/月汇总、热力图、"今天读过没"这类页面天然要一个"今天"，
-/// 直接读 `DateTime.now()` 会让同一份代码在不同日期 / 时区渲染出不同像素。
-/// 基线是**在开发者那台机器的那一天**烙出来的，CI（UTC）或隔天再跑就必红，
-/// 而且本地永远复现不出来——2026-11 就因此让三张 insights 基线连红三次。
-/// 正确做法是把"今天"作为参数注入进页面，测试里传固定值。
-Future<int> goldenDeterminismCheck() async {
-  const reason = '黄金图会随运行日期/时区漂移；把"今天"注入进页面，测试里传固定值';
-  final violations = _scanCode('apps/app/test/golden', <String>[
-    'DateTime.now(',
-  ], reason: reason);
-
-  if (violations.isEmpty) {
-    stdout.writeln('黄金图确定性检查通过');
-    return 0;
-  }
-  for (final v in violations) {
-    stderr.writeln('VIOLATION: $v');
-  }
-  return 1;
-}
-
-List<String> _scanImports(
-  String dir,
-  List<String> forbidden, {
-  required String reason,
-}) {
-  final directory = Directory(dir);
-  if (!directory.existsSync()) return <String>[];
-  final violations = <String>[];
-  for (final entity in directory.listSync(recursive: true)) {
-    if (entity is! File || !entity.path.endsWith('.dart')) continue;
-    final lines = entity.readAsLinesSync();
-    for (var i = 0; i < lines.length; i++) {
-      final line = lines[i];
-      if (!line.contains('import ')) continue;
-      for (final f in forbidden) {
-        if (line.contains(f)) {
-          violations.add('${entity.path}:${i + 1} 禁止 import $f（$reason）');
-        }
-      }
-    }
-  }
-  return violations;
-}
-
-/// 扫描源码里（非注释行）出现的禁用写法。
-List<String> _scanCode(
-  String dir,
-  List<String> forbidden, {
-  required String reason,
-}) {
-  final directory = Directory(dir);
-  if (!directory.existsSync()) return <String>[];
-  final violations = <String>[];
-  for (final entity in directory.listSync(recursive: true)) {
-    if (entity is! File || !entity.path.endsWith('.dart')) continue;
-    final lines = entity.readAsLinesSync();
-    for (var i = 0; i < lines.length; i++) {
-      final line = lines[i].trimLeft();
-      if (line.startsWith('//')) continue;
-      for (final f in forbidden) {
-        if (line.contains(f)) {
-          violations.add('${entity.path}:${i + 1} 禁止直接使用 $f（$reason）');
-        }
-      }
-    }
-  }
-  return violations;
-}
-
-// ---------------------------------------------------------------- process
 
 Future<int> runProc(
   String executable,

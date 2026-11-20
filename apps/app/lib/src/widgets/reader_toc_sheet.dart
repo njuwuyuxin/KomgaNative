@@ -77,9 +77,6 @@ class _ReaderTocSheetState extends ConsumerState<ReaderTocSheet> {
   /// 一行的高度：只用来给"打开时定位到当前书"一个初始偏移。
   static const double _rowHeight = 72;
 
-  /// 一次要多少本。目录是本地列表，多取一些没有额外代价（一份 JSON）。
-  static const int _size = 300;
-
   final ScrollController _scroll = ScrollController();
   final GlobalKey _currentKey = GlobalKey();
   bool _scrolledToCurrent = false;
@@ -122,12 +119,7 @@ class _ReaderTocSheetState extends ConsumerState<ReaderTocSheet> {
     final palette = widget.palette;
     final textStyle = AppTypography.of(context);
     // 目录只要"按卷号的书单"，不需要排序/筛选。
-    final query = (
-      seriesId: widget.seriesId,
-      size: _size,
-      sort: null,
-      readStatus: null,
-    );
+    final query = (seriesId: widget.seriesId, sort: null, readStatus: null);
     final async = ref.watch(seriesBooksProvider(query));
 
     final body = _buildBody(context, l10n, palette, textStyle, async);

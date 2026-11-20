@@ -130,23 +130,21 @@ Komga 的真实行为记录在 `docs/komga-api-verification.md`，已知与 Open
 
 ## 当前阶段
 
-M1 进行中。
-已完成：M0 骨架 + **连接流程**（`lib/src/session/`）+ **API 契约与真实响应验证**（`docs/komga-api-verification.md`）
-+ `komga_api` 的目录读取（系列/书/页/缩略图字节）+ **真实书架**
-（`lib/src/data/library_repository.dart`、`lib/src/providers/library_providers.dart`、`lib/src/screens/library_screen.dart`：
-分页、350ms 搜索防抖、按库筛选、下拉刷新、封面 LRU、空/错态、请求竞态）
-+ **系列详情**（`lib/src/screens/series_detail_screen.dart`：头部 + 书列表 + 点书进阅读器）。
-待完成：阅读器真实书页与进度同步、Drift 离线缓存、i18n 与中文字体、TOFU 自签名证书。
+核心功能与架构治理（`ARC-01` ~ `ARC-12`）已完成：
+- **连接与多服务器隔离**：连接流程、TOFU 自签名证书固定（`lib/src/session/`）、统一共享 `komgaSessionProvider` 连接池；本地进度、已下载书籍、下载队列、置顶系列、阅读历史与阅读器按系列覆盖全面按 `serverKey`（规范化 `baseUrl`）复合主键分区隔离。
+- **数据层与离线能力**：按限界上下文拆分为 `LibraryRepository`、`CollectionsRepository`、`ReadStatusRepository`、`ReaderRepository`；用户资产库 `komga_native.sqlite`（本地进度 Outbox、系列置顶、阅读会话统计）与可再生缓存库 `komga_cache.sqlite`（HTTP 响应缓存、整本下载 `pinned` 页图保护与 256 MB 被动浏览 LRU 淘汰）物理分离。
+- **阅读器与 UI**：单页 / 双页 / 条漫纵向滚动与自动滚动、卷页着色器、纯配置值对象 `ReaderConfig`（预设快照与按系列覆盖零漂移）、平板双栏自适应（`WindowSizeClass` 唯一出口）、中英双语 i18n 与 CJK 字体测试回退、阅读统计热力图。
+- **自动化门禁（`tool/ci.dart`）**：代码生成 + 格式检查 + 静态分析 + 分层与代码规模红线（非生成生产文件 ≤ 350 行、单类 ≤ 300 行、零裸 `catch (_)`）+ 黄金图确定性检查 + 全量单测与黄金图基线。
 
-接服务器时注意：网络访问只能出现在 `lib/src/data/` 的 Repository 层，screen/widget 里禁止 `dio`。
-新增 API 调用时同步在 `test/support/fakes.dart` 补一个假实现，保持"可离线测试"；
+接服务器时注意：网络访问只能出现在 `lib/src/data/` 的 Repository 层，screen/widget 里禁止 `dio` 与直接读写 Store。
+新增 API 调用时同步在 `test/support/` 补假实现，保持"可离线测试"；
 但**假实现不等于验证**，端点行为必须按上面"API 真值规则"落到 fixture 与契约测试里。
 
-书架层的既有约定（改动前先看）：
+书架与列表层的既有约定（改动前先看）：
 - UI 只认 `ShelfFailure`（`lib/src/data/shelf_failure.dart`），不认 `KomgaError`；
 - 封面失败必须返回 `null`，绝不让装饰性资源打断整页；
-- 失败时**不清空**已有内容（刷新失败只在底部提示）；
-- 新的列表/分页逻辑一律走 `ShelfController` 的 generation 竞态保护，不要在页面里自己发请求；
+- 失败时**不清空**已有内容（刷新/翻页失败保留旧列表并在局部提示）；
+- 新的列表/分页逻辑一律走 `ShelfController` 或通用增量分页器 `PagedListController<T>`（内置 `_generation` 竞态保护与 `page` 递增），不要在页面里自己发请求或用增大 `size` 重拉第 0 页；
 - **不要用 `switch (asyncValue) { AsyncError() => … }` 做错误分支**：Riverpod 3 首次加载失败给的是
   `AsyncLoading` + `hasError`（`test/providers/async_value_behavior_test.dart` 钉住了这个行为），
   一律按 `hasError` / `value` 判断。

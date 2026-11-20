@@ -66,7 +66,6 @@ void main() {
         .read(
           seriesBooksProvider((
             seriesId: demoShelf().first.id,
-            size: 100,
             sort: BooksSort.numberDesc,
             readStatus: null,
           )),

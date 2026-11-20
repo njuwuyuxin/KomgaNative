@@ -1,20 +1,19 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/l10n/failure_text.dart';
 import 'package:komga_native/src/data/shelf_view_options.dart';
+import 'package:komga_native/src/l10n/failure_text.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/widgets/load_more_footer.dart';
 import 'package:komga_native/src/widgets/series_shelf_tile.dart';
 import 'package:material_ui/material_ui.dart';
 
-/// 收藏集里的系列（UI-P3-8）。
-///
-/// 支持"加载更多"（FIX-08）：收藏集可能有上百个系列，之前只取 20 个，
-/// 第 21 个起静默消失。
-class CollectionDetailScreen extends ConsumerStatefulWidget {
+/// 收藏集里的系列（UI-P3-8 / ARC-12 增量分页）。
+class CollectionDetailScreen extends ConsumerWidget {
   const CollectionDetailScreen({
     required this.collectionId,
     this.title,
@@ -25,19 +24,10 @@ class CollectionDetailScreen extends ConsumerStatefulWidget {
   final String? title;
 
   @override
-  ConsumerState<CollectionDetailScreen> createState() =>
-      _CollectionDetailScreenState();
-}
-
-class _CollectionDetailScreenState
-    extends ConsumerState<CollectionDetailScreen> {
-  int _size = kListPageSize;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    final query = (collectionId: widget.collectionId, size: _size);
-    final async = ref.watch(collectionSeriesProvider(query));
+    final provider = collectionSeriesProvider(collectionId);
+    final async = ref.watch(provider);
     return Scaffold(
       body: GlassPageBackground(
         child: CustomScrollView(
@@ -49,13 +39,14 @@ class _CollectionDetailScreenState
                   label: MaterialLocalizations.of(context).backButtonTooltip,
                   onPressed: () => context.pop(),
                 ),
-                title: Text(widget.title ?? l10n.collectionFallback),
+                title: Text(title ?? l10n.collectionFallback),
               ),
             ),
             _SeriesSliver(
               async: async,
-              onRetry: () => ref.invalidate(collectionSeriesProvider(query)),
-              onLoadMore: () => setState(() => _size += kListPageSize),
+              onRetry: () => ref.invalidate(provider),
+              onLoadMore: () =>
+                  unawaited(ref.read(provider.notifier).loadMore()),
             ),
             const SliverToBoxAdapter(
               child: SizedBox(height: AppSizes.navBarClearance),

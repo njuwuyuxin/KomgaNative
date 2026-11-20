@@ -74,7 +74,7 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  test('分页：25+ 条能靠增大 size 全部拿到', () async {
+  test('分页：65 条能靠 PagedListController 增量 page=0,1,2 全部拿到且不重拉第 0 页', () async {
     repository = FakeLibraryRepository(series: manySeries('alpha', 65));
     container = ProviderContainer(
       overrides: <Override>[
@@ -83,19 +83,21 @@ void main() {
     );
     addTearDown(container.dispose);
 
-    Future<List<Series>> page(int size) async => (await container.read(
-      searchSeriesProvider((
-        query: 'alpha',
-        size: size,
-        readStatus: null,
-        tag: null,
-      )).future,
-    )).items;
+    const query = (query: 'alpha', readStatus: null, tag: null);
+    final first = await container.read(searchSeriesProvider(query).future);
+    expect(first.items.length, 30);
 
-    expect((await page(30)).length, 30);
-    expect((await page(60)).length, 60);
-    final all = await page(90);
-    expect(all.length, 65, reason: '最后不足一页时按实际条数返回');
+    await container.read(searchSeriesProvider(query).notifier).loadMore();
+    expect(container.read(searchSeriesProvider(query)).value!.items.length, 60);
+
+    await container.read(searchSeriesProvider(query).notifier).loadMore();
+    final all = container.read(searchSeriesProvider(query)).value!.items;
+    expect(all.length, 65, reason: '最后不足一页时按实际条数追加');
+    expect(repository.seriesCalls.map((c) => c.page).toList(), <int>[
+      0,
+      1,
+      2,
+    ], reason: '只请求增量页 0, 1, 2，不重拉第 0 页');
   });
 
   testWidgets('切换查询不会串结果', (WidgetTester tester) async {

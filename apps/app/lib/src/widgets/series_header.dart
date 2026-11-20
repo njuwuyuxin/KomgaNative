@@ -7,20 +7,10 @@ import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/book_selection.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/widgets/series_header_cover.dart';
+import 'package:komga_native/src/widgets/series_header_details.dart';
 import 'package:material_ui/material_ui.dart';
 
-/// 系列详情页的头部（UI-P2-4）。
-///
-/// 构成：**模糊放大的封面当背景**（`ImageFiltered`，不是 `BackdropFilter`——
-/// 模糊的是封面自己，便宜得多，也不违反"页面里不许直接写 BackdropFilter"），
-/// 上面压渐变遮罩，再放封面、标题、作者/出版社/年份、标签、可展开简介，
-/// 最后是主按钮（继续阅读第 N 本 / 开始阅读）。
-///
-/// **加载态与内容态是同一个组件**：封面槽位（含 Hero）第一帧就在，元信息还没
-/// 回来时用骨架占位。这样从书架进详情时共享元素的终点始终存在，首次打开和
-/// 后续打开看到的是同一段动画，而不是"第一次全屏加载、第二次才飞"。
-///
-/// 墨水屏：不做模糊背景，用纯纸色 + 描边（模糊在灰阶屏上就是一团脏灰）。
+/// 系列详情页的头部（UI-P2-4 / ARC-12 拆出标题块与简介组件）。
 class SeriesHeader extends ConsumerWidget {
   const SeriesHeader({
     required this.series,
@@ -35,26 +25,13 @@ class SeriesHeader extends ConsumerWidget {
 
   final Series? series;
   final String seriesId;
-
-  /// 封面 Hero tag（从货架带过来的那一份，见 `seriesHeroTag`）。
   final String heroTag;
-
-  /// 书列表；还没回来或失败时是 null（主按钮位置按 [booksLoading] 处理）。
   final List<Book>? books;
-
-  /// 系列元信息（标题 / 作者 / 进度）还在加载：先用骨架占位，
-  /// 不要先显示 "Series / 0 of 0 read" 再跳成真数据。
   final bool metadataLoading;
-
-  /// 书列表还在加载：主按钮位置先放骨架，避免整块区域先空着再突然出现。
-  ///
-  /// 与 [books] 为 null 分开判断：请求失败时也没有书，但那时不该一直转微光。
   final bool booksLoading;
-
   final void Function(Book book) onOpenBook;
 
-  /// 简介折叠时最多显示几行。
-  static const int _summaryLines = 4;
+  static const int summaryMaxLines = 4;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -86,12 +63,12 @@ class SeriesHeader extends ConsumerWidget {
                 child: metadataLoading
                     ? const Shimmer(
                         child: ExcludeSemantics(
-                          child: _TitleSkeleton(
+                          child: SeriesTitleSkeleton(
                             key: Key('series-title-skeleton'),
                           ),
                         ),
                       )
-                    : _TitleBlock(series: series),
+                    : SeriesTitleBlock(series: series),
               ),
             ],
           ),
@@ -122,7 +99,7 @@ class SeriesHeader extends ConsumerWidget {
           ],
           if (!metadataLoading && summary.isNotEmpty) ...<Widget>[
             const SizedBox(height: AppSpacing.md),
-            _Summary(text: summary),
+            SeriesSummary(text: summary, maxLines: summaryMaxLines),
           ],
         ],
       ),
@@ -139,7 +116,6 @@ class SeriesHeader extends ConsumerWidget {
 
     return Stack(
       children: <Widget>[
-        // 背景：同一张封面放大 + 模糊，压一层暗渐变让文字可读。
         Positioned.fill(child: SeriesHeaderBackdrop(bytes: bytes)),
         Positioned.fill(
           child: DecoratedBox(
@@ -157,228 +133,6 @@ class SeriesHeader extends ConsumerWidget {
         ),
         content,
       ],
-    );
-  }
-}
-
-/// 元信息未就绪时的标题区占位：标题两行 + 作者行 + 进度条的位置。
-///
-/// 宽度/高度都取 token，尽量贴近真实排版；即便真实标题只有一行，
-/// 变化的也只是封面**下方**的高度，封面槽位不会挪位置（Hero 落点稳定）。
-class _TitleSkeleton extends StatelessWidget {
-  const _TitleSkeleton({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        SizedBox(
-          height: AppSpacing.lg,
-          width: AppSpacing.xxl * 3,
-          child: SkeletonBox(),
-        ),
-        SizedBox(height: AppSpacing.sm),
-        SizedBox(
-          height: AppSpacing.md,
-          width: AppSpacing.xxl * 2,
-          child: SkeletonBox(),
-        ),
-        SizedBox(height: AppSpacing.sm),
-        SizedBox(
-          height: AppSizes.progressBar,
-          child: SkeletonBox(shape: StadiumBorder()),
-        ),
-      ],
-    );
-  }
-}
-
-class _TitleBlock extends StatefulWidget {
-  const _TitleBlock({required this.series});
-
-  final Series? series;
-
-  @override
-  State<_TitleBlock> createState() => _TitleBlockState();
-}
-
-class _TitleBlockState extends State<_TitleBlock> {
-  /// 最多先显示几个标签；多出来的收成 `+N`（FIX-09）。
-  static const int _visibleTags = 3;
-
-  bool _showAllTags = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    final muted = theme.colorScheme.onSurfaceVariant;
-    final series = widget.series;
-    final read = series?.booksReadCount ?? 0;
-    final total = series?.booksCount ?? 0;
-    final facts = <String>[
-      if (series != null && series.authors.isNotEmpty)
-        series.authors.join(', '),
-      if (series?.publisher?.trim().isNotEmpty ?? false)
-        series!.publisher!.trim(),
-      if (series?.releaseDate != null) '${series!.releaseDate!.year}',
-    ];
-    final tags = series?.tags ?? const <String>[];
-    final hiddenTags = tags.length - _visibleTags;
-    final shownTags = _showAllTags ? tags : tags.take(_visibleTags);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        Text(
-          series?.title ?? l10n.seriesFallbackTitle,
-          maxLines: 3,
-          overflow: TextOverflow.ellipsis,
-          style: AppTypography.of(context).title,
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        Text(
-          l10n.readOfTotal(read, total),
-          style: theme.textTheme.bodySmall?.copyWith(color: muted),
-        ),
-        if (facts.isNotEmpty) ...<Widget>[
-          const SizedBox(height: AppSpacing.xxs),
-          Text(
-            facts.join(' · '),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodySmall?.copyWith(color: muted),
-          ),
-        ],
-        if (tags.isNotEmpty) ...<Widget>[
-          const SizedBox(height: AppSpacing.sm),
-          Wrap(
-            spacing: AppSpacing.xs,
-            runSpacing: AppSpacing.xs,
-            children: <Widget>[
-              for (final tag in shownTags) _TagChip(label: tag),
-              // 标签很多时不再硬塞四个然后悄悄丢掉剩下的：给一个能点开的 +N。
-              if (!_showAllTags && hiddenTags > 0)
-                GestureDetector(
-                  key: const Key('series-tags-more'),
-                  onTap: () => setState(() => _showAllTags = true),
-                  child: _TagChip(label: '+$hiddenTags', highlighted: true),
-                ),
-            ],
-          ),
-        ],
-        const SizedBox(height: AppSpacing.sm),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadii.sm),
-          child: LinearProgressIndicator(
-            value: series?.progress ?? 0,
-            minHeight: AppSizes.progressBar,
-            backgroundColor: theme.colorScheme.surfaceContainerHighest,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// 一个标签胶囊；`+N` 用同一种形状但换底色，表示"可以点"。
-class _TagChip extends StatelessWidget {
-  const _TagChip({required this.label, this.highlighted = false});
-
-  final String label;
-  final bool highlighted;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final muted = theme.colorScheme.onSurfaceVariant;
-    return DecoratedBox(
-      decoration: ShapeDecoration(
-        color: highlighted
-            ? theme.colorScheme.secondaryContainer
-            : theme.colorScheme.surfaceContainerHighest,
-        shape: const StadiumBorder(),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm,
-          vertical: AppSpacing.xxs,
-        ),
-        child: Text(
-          label,
-          style: theme.textTheme.labelSmall?.copyWith(color: muted),
-        ),
-      ),
-    );
-  }
-}
-
-/// 简介：默认折到 [SeriesHeader._summaryLines] 行，可展开。
-class _Summary extends StatefulWidget {
-  const _Summary({required this.text});
-
-  final String text;
-
-  @override
-  State<_Summary> createState() => _SummaryState();
-}
-
-class _SummaryState extends State<_Summary> {
-  bool _expanded = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    final style = AppTypography.of(context).body
-        .copyWith(color: theme.colorScheme.onSurfaceVariant);
-    return LayoutBuilder(
-      builder: (BuildContext context, BoxConstraints constraints) {
-        // 只有真的被截断时才给"展开"（FIX-09）：短简介下面挂一个永远没用的
-        // "展开"按钮，比没有更让人困惑。
-        final painter = TextPainter(
-          text: TextSpan(text: widget.text, style: style),
-          maxLines: SeriesHeader._summaryLines,
-          textDirection: Directionality.of(context),
-          textScaler: MediaQuery.textScalerOf(context),
-        )..layout(maxWidth: constraints.maxWidth);
-        final truncated = painter.didExceedMaxLines;
-        if (!truncated) {
-          return Text(
-            widget.text,
-            key: const Key('series-summary'),
-            style: style,
-          );
-        }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            GestureDetector(
-              key: const Key('series-summary'),
-              onTap: () => setState(() => _expanded = !_expanded),
-              child: Text(
-                widget.text,
-                maxLines: _expanded ? null : SeriesHeader._summaryLines,
-                overflow: _expanded ? null : TextOverflow.ellipsis,
-                style: style,
-              ),
-            ),
-            TextButton(
-              key: const Key('series-summary-toggle'),
-              style: TextButton.styleFrom(
-                padding: EdgeInsets.zero,
-                minimumSize: const Size(AppSizes.minTouch, AppSizes.minTouch),
-                alignment: Alignment.centerLeft,
-              ),
-              onPressed: () => setState(() => _expanded = !_expanded),
-              child: Text(_expanded ? l10n.showLess : l10n.showMore),
-            ),
-          ],
-        );
-      },
     );
   }
 }
