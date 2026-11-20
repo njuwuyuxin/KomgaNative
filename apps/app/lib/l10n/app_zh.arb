@@ -404,5 +404,46 @@
     "placeholders": {
       "server": {"type": "String"}
     }
-  }
+  },
+  "connRestoreFailedTitle": "无法读取已保存的会话",
+  "connRestoreFailedHint": "请重新登录连接。",
+  "connInvalidAddressTitle": "服务器地址格式不正确",
+  "connInvalidAddressHint": "示例：https://komga.example.com 或 http://192.168.1.10:25600",
+  "connAuthTitle": "账号、密码或 API Key 不正确",
+  "connAuthHint": "如果服务端开启了两步验证，请改用 API Key 方式连接。",
+  "connUntrustedCertTitle": "服务器证书不受信任",
+  "connCertUnreadableHint": "在读取证书之前连接已中断。",
+  "connHttpsOnlyTitle": "这个端口只接受 HTTPS",
+  "connHttpsTryUrlHint": "请改试 {url}。",
+  "@connHttpsTryUrlHint": {
+    "placeholders": {
+      "url": {"type": "String"}
+    }
+  },
+  "connHttpsRefusedHint": "服务器 {url} 拒绝了连接。",
+  "@connHttpsRefusedHint": {
+    "placeholders": {
+      "url": {"type": "String"}
+    }
+  },
+  "connNetworkTitle": "无法连接到 {host}",
+  "@connNetworkTitle": {
+    "placeholders": {
+      "host": {"type": "String"}
+    }
+  },
+  "connNetworkHint": "检查地址和端口，并确认设备与服务器在同一网络。",
+  "connBadRequestTitle": "服务端拒绝了请求",
+  "connBadRequestHint": "检查服务器地址或反向代理配置。",
+  "connServerTitle": "服务器出错了（{code}）",
+  "@connServerTitle": {
+    "placeholders": {
+      "code": {"type": "String"}
+    }
+  },
+  "connServerHint": "稍后重试；如果持续失败，请检查 Komga 服务端日志。",
+  "connProtocolTitle": "意外的服务端响应",
+  "connProtocolHint": "确认这个地址是 Komga，并且反向代理没有把它改写成网页。",
+  "connUnexpectedTitle": "连接失败",
+  "connUnexpectedHint": "请检查设置后重试。"
 }

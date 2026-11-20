@@ -126,7 +126,7 @@ class ContinueCard extends ConsumerWidget {
         width: AppSizes.shelfCover.width,
         height: AppSizes.shelfCover.height,
         child: bytes == null
-            ? const ColoredBox(color: Colors.black12)
+            ? ColoredBox(color: theme.colorScheme.surfaceContainerHighest)
             : CoverImage(bytes: bytes),
       ),
     );

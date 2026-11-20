@@ -122,7 +122,11 @@ class _ReaderOpeningHeroState extends ConsumerState<ReaderOpeningHero>
                   child: ClipPath(
                     clipper: ShapeBorderClipper(shape: shape),
                     child: bytes == null
-                        ? const ColoredBox(color: Colors.black26)
+                        ? ColoredBox(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest,
+                          )
                         : CoverImage(bytes: bytes),
                   ),
                 ),

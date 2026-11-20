@@ -275,9 +275,6 @@ class PageResult<T> {
   bool get hasMore => (page + 1) * size < totalElements;
 }
 
-/// 设备形态，用于布局与阅读器默认值。
-enum FormFactor { phone, tablet, desktopLike }
-
 /// 墨水屏信息。检测不到时返回 [unknown]。
 class EinkInfo {
   const EinkInfo({this.isEink = false, this.vendor = 'unknown'});

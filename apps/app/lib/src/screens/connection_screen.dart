@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
+import 'package:komga_native/src/l10n/connection_failure_text.dart';
 import 'package:komga_native/src/session/session_controller.dart';
 import 'package:komga_native/src/widgets/certificate_panel.dart';
 
@@ -61,8 +62,9 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
     final session = ref.watch(sessionProvider);
     final disconnected = session is SessionDisconnected ? session : null;
     final submitting = disconnected?.submitting ?? false;
-    final error = disconnected?.error;
-    final hint = disconnected?.hint;
+    final failure = disconnected?.failure;
+    final error = failure == null ? null : l10n.connectionFailureTitle(failure);
+    final hint = failure == null ? null : l10n.connectionFailureHint(failure);
     final certificate = disconnected?.certificate;
 
     // HTTP + 公网时提前警告，避免用户把凭据明文发出去。
@@ -85,7 +87,9 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(AppSpacing.lg),
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 440),
+                constraints: const BoxConstraints(
+                  maxWidth: AppSizes.formMaxWidth,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: <Widget>[

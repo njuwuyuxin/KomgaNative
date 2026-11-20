@@ -118,83 +118,88 @@ class DriftProgressStore implements ProgressStore {
   );
 }
 
-/// 测试/预览用：按 `{scope, bookId}` 分区的纯内存版本。
+/// 测试/预览用：按 `{scope, bookId}` 分区的纯内存版本，内部委托复用 [ProgressOutbox]（ARC-11）。
 class InMemoryProgressStore implements ProgressStore {
-  final Map<String, Map<String, ProgressRecord>> _byScope =
-      <String, Map<String, ProgressRecord>>{};
-  int _seq = 0;
+  final Map<String, _ScopedMemoryBucket> _byScope =
+      <String, _ScopedMemoryBucket>{};
 
-  Map<String, ProgressRecord> _bucket(String scope) =>
-      _byScope.putIfAbsent(scope, () => <String, ProgressRecord>{});
+  _ScopedMemoryBucket _bucket(String scope) =>
+      _byScope.putIfAbsent(scope, _ScopedMemoryBucket.new);
+
+  ProgressRecord? _mergedRecord(_ScopedMemoryBucket bucket, String bookId) {
+    final base = bucket.records[bookId];
+    final pending = bucket.outbox.forBook(bookId);
+    if (pending != null) {
+      return ProgressRecord(
+        page: pending.target.page,
+        completed: pending.target.completed,
+        updatedAt: base?.updatedAt ?? DateTime.now().toUtc(),
+        serverLastModified: base?.serverLastModified,
+        pendingSeq: pending.seq,
+      );
+    }
+    return base;
+  }
 
   @override
-  Future<ProgressRecord?> record(String bookId, {String scope = ''}) async =>
-      _byScope[scope]?[bookId];
+  Future<ProgressRecord?> record(String bookId, {String scope = ''}) async {
+    final bucket = _byScope[scope];
+    if (bucket == null) return null;
+    return _mergedRecord(bucket, bookId);
+  }
 
   @override
   Future<Map<String, ProgressRecord>> records(
     Iterable<String> bookIds, {
     String scope = '',
   }) async {
-    final map = _byScope[scope];
-    if (map == null) return const <String, ProgressRecord>{};
-    return <String, ProgressRecord>{
-      for (final id in bookIds)
-        if (map[id] != null) id: map[id]!,
-    };
+    final bucket = _byScope[scope];
+    if (bucket == null) return const <String, ProgressRecord>{};
+    final result = <String, ProgressRecord>{};
+    for (final id in bookIds) {
+      final rec = _mergedRecord(bucket, id);
+      if (rec != null) result[id] = rec;
+    }
+    return result;
   }
 
   @override
   Future<void> enqueue(ProgressTarget target, {String scope = ''}) async {
-    _seq++;
-    final map = _bucket(scope);
-    map[target.bookId] = ProgressRecord(
+    final bucket = _bucket(scope);
+    final seq = bucket.outbox.enqueue(target);
+    bucket.records[target.bookId] = ProgressRecord(
       page: target.page,
       completed: target.completed,
       updatedAt: DateTime.now().toUtc(),
-      serverLastModified: map[target.bookId]?.serverLastModified,
-      pendingSeq: _seq,
+      serverLastModified: bucket.records[target.bookId]?.serverLastModified,
+      pendingSeq: seq,
     );
   }
 
   @override
   Future<List<PendingProgress>> pending({String scope = ''}) async {
-    final map = _byScope[scope];
-    if (map == null) return const <PendingProgress>[];
-    final items =
-        map.entries.where((MapEntry<String, ProgressRecord> e) {
-          return e.value.isPending;
-        }).toList()..sort(
-          (
-            MapEntry<String, ProgressRecord> a,
-            MapEntry<String, ProgressRecord> b,
-          ) => a.value.pendingSeq!.compareTo(b.value.pendingSeq!),
-        );
+    final bucket = _byScope[scope];
+    if (bucket == null) return const <PendingProgress>[];
     return <PendingProgress>[
-      for (final entry in items)
-        PendingProgress(
-          ProgressTarget(
-            bookId: entry.key,
-            page: entry.value.page,
-            completed: entry.value.completed,
-          ),
-          entry.value.pendingSeq!,
-        ),
+      for (final target in bucket.outbox.pending)
+        bucket.outbox.forBook(target.bookId)!,
     ];
   }
 
   @override
   Future<bool> ack(String bookId, int seq, {String scope = ''}) async {
-    final map = _byScope[scope];
-    final current = map?[bookId];
-    if (current == null || current.pendingSeq != seq) return false;
-    map![bookId] = ProgressRecord(
-      page: current.page,
-      completed: current.completed,
-      updatedAt: current.updatedAt,
-      serverLastModified: null,
-      pendingSeq: null,
-    );
+    final bucket = _byScope[scope];
+    if (bucket == null || !bucket.outbox.markAcked(bookId, seq)) return false;
+    final current = bucket.records[bookId];
+    if (current != null) {
+      bucket.records[bookId] = ProgressRecord(
+        page: current.page,
+        completed: current.completed,
+        updatedAt: current.updatedAt,
+        serverLastModified: null,
+        pendingSeq: null,
+      );
+    }
     return true;
   }
 
@@ -204,14 +209,13 @@ class InMemoryProgressStore implements ProgressStore {
     ReadProgress? remote, {
     String scope = '',
   }) async {
-    final map = _bucket(scope);
-    final current = map[bookId];
-    if (current?.isPending ?? false) return;
+    final bucket = _bucket(scope);
+    if (bucket.outbox.contains(bookId)) return;
     if (remote == null) {
-      map.remove(bookId);
+      bucket.records.remove(bookId);
       return;
     }
-    map[bookId] = ProgressRecord(
+    bucket.records[bookId] = ProgressRecord(
       page: remote.page,
       completed: remote.completed,
       updatedAt: DateTime.now().toUtc(),
@@ -225,16 +229,25 @@ class InMemoryProgressStore implements ProgressStore {
     ReadProgress? remote, {
     String scope = '',
   }) async {
-    final map = _bucket(scope);
+    final bucket = _bucket(scope);
+    final pending = bucket.outbox.forBook(bookId);
+    if (pending != null) {
+      bucket.outbox.markAcked(bookId, pending.seq);
+    }
     if (remote == null) {
-      map.remove(bookId);
+      bucket.records.remove(bookId);
       return;
     }
-    map[bookId] = ProgressRecord(
+    bucket.records[bookId] = ProgressRecord(
       page: remote.page,
       completed: remote.completed,
       updatedAt: DateTime.now().toUtc(),
       serverLastModified: remote.lastModified.toUtc(),
     );
   }
+}
+
+class _ScopedMemoryBucket {
+  final ProgressOutbox outbox = ProgressOutbox();
+  final Map<String, ProgressRecord> records = <String, ProgressRecord>{};
 }

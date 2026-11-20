@@ -96,7 +96,8 @@ class ReaderSettingsSheet extends ConsumerWidget {
     return SafeArea(
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(context).height * 0.85,
+          maxHeight:
+              MediaQuery.sizeOf(context).height * AppSizes.modalHeightFraction,
         ),
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(

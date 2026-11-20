@@ -132,6 +132,12 @@ abstract final class AppSizes {
   /// 最近阅读横滑条的整条高度与单个封面宽度（HIS-02）。
   static const double recentHistoryHeight = 132;
   static const double recentHistoryTileWidth = 84;
+
+  /// 登录/连接表单卡片的最大宽度（ARC-11）。
+  static const double formMaxWidth = 440;
+
+  /// 底部设置弹窗占屏幕高度的最大比例（ARC-11）。
+  static const double modalHeightFraction = 0.85;
 }
 
 /// 布局断点，与 `komga_platform` 的形态判断保持同一套数值。

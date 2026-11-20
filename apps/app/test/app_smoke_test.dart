@@ -128,7 +128,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Connect to your Komga server'), findsOneWidget);
-    expect(find.textContaining('账号或密码不正确'), findsOneWidget);
+    expect(
+      find.textContaining('Incorrect email, password, or API key'),
+      findsOneWidget,
+    );
     expect(find.text('Library'), findsNothing);
   });
 

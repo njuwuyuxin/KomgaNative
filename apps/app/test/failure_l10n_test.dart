@@ -3,7 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:komga_api/komga_api.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
+import 'package:komga_native/src/l10n/connection_failure_text.dart';
 import 'package:komga_native/src/l10n/failure_text.dart';
+import 'package:komga_native/src/session/session_controller.dart';
 
 /// I18N-01：失败类型 → 本地化文案。
 void main() {
@@ -66,5 +68,34 @@ void main() {
     // 文案里不会出现原始异常文本。
     final title = zh.failureTitle(failureKindOf(StateError('boom')));
     expect(title, isNot(contains('boom')));
+  });
+
+  test('ARC-11：所有 ConnectionFailureKind 在 en / zh 下均完整本地化，无中英混排', () async {
+    final en = await load(const Locale('en'));
+    final zh = await load(const Locale('zh'));
+    final cjk = RegExp('[\u4e00-\u9fa5]');
+
+    for (final kind in ConnectionFailureKind.values) {
+      final sample = ConnectionFailure(
+        kind,
+        host: '192.168.1.10',
+        url: 'https://komga.example.com',
+        statusCode: 502,
+        certificateUnreadable: true,
+      );
+      final enTitle = en.connectionFailureTitle(sample);
+      final zhTitle = zh.connectionFailureTitle(sample);
+      expect(enTitle.trim(), isNotEmpty);
+      expect(zhTitle.trim(), isNotEmpty);
+      expect(cjk.hasMatch(enTitle), isFalse, reason: '英文标题不应含中文 ($kind)');
+      expect(cjk.hasMatch(zhTitle), isTrue, reason: '中文标题应含中文 ($kind)');
+
+      final enHint = en.connectionFailureHint(sample);
+      final zhHint = zh.connectionFailureHint(sample);
+      expect(enHint, isNotNull);
+      expect(zhHint, isNotNull);
+      expect(cjk.hasMatch(enHint!), isFalse, reason: '英文提示不应含中文 ($kind)');
+      expect(cjk.hasMatch(zhHint!), isTrue, reason: '中文提示应含中文 ($kind)');
+    }
   });
 }

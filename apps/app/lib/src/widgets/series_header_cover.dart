@@ -66,7 +66,11 @@ class SeriesHeaderBackdrop extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final data = bytes;
-    if (data == null) return const ColoredBox(color: Colors.black12);
+    if (data == null) {
+      return ColoredBox(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      );
+    }
     return ClipRect(
       child: ImageFiltered(
         imageFilter: ui.ImageFilter.blur(sigmaX: 24, sigmaY: 24),

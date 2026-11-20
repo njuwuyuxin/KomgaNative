@@ -107,12 +107,12 @@ void main() {
         );
 
     final state = container.read(sessionProvider) as SessionDisconnected;
-    expect(state.error, '账号或密码不正确');
+    expect(state.failure?.kind, ConnectionFailureKind.auth);
     expect(state.submitting, isFalse);
     expect(await store.load(), isNull);
   });
 
-  test('网络错误 → 报错里带上主机名，方便用户判断是不是地址错了', () async {
+  test('网络错误 → 结构化失败里带上主机名，方便用户判断是不是地址错了', () async {
     final container = containerWith(
       service: FakeConnectionService(
         onConnect: (ServerAddress address, _) async => throw networkError(),
@@ -129,8 +129,8 @@ void main() {
         );
 
     final state = container.read(sessionProvider) as SessionDisconnected;
-    expect(state.error, contains('192.168.1.10'));
-    expect(state.hint, isNotNull);
+    expect(state.failure?.kind, ConnectionFailureKind.network);
+    expect(state.failure?.host, '192.168.1.10');
   });
 
   test('地址非法 → 本地拦截，不发请求', () async {
@@ -143,8 +143,7 @@ void main() {
         .connectWithPassword(rawUrl: 'not a url', username: 'u', password: 'p');
 
     final state = container.read(sessionProvider) as SessionDisconnected;
-    expect(state.error, isNotNull);
-    expect(state.hint, contains('https://'));
+    expect(state.failure?.kind, ConnectionFailureKind.invalidAddress);
     expect(service.passwordCalls, 0);
   });
 
@@ -206,7 +205,7 @@ void main() {
 
       final state = container.read(sessionProvider) as SessionDisconnected;
       expect(state.submitting, isFalse);
-      expect(state.error, contains('HTTPS'));
+      expect(state.failure?.kind, ConnectionFailureKind.httpsRefused);
       expect(service.apiKeyCalls, 1);
     });
 
@@ -283,7 +282,7 @@ void main() {
 
       final state = container.read(sessionProvider) as SessionDisconnected;
       expect(state.certificate, isNull);
-      expect(state.error, isNull);
+      expect(state.failure, isNull);
     });
   });
 }

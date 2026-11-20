@@ -542,5 +542,46 @@
     "placeholders": {
       "server": {"type": "String"}
     }
-  }
+  },
+  "connRestoreFailedTitle": "Couldn't read saved session",
+  "connRestoreFailedHint": "Sign in again to reconnect.",
+  "connInvalidAddressTitle": "Invalid server address",
+  "connInvalidAddressHint": "Example: https://komga.example.com or http://192.168.1.10:25600",
+  "connAuthTitle": "Incorrect email, password, or API key",
+  "connAuthHint": "If two-factor authentication is enabled on the server, sign in with an API key instead.",
+  "connUntrustedCertTitle": "The server's certificate is not trusted",
+  "connCertUnreadableHint": "The connection failed before the certificate could be read.",
+  "connHttpsOnlyTitle": "This port speaks HTTPS only",
+  "connHttpsTryUrlHint": "Try {url} instead.",
+  "@connHttpsTryUrlHint": {
+    "placeholders": {
+      "url": {"type": "String"}
+    }
+  },
+  "connHttpsRefusedHint": "The server at {url} refused the connection.",
+  "@connHttpsRefusedHint": {
+    "placeholders": {
+      "url": {"type": "String"}
+    }
+  },
+  "connNetworkTitle": "Cannot connect to {host}",
+  "@connNetworkTitle": {
+    "placeholders": {
+      "host": {"type": "String"}
+    }
+  },
+  "connNetworkHint": "Check the address and port, and make sure this device and the server are on the same network.",
+  "connBadRequestTitle": "The server refused the request",
+  "connBadRequestHint": "Check the server address or reverse proxy configuration.",
+  "connServerTitle": "Server error ({code})",
+  "@connServerTitle": {
+    "placeholders": {
+      "code": {"type": "String"}
+    }
+  },
+  "connServerHint": "Try again later; check the Komga server logs if it persists.",
+  "connProtocolTitle": "Unexpected server response",
+  "connProtocolHint": "Make sure this address points to Komga and is not rewritten by a reverse proxy.",
+  "connUnexpectedTitle": "Connection failed",
+  "connUnexpectedHint": "Check your settings and try again."
 }
