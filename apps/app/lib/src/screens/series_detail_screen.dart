@@ -9,6 +9,7 @@ import 'package:komga_native/src/l10n/failure_text.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/book_read_provider.dart';
 import 'package:komga_native/src/providers/book_selection_provider.dart';
+import 'package:komga_native/src/providers/collections_controller.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/providers/series_read_provider.dart';
 import 'package:komga_native/src/widgets/shelf_selection_bar.dart';
@@ -168,9 +169,8 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
     final messenger = ScaffoldMessenger.of(context);
     try {
       await ref
-          .read(libraryRepositoryProvider)
-          .createCollection(name: name, seriesIds: <String>[seriesId]);
-      ref.invalidate(collectionsProvider);
+          .read(collectionsControllerProvider.notifier)
+          .create(name: name, seriesIds: <String>[seriesId]);
       messenger.showSnackBar(SnackBar(content: Text(l10n.collectionSaved)));
     } on ShelfFailure catch (failure) {
       messenger.showSnackBar(

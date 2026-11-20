@@ -275,6 +275,16 @@ class SessionController extends Notifier<SessionState> {
     await _store.clear();
     state = const SessionDisconnected();
   }
+
+  /// 删除一台已保存的服务器；若它正是当前活动服务器则一并登出（ARC-05）。
+  Future<void> removeServer(StoredServer server) async {
+    final current = state;
+    await _store.remove(server);
+    ref.invalidate(serverListProvider);
+    if (current is SessionConnected && current.server.id == server.id) {
+      await signOut();
+    }
+  }
 }
 
 final Provider<ServerStore> serverStoreProvider = Provider<ServerStore>(

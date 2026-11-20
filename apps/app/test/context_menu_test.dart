@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/l10n/l10n.dart';
+import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/screens/library_screen.dart';
 import 'package:komga_native/src/screens/series_detail_screen.dart';
@@ -81,6 +82,22 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(repository.seriesReadCalls.single.read, isFalse);
+    });
+
+    testWidgets('断网时选"标记全部已读"：不抛未捕获异常且弹出错误 SnackBar', (
+      WidgetTester tester,
+    ) async {
+      final repository = FakeLibraryRepository(series: demoShelf())
+        ..seriesReadFailure = const NetworkFailure();
+      await pumpScreen(tester, const LibraryScreen(), repository: repository);
+
+      await tester.longPress(find.byKey(const Key('series-s1')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Mark all read'));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Cannot reach the server'), findsOneWidget);
     });
 
     testWidgets('墨水屏同样有菜单（普通弹出，不做缩放）', (WidgetTester tester) async {

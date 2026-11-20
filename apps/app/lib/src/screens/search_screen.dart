@@ -6,7 +6,6 @@ import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/l10n/failure_text.dart';
-import 'package:komga_native/src/data/app_settings.dart';
 import 'package:komga_native/src/data/shelf_view_options.dart';
 import 'package:komga_native/src/providers/settings_provider.dart';
 import 'package:komga_native/src/widgets/search_empty_state.dart';
@@ -59,74 +58,34 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   void _onSubmitted(String value) {
     final query = value.trim();
     if (query.isEmpty) return;
-    _remember(query);
+    ref.read(settingsProvider.notifier).rememberSearchTerm(query);
     setState(() => _query = query);
   }
-
-  void _remember(String query) {
-    final store = ref.read(settingsStoreProvider);
-    unawaited(store.update((AppSettings s) => s.withSearchTerm(query)));
-    setState(
-      () => _history = <String>[
-        query,
-        for (final item in _history)
-          if (item != query) item,
-      ].take(kSearchHistoryLimit).toList(),
-    );
-  }
-
-  List<String> _history = const <String>[];
 
   /// 搜索筛选（SCH-02）：跟着这一次搜索走，换关键词不重置（用户可能想接着筛）。
   SeriesReadStatus? _readStatus;
   String? _tag;
 
-  @override
-  void initState() {
-    super.initState();
-    unawaited(_loadHistory());
-  }
-
-  Future<void> _loadHistory() async {
-    final settings = await ref.read(settingsStoreProvider).load();
-    if (!mounted) return;
-    setState(() => _history = settings.searchHistory);
-  }
-
   /// 点历史/建议：回填输入框并立刻搜。
   void _pick(String term) {
     _debounce?.cancel();
     _controller.text = term;
-    _remember(term);
+    ref.read(settingsProvider.notifier).rememberSearchTerm(term);
     setState(() => _query = term);
   }
 
   void _removeHistory(String term) {
-    unawaited(
-      ref
-          .read(settingsStoreProvider)
-          .update((AppSettings s) => s.withoutSearchTerm(term)),
-    );
-    setState(
-      () => _history = <String>[
-        for (final item in _history)
-          if (item != term) item,
-      ],
-    );
+    ref.read(settingsProvider.notifier).removeSearchTerm(term);
   }
 
   void _clearHistory() {
-    unawaited(
-      ref
-          .read(settingsStoreProvider)
-          .update((AppSettings s) => s.clearSearchHistory()),
-    );
-    setState(() => _history = const <String>[]);
+    ref.read(settingsProvider.notifier).clearSearchHistory();
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final history = ref.watch(searchHistoryProvider);
     return Scaffold(
       body: GlassPageBackground(
         child: CustomScrollView(
@@ -150,7 +109,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               // "RenderViewport does not support intrinsics"。
               SliverToBoxAdapter(
                 child: SearchEmptyState(
-                  history: _history,
+                  history: history,
                   onPick: _pick,
                   onRemove: _removeHistory,
                   onClear: _clearHistory,

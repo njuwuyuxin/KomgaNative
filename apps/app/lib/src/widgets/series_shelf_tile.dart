@@ -6,7 +6,9 @@ import 'package:go_router/go_router.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
+import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/data/shelf_view_options.dart';
+import 'package:komga_native/src/l10n/failure_text.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/providers/pinned_series_provider.dart';
 import 'package:komga_native/src/providers/series_read_provider.dart';
@@ -331,6 +333,7 @@ Future<void> showSeriesMenu(
     ],
   );
   if (action == null || !context.mounted) return;
+  final messenger = ScaffoldMessenger.maybeOf(context);
   switch (action) {
     case SeriesMenuAction.viewDetails:
       await context.push(
@@ -338,13 +341,16 @@ Future<void> showSeriesMenu(
         extra: SeriesDetailArgs(heroTag: heroTag),
       );
     case SeriesMenuAction.markRead:
-      await ref
-          .read(seriesReadProvider.notifier)
-          .setRead(series.id, read: true);
     case SeriesMenuAction.markUnread:
-      await ref
-          .read(seriesReadProvider.notifier)
-          .setRead(series.id, read: false);
+      try {
+        await ref
+            .read(seriesReadProvider.notifier)
+            .setRead(series.id, read: action == SeriesMenuAction.markRead);
+      } on ShelfFailure catch (failure) {
+        messenger?.showSnackBar(
+          SnackBar(content: Text(l10n.failureTitle(failure.kind))),
+        );
+      }
     case SeriesMenuAction.pin:
       await ref
           .read(pinnedSeriesControllerProvider)

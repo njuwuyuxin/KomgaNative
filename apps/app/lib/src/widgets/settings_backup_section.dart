@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/prefs_backup.dart';
+import 'package:komga_native/src/providers/download_providers.dart';
 import 'package:komga_native/src/providers/reader_prefs_provider.dart';
 import 'package:komga_native/src/providers/settings_provider.dart';
 import 'package:material_ui/material_ui.dart';
@@ -49,9 +50,8 @@ class SettingsBackupSection extends ConsumerWidget {
   ) async {
     final backup = PrefsBackup.of(
       reader: ref.read(readerPrefsProvider),
-      // AppSettings 是**持久化快照**，SettingsState 只是它的 UI 投影。
-      // 导出用快照，才能把书架/下载/搜索历史这些一起带走。
-      settings: await ref.read(settingsStoreProvider).load(),
+      // AppSettings 是**持久化快照**，由控制器读取，UI 不直接碰 Store。
+      settings: await ref.read(settingsProvider.notifier).loadSnapshot(),
     );
     await Clipboard.setData(ClipboardData(text: backup.encode()));
     if (!context.mounted) return;
@@ -98,6 +98,7 @@ class SettingsBackupSection extends ConsumerWidget {
       final settings = backup.toAppSettings();
       await ref.read(readerPrefsProvider.notifier).replaceAll(prefs);
       await ref.read(settingsProvider.notifier).replaceAll(settings);
+      ref.invalidate(downloadPolicyProvider);
       if (context.mounted) _toast(context, l10n.settingsImportDone);
     } on PrefsBackupException catch (error) {
       if (context.mounted) _toast(context, error.message);

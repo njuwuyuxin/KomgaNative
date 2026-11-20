@@ -130,5 +130,25 @@ void main() {
       // 清空后回落到引导态，而不是一片空白。
       expect(find.byKey(const Key('search-guidance')), findsOneWidget);
     });
+
+    testWidgets('导入含 searchHistory 的配置后，已挂载的搜索页即时更新历史列表', (
+      WidgetTester tester,
+    ) async {
+      await pumpSearch(tester);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(SearchScreen)),
+      );
+
+      await container
+          .read(settingsProvider.notifier)
+          .replaceAll(
+            const AppSettings(searchHistory: <String>['akira', 'pluto']),
+          );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('search-history-akira')), findsOneWidget);
+      expect(find.byKey(const Key('search-history-pluto')), findsOneWidget);
+      expect(find.byKey(const Key('search-history-vagabond')), findsNothing);
+    });
   });
 }

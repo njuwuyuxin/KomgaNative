@@ -21,10 +21,10 @@ class DownloadSettingsSection extends ConsumerWidget {
     final theme = Theme.of(context);
     // 这里用 `downloadPolicyProvider` 而不是 SettingsState：那里面只有外观/语言。
     final policy = ref.watch(downloadPolicyProvider).value;
-    final store = ref.read(settingsStoreProvider);
+    final settingsController = ref.read(settingsProvider.notifier);
 
     void write(AppSettings Function(AppSettings) mutate) {
-      unawaited(store.update(mutate));
+      unawaited(settingsController.updateSettings(mutate));
       ref.invalidate(downloadPolicyProvider);
     }
 

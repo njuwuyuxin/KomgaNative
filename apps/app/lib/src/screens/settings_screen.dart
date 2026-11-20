@@ -291,10 +291,5 @@ Future<void> _removeServer(
   );
   if (!(confirmed ?? false)) return;
 
-  final session = ref.read(sessionProvider);
-  await ref.read(serverStoreProvider).remove(server);
-  ref.invalidate(serverListProvider);
-  if (session is SessionConnected && session.server.id == server.id) {
-    await ref.read(sessionProvider.notifier).signOut();
-  }
+  await ref.read(sessionProvider.notifier).removeServer(server);
 }

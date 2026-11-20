@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
+import 'package:komga_native/src/data/shelf_failure.dart';
+import 'package:komga_native/src/l10n/failure_text.dart';
 import 'package:komga_native/src/providers/book_read_provider.dart';
 import 'package:komga_native/src/providers/download_policy_gate.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
@@ -157,7 +159,8 @@ class SeriesBookRow extends ConsumerWidget {
         ],
       ],
     );
-    if (action == null) return;
+    if (action == null || !context.mounted) return;
+    final messenger = ScaffoldMessenger.maybeOf(context);
     switch (action) {
       case BookMenuAction.markPreviousRead:
         await onMarkPrevious?.call(read: true);
@@ -165,20 +168,26 @@ class SeriesBookRow extends ConsumerWidget {
         await onMarkPrevious?.call(read: false);
       case BookMenuAction.markRead:
       case BookMenuAction.markUnread:
-        await ref
-            .read(bookReadProvider.notifier)
-            .setRead(
-              book.id,
-              read: action == BookMenuAction.markRead,
-              pagesCount: book.pagesCount,
-            );
-        if (!context.mounted) return;
-        // 书列表是"本地进度叠加"出来的，改完要让详情重新取一遍。
-        ref.invalidate(seriesBooksProvider);
-        ref.invalidate(seriesDetailProvider(book.seriesId));
-        // "读完自动删除"（DLD-01）：标记已读后按策略删掉这一本的下载。
-        if (action == BookMenuAction.markRead) {
-          await maybeDeleteReadDownload(ref, book);
+        try {
+          await ref
+              .read(bookReadProvider.notifier)
+              .setRead(
+                book.id,
+                read: action == BookMenuAction.markRead,
+                pagesCount: book.pagesCount,
+              );
+          if (!context.mounted) return;
+          // 书列表是"本地进度叠加"出来的，改完要让详情重新取一遍。
+          ref.invalidate(seriesBooksProvider);
+          ref.invalidate(seriesDetailProvider(book.seriesId));
+          // "读完自动删除"（DLD-01）：标记已读后按策略删掉这一本的下载。
+          if (action == BookMenuAction.markRead) {
+            await maybeDeleteReadDownload(ref, book);
+          }
+        } on ShelfFailure catch (failure) {
+          messenger?.showSnackBar(
+            SnackBar(content: Text(l10n.failureTitle(failure.kind))),
+          );
         }
     }
   }

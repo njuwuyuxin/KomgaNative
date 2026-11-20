@@ -7,6 +7,7 @@ import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/l10n/failure_text.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
+import 'package:komga_native/src/providers/collections_controller.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/widgets/collection_covers.dart';
 import 'package:komga_native/src/widgets/load_more_footer.dart';
@@ -325,8 +326,8 @@ class _CollectionsTabState extends ConsumerState<_CollectionsTab> {
     await _runWrite(
       context,
       () => ref
-          .read(libraryRepositoryProvider)
-          .renameCollection(collection.id, name),
+          .read(collectionsControllerProvider.notifier)
+          .rename(collection.id, name),
     );
   }
 
@@ -357,11 +358,13 @@ class _CollectionsTabState extends ConsumerState<_CollectionsTab> {
     if (confirmed != true || !context.mounted) return;
     await _runWrite(
       context,
-      () => ref.read(libraryRepositoryProvider).deleteCollection(collection.id),
+      () => ref
+          .read(collectionsControllerProvider.notifier)
+          .delete(collection.id),
     );
   }
 
-  /// 写操作的统一收尾：成功刷新列表、失败给本地化提示。
+  /// 写操作的统一收尾：成功弹提示、失败给本地化提示（失效由控制器负责）。
   Future<void> _runWrite(
     BuildContext context,
     Future<void> Function() action,
@@ -370,7 +373,6 @@ class _CollectionsTabState extends ConsumerState<_CollectionsTab> {
     final messenger = ScaffoldMessenger.of(context);
     try {
       await action();
-      ref.invalidate(collectionsProvider(_size));
       messenger.showSnackBar(SnackBar(content: Text(l10n.collectionSaved)));
     } on ShelfFailure catch (failure) {
       messenger.showSnackBar(

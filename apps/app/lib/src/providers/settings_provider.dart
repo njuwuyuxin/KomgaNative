@@ -43,6 +43,7 @@ class SettingsState {
     this.forceEink = false,
     this.language = AppLanguage.system,
     this.haptics = true,
+    this.searchHistory = const <String>[],
   });
 
   final ThemeMode themeMode;
@@ -55,16 +56,21 @@ class SettingsState {
   /// 触感反馈（默认开启）。墨水屏也保留：它不影响屏幕刷新。
   final bool haptics;
 
+  /// 最近搜索关键词（SCH-01 / ARC-05）：与备份导入实时响应式同步。
+  final List<String> searchHistory;
+
   SettingsState copyWith({
     ThemeMode? themeMode,
     bool? forceEink,
     AppLanguage? language,
     bool? haptics,
+    List<String>? searchHistory,
   }) => SettingsState(
     themeMode: themeMode ?? this.themeMode,
     forceEink: forceEink ?? this.forceEink,
     language: language ?? this.language,
     haptics: haptics ?? this.haptics,
+    searchHistory: searchHistory ?? this.searchHistory,
   );
 }
 
@@ -75,6 +81,7 @@ class SettingsController extends Notifier<SettingsState> {
   bool _einkTouched = false;
   bool _languageTouched = false;
   bool _hapticsTouched = false;
+  bool _searchHistoryTouched = false;
 
   @override
   SettingsState build() {
@@ -83,6 +90,13 @@ class SettingsController extends Notifier<SettingsState> {
   }
 
   SettingsStore get _store => ref.read(settingsStoreProvider);
+
+  /// 读取完整持久化快照（供备份导出使用，避免 UI 直接碰 Store）。
+  Future<AppSettings> loadSnapshot() => _store.load();
+
+  /// 更新持久化中的非外观子项（如下载策略）。
+  Future<void> updateSettings(AppSettings Function(AppSettings) mutate) =>
+      _store.update(mutate);
 
   Future<void> _restore() async {
     final saved = await _store.load();
@@ -93,17 +107,19 @@ class SettingsController extends Notifier<SettingsState> {
       forceEink: _einkTouched ? null : saved.forceEink,
       language: _languageTouched ? null : appLanguageFromCode(saved.language),
       haptics: nextHaptics,
+      searchHistory: _searchHistoryTouched ? null : saved.searchHistory,
     );
   }
 
   /// 整份替换（SET-02 导入备份）。
   ///
-  /// 四个"用户手动改过"的标记一并置位：导入之后不该再被异步恢复覆盖。
+  /// 手动修改标记一并置位：导入之后不该再被异步恢复覆盖。
   Future<void> replaceAll(AppSettings next) async {
     _themeTouched = true;
     _einkTouched = true;
     _languageTouched = true;
     _hapticsTouched = true;
+    _searchHistoryTouched = true;
     await _store.update((AppSettings _) => next);
     AppHaptics.enabled = next.haptics;
     state = state.copyWith(
@@ -111,6 +127,7 @@ class SettingsController extends Notifier<SettingsState> {
       forceEink: next.forceEink,
       language: appLanguageFromCode(next.language),
       haptics: next.haptics,
+      searchHistory: next.searchHistory,
     );
   }
 
@@ -144,7 +161,43 @@ class SettingsController extends Notifier<SettingsState> {
     state = state.copyWith(haptics: enabled);
     unawaited(_store.update((AppSettings s) => s.copyWith(haptics: enabled)));
   }
+
+  void rememberSearchTerm(String raw) {
+    final term = raw.trim();
+    if (term.isEmpty) return;
+    _searchHistoryTouched = true;
+    final next = <String>[
+      term,
+      for (final item in state.searchHistory)
+        if (item != term) item,
+    ].take(kSearchHistoryLimit).toList(growable: false);
+    state = state.copyWith(searchHistory: next);
+    unawaited(_store.update((AppSettings s) => s.withSearchTerm(term)));
+  }
+
+  void removeSearchTerm(String term) {
+    _searchHistoryTouched = true;
+    final next = <String>[
+      for (final item in state.searchHistory)
+        if (item != term) item,
+    ];
+    state = state.copyWith(searchHistory: next);
+    unawaited(_store.update((AppSettings s) => s.withoutSearchTerm(term)));
+  }
+
+  void clearSearchHistory() {
+    if (state.searchHistory.isEmpty) return;
+    _searchHistoryTouched = true;
+    state = state.copyWith(searchHistory: const <String>[]);
+    unawaited(_store.update((AppSettings s) => s.clearSearchHistory()));
+  }
 }
+
+/// 响应式搜索历史（ARC-05）：搜索页直接监听，导入配置后即时刷新。
+final Provider<List<String>> searchHistoryProvider = Provider<List<String>>(
+  (Ref ref) =>
+      ref.watch(settingsProvider.select((SettingsState s) => s.searchHistory)),
+);
 
 final Provider<SettingsStore> settingsStoreProvider = Provider<SettingsStore>(
   (Ref ref) => SecureSettingsStore(),
