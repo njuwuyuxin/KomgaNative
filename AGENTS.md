@@ -106,6 +106,8 @@ Komga 的真实行为记录在 `docs/komga-api-verification.md`，已知与 Open
 - 基线平台：**Windows**（与 CI 的 `windows-latest` 一致）。不要在 Linux/macOS 上 `--update-goldens`，否则整套基线作废。
 - 命名：`<页面>@<形态>_<主题>[_text<缩放>].png`，例如 `library@tablet_dark.png`。
 - 新增页面必须同时补齐：手机 light、平板 dark、墨水屏 eink 三张（除非该页面在墨水屏不可达）。
+- **黄金图里不得读系统时钟**（`DateTime.now()`）：基线会随运行日期/时区漂移，本地绿、CI 红且复现不出来。
+  需要"今天"的页面把时钟作为参数注入（如 `InsightsScreen(now:)`），测试里传固定值；门禁的 `goldens` 步会拦。
 
 ## 反模式
 

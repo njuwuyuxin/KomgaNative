@@ -826,6 +826,12 @@ void main() {
   });
 
   /// Insights（HIS-03）：连续天数 + 周/月 + 12 周热力图。
+  ///
+  /// "今天"固定成下面这个日期，造数据与渲染都用它。
+  /// 别改回 `DateTime.now()`：周/月汇总相对"今天"算，跟着系统时钟走的基线
+  /// 在别的日期或时区必然失配（CI 跑 UTC、本地跑 +08，跨日就把"本月"
+  /// 从 270 分钟算成 252 分钟，三张 insights 基线全红过）。
+  final DateTime insightsNow = DateTime(2026, 11, 25, 20, 30);
   Future<void> pumpInsightsGolden(
     WidgetTester tester, {
     required String name,
@@ -836,7 +842,7 @@ void main() {
     final db = HttpCacheDatabase(NativeDatabase.memory());
     addTearDown(db.close);
     if (!empty) {
-      final now = DateTime.now();
+      final now = insightsNow;
       for (var i = 0; i < 21; i++) {
         // 隔三差五地读：热力图有明显深浅，连续天数不是一条直线。
         if (i % 4 == 0) continue;
@@ -856,7 +862,7 @@ void main() {
     }
     await pumpGoldenScreen(
       tester,
-      screen: const InsightsScreen(),
+      screen: InsightsScreen(now: insightsNow),
       size: size,
       theme: theme,
       overrides: <Override>[httpCacheDatabaseProvider.overrideWithValue(db)],

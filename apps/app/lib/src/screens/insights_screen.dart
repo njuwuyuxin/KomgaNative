@@ -11,7 +11,14 @@ import 'package:material_ui/material_ui.dart';
 /// 全部来自本地 `reading_sessions`，没有服务端参与——
 /// 这里回答的是"我自己读了多少"，不是"服务器上有什么"。
 class InsightsScreen extends ConsumerWidget {
-  const InsightsScreen({super.key});
+  const InsightsScreen({this.now, super.key});
+
+  /// 统计口径里的"今天"。默认取系统时钟。
+  ///
+  /// 测试（尤其是黄金图）必须注入固定值：周/月汇总与热力图都相对"今天"算，
+  /// 跟着系统时钟走的话，同一份代码在不同日期 / 时区渲染出的数字不同，
+  /// 基线就会莫名其妙失配（CI 跑 UTC，本地跑 +08，跨日必红）。
+  final DateTime? now;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -20,7 +27,7 @@ class InsightsScreen extends ConsumerWidget {
     final sessions = ref.watch(readingSessionsProvider).value;
     final stats = sessions == null
         ? ReadingStats.empty
-        : ReadingStats.fromSessions(sessions);
+        : ReadingStats.fromSessions(sessions, now: now);
 
     return Scaffold(
       body: GlassPageBackground(

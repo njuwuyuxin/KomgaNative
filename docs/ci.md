@@ -175,6 +175,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tool\bootstrap.ps1 -CheckOnl
 | 现象 | 大概率原因 | 处理 |
 |---|---|---|
 | `golden` 失配，diff 百分比很小 | 字体/平台/Flutter 版本不一致 | 确认 runner 是 windows-latest 且 Flutter 版本 = `.fvmrc`；必要时本地 `dart run tool/ci.dart golden` 重生成 |
+| `golden` 失配，**本地却全绿**，diff 只有几个像素（通常是一个数字） | 测试读了系统时钟：基线在本地那天/那个时区烙的，CI 跑 UTC、或者已经隔天 | 把"今天"注入进页面（如 `InsightsScreen(now:)`），黄金图里传固定值。门禁的 `goldens` 步会拦住 `test/golden` 里的 `DateTime.now()` |
 | `flutter pub get` 超时 | runner 访问 pub.dev 抖动 | 重跑；持续失败再考虑镜像（但要写进 AGENTS.md，否则本地/CI 不一致） |
 | `Build APK` / `Build iOS` 报 `isn't defined`、`Target of URI hasn't been generated` | 全新 clone 没有 drift 生成物 | 确认该 workflow 在 build 前有 `dart run tool/ci.dart codegen`；本地用干净 worktree 复现 |
 | iOS job 报 `not acquired by Runner of type hosted` | GitHub macOS 容量不足，不是代码问题 | 直接 Re-run failed jobs |

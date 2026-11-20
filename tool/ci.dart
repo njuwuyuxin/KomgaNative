@@ -71,6 +71,7 @@ Future<int> check() async {
     (name: 'format', run: formatCheck),
     (name: 'analyze', run: analyze),
     (name: 'layers', run: layerCheck),
+    (name: 'goldens', run: goldenDeterminismCheck),
     (name: 'tests', run: test),
   ];
 
@@ -305,6 +306,29 @@ Future<int> layerCheck() async {
 
   if (violations.isEmpty) {
     stdout.writeln('分层规则通过');
+    return 0;
+  }
+  for (final v in violations) {
+    stderr.writeln('VIOLATION: $v');
+  }
+  return 1;
+}
+
+/// 黄金图里不得读系统时钟。
+///
+/// 为什么单独拦一条：周/月汇总、热力图、"今天读过没"这类页面天然要一个"今天"，
+/// 直接读 `DateTime.now()` 会让同一份代码在不同日期 / 时区渲染出不同像素。
+/// 基线是**在开发者那台机器的那一天**烙出来的，CI（UTC）或隔天再跑就必红，
+/// 而且本地永远复现不出来——2026-11 就因此让三张 insights 基线连红三次。
+/// 正确做法是把"今天"作为参数注入进页面，测试里传固定值。
+Future<int> goldenDeterminismCheck() async {
+  const reason = '黄金图会随运行日期/时区漂移；把"今天"注入进页面，测试里传固定值';
+  final violations = _scanCode('apps/app/test/golden', <String>[
+    'DateTime.now(',
+  ], reason: reason);
+
+  if (violations.isEmpty) {
+    stdout.writeln('黄金图确定性检查通过');
     return 0;
   }
   for (final v in violations) {
