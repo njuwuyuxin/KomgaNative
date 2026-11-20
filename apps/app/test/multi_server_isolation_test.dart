@@ -33,11 +33,13 @@ void main() {
     addTearDown(httpB.close);
 
     httpA.listen((HttpRequest req) async {
+      await req.drain<void>();
       serverARequests.add('${req.method} ${req.uri.path}');
       req.response.statusCode = serverAOnline ? 204 : 503;
       await req.response.close();
     });
     httpB.listen((HttpRequest req) async {
+      await req.drain<void>();
       serverBRequests.add('${req.method} ${req.uri.path}');
       req.response.statusCode = 204;
       await req.response.close();

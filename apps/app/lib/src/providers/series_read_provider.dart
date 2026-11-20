@@ -19,7 +19,7 @@ class SeriesReadController extends Notifier<Set<String>> {
     state = <String>{...state, seriesId};
     try {
       await ref
-          .read(libraryRepositoryProvider)
+          .read(readStatusRepositoryProvider)
           .setSeriesRead(seriesId, read: read);
       if (_disposed) return;
       // 服务端已经改了：让详情、书列表、继续阅读都重新取。

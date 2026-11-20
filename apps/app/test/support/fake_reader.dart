@@ -111,7 +111,6 @@ class FakeReaderRepository implements ReaderRepository {
   Uint8List? cachedPageImage(String bookId, int page) =>
       _bytes[pageNames[(page - 1) % pageNames.length]];
 
-  @override
   Future<void> uploadProgress(
     String bookId, {
     required int page,

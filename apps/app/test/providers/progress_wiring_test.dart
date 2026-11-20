@@ -2,7 +2,12 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:komga_domain/komga_domain.dart';
+import 'package:komga_native/src/data/collections_repository.dart';
+import 'package:komga_native/src/data/library_repository.dart';
 import 'package:komga_native/src/data/progress/progress_store.dart';
+import 'package:komga_native/src/data/read_status_repository.dart';
+import 'package:komga_native/src/data/reader_repository.dart';
+import 'package:komga_native/src/providers/komga_session_provider.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/providers/progress_providers.dart';
 import 'package:komga_native/src/providers/reader_providers.dart';
@@ -50,9 +55,23 @@ void main() {
     }
     expect(container.read(sessionProvider), isA<SessionConnected>());
 
-    // 先建仓库（它会 watch 同步服务），再触发 flush（上传走自己的会话）。
-    expect(container.read(libraryRepositoryProvider), isNotNull);
-    expect(container.read(readerRepositoryProvider), isNotNull);
+    // 同一会话内：书架、收藏集、已读状态、阅读器与进度补交全部共享唯一 KomgaSession 实例（ARC-09）。
+    final shared = container.read(komgaSessionProvider);
+    expect(shared, isNotNull);
+    final libRepo =
+        container.read(libraryRepositoryProvider) as KomgaLibraryRepository;
+    final colRepo = container.read(
+      collectionsRepositoryProvider,
+    ) as KomgaCollectionsRepository;
+    final statusRepo = container.read(
+      readStatusRepositoryProvider,
+    ) as KomgaReadStatusRepository;
+    final rdrRepo =
+        container.read(readerRepositoryProvider) as KomgaReaderRepository;
+    expect(identical(libRepo.debugSession, shared), isTrue);
+    expect(identical(colRepo.debugSession, shared), isTrue);
+    expect(identical(statusRepo.debugSession, shared), isTrue);
+    expect(identical(rdrRepo.debugSession, shared), isTrue);
     await container.read(progressSyncProvider).flush();
 
     // 连不上 → 进度必须留在队列里，而不是被当成已提交丢掉。
@@ -65,6 +84,7 @@ void main() {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(server.close);
       server.listen((HttpRequest req) async {
+        await req.drain<void>();
         receivedPaths.add(req.uri.path);
         if (req.uri.path.endsWith('/b-dead/read-progress')) {
           req.response.statusCode = badStatus;

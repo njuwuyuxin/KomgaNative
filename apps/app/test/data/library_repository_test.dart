@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:komga_api/komga_api.dart';
 import 'package:komga_domain/komga_domain.dart';
+import 'package:komga_native/src/data/collections_repository.dart';
 import 'package:komga_native/src/data/library_repository.dart';
 import 'package:komga_native/src/data/progress/progress_store.dart';
 import 'package:komga_native/src/data/progress/progress_sync_service.dart';
@@ -219,11 +220,20 @@ void main() {
           return _rawJson(_bookPageJson());
         });
         final repository = _repository(adapter, store: store);
+        final collectionsRepo = KomgaCollectionsRepository(
+          repository.debugSession,
+          ProgressSyncService(
+            store: store,
+            upload: (ProgressTarget target) async {
+              throw const NetworkFailure();
+            },
+          ),
+        );
 
         final single = await repository.book('b1');
         final seriesBooks = await repository.books('s1');
         final searched = await repository.searchBooks('frieren');
-        final readList = await repository.readListBooks('rl-1');
+        final readList = await collectionsRepo.readListBooks('rl-1');
         final ondeck = await repository.ondeck();
 
         expect(single?.readProgress?.page, 17);

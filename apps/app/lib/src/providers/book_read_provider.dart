@@ -23,7 +23,7 @@ class BookReadController extends Notifier<Set<String>> {
     state = <String>{...state, bookId};
     try {
       await ref
-          .read(libraryRepositoryProvider)
+          .read(readStatusRepositoryProvider)
           .setBookRead(bookId, read: read, pagesCount: pagesCount);
       if (_disposed) return;
       ref.invalidate(ondeckProvider);

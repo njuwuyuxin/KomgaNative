@@ -7,10 +7,10 @@ import 'package:komga_native/src/data/cache/http_cache_database.dart';
 import 'package:komga_native/src/data/download/download_service.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/cache_providers.dart';
+import 'package:komga_native/src/providers/komga_session_provider.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/providers/pinned_series_provider.dart';
 import 'package:komga_native/src/providers/settings_provider.dart';
-import 'package:komga_native/src/session/session_controller.dart';
 import 'package:komga_platform/komga_platform.dart';
 
 /// 当前生效的下载策略（DLD-01）：仅 Wi-Fi、读完自动删除、并发数。
@@ -39,23 +39,10 @@ final Provider<NetworkProbe> networkProbeProvider = Provider<NetworkProbe>(
   (Ref ref) => const SystemNetworkProbe(),
 );
 
-/// 下载服务：跟着会话走（换服务器/重新登录就重建）。
-///
-/// 页图请求走带缓存的会话，所以下载完的页就是离线可读的页——两件事共用一条链路，
-/// 不需要"下载目录"这种东西。
+/// 下载服务：复用共享 [komgaSessionProvider] 连接池（ARC-09）。
 final Provider<DownloadService> downloadServiceProvider =
     Provider<DownloadService>((Ref ref) {
-      final session = ref.watch(sessionProvider);
-      if (session is! SessionConnected) {
-        throw StateError('未连接服务器时不应下载');
-      }
-      final komga = KomgaSession.withApiKey(
-        address: session.server.address,
-        apiKey: session.server.apiKey,
-        trust: session.server.tls,
-        cache: ref.watch(httpCacheProvider),
-      );
-      ref.onDispose(komga.close);
+      final komga = requireKomgaSession(ref, reason: '未连接服务器时不应下载');
       return KomgaDownloadService(
         pages: (String bookId) async {
           try {
@@ -72,7 +59,7 @@ final Provider<DownloadService> downloadServiceProvider =
           }
         },
         db: ref.watch(httpCacheDatabaseProvider),
-        scope: session.server.address.baseUrl,
+        scope: komga.address.baseUrl,
       );
     });
 

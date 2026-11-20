@@ -65,13 +65,19 @@ class ProgressSyncService {
     }
   }
 
-  /// 提交当前活动服务器分区的待提交项。已在跑就直接复用同一个 Future（单飞）。
+  /// 提交当前活动服务器分区的待提交项。已在跑就直接复用同一个 Future（严格单飞，防同步重入）。
   Future<void> flush() {
     final running = _inFlight;
     if (running != null) return running;
-    final future = _flushLoop();
-    _inFlight = future;
-    return future.whenComplete(() => _inFlight = null);
+    final completer = Completer<void>();
+    _inFlight = completer.future;
+    unawaited(
+      _flushLoop().whenComplete(() {
+        _inFlight = null;
+        completer.complete();
+      }),
+    );
+    return completer.future;
   }
 
   Future<void> _flushLoop() async {

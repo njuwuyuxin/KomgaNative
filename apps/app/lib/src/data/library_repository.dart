@@ -6,10 +6,9 @@ import 'package:komga_native/src/data/byte_cache.dart';
 import 'package:komga_native/src/data/progress/progress_sync_service.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 
-/// 书架/系列详情的数据来源。
+/// 书架与目录查询限界上下文（库、系列、书籍目录、搜索、继续阅读、封面，ARC-09）。
 ///
-/// UI 只认这个接口：`screens/**` 与 `widgets/**` 都不能 import `komga_api`，
-/// 网络细节全部关在实现里；测试用假实现替换，黄金图不联网。
+/// 收藏集/阅读列表归 [CollectionsRepository]，已读/未读状态变更归 [ReadStatusRepository]。
 abstract interface class LibraryRepository {
   Future<List<Library>> libraries();
 
@@ -37,43 +36,7 @@ abstract interface class LibraryRepository {
     int size = 20,
   });
 
-  /// 收藏集列表（UI-P3-8）。
-  Future<PageResult<KomgaCollection>> collections({
-    int page = 0,
-    int size = 20,
-  });
-
-  /// 新建收藏集（SER-04）：必须至少带一个系列（Komga 实测会拒空集合）。
-  Future<KomgaCollection> createCollection({
-    required String name,
-    required List<String> seriesIds,
-    bool ordered = false,
-  });
-
-  /// 收藏集改名。
-  Future<void> renameCollection(String collectionId, String name);
-
-  /// 删除收藏集。
-  Future<void> deleteCollection(String collectionId);
-
-  /// 收藏集里的系列。
-  Future<PageResult<Series>> collectionSeries(
-    String collectionId, {
-    int page = 0,
-    int size = 20,
-  });
-
-  /// 阅读列表。
-  Future<PageResult<ReadList>> readLists({int page = 0, int size = 20});
-
-  /// 阅读列表里的书。
-  Future<PageResult<Book>> readListBooks(
-    String readListId, {
-    int page = 0,
-    int size = 20,
-  });
-
-  /// 系列下的书。默认一次抓 100 本（多数系列够用，超出部分 UI 会明说）。
+  /// 系列下的书。
   Future<PageResult<Book>> books(
     String seriesId, {
     int page = 0,
@@ -85,34 +48,13 @@ abstract interface class LibraryRepository {
   /// "继续阅读"（Komga 的 ondeck：在读过、还没读完的书）。
   Future<PageResult<Book>> ondeck({int size = 20});
 
-  /// 把整个系列标记已读/未读：服务端一条请求 + 本地进度一起改。
-  ///
-  /// 本地也要改，是因为 outbox 里可能还留着这本书没提交的旧进度：
-  /// 只改服务端的话，界面会显示"刚标记未读，书架却还是读过"。
-  Future<void> setSeriesRead(String seriesId, {required bool read});
-
-  /// 把单本书标记已读/未读（UI-P2-5）。
-  ///
-  /// 端点早已存在（`PATCH` / `DELETE /books/{id}/read-progress`，见
-  /// `docs/komga-api-verification.md`），这里只是把它接到书架层：
-  /// 已读 = `page = 页数 + completed`，未读 = 删掉进度。
-  /// 页数未知（<=0）时只发 `completed`，让服务端保留自己的页码。
-  Future<void> setBookRead(
-    String bookId, {
-    required bool read,
-    required int pagesCount,
-  });
-
   /// 系列封面。返回 `null` 表示"没有封面"——装饰性资源**不允许**让整页报错。
   Future<Uint8List?> seriesCover(String seriesId);
 
   Future<Uint8List?> bookCover(String bookId);
 }
 
-/// 真实实现：包一层 [KomgaSession]，把 `KomgaError` 翻成 [ShelfFailure]。
-///
-/// 书列表会用 [ProgressSyncService] 做一次"本地进度叠加"：断网时读到的进度
-/// 还没提交，但用户看到的必须是**自己刚读到的位置**，不是服务端的旧值。
+/// 真实实现：共享 [KomgaSession]，把 `KomgaError` 翻成 [ShelfFailure]，并叠加本地进度。
 class KomgaLibraryRepository implements LibraryRepository {
   KomgaLibraryRepository(
     this._session,
@@ -123,6 +65,9 @@ class KomgaLibraryRepository implements LibraryRepository {
   final KomgaSession _session;
   final ProgressSyncService _sync;
   final ByteLruCache _covers;
+
+  /// 测试诊断用：暴露底层会话引用以验证连接池共享。
+  KomgaSession get debugSession => _session;
 
   @override
   Future<List<Library>> libraries() async {
@@ -187,98 +132,7 @@ class KomgaLibraryRepository implements LibraryRepository {
   }) async {
     try {
       final result = await _session.searchBooks(query, page: page, size: size);
-      return await _overlayBooksPage(result);
-    } on KomgaError catch (error) {
-      throw shelfFailureOf(error);
-    }
-  }
-
-  @override
-  Future<PageResult<KomgaCollection>> collections({
-    int page = 0,
-    int size = 20,
-  }) async {
-    try {
-      return await _session.fetchCollections(page: page, size: size);
-    } on KomgaError catch (error) {
-      throw shelfFailureOf(error);
-    }
-  }
-
-  @override
-  Future<KomgaCollection> createCollection({
-    required String name,
-    required List<String> seriesIds,
-    bool ordered = false,
-  }) async {
-    try {
-      return await _session.createCollection(
-        name: name,
-        seriesIds: seriesIds,
-        ordered: ordered,
-      );
-    } on KomgaError catch (error) {
-      throw shelfFailureOf(error);
-    }
-  }
-
-  @override
-  Future<void> renameCollection(String collectionId, String name) async {
-    try {
-      await _session.renameCollection(collectionId, name);
-    } on KomgaError catch (error) {
-      throw shelfFailureOf(error);
-    }
-  }
-
-  @override
-  Future<void> deleteCollection(String collectionId) async {
-    try {
-      await _session.deleteCollection(collectionId);
-    } on KomgaError catch (error) {
-      throw shelfFailureOf(error);
-    }
-  }
-
-  @override
-  Future<PageResult<Series>> collectionSeries(
-    String collectionId, {
-    int page = 0,
-    int size = 20,
-  }) async {
-    try {
-      return await _session.fetchCollectionSeries(
-        collectionId,
-        page: page,
-        size: size,
-      );
-    } on KomgaError catch (error) {
-      throw shelfFailureOf(error);
-    }
-  }
-
-  @override
-  Future<PageResult<ReadList>> readLists({int page = 0, int size = 20}) async {
-    try {
-      return await _session.fetchReadLists(page: page, size: size);
-    } on KomgaError catch (error) {
-      throw shelfFailureOf(error);
-    }
-  }
-
-  @override
-  Future<PageResult<Book>> readListBooks(
-    String readListId, {
-    int page = 0,
-    int size = 20,
-  }) async {
-    try {
-      final result = await _session.fetchReadListBooks(
-        readListId,
-        page: page,
-        size: size,
-      );
-      return await _overlayBooksPage(result);
+      return await overlayBooksPage(_sync, result);
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);
     }
@@ -300,89 +154,17 @@ class KomgaLibraryRepository implements LibraryRepository {
         sort: sort,
         readStatus: readStatus,
       );
-      return await _overlayBooksPage(result);
+      return await overlayBooksPage(_sync, result);
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);
     }
   }
 
-  /// "继续阅读"：Komga 的 ondeck（在读过、还没读完的书）。
-  ///
-  /// 同样叠加本地未提交进度：断网读完最后一页但还没补交时，书架不该还显示旧页码。
   @override
   Future<PageResult<Book>> ondeck({int size = 20}) async {
     try {
       final result = await _session.fetchOndeck(size: size);
-      return await _overlayBooksPage(result);
-    } on KomgaError catch (error) {
-      throw shelfFailureOf(error);
-    }
-  }
-
-  Future<PageResult<Book>> _overlayBooksPage(PageResult<Book> result) async =>
-      PageResult<Book>(
-        items: await _sync.overlay(result.items),
-        totalElements: result.totalElements,
-        page: result.page,
-        size: result.size,
-      );
-
-  @override
-  Future<void> setSeriesRead(String seriesId, {required bool read}) async {
-    try {
-      // 先拿书列表：标记完要把本地进度逐本对齐，否则 overlay 会让界面回退。
-      final books = await _session.fetchSeriesBooks(seriesId, size: 100);
-      if (read) {
-        await _session.markSeriesRead(seriesId);
-      } else {
-        await _session.markSeriesUnread(seriesId);
-      }
-      // 实测：标记已读后 page = 该书页数；标记未读后服务端 readProgress = null。
-      final now = DateTime.now().toUtc();
-      for (final book in books.items) {
-        await _sync.forceAdopt(
-          book.id,
-          read
-              ? ReadProgress(
-                  page: book.pagesCount,
-                  completed: true,
-                  lastModified: now,
-                )
-              : null,
-        );
-      }
-    } on KomgaError catch (error) {
-      throw shelfFailureOf(error);
-    }
-  }
-
-  @override
-  Future<void> setBookRead(
-    String bookId, {
-    required bool read,
-    required int pagesCount,
-  }) async {
-    try {
-      final now = DateTime.now().toUtc();
-      if (read) {
-        await _session.updateReadProgress(
-          bookId,
-          page: pagesCount <= 0 ? null : pagesCount,
-          completed: true,
-        );
-        // 本地也改：outbox 里可能还有这本书没提交的旧进度。
-        await _sync.forceAdopt(
-          bookId,
-          ReadProgress(
-            page: pagesCount <= 0 ? 1 : pagesCount,
-            completed: true,
-            lastModified: now,
-          ),
-        );
-      } else {
-        await _session.markBookUnread(bookId);
-        await _sync.forceAdopt(bookId, null);
-      }
+      return await overlayBooksPage(_sync, result);
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);
     }
@@ -408,8 +190,18 @@ class KomgaLibraryRepository implements LibraryRepository {
       _covers.put(cacheKey, bytes);
       return bytes;
     } on KomgaError {
-      // 封面失败不抛：书架照常显示占位图，用户还能点进去读。
       return null;
     }
   }
 }
+
+/// 书籍分页结果的本地进度叠加辅助函数（供目录仓库与阅读列表仓库共用）。
+Future<PageResult<Book>> overlayBooksPage(
+  ProgressSyncService sync,
+  PageResult<Book> result,
+) async => PageResult<Book>(
+  items: await sync.overlay(result.items),
+  totalElements: result.totalElements,
+  page: result.page,
+  size: result.size,
+);

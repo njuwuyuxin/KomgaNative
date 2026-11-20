@@ -2,36 +2,43 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_api/komga_api.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/app_settings.dart';
+import 'package:komga_native/src/data/collections_repository.dart';
 import 'package:komga_native/src/data/library_repository.dart';
+import 'package:komga_native/src/data/read_status_repository.dart';
 import 'package:komga_native/src/data/settings_store.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/data/shelf_filter_preset.dart';
 import 'package:komga_native/src/data/shelf_view_options.dart';
-import 'package:komga_native/src/providers/cache_providers.dart';
+import 'package:komga_native/src/providers/komga_session_provider.dart';
 import 'package:komga_native/src/providers/progress_providers.dart';
 import 'package:komga_native/src/providers/settings_provider.dart';
 import 'package:komga_native/src/session/session_controller.dart';
 
-/// 书架仓库：由当前会话构造，会话变了就重建（并关掉旧的 dio 连接）。
+/// 书架目录仓库：复用共享 [komgaSessionProvider] 连接池（ARC-09）。
 final Provider<LibraryRepository> libraryRepositoryProvider =
     Provider<LibraryRepository>((Ref ref) {
-      final session = ref.watch(sessionProvider);
-      if (session is! SessionConnected) {
-        // 只有已连接才会路由到书架；走到这里说明代码接错了，直接暴露。
-        throw StateError('未连接服务器时不应读取书架');
-      }
-      final komga = KomgaSession.withApiKey(
-        address: session.server.address,
-        apiKey: session.server.apiKey,
-        trust: session.server.tls,
-        // 书架/封面/系列/书列表都走这个会话：GET 成功落盘，断网回退。
-        cache: ref.watch(httpCacheProvider),
-      );
-      ref.onDispose(komga.close);
+      final komga = requireKomgaSession(ref, reason: '未连接服务器时不应读取书架');
       return KomgaLibraryRepository(komga, ref.watch(progressSyncProvider));
+    });
+
+/// 收藏集与阅读列表仓库（ARC-09）。
+final Provider<CollectionsRepository> collectionsRepositoryProvider =
+    Provider<CollectionsRepository>((Ref ref) {
+      final lib = ref.watch(libraryRepositoryProvider);
+      if (lib is CollectionsRepository) return lib as CollectionsRepository;
+      final komga = requireKomgaSession(ref, reason: '未连接服务器时不应读取收藏集');
+      return KomgaCollectionsRepository(komga, ref.watch(progressSyncProvider));
+    });
+
+/// 已读/未读状态变更仓库（ARC-09）。
+final Provider<ReadStatusRepository> readStatusRepositoryProvider =
+    Provider<ReadStatusRepository>((Ref ref) {
+      final lib = ref.watch(libraryRepositoryProvider);
+      if (lib is ReadStatusRepository) return lib as ReadStatusRepository;
+      final komga = requireKomgaSession(ref, reason: '未连接服务器时不应修改阅读状态');
+      return KomgaReadStatusRepository(komga, ref.watch(progressSyncProvider));
     });
 
 /// 当前账号可见的库（用于筛选条）。
@@ -100,7 +107,7 @@ final collectionsProvider =
       Ref ref,
       int size,
     ) {
-      return ref.watch(libraryRepositoryProvider).collections(size: size);
+      return ref.watch(collectionsRepositoryProvider).collections(size: size);
     });
 
 /// 阅读列表。
@@ -108,7 +115,7 @@ final readListsProvider = FutureProvider.family<PageResult<ReadList>, int>((
   Ref ref,
   int size,
 ) {
-  return ref.watch(libraryRepositoryProvider).readLists(size: size);
+  return ref.watch(collectionsRepositoryProvider).readLists(size: size);
 });
 
 /// 一次"加载更多"多要多少条收藏集/阅读列表/搜索结果。
@@ -123,7 +130,7 @@ final collectionSeriesProvider =
       CollectionSeriesQuery query,
     ) {
       return ref
-          .watch(libraryRepositoryProvider)
+          .watch(collectionsRepositoryProvider)
           .collectionSeries(query.collectionId, size: query.size);
     });
 
@@ -136,7 +143,7 @@ final readListBooksProvider =
       ReadListBooksQuery query,
     ) {
       return ref
-          .watch(libraryRepositoryProvider)
+          .watch(collectionsRepositoryProvider)
           .readListBooks(query.readListId, size: query.size);
     });
 

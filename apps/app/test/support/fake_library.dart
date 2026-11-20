@@ -4,14 +4,17 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:komga_domain/komga_domain.dart';
+import 'package:komga_native/src/data/collections_repository.dart';
 import 'package:komga_native/src/data/library_repository.dart';
+import 'package:komga_native/src/data/read_status_repository.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 
 /// 书架假仓库：可指定数据、可随时切换失败、可把请求"卡住"以观察加载态。
 ///
 /// 封面用 `test/fixtures/covers/*.png` 里的真实 PNG（4~5 KB），
 /// 这样黄金图能看到"有封面"的真实版式，而不是一片灰块。
-class FakeLibraryRepository implements LibraryRepository {
+class FakeLibraryRepository
+    implements LibraryRepository, CollectionsRepository, ReadStatusRepository {
   FakeLibraryRepository({
     List<Library>? libraries,
     List<Series>? series,

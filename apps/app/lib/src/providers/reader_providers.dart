@@ -1,32 +1,19 @@
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_api/komga_api.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/page_border_crop.dart';
 import 'package:komga_native/src/data/page_edge_color.dart';
 import 'package:komga_native/src/data/reader_repository.dart';
-import 'package:komga_native/src/providers/cache_providers.dart';
+import 'package:komga_native/src/providers/komga_session_provider.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/providers/progress_providers.dart';
-import 'package:komga_native/src/session/session_controller.dart';
 import 'package:komga_reader_engine/komga_reader_engine.dart';
 
-/// 阅读器仓库：跟着会话走，会话变了就重建并关掉旧连接。
+/// 阅读器仓库：复用共享 [komgaSessionProvider] 连接池（ARC-09）。
 final Provider<ReaderRepository> readerRepositoryProvider =
     Provider<ReaderRepository>((Ref ref) {
-      final session = ref.watch(sessionProvider);
-      if (session is! SessionConnected) {
-        throw StateError('未连接服务器时不应打开阅读器');
-      }
-      final komga = KomgaSession.withApiKey(
-        address: session.server.address,
-        apiKey: session.server.apiKey,
-        trust: session.server.tls,
-        // 页图/页列表落盘：看过的页断网还能翻回去。
-        cache: ref.watch(httpCacheProvider),
-      );
-      ref.onDispose(komga.close);
+      final komga = requireKomgaSession(ref, reason: '未连接服务器时不应打开阅读器');
       return KomgaReaderRepository(komga, ref.watch(progressSyncProvider));
     });
 
