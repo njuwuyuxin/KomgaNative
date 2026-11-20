@@ -170,7 +170,10 @@ class KomgaLibraryRepository implements LibraryRepository {
   @override
   Future<Book?> book(String bookId) async {
     try {
-      return await _session.fetchBook(bookId);
+      final fetched = await _session.fetchBook(bookId);
+      return await _sync.overlayOne(fetched);
+    } on KomgaNotFoundError {
+      return null;
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);
     }
@@ -183,7 +186,8 @@ class KomgaLibraryRepository implements LibraryRepository {
     int size = 20,
   }) async {
     try {
-      return await _session.searchBooks(query, page: page, size: size);
+      final result = await _session.searchBooks(query, page: page, size: size);
+      return await _overlayBooksPage(result);
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);
     }
@@ -269,11 +273,12 @@ class KomgaLibraryRepository implements LibraryRepository {
     int size = 20,
   }) async {
     try {
-      return await _session.fetchReadListBooks(
+      final result = await _session.fetchReadListBooks(
         readListId,
         page: page,
         size: size,
       );
+      return await _overlayBooksPage(result);
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);
     }
@@ -292,13 +297,10 @@ class KomgaLibraryRepository implements LibraryRepository {
         seriesId,
         page: page,
         size: size,
+        sort: sort,
+        readStatus: readStatus,
       );
-      return PageResult<Book>(
-        items: await _sync.overlay(result.items),
-        totalElements: result.totalElements,
-        page: result.page,
-        size: result.size,
-      );
+      return await _overlayBooksPage(result);
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);
     }
@@ -311,16 +313,19 @@ class KomgaLibraryRepository implements LibraryRepository {
   Future<PageResult<Book>> ondeck({int size = 20}) async {
     try {
       final result = await _session.fetchOndeck(size: size);
-      return PageResult<Book>(
+      return await _overlayBooksPage(result);
+    } on KomgaError catch (error) {
+      throw shelfFailureOf(error);
+    }
+  }
+
+  Future<PageResult<Book>> _overlayBooksPage(PageResult<Book> result) async =>
+      PageResult<Book>(
         items: await _sync.overlay(result.items),
         totalElements: result.totalElements,
         page: result.page,
         size: result.size,
       );
-    } on KomgaError catch (error) {
-      throw shelfFailureOf(error);
-    }
-  }
 
   @override
   Future<void> setSeriesRead(String seriesId, {required bool read}) async {

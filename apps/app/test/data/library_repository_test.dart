@@ -42,18 +42,35 @@ ResponseBody _rawJson(String body, {int status = 200}) =>
 
 /// 仓库只做网络 + 叠加；测试里给一个"永远没有本地进度"的同步服务，
 /// 叠加就不改变任何东西（本文件测的是 URL/解析，不是 outbox）。
-KomgaLibraryRepository _repository(_Adapter adapter) {
+KomgaLibraryRepository _repository(_Adapter adapter, {ProgressStore? store}) {
   final session = KomgaSession.withApiKey(
     address: ServerAddress.parse('https://komga.example.com'),
     apiKey: 'KEY',
     dio: Dio()..httpClientAdapter = adapter,
   );
   final sync = ProgressSyncService(
-    store: InMemoryProgressStore(),
-    upload: (ProgressTarget target) async {},
+    store: store ?? InMemoryProgressStore(),
+    upload: (ProgressTarget target) async {
+      // 保留 pending 状态：测试离线未同步进度在各查询出口的叠加效果。
+      throw const NetworkFailure();
+    },
   );
   return KomgaLibraryRepository(session, sync);
 }
+
+String _bookJson({String id = 'b1', int remotePage = 2}) =>
+    '{'
+    '"id":"$id",'
+    '"seriesId":"s1",'
+    '"seriesTitle":"Frieren",'
+    '"name":"Vol. 1",'
+    '"number":1,'
+    '"media":{"pagesCount":20},'
+    '"readProgress":{"page":$remotePage,"completed":false,"lastModified":"2026-01-01T00:00:00Z"}'
+    '}';
+
+String _bookPageJson({String id = 'b1', int remotePage = 2}) =>
+    '{"content":[${_bookJson(id: id, remotePage: remotePage)}],"totalElements":1,"number":0,"size":20}';
 
 void main() {
   group('KomgaLibraryRepository', () {
@@ -144,5 +161,77 @@ void main() {
       expect(adapter.requests, hasLength(1), reason: '第二次应命中 LRU 缓存');
       expect(adapter.requests.single.headers['Accept'], contains('image/'));
     });
+
+    test('books() 把 sort 与 readStatus 透传到 /series/{id}/books 查询串', () async {
+      final adapter = _Adapter(
+        (_) async =>
+            _rawJson('{"content":[],"totalElements":0,"number":1,"size":50}'),
+      );
+      final repository = _repository(adapter);
+
+      await repository.books(
+        's1',
+        page: 1,
+        size: 50,
+        sort: BooksSort.numberDesc,
+        readStatus: SeriesReadStatus.unread,
+      );
+
+      final uri = adapter.requests.single.uri;
+      expect(uri.path, '/api/v1/series/s1/books');
+      expect(uri.queryParameters['page'], '1');
+      expect(uri.queryParameters['size'], '50');
+      expect(uri.queryParameters['sort'], 'metadata.numberSort,desc');
+      expect(uri.queryParameters['read_status'], 'UNREAD');
+    });
+
+    test('books() 未指定排序与筛选时不写 sort / read_status 参数', () async {
+      final adapter = _Adapter(
+        (_) async =>
+            _rawJson('{"content":[],"totalElements":0,"number":0,"size":100}'),
+      );
+      await _repository(adapter).books('s1');
+
+      final query = adapter.requests.single.uri.queryParameters;
+      expect(query.containsKey('sort'), isFalse);
+      expect(query.containsKey('read_status'), isFalse);
+    });
+
+    test('book(bookId) 在服务端返回 404 时遵守契约返回 null', () async {
+      final adapter = _Adapter(
+        (_) async => _rawJson('{"message":"Not Found"}', status: 404),
+      );
+
+      expect(await _repository(adapter).book('missing-book'), isNull);
+    });
+
+    test(
+      'book / books / searchBooks / readListBooks / ondeck 均叠加本地未提交进度',
+      () async {
+        final store = InMemoryProgressStore();
+        await store.enqueue(
+          const ProgressTarget(bookId: 'b1', page: 17, completed: false),
+        );
+        final adapter = _Adapter((RequestOptions options) async {
+          if (options.uri.path == '/api/v1/books/b1') {
+            return _rawJson(_bookJson());
+          }
+          return _rawJson(_bookPageJson());
+        });
+        final repository = _repository(adapter, store: store);
+
+        final single = await repository.book('b1');
+        final seriesBooks = await repository.books('s1');
+        final searched = await repository.searchBooks('frieren');
+        final readList = await repository.readListBooks('rl-1');
+        final ondeck = await repository.ondeck();
+
+        expect(single?.readProgress?.page, 17);
+        expect(seriesBooks.items.single.readProgress?.page, 17);
+        expect(searched.items.single.readProgress?.page, 17);
+        expect(readList.items.single.readProgress?.page, 17);
+        expect(ondeck.items.single.readProgress?.page, 17);
+      },
+    );
   });
 }
