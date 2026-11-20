@@ -252,12 +252,11 @@ class SettingsScreen extends ConsumerWidget {
   }
 }
 
-/// 清空离线内容。缓存是"可再生"的：清掉只影响断网能看什么，不影响进度。
+/// 清空被动浏览缓存（不含已整本下载的书与页图，ARC-08）。
 Future<void> _clearCache(BuildContext context, WidgetRef ref) async {
   final l10n = AppLocalizations.of(context);
   await ref.read(httpCacheProvider).clear();
   ref.invalidate(cacheUsageProvider);
-  ref.invalidate(downloadsUsageProvider);
   if (!context.mounted) return;
   ScaffoldMessenger.of(context)
       .showSnackBar(SnackBar(content: Text(l10n.offlineContentCleared)));

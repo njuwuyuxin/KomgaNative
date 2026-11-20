@@ -65,11 +65,18 @@ class KomgaDownloadService implements DownloadService {
     _cancelFlags[book.id] = false;
     var progress = DownloadProgress(done: 0, total: list.length);
     var bytes = 0;
+    var completed = false;
     try {
       onProgress(progress);
       for (final page in list) {
         if (_cancelFlags[book.id] ?? false) return false;
         final data = await pageImage(book.id, page.number);
+        // 逐页立即钉住：即使单书总大小超过被动 LRU 预算，后续页也不会把前面的页挤掉。
+        await db.setBookPagesPinned(
+          scope: scope,
+          bookId: book.id,
+          pinned: true,
+        );
         bytes += data.length;
         progress = progress.advance();
         onProgress(progress);
@@ -81,9 +88,18 @@ class KomgaDownloadService implements DownloadService {
         pageCount: list.length,
         bytes: bytes,
       );
+      completed = true;
       return true;
     } finally {
       _cancelFlags.remove(book.id);
+      if (!completed) {
+        // 取消或中途失败时尚未成为"已下载"，解除钉住以回归普通被动缓存策略。
+        await db.setBookPagesPinned(
+          scope: scope,
+          bookId: book.id,
+          pinned: false,
+        );
+      }
     }
   }
 

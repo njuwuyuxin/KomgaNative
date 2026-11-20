@@ -29,7 +29,7 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
   int? _seqSeed;
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -44,6 +44,18 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
         final escaped = rawScope.replaceAll("'", "''");
         if (from >= 2) await _upgradeDownloadedBooksToV6(escaped);
         if (from >= 3) await _upgradeDownloadQueueToV6(escaped);
+      }
+      if (from < 7) {
+        await m.addColumn(cachedResponses, cachedResponses.pinned);
+        await customStatement('''
+          UPDATE cached_responses
+          SET pinned = 1
+          WHERE EXISTS (
+            SELECT 1 FROM downloaded_books d
+            WHERE d.scope = cached_responses.scope
+              AND cached_responses.url LIKE '%/books/' || d.book_id || '/pages/%'
+          )
+        ''');
       }
     },
   );
@@ -118,10 +130,11 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
     String scope,
     String url,
     String kind,
-    Uint8List body,
-  ) async {
+    Uint8List body, {
+    bool pinned = false,
+  }) async {
     final seq = await _nextSeq();
-    await into(cachedResponses).insertOnConflictUpdate(
+    await into(cachedResponses).insert(
       CachedResponsesCompanion.insert(
         scope: scope,
         url: url,
@@ -129,21 +142,36 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
         byteSize: body.length,
         body: body,
         lastUsedSeq: seq,
+        pinned: Value<bool>(pinned),
+      ),
+      onConflict: DoUpdate(
+        (CachedResponses old) => CachedResponsesCompanion(
+          kind: Value<String>(kind),
+          byteSize: Value<int>(body.length),
+          body: Value<Uint8List>(body),
+          lastUsedSeq: Value<int>(seq),
+          // 若该页本就已作为整本下载被钉住（pinned=true），在线重读不得把它降级为被动缓存。
+          pinned: pinned ? const Value<bool>(true) : const Value<bool>.absent(),
+        ),
       ),
     );
     if (kind == 'image') {
-      await _evictImages(keepUrl: url);
+      if (!pinned) await _evictImages(keepUrl: url);
     } else {
       await _pruneJson(scope);
     }
   }
 
+  /// 被动浏览缓存占用（不含 `pinned = true` 的已整本下载页图，ARC-08）。
   Future<CacheUsage> usage({String? scope}) async {
     final byteSum = cachedResponses.byteSize.sum();
     final count = cachedResponses.url.count();
     final query = selectOnly(cachedResponses)
       ..addColumns(<Expression<Object>>[byteSum, count]);
-    if (scope != null) query.where(cachedResponses.scope.equals(scope));
+    final unpinned = cachedResponses.pinned.equals(false);
+    query.where(
+      scope == null ? unpinned : unpinned & cachedResponses.scope.equals(scope),
+    );
     final row = await query.getSingle();
     return CacheUsage(
       bytes: row.read(byteSum) ?? 0,
@@ -151,13 +179,27 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
     );
   }
 
+  /// 清空被动浏览缓存（保留 `pinned = true` 的已下载书籍及其页图，ARC-08）。
   Future<void> clear({String? scope}) async {
-    final statement = delete(cachedResponses);
-    if (scope != null) statement.where((t) => t.scope.equals(scope));
+    final statement = delete(cachedResponses)
+      ..where(
+        (t) => scope == null
+            ? t.pinned.equals(false)
+            : t.pinned.equals(false) & t.scope.equals(scope),
+      );
     await statement.go();
-    final dlStmt = delete(downloadedBooks);
-    if (scope != null) dlStmt.where((t) => t.scope.equals(scope));
-    await dlStmt.go();
+  }
+
+  /// 将某本书已缓存的页图标记/取消标记为受保护（ARC-08）。
+  Future<int> setBookPagesPinned({
+    required String scope,
+    required String bookId,
+    required bool pinned,
+  }) {
+    final fragment = '/books/$bookId/pages/';
+    return (update(cachedResponses)
+          ..where((t) => t.scope.equals(scope) & t.url.contains(fragment)))
+        .write(CachedResponsesCompanion(pinned: Value<bool>(pinned)));
   }
 
   // ---- 整本下载记录（按 scope 分区）----
@@ -169,6 +211,7 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
     required int pageCount,
     required int bytes,
   }) async {
+    await setBookPagesPinned(scope: scope, bookId: bookId, pinned: true);
     await into(downloadedBooks).insertOnConflictUpdate(
       DownloadedBooksCompanion.insert(
         scope: Value<String>(scope),
@@ -305,7 +348,7 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
 
   Future<List<CachedResponse>> _oldestImages() {
     return (select(cachedResponses)
-          ..where((t) => t.kind.equals('image'))
+          ..where((t) => t.kind.equals('image') & t.pinned.equals(false))
           ..orderBy(<OrderClauseGenerator<CachedResponses>>[
             (t) => OrderingTerm(expression: t.lastUsedSeq),
           ])
@@ -317,7 +360,10 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
     final byteSum = cachedResponses.byteSize.sum();
     final query = selectOnly(cachedResponses)
       ..addColumns(<Expression<Object>>[byteSum])
-      ..where(cachedResponses.kind.equals('image'));
+      ..where(
+        cachedResponses.kind.equals('image') &
+            cachedResponses.pinned.equals(false),
+      );
     final row = await query.getSingle();
     return row.read(byteSum) ?? 0;
   }

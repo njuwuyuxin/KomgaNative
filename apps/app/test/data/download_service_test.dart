@@ -143,4 +143,87 @@ void main() {
     expect(await service.download(book(pages: 0), onProgress: (_) {}), isFalse);
     expect(await service.downloaded('b1'), isNull);
   });
+
+  test(
+    'ARC-08：整本下载页图 pinned=true 永不被 10 KB 被动浏览 LRU 淘汰，且清浏览缓存不误删已下载',
+    () async {
+      await db.close();
+      db = HttpCacheDatabase(NativeDatabase.memory(), maxImageBytes: 10 * 1024);
+
+      final pagePayload = Uint8List(3 * 1024)..fillRange(0, 3 * 1024, 7);
+      final service = KomgaDownloadService(
+        pages: (String bookId) async => <PageInfo>[
+          for (var i = 1; i <= 3; i++)
+            PageInfo(
+              number: i,
+              width: 800,
+              height: 1200,
+              mediaType: 'image/png',
+            ),
+        ],
+        pageImage: (String bookId, int page) async {
+          final url =
+              '$scope/api/v1/books/$bookId/pages/$page?zero_based=false';
+          await db.write(scope, url, 'image', pagePayload);
+          return pagePayload;
+        },
+        db: db,
+        scope: scope,
+      );
+
+      // 1. 先整本下载 book-1（3 页共 9 KB）。
+      final downloaded = await service.download(
+        book(id: 'book-1', pages: 3),
+        onProgress: (_) {},
+      );
+      expect(downloaded, isTrue);
+      expect(
+        (await db.usage(scope: scope)).bytes,
+        0,
+        reason: '已下载页图不计入被动浏览缓存占用',
+      );
+
+      // 2. 连续被动浏览写入 20 张新页图（共 60 KB，远超 10 KB 预算）。
+      for (var i = 1; i <= 20; i++) {
+        await db.write(
+          scope,
+          '$scope/api/v1/books/other/pages/$i?zero_based=false',
+          'image',
+          Uint8List(3 * 1024)..fillRange(0, 3 * 1024, i),
+        );
+      }
+
+      // 3. 被动缓存被正常裁剪到 10 KB 预算内（最多保留 3 张 = 9 KB）。
+      final passiveUsage = await db.usage(scope: scope);
+      expect(passiveUsage.bytes, lessThanOrEqualTo(10 * 1024));
+      expect(passiveUsage.bytes, greaterThan(0));
+
+      // 4. book-1 的全部 3 页离线读取依然 100% 命中（包括在线重读覆盖写后仍保持 pinned）。
+      await db.write(
+        scope,
+        '$scope/api/v1/books/book-1/pages/1?zero_based=false',
+        'image',
+        pagePayload,
+      );
+      for (final page in <int>[1, 2, 3]) {
+        final hit = await db.read(
+          scope,
+          '$scope/api/v1/books/book-1/pages/$page?zero_based=false',
+        );
+        expect(hit?.body, pagePayload, reason: 'book-1 第 $page 页绝不能被被动 LRU 挤掉');
+      }
+
+      // 5. 清空被动浏览缓存不影响 book-1 的下载记录与页图。
+      await db.clear(scope: scope);
+      expect((await db.usage(scope: scope)).bytes, 0);
+      expect(await service.downloaded('book-1'), isNotNull);
+      expect(
+        await db.read(
+          scope,
+          '$scope/api/v1/books/book-1/pages/2?zero_based=false',
+        ),
+        isNotNull,
+      );
+    },
+  );
 }

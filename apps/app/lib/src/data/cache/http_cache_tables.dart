@@ -18,6 +18,9 @@ class CachedResponses extends Table {
   /// 最近使用序号（单调递增）。
   IntColumn get lastUsedSeq => integer()();
 
+  /// 是否属于整本下载受保护的页图（ARC-08）：`true` 不计入被动浏览 256 MB 预算，且永不被 LRU 驱逐。
+  BoolColumn get pinned => boolean().withDefault(const Constant(false))();
+
   @override
   Set<Column<Object>> get primaryKey => <Column<Object>>{scope, url};
 }
