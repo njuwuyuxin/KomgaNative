@@ -179,6 +179,14 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
     );
   }
 
+  /// 监听 `cached_responses` 表变动事件（广播流，无挂起 Timer，ARC-10）。
+  Stream<Set<TableUpdate>> cachedResponsesUpdates() =>
+      tableUpdates(TableUpdateQuery.onTable(cachedResponses));
+
+  /// 监听 `downloaded_books` 表变动事件（广播流，ARC-10）。
+  Stream<Set<TableUpdate>> downloadedBooksUpdates() =>
+      tableUpdates(TableUpdateQuery.onTable(downloadedBooks));
+
   /// 清空被动浏览缓存（保留 `pinned = true` 的已下载书籍及其页图，ARC-08）。
   Future<void> clear({String? scope}) async {
     final statement = delete(cachedResponses)

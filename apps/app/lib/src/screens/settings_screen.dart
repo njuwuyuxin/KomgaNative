@@ -6,7 +6,6 @@ import 'package:komga_native/src/providers/app_info_provider.dart';
 import 'package:komga_native/src/providers/cache_providers.dart';
 import 'package:komga_native/src/providers/download_providers.dart';
 import 'package:komga_native/src/providers/settings_provider.dart';
-import 'package:komga_native/src/screens/downloads_screen.dart';
 import 'package:komga_native/src/widgets/download_settings_section.dart';
 import 'package:komga_native/src/widgets/settings_backup_section.dart';
 import 'package:komga_native/src/widgets/settings_library_reading_sections.dart';
@@ -203,12 +202,7 @@ class SettingsScreen extends ConsumerWidget {
                                   ),
                           ),
                           leading: const Icon(Icons.download_done_outlined),
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (BuildContext context) =>
-                                  const DownloadsScreen(),
-                            ),
-                          ),
+                          onTap: () => context.push('/downloads'),
                         ),
                       ],
                     ),
@@ -252,11 +246,10 @@ class SettingsScreen extends ConsumerWidget {
   }
 }
 
-/// 清空被动浏览缓存（不含已整本下载的书与页图，ARC-08）。
+/// 清空被动浏览缓存（不含已整本下载的书与页图，ARC-08 / ARC-10 Drift 流自动推送更新）。
 Future<void> _clearCache(BuildContext context, WidgetRef ref) async {
   final l10n = AppLocalizations.of(context);
   await ref.read(httpCacheProvider).clear();
-  ref.invalidate(cacheUsageProvider);
   if (!context.mounted) return;
   ScaffoldMessenger.of(context)
       .showSnackBar(SnackBar(content: Text(l10n.offlineContentCleared)));

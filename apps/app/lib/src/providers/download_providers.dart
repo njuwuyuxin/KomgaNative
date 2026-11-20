@@ -63,16 +63,22 @@ final Provider<DownloadService> downloadServiceProvider =
       );
     });
 
-/// 当前服务器已下载书籍的合计占用（设置页，ARC-07）。
+/// 当前服务器已下载书籍的合计占用（设置页，ARC-07 / ARC-10 Drift 表更新流驱动）。
 final downloadsUsageProvider = FutureProvider<CacheUsage>((Ref ref) {
   final scope = ref.watch(activeServerKeyProvider);
-  return ref.watch(httpCacheDatabaseProvider).downloadsUsage(scope: scope);
+  final db = ref.watch(httpCacheDatabaseProvider);
+  final sub = db.downloadedBooksUpdates().listen((_) => ref.invalidateSelf());
+  ref.onDispose(sub.cancel);
+  return db.downloadsUsage(scope: scope);
 });
 
-/// 当前服务器已下载书籍列表（下载管理页，UI-P3-13 / ARC-07）。
+/// 当前服务器已下载书籍列表（下载管理页，UI-P3-13 / ARC-07 / ARC-10 Drift 表更新流驱动）。
 final downloadedBooksProvider = FutureProvider<List<DownloadedBook>>((Ref ref) {
   final scope = ref.watch(activeServerKeyProvider);
-  return ref.watch(httpCacheDatabaseProvider).downloads(scope: scope);
+  final db = ref.watch(httpCacheDatabaseProvider);
+  final sub = db.downloadedBooksUpdates().listen((_) => ref.invalidateSelf());
+  ref.onDispose(sub.cancel);
+  return db.downloads(scope: scope);
 });
 
 /// 当前服务器待恢复的下载队列（ARC-07）。
@@ -380,8 +386,6 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
       if (!_disposed) {
         _persist(_db.dequeueDownload(book.id, scope: scope));
         ref.invalidate(downloadedProvider(book.id));
-        ref.invalidate(downloadedBooksProvider);
-        ref.invalidate(downloadsUsageProvider);
       }
     }
     if (_disposed) return;
@@ -400,7 +404,6 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
     _clear(bookId);
     if (!_disposed) {
       ref.invalidate(downloadedProvider(bookId));
-      ref.invalidate(downloadedBooksProvider);
     }
   }
 
@@ -418,7 +421,6 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
       for (final entry in state.entries)
         if (!pending.contains(entry.key)) entry.key: entry.value,
     };
-    ref.invalidate(downloadedBooksProvider);
   }
 
   Future<void> delete(Book book) async {
@@ -427,8 +429,6 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
     _clear(book.id);
     if (_disposed) return;
     ref.invalidate(downloadedProvider(book.id));
-    ref.invalidate(downloadedBooksProvider);
-    ref.invalidate(cacheUsageProvider);
   }
 
   void dismiss(String bookId) => _clear(bookId);

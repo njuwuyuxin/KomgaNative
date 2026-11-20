@@ -245,6 +245,17 @@ final libraryShelfProvider = FutureProvider.family<List<Series>, String>((
   return page.items;
 });
 
+/// 阅读状态变更纪元（ARC-10）：每次标为已读/未读后自增，驱动已挂载的书架原地刷新。
+class ReadStatusEpoch extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void bump() => state++;
+}
+
+final NotifierProvider<ReadStatusEpoch, int> readStatusEpochProvider =
+    NotifierProvider<ReadStatusEpoch, int>(ReadStatusEpoch.new);
+
 /// 继续阅读（在读过、还没读完的书）。空列表/失败都只是"不显示这一行"。
 final ondeckProvider = FutureProvider<PageResult<Book>>((Ref ref) {
   return ref.watch(libraryRepositoryProvider).ondeck();
@@ -383,6 +394,9 @@ class ShelfController extends Notifier<ShelfState> {
     //
     // 首屏**不**等偏好恢复：读钥匙串要走平台通道，真机上虽快但没必要挡首帧，
     // 测试环境里更是根本没有回包。恢复落地后如果需要换查询条件，再重新拉一次。
+    ref.listen<int>(readStatusEpochProvider, (_, _) {
+      unawaited(refreshInPlace());
+    });
     unawaited(Future<void>.microtask(() => _load(reset: true)));
     unawaited(_restore());
     return const ShelfState();

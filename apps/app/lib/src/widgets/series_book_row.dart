@@ -175,11 +175,9 @@ class SeriesBookRow extends ConsumerWidget {
                 book.id,
                 read: action == BookMenuAction.markRead,
                 pagesCount: book.pagesCount,
+                seriesId: book.seriesId,
               );
           if (!context.mounted) return;
-          // 书列表是"本地进度叠加"出来的，改完要让详情重新取一遍。
-          ref.invalidate(seriesBooksProvider);
-          ref.invalidate(seriesDetailProvider(book.seriesId));
           // "读完自动删除"（DLD-01）：标记已读后按策略删掉这一本的下载。
           if (action == BookMenuAction.markRead) {
             await maybeDeleteReadDownload(ref, book);

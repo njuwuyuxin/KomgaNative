@@ -40,6 +40,8 @@ class DriftHttpCache implements HttpCache {
 
   Future<CacheUsage> usage({String? scope}) => _db.usage(scope: scope);
 
+  Stream<Object?> get updates => _db.cachedResponsesUpdates();
+
   Future<void> clear({String? scope}) => _db.clear(scope: scope);
 
   void dispose() => offline.dispose();

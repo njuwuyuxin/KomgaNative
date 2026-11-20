@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
@@ -47,7 +48,11 @@ class DownloadsScreen extends ConsumerWidget {
                           key: const Key('downloads-back'),
                           tooltip: MaterialLocalizations.of(context)
                               .backButtonTooltip,
-                          onPressed: () => Navigator.of(context).maybePop(),
+                          onPressed: () {
+                            if (Navigator.of(context).canPop()) {
+                              context.pop();
+                            }
+                          },
                           icon: const Icon(Icons.chevron_left),
                         ),
                         Expanded(
@@ -235,7 +240,6 @@ class _DownloadRow extends ConsumerWidget {
         .delete(
           book ?? Book(id: bookId, seriesId: '', name: bookId, pagesCount: 0),
         );
-    ref.invalidate(downloadedBooksProvider);
   }
 }
 

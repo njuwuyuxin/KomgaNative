@@ -81,4 +81,42 @@ void main() {
     expect(find.byKey(const Key('series-error')), findsNothing);
     expect(find.text('Frieren'), findsWidgets);
   });
+
+  testWidgets('标记已读后联动刷新已挂载的书架与最近添加（ARC-10）', (WidgetTester tester) async {
+    final repository = FakeLibraryRepository(
+      series: demoShelf(),
+      libraries: demoLibraries(),
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          libraryRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: appLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          theme: AppTheme.light(),
+          home: const SeriesDetailScreen(seriesId: 's1'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(SeriesDetailScreen)),
+    );
+    // 先挂载书架状态机与最近系列缓存。
+    container.read(shelfProvider);
+    await container.read(recentSeriesProvider.future);
+    await tester.pumpAndSettle();
+    final shelfCallsBefore = repository.seriesCalls.length;
+
+    await choose(tester, 'Mark all read');
+
+    expect(
+      repository.seriesCalls.length,
+      greaterThan(shelfCallsBefore),
+      reason: '书架应由 SeriesReadController 自动触发 refreshInPlace',
+    );
+  });
 }

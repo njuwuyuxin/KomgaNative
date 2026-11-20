@@ -44,7 +44,7 @@
 | **B2 存储与多服隔离** | `ARC-07` | #1 (前半) | 多服务器数据隔离闭环：进度、下载、队列、历史与阅读偏好补齐 `serverId` | P0 | L | `ARC-04`, `ARC-06` | [x] |
 | **B2 存储与多服隔离** | `ARC-08` | #1 (后半) | 解耦“整本下载”与被动浏览 LRU 缓存淘汰，保护已下载页图不被静默驱逐 | P0 | M | `ARC-07` | [x] |
 | **B3 解耦与规范收口** | `ARC-09` | #4 | 下沉共享 `komgaSessionProvider` 连接池，按限界上下文拆分 `LibraryRepository` | P1 | M | `ARC-01`, `ARC-05` | [x] |
-| **B3 解耦与规范收口** | `ARC-10` | #8 | `/downloads` 纳入 `GoRouter`，以 Drift 流监听与统一失效钩子替代手工 `invalidate` | P2 | M | `ARC-07`, `ARC-09` | [ ] |
+| **B3 解耦与规范收口** | `ARC-10` | #8 | `/downloads` 纳入 `GoRouter`，以 Drift 流监听与统一失效钩子替代手工 `invalidate` | P2 | M | `ARC-07`, `ARC-09` | [x] |
 | **B3 解耦与规范收口** | `ARC-11` | #9, #11 | 清理 M0 死代码与重复实现，`SessionController` 本地化，消除 UI 魔法值 | P2/P3 | M | — | [ ] |
 | **B3 解耦与规范收口** | `ARC-12` | #9, #12 | 拆分 10 个超长文件/5 个超大类，提炼通用增量分页器，并在 `ci.dart` 加门禁 | P2/P3 | L | `ARC-04`, `ARC-09` | [ ] |
 

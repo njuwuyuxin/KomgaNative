@@ -41,9 +41,12 @@ final Provider<DriftHttpCache> httpCacheProvider = Provider<DriftHttpCache>((
   return cache;
 });
 
-/// 缓存占用（设置页）。清空缓存后 `ref.invalidate(cacheUsageProvider)` 刷新。
+/// 缓存占用（设置页，ARC-10 监听 Drift 表更新流自动刷新）。
 final cacheUsageProvider = FutureProvider<CacheUsage>((Ref ref) {
-  return ref.watch(httpCacheProvider).usage();
+  final cache = ref.watch(httpCacheProvider);
+  final sub = cache.updates.listen((_) => ref.invalidateSelf());
+  ref.onDispose(sub.cancel);
+  return cache.usage();
 });
 
 /// 当前是否处于"离线（或服务端不可用）"状态。

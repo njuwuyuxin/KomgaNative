@@ -4,6 +4,7 @@ import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/screens/collection_detail_screen.dart';
 import 'package:komga_native/src/screens/collections_screen.dart';
 import 'package:komga_native/src/screens/connection_screen.dart';
+import 'package:komga_native/src/screens/downloads_screen.dart';
 import 'package:komga_native/src/screens/readlist_detail_screen.dart';
 import 'package:komga_native/src/screens/search_screen.dart';
 import 'package:komga_native/src/screens/history_screen.dart';
@@ -135,6 +136,11 @@ GoRouter createRouter({
         path: '/history',
         builder: (BuildContext context, GoRouterState state) =>
             const HistoryScreen(),
+      ),
+      GoRoute(
+        path: '/downloads',
+        builder: (BuildContext context, GoRouterState state) =>
+            const DownloadsScreen(),
       ),
       GoRoute(
         path: '/collections/:collectionId',

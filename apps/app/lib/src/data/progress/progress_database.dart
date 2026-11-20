@@ -278,6 +278,10 @@ class ProgressDatabase extends _$ProgressDatabase {
     return <String>[for (final row in rows) row.seriesId];
   }
 
+  /// 监听 `pinned_series_rows` 表更新流（广播流，无挂起 Timer，ARC-10）。
+  Stream<Set<TableUpdate>> pinnedSeriesUpdates() =>
+      tableUpdates(TableUpdateQuery.onTable(pinnedSeriesRows));
+
   Future<void> setPinned({
     required String serverId,
     required String seriesId,
@@ -371,6 +375,10 @@ class ProgressDatabase extends _$ProgressDatabase {
       ..limit(limit);
     return query.get();
   }
+
+  /// 监听 `reading_sessions` 表更新流（广播流，无挂起 Timer，ARC-10）。
+  Stream<Set<TableUpdate>> readingSessionsUpdates() =>
+      tableUpdates(TableUpdateQuery.onTable(readingSessions));
 
   Future<void> deleteReadingSession(int id) => (delete(
     readingSessions,
