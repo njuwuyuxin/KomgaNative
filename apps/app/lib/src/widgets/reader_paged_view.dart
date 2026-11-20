@@ -30,8 +30,8 @@ enum _TurnPhase { idle, dragging, settling }
 ///
 /// 翻页动画在 `reader_page_turn.dart`：单页模式卷走当前页 / 卷回上一页；
 /// 双页模式像真书一样，半边页铰接在书脊上翻过去，纸背就是下一屏的那一页。
-/// 纸面位图没就绪、或屏的页数变了（单页↔双页）时退化成平移；单页模式下
-/// 底下那一页还在加载**不算**退化——纸掀开后露出的就是它的加载态。
+/// 只有当前被掀起的那张纸位图没就绪、或屏的页数变了（单页↔双页）时才退化成平移；
+/// 相邻屏还在加载**不算**退化——纸背暂用白纸，掀开后露出的就是它的加载态。
 /// 缩放、平移与双击缩放在 `reader_zoom.dart`。
 class ReaderPagedView extends ConsumerStatefulWidget {
   const ReaderPagedView({
@@ -115,12 +115,18 @@ class ReaderPagedViewState extends ConsumerState<ReaderPagedView>
   @override
   void didUpdateWidget(ReaderPagedView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final bookChanged = oldWidget.bookId != widget.bookId;
     final spreadChanged = !_sameSpread(oldWidget.spread, widget.spread);
+    final neighboursChanged =
+        !_sameOptionalSpread(oldWidget.nextSpread, widget.nextSpread) ||
+        !_sameOptionalSpread(oldWidget.previousSpread, widget.previousSpread);
     final layoutChanged =
         oldWidget.fit != widget.fit ||
         oldWidget.doublePage != widget.doublePage;
-    if (layoutChanged) {
-      // 适配方式/单双页变了，旧缩放/平移不再成立。
+    final effectChanged = oldWidget.style.effect != widget.style.effect;
+    final directionChanged = oldWidget.rightToLeft != widget.rightToLeft;
+    if (layoutChanged || bookChanged) {
+      // 适配方式/单双页/换书，旧缩放/平移不再成立。
       _resetZoom();
     } else if (spreadChanged) {
       if (widget.lockZoom) {
@@ -130,7 +136,26 @@ class ReaderPagedViewState extends ConsumerState<ReaderPagedView>
         _resetZoom();
       }
     }
-    if (spreadChanged || layoutChanged) _scheduleSheets();
+    if (bookChanged) _sheets.clear();
+    if (effectChanged) {
+      if (widget.style.effect == PageTurnEffect.curl) {
+        unawaited(PageCurlProgram.ensureLoaded());
+        _scheduleSheets();
+      } else {
+        _sheets.clear();
+      }
+    } else if (bookChanged ||
+        spreadChanged ||
+        neighboursChanged ||
+        layoutChanged ||
+        directionChanged) {
+      _scheduleSheets();
+    }
+  }
+
+  static bool _sameOptionalSpread(List<int>? a, List<int>? b) {
+    if (a == null || b == null) return a == b;
+    return _sameSpread(a, b);
   }
 
   static bool _sameSpread(List<int> a, List<int> b) {

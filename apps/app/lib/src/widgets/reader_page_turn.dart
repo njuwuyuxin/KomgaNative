@@ -31,12 +31,13 @@ mixin _PageTurn
   double _settleTarget = 0;
   Curve _settleCurve = Curves.easeOutCubic;
 
-  /// 卷页用的位图（单页：当前页、上一页；双页：两个方向各一张纸 + 纸背）。
+  /// 卷页用的位图（单页：当前页、上一页；双页：当前屏 + 前后相邻屏）。
   ///
   /// 没用 `RepaintBoundary.toImage()`：它在真机上取不到 layer（null check 崩），
   /// 本地 widget 测试却能跑，属于"测试绿、真机死"。页图字节本来就在仓库 LRU 里，
   /// 自己解成 `ui.Image` 更短也更可控。
   final CurlSheets _sheets = CurlSheets();
+  bool _sheetsScheduled = false;
 
   // 由宿主 State 提供。
   double get _zoom;
@@ -105,8 +106,8 @@ mixin _PageTurn
     _forward = forward;
     _progress = 0;
     final plan = _planFor(forward);
-    // 只看 [requiredPages]：单页是"当前这一张纸"，双页是纸面 + 纸背。
-    // 底层没就绪不再是退化条件（见 `_CurlPlan.requiredPages`）。
+    // 只看 [requiredPages]：当前被掀起来的那一页/半页就绪即可卷页，
+    // 相邻屏未加载完时背面用白纸、底层透出加载态（见 `_CurlPlan.requiredPages`）。
     final ready =
         plan != null &&
         PageCurlProgram.program != null &&
@@ -233,6 +234,7 @@ mixin _PageTurn
     _commit = false;
     _plan = null;
     setState(() {});
+    _scheduleSheets();
   }
 
   // ---- 图层 ----
@@ -242,7 +244,7 @@ mixin _PageTurn
     final sheet = _sheets.imageFor(plan.sheetPage);
     final backPage = plan.backPage;
     final back = backPage == null ? null : _sheets.imageFor(backPage);
-    if (sheet == null) return const SizedBox.shrink();
+    if (sheet == null && back == null) return const SizedBox.shrink();
     return Positioned.fill(
       child: IgnorePointer(
         child: CustomPaint(
@@ -253,6 +255,7 @@ mixin _PageTurn
             back: back,
             backRect: plan.backRect,
             spineX: plan.spineX,
+            hinged: plan.motion.hinged,
             frame: plan.motion.frame(_finger, mirrored: !widget.rightToLeft),
           ),
         ),

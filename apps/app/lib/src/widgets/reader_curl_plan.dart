@@ -65,14 +65,20 @@ class _CurlPlan {
 
   /// 起手判定"这次能不能卷"至少要有的位图。
   ///
-  /// 单页（[backPage] 为 null）只要求纸面：纸背是白纸 + 透印，着色器只采样
-  /// 这一张（`page_curl.frag` 的 `backAt` 在 `uHasBack = 0` 时完全用 `uSheet`），
-  /// 垫在下面的相邻页是透出来的 widget，不参与合成。所以下层还在转圈也能照常
-  /// 卷页——整屏平移并不会让下层更早有像素，只换来一次没有卷页的翻动。
+  /// 只需要"当前要掀起来的那张纸"：
+  /// - 单页（[backPage] 为 null）：只要求 [sheetPage]（往前翻是当前页、往回翻是上一页）；
+  ///   纸背是白纸 + 透印，底层相邻页是透出来的 widget，还在转圈也能照常卷页。
+  /// - 双页往前翻：只要求 [sheetPage]（当前屏掀起侧）；纸背（下一屏落地侧）还没解码好时
+  ///   先用白纸 + 透印，底层（下一屏掀起侧）透出自己的加载态。
+  /// - 双页往回翻：只要求 [backPage]（当前屏落地侧）；纸面（上一屏掀起侧）还没解码好时
+  ///   先用白纸，底层（上一屏落地侧）透出自己的加载态。
   ///
-  /// 双页仍要求 [pages] 全部：纸背就是下一屏落在那半边的那页，露出的底层就是
-  /// 纸要落地的地方，缺了会翻出一张空白纸或黑半页——那不是"还没加载"，是画错。
-  Set<int> get requiredPages => backPage == null ? <int>{sheetPage} : pages;
+  /// 这样双页翻页不再被相邻屏的下载/解码拖垮而无规律退化成平移。
+  Set<int> get requiredPages {
+    final back = backPage;
+    if (back == null) return <int>{sheetPage};
+    return <int>{motion.forward ? sheetPage : back};
+  }
 
   /// 从屏 [before] 翻到屏 [after] 的卷页计划；页数不配对时为 null。
   ///
@@ -155,18 +161,23 @@ extension _TurnImages on _PageTurn {
     );
   }
 
-  /// 空闲时把两个方向卷页要用的位图解码好，开始拖的那一刻就有图可用。
+  /// 空闲时把当前屏及前后相邻屏要用的位图并发解码好，开始拖的那一刻就有图可用。
   ///
-  /// 解码失败就不做卷页，自动退化成平移，不打断阅读。
+  /// 不依赖 `_planFor`（避免首帧视口未布局或封面/宽页等 1↔2 过渡时跳过下一屏预解码）；
+  /// 解码失败只跳过该页，不阻塞同屏其余页。
   void _scheduleSheets() {
     if (widget.style.effect != PageTurnEffect.curl) return;
+    if (_sheetsScheduled) return;
+    _sheetsScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _sheetsScheduled = false;
       if (!mounted || _phase != _TurnPhase.idle) return;
-      final spread = widget.spread;
+      if (widget.style.effect != PageTurnEffect.curl) return;
+      final bookId = widget.bookId;
       final pages = <int>{
-        ...spread,
-        ...?_planFor(true)?.pages,
-        ...?_planFor(false)?.pages,
+        ...widget.spread,
+        ...?widget.nextSpread,
+        ...?widget.previousSpread,
       };
       unawaited(
         _sheets.ensure(
@@ -174,7 +185,8 @@ extension _TurnImages on _PageTurn {
           decode: _decodePage,
           stillWanted: () =>
               mounted &&
-              ReaderPagedViewState._sameSpread(widget.spread, spread),
+              widget.bookId == bookId &&
+              widget.style.effect == PageTurnEffect.curl,
         ),
       );
     });
@@ -189,9 +201,16 @@ extension _TurnImages on _PageTurn {
     } on ShelfFailure {
       return null;
     }
-    final codec = await ui.instantiateImageCodec(bytes);
-    final frame = await codec.getNextFrame();
-    codec.dispose();
-    return frame.image;
+    ui.Codec? codec;
+    try {
+      codec = await ui.instantiateImageCodec(bytes);
+      final frame = await codec.getNextFrame();
+      return frame.image;
+    } on Object {
+      // 单页解码失败返回空，不中断同屏其余页的并发解码。
+      return null;
+    } finally {
+      codec?.dispose();
+    }
   }
 }

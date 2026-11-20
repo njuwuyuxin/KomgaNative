@@ -32,6 +32,8 @@ uniform float uRadius;  // 圆柱半径（px），可以为 0（折痕）
 uniform vec4 uBackRect; // 纸背那页落地后的矩形（画布坐标），uHasBack = 0 时不用
 uniform float uSpineX;  // 书脊 x（画布坐标），纸背沿它镜像
 uniform float uHasBack; // 1 = 纸背是真实页面（双页），0 = 白纸
+uniform float uHasSheet; // 1 = 纸面是真实页面，0 = 白纸（双页往回翻且上一屏未就绪）
+uniform float uHinged;  // 1 = 双页铰接书脊（落地帧 R=0 仍须绘制平压背面），0 = 单页
 uniform sampler2D uSheet;
 uniform sampler2D uBack;
 
@@ -68,7 +70,7 @@ float coverage(vec2 q) {
 
 vec3 sheetAt(vec2 q) {
     vec2 uv = clamp((q - uRect.xy) / uRect.zw, 0.0, 1.0);
-    return texture(uSheet, uv).rgb;
+    return uHasSheet > 0.5 ? texture(uSheet, uv).rgb : kPaper;
 }
 
 // 纸背：双页是镜像过去的真实页面（页面外留白纸），单页是白纸 + 很淡的透印。
@@ -196,9 +198,9 @@ void main() {
     }
 
     // ---- 4. 翻过去平压在上面的背面（d <= 0，最高的一层）----
-    // 双页落地那一帧 R = 0、纸整张平压在另一半上，这一层必须照画；
+    // 双页落地那一帧 R = 0、纸整张平压在另一半上，这一层必须照画（即使纸背还在加载）；
     // 单页 R = 0 只出现在起手（还没卷），跳过以免角上留半像素的边。
-    if (flatSide && (r > 0.01 || uHasBack > 0.5)) {
+    if (flatSide && (r > 0.01 || uHinged > 0.5)) {
         vec2 qFlip = p + u * (kPi * r - 2.0 * d);
         color = over(color, backAt(qFlip), coverage(qFlip));
     }

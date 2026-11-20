@@ -127,10 +127,13 @@ void main() {
     }
   }
 
-  testWidgets('底层冷页还没解码时不启动卷页，放行后恢复卷页', (tester) async {
+  testWidgets('双页下一屏仍在加载时照常铰接卷页，掀开后露出加载态', (tester) async {
     final repository = _SolidPages();
-    final gate = Completer<void>();
-    repository.pageGates[6] = gate;
+    // 下一屏 [4, 5]（1 基第 5、6 页）全部挂住：当前屏 [2, 3] 就绪即可卷页。
+    final backGate = Completer<void>();
+    final revealGate = Completer<void>();
+    repository.pageGates[5] = backGate;
+    repository.pageGates[6] = revealGate;
     await tester.runAsync(() async {
       await PageCurlProgram.ensureLoaded();
       await repository.prepare();
@@ -163,18 +166,17 @@ void main() {
     }
     key.currentState!.turn(1);
     await tester.pump();
-    expect(key.currentState!.debugCurling, isFalse, reason: '有纸背但底层还冷，不能卷出黑半页');
-    await tester.pump(const Duration(milliseconds: 560));
-    gate.complete();
-    for (var i = 0; i < 12; i++) {
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 25)),
-      );
-      await tester.pump();
-    }
-    key.currentState!.turn(1);
-    await tester.pump();
+    expect(key.currentState!.debugCurling, isTrue, reason: '当前屏就绪即应卷页，不能等下一屏');
     expect(key.currentState!.debugHinged, isTrue);
+    expect(find.byKey(const Key('reader-curl-layer')), findsOneWidget);
+    expect(
+      find.byKey(const Key('reader-page-loading-5')),
+      findsOneWidget,
+      reason: '纸掀开后露出的就是下一屏掀起侧的加载态',
+    );
+    await tester.pump(const Duration(milliseconds: 560));
+    backGate.complete();
+    revealGate.complete();
     await tester.pumpWidget(const SizedBox.shrink());
   });
 }

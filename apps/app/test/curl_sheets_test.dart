@@ -120,4 +120,68 @@ void main() {
     expect(pixels.debugDisposed, isTrue);
     expect(sheets.imageFor(0), isNull);
   });
+
+  testWidgets('并发解码：慢页卡住不阻塞同一批里其它页就绪', (tester) async {
+    final sheets = CurlSheets();
+    addTearDown(sheets.dispose);
+    final slow = Completer<ui.Image?>();
+    final fast = await image(tester);
+
+    final loading = sheets.ensure(
+      pages: <int>{0, 1},
+      decode: (page) => page == 0 ? slow.future : Future<ui.Image?>.value(fast),
+      stillWanted: () => true,
+    );
+    // 给微任务跑完的机会：page 0 还没回来，但 page 1 必须已经就绪。
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    expect(sheets.imageFor(0), isNull);
+    expect(sheets.imageFor(1), same(fast));
+
+    final slowPixels = await image(tester);
+    slow.complete(slowPixels);
+    await loading;
+    expect(sheets.imageFor(0), same(slowPixels));
+  });
+
+  testWidgets('clear 延后释放已有位图，并丢弃在途旧结果且不阻塞同页重解', (tester) async {
+    await tester.pumpWidget(const SizedBox.shrink());
+    final sheets = CurlSheets();
+    addTearDown(sheets.dispose);
+    final existing = await image(tester);
+    final stale = await image(tester);
+    final fresh = await image(tester);
+    final gate = Completer<ui.Image?>();
+
+    await sheets.ensure(
+      pages: <int>{0},
+      decode: (page) async => existing,
+      stillWanted: () => true,
+    );
+    final oldDecode = sheets.ensure(
+      pages: <int>{0, 1},
+      decode: (page) => gate.future,
+      stillWanted: () => true,
+    );
+
+    sheets.clear();
+    expect(sheets.imageFor(0), isNull);
+    expect(existing.debugDisposed, isFalse);
+
+    // clear 后同页号（如换书）立即发起的新解码不会被旧 pending 卡住。
+    await sheets.ensure(
+      pages: <int>{1},
+      decode: (page) async => fresh,
+      stillWanted: () => true,
+    );
+    expect(sheets.imageFor(1), same(fresh));
+
+    gate.complete(stale);
+    await oldDecode;
+    expect(stale.debugDisposed, isTrue);
+    expect(sheets.imageFor(1), same(fresh));
+
+    tester.binding.scheduleFrame();
+    await tester.pump();
+    expect(existing.debugDisposed, isTrue);
+  });
 }
