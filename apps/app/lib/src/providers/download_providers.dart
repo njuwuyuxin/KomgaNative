@@ -7,8 +7,9 @@ import 'package:komga_native/src/data/cache/http_cache_database.dart';
 import 'package:komga_native/src/data/download/download_service.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/cache_providers.dart';
-import 'package:komga_native/src/providers/settings_provider.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
+import 'package:komga_native/src/providers/pinned_series_provider.dart';
+import 'package:komga_native/src/providers/settings_provider.dart';
 import 'package:komga_native/src/session/session_controller.dart';
 import 'package:komga_platform/komga_platform.dart';
 
@@ -75,21 +76,24 @@ final Provider<DownloadService> downloadServiceProvider =
       );
     });
 
-/// 已下载书籍的合计占用（设置页）。
+/// 当前服务器已下载书籍的合计占用（设置页，ARC-07）。
 final downloadsUsageProvider = FutureProvider<CacheUsage>((Ref ref) {
-  return ref.watch(httpCacheDatabaseProvider).downloadsUsage();
+  final scope = ref.watch(activeServerKeyProvider);
+  return ref.watch(httpCacheDatabaseProvider).downloadsUsage(scope: scope);
 });
 
-/// 已下载书籍列表（下载管理页，UI-P3-13）。
+/// 当前服务器已下载书籍列表（下载管理页，UI-P3-13 / ARC-07）。
 final downloadedBooksProvider = FutureProvider<List<DownloadedBook>>((Ref ref) {
-  return ref.watch(httpCacheDatabaseProvider).downloads();
+  final scope = ref.watch(activeServerKeyProvider);
+  return ref.watch(httpCacheDatabaseProvider).downloads(scope: scope);
 });
 
-/// 磁盘上待恢复的下载队列（下载管理页用来显示"重启前还在排队"的书）。
+/// 当前服务器待恢复的下载队列（ARC-07）。
 final downloadQueueProvider = FutureProvider<List<DownloadQueueEntry>>((
   Ref ref,
 ) {
-  return ref.watch(httpCacheDatabaseProvider).downloadQueue();
+  final scope = ref.watch(activeServerKeyProvider);
+  return ref.watch(httpCacheDatabaseProvider).downloadQueue(scope: scope);
 });
 
 /// 下载管理页要显示书名：按 bookId 取一次（失败返回 null，不打断列表）。
@@ -179,22 +183,25 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
     return queued;
   }
 
-  /// 恢复是否已经做过：`build` 会在每次被订阅时跑一次，恢复只做一次。
+  /// 恢复是否已经做过：`build` 会在每次被订阅或切服务器时跑一次。
   bool _restored = false;
+  String _scope = '';
 
   @override
   Map<String, DownloadStatus> build() {
+    _disposed = false;
+    _restored = false;
+    _paused = false;
+    _queue.clear();
+    _running.clear();
+    _scope = ref.watch(activeServerKeyProvider);
     ref.onDispose(() => _disposed = true);
-    // 队列从 [downloadQueueProvider] 读：读库失败会变成 `AsyncError` 而不是
-    // 未捕获异常（直接 `unawaited` 一个裸 Future 时，缓存库打不开会把
-    // 整棵 widget 树炸掉——黄金图测试里当场撞到）。
     ref.listen<AsyncValue<List<DownloadQueueEntry>>>(downloadQueueProvider, (
       AsyncValue<List<DownloadQueueEntry>>? _,
       AsyncValue<List<DownloadQueueEntry>> next,
     ) {
       final entries = next.value;
       if (entries == null || entries.isEmpty) return;
-      // 延到微任务：build 还没返回时不能写 state。
       unawaited(Future<void>.microtask(() => _restore(entries)));
     }, fireImmediately: true);
     return const <String, DownloadStatus>{};
@@ -229,13 +236,14 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
       }
       var alreadyDownloaded = false;
       try {
-        alreadyDownloaded = await _db.download(entry.bookId) != null;
+        alreadyDownloaded =
+            await _db.download(entry.bookId, scope: _scope) != null;
       } on Object {
         // 查不了就按"没下完"处理：多下一次比永远不恢复强。
       }
       if (alreadyDownloaded) {
         // 上次已完成，只是队列行没删干净。
-        _persist(_db.dequeueDownload(entry.bookId));
+        _persist(_db.dequeueDownload(entry.bookId, scope: _scope));
         continue;
       }
       _queue.add(
@@ -282,6 +290,7 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
     // 落盘不阻塞出队：界面先显示"排队中"，写库按提交顺序跟在后面。
     _persist(
       _db.enqueueDownload(
+        scope: _scope,
         bookId: book.id,
         seriesId: book.seriesId,
         name: book.name,
@@ -315,6 +324,7 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
       _set(book.id, const DownloadStatus(queued: true));
       _persist(
         _db.enqueueDownload(
+          scope: _scope,
           bookId: book.id,
           seriesId: book.seriesId,
           name: book.name,
@@ -346,12 +356,19 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
   }
 
   Future<void> _runOne(Book book) async {
+    final scope = _scope;
     _set(
       book.id,
       const DownloadStatus(progress: DownloadProgress(done: 0, total: 0)),
     );
     _persist(
-      _db.updateQueueEntry(bookId: book.id, state: 'active', done: 0, total: 0),
+      _db.updateQueueEntry(
+        scope: scope,
+        bookId: book.id,
+        state: 'active',
+        done: 0,
+        total: 0,
+      ),
     );
     try {
       await _service.download(
@@ -360,6 +377,7 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
           _set(book.id, DownloadStatus(progress: progress));
           _persist(
             _db.updateQueueEntry(
+              scope: scope,
               bookId: book.id,
               state: 'active',
               done: progress.done,
@@ -372,9 +390,8 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
       _set(book.id, DownloadStatus(error: failure.message));
     } finally {
       _running.remove(book.id);
-      // 成功/取消/失败都要让"已下载"标记重新查一次，并且清掉队列行。
-      _persist(_db.dequeueDownload(book.id));
       if (!_disposed) {
+        _persist(_db.dequeueDownload(book.id, scope: scope));
         ref.invalidate(downloadedProvider(book.id));
         ref.invalidate(downloadedBooksProvider);
         ref.invalidate(downloadsUsageProvider);
@@ -392,7 +409,7 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
   void cancel(String bookId) {
     _queue.removeWhere((Book book) => book.id == bookId);
     _service.cancel(bookId);
-    _persist(_db.dequeueDownload(bookId));
+    _persist(_db.dequeueDownload(bookId, scope: _scope));
     _clear(bookId);
     if (!_disposed) {
       ref.invalidate(downloadedProvider(bookId));
@@ -400,9 +417,7 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
     }
   }
 
-  /// 取消全部：清空排队、取消正在下的那本、清掉磁盘上的队列。
-  ///
-  /// 已经下完的书**不动**：用户的意图是"别再下了"，不是"删掉我的下载"。
+  /// 取消全部：清空当前服务器的排队与正在下的那本。
   void cancelAll() {
     final pending = <String>{..._queue.map((Book book) => book.id)};
     pending.addAll(_running);
@@ -410,7 +425,7 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
     for (final id in pending) {
       _service.cancel(id);
     }
-    _persist(_db.clearDownloadQueue());
+    _persist(_db.clearDownloadQueue(scope: _scope));
     if (_disposed) return;
     state = <String, DownloadStatus>{
       for (final entry in state.entries)
@@ -421,7 +436,7 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
 
   Future<void> delete(Book book) async {
     await _service.delete(book);
-    _persist(_db.dequeueDownload(book.id));
+    _persist(_db.dequeueDownload(book.id, scope: _scope));
     _clear(book.id);
     if (_disposed) return;
     ref.invalidate(downloadedProvider(book.id));

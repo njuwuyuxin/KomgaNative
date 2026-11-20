@@ -34,6 +34,7 @@ class FakeDownloadService implements DownloadService {
       onProgress(DownloadProgress(done: i, total: 3));
     }
     record = DownloadedBook(
+      scope: '',
       bookId: book.id,
       seriesId: book.seriesId,
       pageCount: 3,

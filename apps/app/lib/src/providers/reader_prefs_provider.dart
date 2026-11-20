@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
 import 'package:komga_native/src/data/reader_prefs_store.dart';
+import 'package:komga_native/src/providers/pinned_series_provider.dart';
 import 'package:komga_platform/komga_platform.dart';
 import 'package:komga_reader_engine/komga_reader_engine.dart'
     show TapZonePreset;
@@ -22,10 +23,12 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
 
   ReaderPrefsStore get _store => ref.read(readerPrefsStoreProvider);
 
+  String get _serverKey => ref.read(activeServerKeyProvider);
+
   Future<void> _restore() async {
     try {
       final saved = await _store.load();
-      if (saved == null || _touched) return;
+      if (!ref.mounted || saved == null || _touched) return;
       state = saved;
     } on Object {
       // 读不出偏好就用默认值：不能让设置存储读失败挡住阅读。
@@ -103,24 +106,29 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
     (ReaderConfig c) => c.copyWith(showSessionTime: enabled),
   );
 
-  /// 记住/清除某本书的双页分组起点（RDR-06）；[index] 为 null 表示恢复自动。
+  /// 记住/清除某本书的双页分组起点（RDR-06 / ARC-07）；[index] 为 null 表示恢复自动。
   void setSpreadFrom(String bookId, int? index) =>
-      _update(state.withSpreadFrom(bookId, index));
+      _update(state.withSpreadFrom(bookId, index, serverKey: _serverKey));
 
   /// 把某一组设置恢复默认（RDR-04）：只动这一组，其它组不受影响。
   void resetGroup(ReaderSettingsGroup group, {String? seriesId}) =>
       _updateConfig(seriesId, (ReaderConfig c) => c.resetGroup(group));
 
-  /// 打开/关闭"按系列记住"（UI-P3-2）。
-  ///
-  /// 打开时把**当前生效配置**快照成这个系列的覆盖；关闭时删掉覆盖、回到全局。
+  /// 打开/关闭"按系列记住"（UI-P3-2 / ARC-07 按服务器分区）。
   void setSeriesOverride(String seriesId, bool enabled) {
+    final serverKey = _serverKey;
     if (!enabled) {
-      if (!state.seriesOverrides.containsKey(seriesId)) return;
-      _update(state.withSeriesOverride(seriesId, null));
+      if (!state.hasSeriesOverride(seriesId, serverKey: serverKey)) return;
+      _update(state.withSeriesOverride(seriesId, null, serverKey: serverKey));
       return;
     }
-    _update(state.withSeriesOverride(seriesId, state.forSeries(seriesId)));
+    _update(
+      state.withSeriesOverride(
+        seriesId,
+        state.forSeries(seriesId, serverKey: serverKey),
+        serverKey: serverKey,
+      ),
+    );
   }
 
   /// 把当前配置存成一个命名预设（UI-P3-1）。
@@ -130,7 +138,7 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
     final preset = ReaderPreset(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       name: trimmed,
-      config: state.forSeries(seriesId),
+      config: state.forSeries(seriesId, serverKey: _serverKey),
     );
     _update(state.copyWith(presets: <ReaderPreset>[...state.presets, preset]));
   }
@@ -140,7 +148,13 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
     for (final preset in state.presets) {
       if (preset.id != id) continue;
       if (seriesId != null) {
-        _update(state.withSeriesOverride(seriesId, preset.config));
+        _update(
+          state.withSeriesOverride(
+            seriesId,
+            preset.config,
+            serverKey: _serverKey,
+          ),
+        );
       } else {
         _update(state.copyWith(global: preset.config));
       }
@@ -157,7 +171,7 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
     _update(state.copyWith(presets: next));
   }
 
-  /// 有 seriesId 时只改这个系列的覆盖；没有时改全局 [ReaderConfig]。
+  /// 有 seriesId 时只改当前服务器下这个系列的覆盖；没有时改全局 [ReaderConfig]。
   void _updateConfig(
     String? seriesId,
     ReaderConfig Function(ReaderConfig current) change,
@@ -166,8 +180,13 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
       _update(state.copyWith(global: change(state.global)));
       return;
     }
+    final serverKey = _serverKey;
     _update(
-      state.withSeriesOverride(seriesId, change(state.forSeries(seriesId))),
+      state.withSeriesOverride(
+        seriesId,
+        change(state.forSeries(seriesId, serverKey: serverKey)),
+        serverKey: serverKey,
+      ),
     );
   }
 

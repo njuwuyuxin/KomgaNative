@@ -19,9 +19,11 @@ import 'package:komga_sync_engine/komga_sync_engine.dart';
 /// 并真的跑一次 flush：有环就会抛，没环就只是普通的网络失败。
 void main() {
   test('建图 + flush 不会形成循环依赖', () async {
+    const baseUrl = 'http://127.0.0.1:1';
     final store = InMemoryProgressStore();
     await store.enqueue(
       const ProgressTarget(bookId: 'b1', page: 3, completed: false),
+      scope: baseUrl,
     );
 
     final container = ProviderContainer(
@@ -30,7 +32,7 @@ void main() {
         serverStoreProvider.overrideWithValue(
           InMemoryServerStore(
             StoredServer(
-              address: ServerAddress.parse('http://127.0.0.1:1'),
+              address: ServerAddress.parse(baseUrl),
               apiKey: 'KEY',
               accountEmail: 'me@example.com',
             ),
@@ -54,7 +56,7 @@ void main() {
     await container.read(progressSyncProvider).flush();
 
     // 连不上 → 进度必须留在队列里，而不是被当成已提交丢掉。
-    expect(await store.pending(), hasLength(1));
+    expect(await store.pending(scope: baseUrl), hasLength(1));
   });
 
   for (final badStatus in <int>[404, 400]) {
@@ -72,12 +74,15 @@ void main() {
         await req.response.close();
       });
 
+      final baseUrl = 'http://127.0.0.1:${server.port}';
       final store = InMemoryProgressStore();
       await store.enqueue(
         const ProgressTarget(bookId: 'b-dead', page: 99, completed: false),
+        scope: baseUrl,
       );
       await store.enqueue(
         const ProgressTarget(bookId: 'b-good', page: 5, completed: false),
+        scope: baseUrl,
       );
 
       final container = ProviderContainer(
@@ -85,7 +90,7 @@ void main() {
           serverStoreProvider.overrideWithValue(
             InMemoryServerStore(
               StoredServer(
-                address: ServerAddress.parse('http://127.0.0.1:${server.port}'),
+                address: ServerAddress.parse(baseUrl),
                 apiKey: 'KEY',
                 accountEmail: 'me@example.com',
               ),
@@ -107,7 +112,11 @@ void main() {
         '/api/v1/books/b-dead/read-progress',
         '/api/v1/books/b-good/read-progress',
       ]);
-      expect(await store.pending(), isEmpty, reason: '坏死项与成功项都已出队，不死循环');
+      expect(
+        await store.pending(scope: baseUrl),
+        isEmpty,
+        reason: '坏死项与成功项都已出队，不死循环',
+      );
     });
   }
 }

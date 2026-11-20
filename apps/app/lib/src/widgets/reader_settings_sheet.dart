@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
+import 'package:komga_native/src/providers/pinned_series_provider.dart';
 import 'package:komga_native/src/providers/reader_prefs_provider.dart';
 import 'package:komga_native/src/widgets/reader_fit_preview.dart';
 import 'package:komga_native/src/widgets/reader_mode_text.dart';
@@ -78,16 +79,19 @@ class ReaderSettingsSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final global = ref.watch(readerPrefsProvider);
+    final serverKey = ref.watch(activeServerKeyProvider);
     final controller = ref.read(readerPrefsProvider.notifier);
     final palette = this.palette;
     final theme = Theme.of(context);
     final textStyle = theme.textTheme;
     final seriesId = this.seriesId;
-    final seriesOverridden =
-        seriesId != null && global.seriesOverrides.containsKey(seriesId);
+    final seriesOverridden = global.hasSeriesOverride(
+      seriesId,
+      serverKey: serverKey,
+    );
     // 开关关着时改的是全局；开着时才写这个系列的覆盖。
     final writeSeriesId = seriesOverridden ? seriesId : null;
-    final prefs = global.forSeries(seriesId);
+    final prefs = global.forSeries(seriesId, serverKey: serverKey);
 
     return SafeArea(
       child: ConstrainedBox(

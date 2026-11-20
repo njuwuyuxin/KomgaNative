@@ -5,45 +5,67 @@ import 'package:komga_native/src/data/progress/progress_store.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_sync_engine/komga_sync_engine.dart';
 
-/// 进度上传接口（真实现就是 `ReaderRepository.uploadProgress`）。
+/// 单服进度上传接口（单测便捷入口）。
 typedef ProgressUpload = Future<void> Function(ProgressTarget target);
 
-/// 进度同步：本地先写，再尽力提交；拿不到服务端数据时以本地为准。
-///
-/// 三条规则（对应 ADR 0002）：
-/// 1. `save` 只负责**入队 + 落盘**，网络失败不影响阅读；
-/// 2. `flush` 单飞（同一时刻只有一条队列在跑），失败保留 pending 等下次触发；
-/// 3. 401/403 后本轮停手：Key 失效时反复重试只会刷服务端日志，等重新登录再试。
+/// 带服务器分区校验的进度上传接口（ARC-07）。
+typedef ScopedProgressUpload = Future<void> Function(
+  String scope,
+  ProgressTarget target,
+);
+
+/// 进度同步：本地按服务器分区先写，再仅对当前连接服务器尽力提交。
 class ProgressSyncService {
-  ProgressSyncService({required ProgressStore store, required this.upload})
-    : _store = store;
+  ProgressSyncService({
+    required ProgressStore store,
+    ProgressUpload? upload,
+    ScopedProgressUpload? scopedUpload,
+    String Function()? activeScope,
+  }) : assert(upload != null || scopedUpload != null, '必须提供上传实现'),
+       _store = store,
+       _activeScope = activeScope ?? (() => ''),
+       _upload =
+           scopedUpload ??
+           ((String _, ProgressTarget target) => upload!(target));
 
   final ProgressStore _store;
-  final ProgressUpload upload;
+  final String Function() _activeScope;
+  final ScopedProgressUpload _upload;
 
   Future<void>? _inFlight;
-  bool _authBlocked = false;
+  final Set<String> _authBlockedScopes = <String>{};
 
   ProgressStore get store => _store;
 
   /// 用户显式改了阅读状态（标记已读/未读）后调用：本地那份 pending 已过期。
   Future<void> forceAdopt(String bookId, ReadProgress? remote) =>
-      _store.forceAdopt(bookId, remote);
+      _store.forceAdopt(bookId, remote, scope: _activeScope());
 
-  /// 记一页进度：先落盘，再尽力提交（不阻塞调用方）。
+  /// 记一页进度：先落入当前服务器分区，再尽力提交（不阻塞调用方）。
   Future<void> save(
     String bookId, {
     required int page,
     required bool completed,
   }) async {
+    final scope = _activeScope();
     await _store.enqueue(
       ProgressTarget(bookId: bookId, page: page, completed: completed),
+      scope: scope,
     );
-    _authBlocked = false;
+    _authBlockedScopes.remove(scope);
     unawaited(flush());
   }
 
-  /// 提交所有待提交项。已在跑就直接复用同一个 Future（单飞）。
+  /// 解除指定服务器（或全部）的鉴权停手标记（切换服务器或重登后调用）。
+  void resetAuthBlock([String? scope]) {
+    if (scope == null) {
+      _authBlockedScopes.clear();
+    } else {
+      _authBlockedScopes.remove(scope);
+    }
+  }
+
+  /// 提交当前活动服务器分区的待提交项。已在跑就直接复用同一个 Future（单飞）。
   Future<void> flush() {
     final running = _inFlight;
     if (running != null) return running;
@@ -53,35 +75,35 @@ class ProgressSyncService {
   }
 
   Future<void> _flushLoop() async {
-    if (_authBlocked) return;
-    for (final item in await _store.pending()) {
+    final scope = _activeScope();
+    if (_authBlockedScopes.contains(scope)) return;
+    for (final item in await _store.pending(scope: scope)) {
+      // 若冲洗中途用户切换了服务器，立即停手，绝不把旧服条目发给新服。
+      if (_activeScope() != scope) return;
       try {
-        await upload(item.target);
-        await _store.ack(item.target.bookId, item.seq);
+        await _upload(scope, item.target);
+        await _store.ack(item.target.bookId, item.seq, scope: scope);
       } on AuthFailure {
-        // Key 失效：保留 pending，但别继续打服务端。
-        _authBlocked = true;
+        _authBlockedScopes.add(scope);
         return;
       } on NotFoundFailure {
-        // 404（书已删除）：不可恢复，出队并继续冲洗后续书籍，绝不队头阻塞。
-        await _store.ack(item.target.bookId, item.seq);
+        await _store.ack(item.target.bookId, item.seq, scope: scope);
       } on BadRequestFailure {
-        // 400（参数越界等不可恢复错误）：出队并继续冲洗后续书籍，下次 GET 对账更新基准。
-        await _store.ack(item.target.bookId, item.seq);
+        await _store.ack(item.target.bookId, item.seq, scope: scope);
       } on ShelfFailure {
-        // 网络/服务端/证书错误：保留，等下次触发（翻页、进前台、刷新书架）。
         return;
       }
     }
   }
 
-  /// 把一批书的进度换成"本地优先"的版本。
-  ///
-  /// 对账规则在 `komga_sync_engine.decideSync` 里（只信服务端 lastModified）；
-  /// 这里负责取数据、执行决定、并把结果叠加到 [Book] 上给 UI。
+  /// 把一批书的进度换成当前服务器分区"本地优先"的版本。
   Future<List<Book>> overlay(List<Book> books) async {
     if (books.isEmpty) return books;
-    final records = await _store.records(books.map((Book b) => b.id));
+    final scope = _activeScope();
+    final records = await _store.records(
+      books.map((Book b) => b.id),
+      scope: scope,
+    );
     var needsFlush = false;
 
     final merged = <Book>[];
@@ -94,7 +116,7 @@ class ProgressSyncService {
           needsFlush = true;
           merged.add(book.withProgress(record!.toReadProgress()));
         case SyncAction.adoptRemote:
-          await _store.adoptRemote(book.id, decision.remote);
+          await _store.adoptRemote(book.id, decision.remote, scope: scope);
           merged.add(book.withProgress(decision.remote));
         case SyncAction.inSync || SyncAction.staleRemote:
           merged.add(

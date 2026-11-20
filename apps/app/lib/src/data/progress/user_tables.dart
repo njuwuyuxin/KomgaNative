@@ -1,7 +1,10 @@
 import 'package:drift/drift.dart';
 
-/// 本地进度 + 待提交队列（合一张表：一本书一行，pending 非空即可提交）。
+/// 本地进度 + 待提交队列（合一张表：按 `{scope, bookId}` 分区，pending 非空即可提交）。
 class LocalProgress extends Table {
+  /// 服务器分区键（规范化 `baseUrl`）；空串兼容未分区单测与旧存档。
+  TextColumn get scope => text().withDefault(const Constant(''))();
+
   TextColumn get bookId => text()();
 
   IntColumn get page => integer()();
@@ -18,7 +21,7 @@ class LocalProgress extends Table {
   IntColumn get pendingSeq => integer().nullable()();
 
   @override
-  Set<Column<Object>> get primaryKey => <Column<Object>>{bookId};
+  Set<Column<Object>> get primaryKey => <Column<Object>>{scope, bookId};
 }
 
 /// 置顶的系列（LIB-02 / ARC-06 归位至用户库）。
@@ -35,11 +38,12 @@ class PinnedSeriesRows extends Table {
   Set<Column<Object>> get primaryKey => <Column<Object>>{serverId, seriesId};
 }
 
-/// 一次阅读会话（HIS-01 / ARC-06 归位至用户库）。
-///
-/// 属于不可再生的用户阅读资产，不能放在随时可清空重建的 HTTP 缓存库中。
+/// 一次阅读会话（HIS-01 / ARC-06 归位至用户库 / ARC-07 补齐服务器分区）。
 class ReadingSessions extends Table {
   IntColumn get id => integer().autoIncrement()();
+
+  /// 所属服务器标识（规范化 `baseUrl`）；默认空串兼容旧历史行。
+  TextColumn get scope => text().withDefault(const Constant(''))();
 
   TextColumn get bookId => text()();
 

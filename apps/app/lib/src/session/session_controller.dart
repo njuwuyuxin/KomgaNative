@@ -81,13 +81,12 @@ class SessionController extends Notifier<SessionState> {
   Future<void> _restore() async {
     try {
       final saved = await _store.load();
-      // 读钥匙串期间用户可能已经点过 Connect：不能被"旧状态"覆盖回去。
-      if (state is! SessionLoading) return;
+      if (!ref.mounted || state is! SessionLoading) return;
       state = saved == null
           ? const SessionDisconnected()
           : SessionConnected(saved);
     } on Object catch (e) {
-      if (state is! SessionLoading) return;
+      if (!ref.mounted || state is! SessionLoading) return;
       state = SessionDisconnected(error: '无法读取已保存的会话', hint: '$e');
     }
   }

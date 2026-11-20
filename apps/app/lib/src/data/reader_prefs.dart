@@ -81,28 +81,64 @@ class ReaderPrefs {
   /// 按系列覆盖的阅读配置（UI-P3-2）：seriesId → [ReaderConfig]。
   final Map<String, ReaderConfig> seriesOverrides;
 
-  /// 某个系列实际生效的配置：有系列覆盖则直接返回该覆盖，否则返回 [global]。
-  ReaderConfig forSeries(String? seriesId) =>
-      seriesId == null ? global : (seriesOverrides[seriesId] ?? global);
+  /// 组合带服务器分区的键（`$serverKey|$id`）；未提供服务器标识时退化为裸 `id`。
+  static String scopedKey(String? serverKey, String id) =>
+      (serverKey == null || serverKey.isEmpty) ? id : '$serverKey|$id';
 
-  /// 记住/清除某本书的双页分组起点（RDR-06）。[index] 为 null 表示恢复自动。
-  ReaderPrefs withSpreadFrom(String bookId, int? index) {
+  /// 当前服务器下该系列是否已启用系列覆盖（兼容无前缀旧存档键）。
+  bool hasSeriesOverride(String? seriesId, {String? serverKey}) {
+    if (seriesId == null) return false;
+    if (serverKey != null && serverKey.isNotEmpty) {
+      if (seriesOverrides.containsKey('$serverKey|$seriesId')) return true;
+    }
+    return seriesOverrides.containsKey(seriesId);
+  }
+
+  /// 某个系列实际生效的配置：优先命中 `$serverKey|$seriesId`，其次回退旧版裸 `seriesId`，最后返回 [global]。
+  ReaderConfig forSeries(String? seriesId, {String? serverKey}) {
+    if (seriesId == null) return global;
+    if (serverKey != null && serverKey.isNotEmpty) {
+      final scoped = seriesOverrides['$serverKey|$seriesId'];
+      if (scoped != null) return scoped;
+    }
+    return seriesOverrides[seriesId] ?? global;
+  }
+
+  /// 读取某本书的双页分组起点：优先命中 `$serverKey|$bookId`，兼容回退裸 `bookId`。
+  int? spreadFromFor(String bookId, {String? serverKey}) {
+    if (serverKey != null && serverKey.isNotEmpty) {
+      final scoped = spreadFrom['$serverKey|$bookId'];
+      if (scoped != null) return scoped;
+    }
+    return spreadFrom[bookId];
+  }
+
+  /// 记住/清除某本书的双页分组起点（RDR-06 / ARC-07）。[index] 为 null 表示恢复自动。
+  ReaderPrefs withSpreadFrom(String bookId, int? index, {String? serverKey}) {
     final next = Map<String, int>.of(spreadFrom);
+    final key = scopedKey(serverKey, bookId);
     if (index == null || index < 0) {
-      next.remove(bookId);
+      next.remove(key);
+      if (key != bookId) next.remove(bookId);
     } else {
-      next[bookId] = index;
+      next[key] = index;
     }
     return copyWith(spreadFrom: next);
   }
 
   /// 写入/删除某个系列的覆盖。传入 null 表示删除。
-  ReaderPrefs withSeriesOverride(String seriesId, ReaderConfig? config) {
+  ReaderPrefs withSeriesOverride(
+    String seriesId,
+    ReaderConfig? config, {
+    String? serverKey,
+  }) {
     final next = Map<String, ReaderConfig>.from(seriesOverrides);
+    final key = scopedKey(serverKey, seriesId);
     if (config == null) {
-      next.remove(seriesId);
+      next.remove(key);
+      if (key != seriesId) next.remove(seriesId);
     } else {
-      next[seriesId] = config;
+      next[key] = config;
     }
     return copyWith(seriesOverrides: next);
   }

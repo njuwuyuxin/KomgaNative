@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
+import 'package:komga_native/src/providers/pinned_series_provider.dart';
 import 'package:komga_native/src/providers/reading_history_provider.dart';
 import 'package:komga_native/src/widgets/cover_image.dart';
 import 'package:material_ui/material_ui.dart';
@@ -86,7 +87,21 @@ class _RecentHistoryTile extends ConsumerWidget {
       child: InkWell(
         key: Key('recent-history-${session.bookId}'),
         borderRadius: BorderRadius.circular(AppRadii.sm),
-        onTap: () => context.push('/reader/${session.bookId}'),
+        onTap: () {
+          final activeScope = ref.read(activeServerKeyProvider);
+          if (session.scope.isNotEmpty &&
+              activeScope.isNotEmpty &&
+              session.scope != activeScope) {
+            final l10n = AppLocalizations.of(context);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(l10n.historyDifferentServer(session.scope)),
+              ),
+            );
+            return;
+          }
+          context.push('/reader/${session.bookId}');
+        },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[

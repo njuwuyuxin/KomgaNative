@@ -12,6 +12,7 @@ void main() {
     int minutes = 10,
   }) => ReadingSession(
     id: 0,
+    scope: '',
     bookId: bookId,
     seriesId: 's1',
     bookName: 'Vol. $bookId',

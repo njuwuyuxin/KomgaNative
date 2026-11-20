@@ -116,8 +116,12 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
   /// 从偏好里按**书**读（RDR-06）：以前是会话内字段，退出阅读器就丢了。
   /// 用 `read` 而不是 `watch`：这个 getter 也会在事件回调 / 进度回写里被调用，
   /// 那里不能 watch；重建由 `ReaderScreen.build` 对同一个 provider 的 watch 负责。
-  int? get _spreadFrom =>
-      ref.read(readerPrefsProvider).spreadFrom[widget.bookId];
+  int? get _spreadFrom => ref
+      .read(readerPrefsProvider)
+      .spreadFromFor(
+        widget.bookId,
+        serverKey: ref.read(activeServerKeyProvider),
+      );
 
   /// 最近一次 build 解析出的**有效**阅读方向。
   ///
@@ -156,7 +160,7 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
 
   /// 系列覆盖优先，其余用全局。
   ReaderConfig _effectiveConfig(ReaderPrefs prefs) =>
-      prefs.forSeries(_seriesId);
+      prefs.forSeries(_seriesId, serverKey: ref.read(activeServerKeyProvider));
 
   /// 外部翻页（底栏箭头 / 音量键）统一入口：交给绘制层播动画，动画结束后
   /// 它再回调 `onTurn` 真正换页；绘制层还没建好时（页数据未到）什么也不做。

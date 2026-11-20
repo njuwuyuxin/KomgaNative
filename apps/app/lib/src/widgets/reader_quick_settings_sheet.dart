@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
+import 'package:komga_native/src/providers/pinned_series_provider.dart';
 import 'package:komga_native/src/providers/reader_prefs_provider.dart';
 import 'package:komga_native/src/widgets/reader_palette.dart';
 import 'package:komga_native/src/widgets/reader_settings_rows.dart';
@@ -59,13 +60,13 @@ class ReaderQuickSettingsSheet extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final all = ref.watch(readerPrefsProvider);
+    final serverKey = ref.watch(activeServerKeyProvider);
     // 与完整面板同一条规则：只有这个系列**已经**开了"按系列记住"才写覆盖，
     // 否则改动应该是全局的（否则用户会发现"改了只有这一本生效"）。
-    final writeSeriesId =
-        seriesId != null && all.seriesOverrides.containsKey(seriesId)
+    final writeSeriesId = all.hasSeriesOverride(seriesId, serverKey: serverKey)
         ? seriesId
         : null;
-    final prefs = all.forSeries(seriesId);
+    final prefs = all.forSeries(seriesId, serverKey: serverKey);
     final controller = ref.read(readerPrefsProvider.notifier);
 
     return SafeArea(

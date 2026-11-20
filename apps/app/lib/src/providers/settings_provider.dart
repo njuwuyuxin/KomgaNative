@@ -100,6 +100,7 @@ class SettingsController extends Notifier<SettingsState> {
 
   Future<void> _restore() async {
     final saved = await _store.load();
+    if (!ref.mounted) return;
     final nextHaptics = _hapticsTouched ? state.haptics : saved.haptics;
     AppHaptics.enabled = nextHaptics;
     state = state.copyWith(

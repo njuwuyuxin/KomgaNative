@@ -109,6 +109,7 @@ class _BatchDownloadService implements DownloadService {
   Future<DownloadedBook?> downloaded(String bookId) async =>
       alreadyDownloaded.contains(bookId)
       ? DownloadedBook(
+          scope: '',
           bookId: bookId,
           seriesId: 's1',
           pageCount: 3,

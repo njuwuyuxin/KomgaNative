@@ -536,5 +536,11 @@
   "readingNowLoadFailedHint": "Check the connection and try again.",
   "readingNowRefreshFailed": "Couldn't refresh · showing the last result",
   "recentlyAdded": "Recently added",
-  "pickUpWhereYouLeftOff": "Pick up where you left off"
+  "pickUpWhereYouLeftOff": "Pick up where you left off",
+  "historyDifferentServer": "This item belongs to {server}. Switch servers in Settings first.",
+  "@historyDifferentServer": {
+    "placeholders": {
+      "server": {"type": "String"}
+    }
+  }
 }

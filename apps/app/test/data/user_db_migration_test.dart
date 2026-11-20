@@ -83,7 +83,7 @@ void main() {
       (1, 'b1', 's1', 'Vol. 1', 1700000100, 1700000700, 600000, 1, 15, 0),
       (2, 'b2', 's1', 'Vol. 2', 1700001000, 1700001900, 900000, 1, 20, 1);
     ''');
-    cacheRaw.dispose();
+    cacheRaw.close();
 
     final userRaw = sqlite.sqlite3.open(userFile.path);
     userRaw.execute('''
@@ -99,7 +99,7 @@ void main() {
       VALUES ('b1', 15, 0, 1700000700, 42);
       PRAGMA user_version = 1;
     ''');
-    userRaw.dispose();
+    userRaw.close();
   }
 
   test('从 v5 缓存库平滑迁入置顶与阅读历史；清空或删除缓存库完全不影响用户资产', () async {

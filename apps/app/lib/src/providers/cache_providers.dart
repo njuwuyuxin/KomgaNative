@@ -6,15 +6,20 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_native/src/data/cache/drift_http_cache.dart';
 import 'package:komga_native/src/data/cache/http_cache_database.dart';
+import 'package:komga_native/src/session/session_controller.dart';
 import 'package:path_provider/path_provider.dart';
 
 /// 内容缓存库（Drift，独立于进度库）。
-///
-/// 懒打开：没有请求也不会创建文件。测试里覆盖 [httpCacheProvider] 就不会碰
-/// path_provider 的平台通道。
 final Provider<HttpCacheDatabase> httpCacheDatabaseProvider =
     Provider<HttpCacheDatabase>((Ref ref) {
-      final db = HttpCacheDatabase(_openCacheConnection());
+      final serverStore = ref.read(serverStoreProvider);
+      final db = HttpCacheDatabase(
+        _openCacheConnection(),
+        defaultLegacyScope: () async {
+          final saved = await serverStore.load();
+          return saved?.address.baseUrl ?? '';
+        },
+      );
       ref.onDispose(db.close);
       return db;
     });

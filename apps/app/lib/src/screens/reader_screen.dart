@@ -13,6 +13,7 @@ import 'package:komga_native/src/data/reading_session_tracker.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/screens/reader_args.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
+import 'package:komga_native/src/providers/pinned_series_provider.dart';
 import 'package:komga_native/src/providers/progress_providers.dart';
 import 'package:komga_native/src/providers/reading_history_provider.dart';
 import 'package:komga_native/src/providers/reader_prefs_provider.dart';
@@ -126,9 +127,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     // 偏好与书都在**本 build** 里 watch：写在 gate 的 builder 里时，
     // 偏好恢复/换书不一定会让这一层重建（RDR-05 踩到过）。
     final allPrefs = ref.watch(readerPrefsProvider);
+    final serverKey = ref.watch(activeServerKeyProvider);
     final book =
         widget.book ?? ref.watch(readerBookProvider(widget.bookId)).value;
-    final config = allPrefs.forSeries(book?.seriesId ?? _seriesId);
+    final config = allPrefs.forSeries(
+      book?.seriesId ?? _seriesId,
+      serverKey: serverKey,
+    );
     final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     final openingHero = widget.heroTag;
     return EdgeSwipeBack(

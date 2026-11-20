@@ -398,5 +398,11 @@
   "readingNowLoadFailedHint": "检查一下网络，再试一次。",
   "readingNowRefreshFailed": "刷新失败 · 显示的是上一次的结果",
   "recentlyAdded": "最近添加",
-  "pickUpWhereYouLeftOff": "继续上次读到的位置"
+  "pickUpWhereYouLeftOff": "继续上次读到的位置",
+  "historyDifferentServer": "这条历史属于 {server}，请先在设置中切换服务器。",
+  "@historyDifferentServer": {
+    "placeholders": {
+      "server": {"type": "String"}
+    }
+  }
 }

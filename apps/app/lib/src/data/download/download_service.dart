@@ -17,12 +17,6 @@ class DownloadProgress {
 }
 
 /// 整本下载。
-///
-/// 为什么不直接复用"读过的页自动缓存"：那是**被动**的，用户无法预期
-/// "这本书断网能不能读"。下载是显式意图：开始、看进度、可取消、可删除。
-///
-/// 抽成接口是为了单测能脱离 KomgaSession（用两个闭包喂页列表与页图），
-/// 而不是为"以后可能换实现"。
 abstract interface class DownloadService {
   Future<DownloadedBook?> downloaded(String bookId);
 
@@ -47,27 +41,23 @@ class KomgaDownloadService implements DownloadService {
     required this.scope,
   });
 
-  /// 页列表（含页码/尺寸）。
   final Future<List<PageInfo>> Function(String bookId) pages;
-
-  /// 单页图字节（会顺带写进 HTTP 缓存，所以离线可直接读）。
   final Future<Uint8List> Function(String bookId, int page) pageImage;
-
   final HttpCacheDatabase db;
   final String scope;
 
-  /// 进行中的下载：bookId → 是否已请求取消。
   final Map<String, bool> _cancelFlags = <String, bool>{};
 
   @override
-  Future<DownloadedBook?> downloaded(String bookId) => db.download(bookId);
+  Future<DownloadedBook?> downloaded(String bookId) =>
+      db.download(bookId, scope: scope);
 
   @override
   Future<bool> download(
     Book book, {
     required void Function(DownloadProgress progress) onProgress,
   }) async {
-    if (await db.download(book.id) != null) return false;
+    if (await db.download(book.id, scope: scope) != null) return false;
 
     final list = await pages(book.id);
     if (list.isEmpty) return false;
@@ -85,6 +75,7 @@ class KomgaDownloadService implements DownloadService {
         onProgress(progress);
       }
       await db.markDownloaded(
+        scope: scope,
         bookId: book.id,
         seriesId: book.seriesId,
         pageCount: list.length,
@@ -103,7 +94,7 @@ class KomgaDownloadService implements DownloadService {
 
   @override
   Future<void> delete(Book book) async {
-    await db.removeDownload(book.id);
+    await db.removeDownload(book.id, scope: scope);
     await db.deleteCachedPages(scope: scope, bookId: book.id);
   }
 }

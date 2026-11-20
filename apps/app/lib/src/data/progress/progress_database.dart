@@ -12,16 +12,24 @@ part 'progress_database.g.dart';
 
 /// 用户本地资产数据库（`komga_native.sqlite`）：阅读进度、系列置顶与阅读会话统计。
 ///
-/// 与随时可清空重建的 `komga_cache.sqlite` 严格物理隔离（ARC-06）。
+/// 与随时可清空重建的 `komga_cache.sqlite` 严格物理隔离（ARC-06），
+/// 且所有服务器相关表均带 `scope`/`serverId` 分区（ARC-07）。
 @DriftDatabase(tables: <Type>[LocalProgress, PinnedSeriesRows, ReadingSessions])
 class ProgressDatabase extends _$ProgressDatabase {
-  ProgressDatabase(super.executor, {this.legacyCacheDbPath});
+  ProgressDatabase(
+    super.executor, {
+    this.legacyCacheDbPath,
+    this.defaultLegacyScope,
+  });
 
   /// 旧版 v5 `komga_cache.sqlite` 的文件路径提供器（首次升级平滑迁入置顶与阅读历史）。
   final FutureOr<String?> Function()? legacyCacheDbPath;
 
+  /// 旧单服表升级到 v3 复合主键时用于回填的活动服务器 `baseUrl`。
+  final FutureOr<String> Function()? defaultLegacyScope;
+
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -33,11 +41,49 @@ class ProgressDatabase extends _$ProgressDatabase {
         await m.createTable(pinnedSeriesRows);
         await m.createTable(readingSessions);
       }
+      if (from < 3) {
+        final rawScope = await defaultLegacyScope?.call() ?? '';
+        final escaped = rawScope.replaceAll("'", "''");
+        await _upgradeLocalProgressToV3(escaped);
+        if (from >= 2) {
+          await m.addColumn(readingSessions, readingSessions.scope);
+        }
+        if (escaped.isNotEmpty) {
+          await customStatement(
+            "UPDATE reading_sessions SET scope = '$escaped' WHERE scope = ''",
+          );
+        }
+      }
     },
     beforeOpen: (OpeningDetails details) async {
       await _migrateFromLegacyCacheIfNeeded();
     },
   );
+
+  Future<void> _upgradeLocalProgressToV3(String escapedScope) async {
+    await customStatement('''
+      CREATE TABLE local_progress_v3 (
+        scope TEXT NOT NULL DEFAULT '',
+        book_id TEXT NOT NULL,
+        page INTEGER NOT NULL,
+        completed INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        server_last_modified INTEGER NULL,
+        pending_seq INTEGER NULL,
+        PRIMARY KEY (scope, book_id)
+      )
+    ''');
+    await customStatement(
+      'INSERT OR REPLACE INTO local_progress_v3 '
+      '(scope, book_id, page, completed, updated_at, server_last_modified, pending_seq) '
+      "SELECT '$escapedScope', book_id, page, completed, updated_at, server_last_modified, pending_seq "
+      'FROM local_progress',
+    );
+    await customStatement('DROP TABLE local_progress');
+    await customStatement(
+      'ALTER TABLE local_progress_v3 RENAME TO local_progress',
+    );
+  }
 
   /// 一次性平滑迁入旧缓存库里的 `pinned_series_rows` 与 `reading_sessions`。
   Future<void> _migrateFromLegacyCacheIfNeeded() async {
@@ -46,11 +92,13 @@ class ProgressDatabase extends _$ProgressDatabase {
     try {
       final path = await resolver();
       if (path == null || path.isEmpty || !File(path).existsSync()) return;
-      final escaped = path.replaceAll("'", "''");
-      await customStatement("ATTACH DATABASE '$escaped' AS legacy_cache");
+      final escapedPath = path.replaceAll("'", "''");
+      final rawScope = await defaultLegacyScope?.call() ?? '';
+      final escapedScope = rawScope.replaceAll("'", "''");
+      await customStatement("ATTACH DATABASE '$escapedPath' AS legacy_cache");
       try {
         final tablesRows = await customSelect(
-          "SELECT name FROM legacy_cache.sqlite_master "
+          'SELECT name FROM legacy_cache.sqlite_master '
           "WHERE type = 'table' AND name IN ('pinned_series_rows', 'reading_sessions')",
         ).get();
         final legacyTables = <String>{
@@ -66,8 +114,8 @@ class ProgressDatabase extends _$ProgressDatabase {
         if (legacyTables.contains('reading_sessions')) {
           await customStatement(
             'INSERT OR IGNORE INTO reading_sessions '
-            '(id, book_id, series_id, book_name, started_at, ended_at, duration_ms, start_page, end_page, completed) '
-            'SELECT id, book_id, series_id, book_name, started_at, ended_at, duration_ms, start_page, end_page, completed '
+            '(id, scope, book_id, series_id, book_name, started_at, ended_at, duration_ms, start_page, end_page, completed) '
+            "SELECT id, '$escapedScope', book_id, series_id, book_name, started_at, ended_at, duration_ms, start_page, end_page, completed "
             'FROM legacy_cache.reading_sessions',
           );
           await _tryDropLegacy('reading_sessions');
@@ -90,15 +138,16 @@ class ProgressDatabase extends _$ProgressDatabase {
 
   int _seqSeed = 0;
 
-  // ---- 阅读进度 ----
+  // ---- 阅读进度（按 scope 分区）----
 
-  Future<int> enqueue(ProgressTarget target) async {
+  Future<int> enqueue(ProgressTarget target, {String scope = ''}) async {
     final now = DateTime.now().toUtc();
     final micros = now.microsecondsSinceEpoch;
     final seq = micros > _seqSeed ? micros : _seqSeed + 1;
     _seqSeed = seq;
     await into(localProgress).insertOnConflictUpdate(
       LocalProgressCompanion.insert(
+        scope: Value<String>(scope),
         bookId: target.bookId,
         page: target.page,
         completed: target.completed,
@@ -109,11 +158,13 @@ class ProgressDatabase extends _$ProgressDatabase {
     return seq;
   }
 
-  Future<bool> ack(String bookId, int seq) async {
+  Future<bool> ack(String bookId, int seq, {String scope = ''}) async {
     final updated =
         await (update(localProgress)..where(
               (LocalProgress t) =>
-                  t.bookId.equals(bookId) & t.pendingSeq.equals(seq),
+                  t.scope.equals(scope) &
+                  t.bookId.equals(bookId) &
+                  t.pendingSeq.equals(seq),
             ))
             .write(
               const LocalProgressCompanion(
@@ -124,19 +175,25 @@ class ProgressDatabase extends _$ProgressDatabase {
     return updated > 0;
   }
 
-  Future<LocalProgressData?> record(String bookId) => (select(
-    localProgress,
-  )..where((t) => t.bookId.equals(bookId))).getSingleOrNull();
+  Future<LocalProgressData?> record(String bookId, {String scope = ''}) =>
+      (select(localProgress)
+            ..where((t) => t.scope.equals(scope) & t.bookId.equals(bookId)))
+          .getSingleOrNull();
 
-  Future<List<LocalProgressData>> records(List<String> bookIds) async {
+  Future<List<LocalProgressData>> records(
+    List<String> bookIds, {
+    String scope = '',
+  }) async {
     if (bookIds.isEmpty) return const <LocalProgressData>[];
-    return (select(localProgress)..where((t) => t.bookId.isIn(bookIds))).get();
+    return (select(
+      localProgress,
+    )..where((t) => t.scope.equals(scope) & t.bookId.isIn(bookIds))).get();
   }
 
-  Future<List<PendingProgress>> pending() async {
+  Future<List<PendingProgress>> pending({String scope = ''}) async {
     final rows =
         await (select(localProgress)
-              ..where((t) => t.pendingSeq.isNotNull())
+              ..where((t) => t.scope.equals(scope) & t.pendingSeq.isNotNull())
               ..orderBy(<OrderClauseGenerator<LocalProgress>>[
                 (t) => OrderingTerm(expression: t.pendingSeq),
               ]))
@@ -154,16 +211,23 @@ class ProgressDatabase extends _$ProgressDatabase {
     ];
   }
 
-  Future<void> adoptRemote(String bookId, ReadProgress? remote) async {
-    final current = await record(bookId);
+  Future<void> adoptRemote(
+    String bookId,
+    ReadProgress? remote, {
+    String scope = '',
+  }) async {
+    final current = await record(bookId, scope: scope);
     if (current?.pendingSeq != null) return;
 
     if (remote == null) {
-      await (delete(localProgress)..where((t) => t.bookId.equals(bookId))).go();
+      await (delete(
+        localProgress,
+      )..where((t) => t.scope.equals(scope) & t.bookId.equals(bookId))).go();
       return;
     }
     await into(localProgress).insertOnConflictUpdate(
       LocalProgressCompanion.insert(
+        scope: Value<String>(scope),
         bookId: bookId,
         page: remote.page,
         completed: remote.completed,
@@ -173,13 +237,20 @@ class ProgressDatabase extends _$ProgressDatabase {
     );
   }
 
-  Future<void> forceAdopt(String bookId, ReadProgress? remote) async {
+  Future<void> forceAdopt(
+    String bookId,
+    ReadProgress? remote, {
+    String scope = '',
+  }) async {
     if (remote == null) {
-      await (delete(localProgress)..where((t) => t.bookId.equals(bookId))).go();
+      await (delete(
+        localProgress,
+      )..where((t) => t.scope.equals(scope) & t.bookId.equals(bookId))).go();
       return;
     }
     await into(localProgress).insertOnConflictUpdate(
       LocalProgressCompanion.insert(
+        scope: Value<String>(scope),
         bookId: bookId,
         page: remote.page,
         completed: remote.completed,
@@ -229,7 +300,6 @@ class ProgressDatabase extends _$ProgressDatabase {
     );
   }
 
-  /// 整份替换指定服务器的置顶系列（备份导入用，保持传入顺序：排前面的时间戳更新）。
   Future<void> replacePinnedSeries(
     String serverId,
     List<String> seriesIds,
@@ -252,9 +322,10 @@ class ProgressDatabase extends _$ProgressDatabase {
     });
   }
 
-  // ---- 阅读会话历史（HIS-01 / ARC-06）----
+  // ---- 阅读会话历史（HIS-01 / ARC-06 / ARC-07）----
 
   Future<int> addReadingSession({
+    String scope = '',
     required String bookId,
     required String seriesId,
     required String bookName,
@@ -267,6 +338,7 @@ class ProgressDatabase extends _$ProgressDatabase {
   }) {
     return into(readingSessions).insert(
       ReadingSessionsCompanion.insert(
+        scope: Value<String>(scope),
         bookId: bookId,
         seriesId: seriesId,
         bookName: Value<String>(bookName),
@@ -280,19 +352,37 @@ class ProgressDatabase extends _$ProgressDatabase {
     );
   }
 
-  Future<List<ReadingSession>> readingSessionList({int limit = 200}) {
-    return (select(readingSessions)
-          ..orderBy(<OrderClauseGenerator<ReadingSessions>>[
-            (ReadingSessions t) =>
-                OrderingTerm(expression: t.startedAt, mode: OrderingMode.desc),
-          ])
-          ..limit(limit))
-        .get();
+  /// 最近的会话；指定非空 [scope] 时仅返回当前服务器及旧版未标记 scope 的会话。
+  Future<List<ReadingSession>> readingSessionList({
+    String? scope,
+    int limit = 200,
+  }) {
+    final query = select(readingSessions);
+    if (scope != null && scope.isNotEmpty) {
+      query.where(
+        (ReadingSessions t) => t.scope.equals(scope) | t.scope.equals(''),
+      );
+    }
+    query
+      ..orderBy(<OrderClauseGenerator<ReadingSessions>>[
+        (ReadingSessions t) =>
+            OrderingTerm(expression: t.startedAt, mode: OrderingMode.desc),
+      ])
+      ..limit(limit);
+    return query.get();
   }
 
   Future<void> deleteReadingSession(int id) => (delete(
     readingSessions,
   )..where((ReadingSessions t) => t.id.equals(id))).go();
 
-  Future<void> clearReadingSessions() => delete(readingSessions).go();
+  Future<void> clearReadingSessions({String? scope}) {
+    final stmt = delete(readingSessions);
+    if (scope != null && scope.isNotEmpty) {
+      stmt.where(
+        (ReadingSessions t) => t.scope.equals(scope) | t.scope.equals(''),
+      );
+    }
+    return stmt.go();
+  }
 }

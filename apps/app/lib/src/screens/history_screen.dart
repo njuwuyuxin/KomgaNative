@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
+import 'package:komga_native/src/providers/pinned_series_provider.dart';
 import 'package:komga_native/src/providers/reading_history_provider.dart';
 import 'package:komga_native/src/widgets/cover_image.dart';
 import 'package:material_ui/material_ui.dart';
@@ -280,8 +281,25 @@ class _HistoryRow extends ConsumerWidget {
         icon: const Icon(Icons.close, size: AppSizes.iconSm),
         onPressed: () => onDelete(session.id),
       ),
-      onTap: () => context.push('/reader/${session.bookId}'),
+      onTap: () => _openSessionBook(context, ref, l10n),
     );
+  }
+
+  void _openSessionBook(
+    BuildContext context,
+    WidgetRef ref,
+    AppLocalizations l10n,
+  ) {
+    final activeScope = ref.read(activeServerKeyProvider);
+    if (session.scope.isNotEmpty &&
+        activeScope.isNotEmpty &&
+        session.scope != activeScope) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.historyDifferentServer(session.scope))),
+      );
+      return;
+    }
+    unawaited(context.push('/reader/${session.bookId}'));
   }
 
   static String _two(int value) => value.toString().padLeft(2, '0');
