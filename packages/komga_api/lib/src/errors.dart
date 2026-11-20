@@ -92,12 +92,13 @@ KomgaError mapDioException(DioException e) {
   switch (e.type) {
     case DioExceptionType.cancel:
       return const KomgaCancelledError();
+    case DioExceptionType.badCertificate:
+      return KomgaTlsError('TLS 握手失败：${e.message ?? '服务器证书不受信任'}', cause: e);
     case DioExceptionType.connectionTimeout:
     case DioExceptionType.sendTimeout:
     case DioExceptionType.receiveTimeout:
     case DioExceptionType.transformTimeout:
     case DioExceptionType.connectionError:
-    case DioExceptionType.badCertificate:
       return KomgaNetworkError('无法连接服务器：${e.message ?? e.type.name}', cause: e);
     case DioExceptionType.badResponse:
       final status = e.response?.statusCode ?? 0;

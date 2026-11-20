@@ -62,8 +62,14 @@ class ProgressSyncService {
         // Key 失效：保留 pending，但别继续打服务端。
         _authBlocked = true;
         return;
+      } on NotFoundFailure {
+        // 404（书已删除）：不可恢复，出队并继续冲洗后续书籍，绝不队头阻塞。
+        await _store.ack(item.target.bookId, item.seq);
+      } on BadRequestFailure {
+        // 400（参数越界等不可恢复错误）：出队并继续冲洗后续书籍，下次 GET 对账更新基准。
+        await _store.ack(item.target.bookId, item.seq);
       } on ShelfFailure {
-        // 网络/服务端错误：保留，等下次触发（翻页、进前台、刷新书架）。
+        // 网络/服务端/证书错误：保留，等下次触发（翻页、进前台、刷新书架）。
         return;
       }
     }

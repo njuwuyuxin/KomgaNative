@@ -96,5 +96,12 @@ void main() {
         isA<KomgaCancelledError>(),
       );
     });
+
+    test('badCertificate（无 HandshakeException cause）直接映射为 KomgaTlsError', () {
+      expect(
+        mapDioException(make(DioExceptionType.badCertificate)),
+        isA<KomgaTlsError>(),
+      );
+    });
   });
 }

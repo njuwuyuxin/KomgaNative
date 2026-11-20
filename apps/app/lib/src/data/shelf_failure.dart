@@ -97,6 +97,30 @@ class CertificateFailure extends ShelfFailure {
       );
 }
 
+/// 404：资源（书/系列/收藏集）在服务端已被删除，原样重试不会恢复。
+class NotFoundFailure extends ShelfFailure {
+  @override
+  ShelfFailureKind get kind => ShelfFailureKind.protocol;
+
+  const NotFoundFailure()
+    : super(
+        'Resource not found',
+        hint: 'This item may have been removed from the server.',
+      );
+}
+
+/// 400：请求参数被服务端拒绝（如页码越界），原样重放只会永久失败。
+class BadRequestFailure extends ShelfFailure {
+  @override
+  ShelfFailureKind get kind => ShelfFailureKind.protocol;
+
+  const BadRequestFailure()
+    : super(
+        'Request rejected by server',
+        hint: 'Refresh from the server and try again.',
+      );
+}
+
 /// 兜底：不该发生，但绝不让 UI 看到裸异常。
 class UnexpectedFailure extends ShelfFailure {
   @override
@@ -115,8 +139,7 @@ ShelfFailure shelfFailureOf(KomgaError error) => switch (error) {
   KomgaServerError() => const ServerFailure(),
   KomgaCancelledError() => const NetworkFailure(),
   KomgaTlsError() => const CertificateFailure(),
-  KomgaNotFoundError() ||
-  KomgaProtocolError() ||
-  KomgaBadRequestError() ||
-  KomgaHttpsRequiredError() => const ProtocolFailure(),
+  KomgaNotFoundError() => const NotFoundFailure(),
+  KomgaBadRequestError() => const BadRequestFailure(),
+  KomgaProtocolError() || KomgaHttpsRequiredError() => const ProtocolFailure(),
 };

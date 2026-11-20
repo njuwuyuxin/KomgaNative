@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/progress/progress_store.dart';
@@ -54,4 +56,58 @@ void main() {
     // 连不上 → 进度必须留在队列里，而不是被当成已提交丢掉。
     expect(await store.pending(), hasLength(1));
   });
+
+  for (final badStatus in <int>[404, 400]) {
+    test('队首书籍返回 $badStatus 时直接出队，不阻塞第 2 本书（204）正常上传', () async {
+      final receivedPaths = <String>[];
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(server.close);
+      server.listen((HttpRequest req) async {
+        receivedPaths.add(req.uri.path);
+        if (req.uri.path.endsWith('/b-dead/read-progress')) {
+          req.response.statusCode = badStatus;
+        } else {
+          req.response.statusCode = 204;
+        }
+        await req.response.close();
+      });
+
+      final store = InMemoryProgressStore();
+      await store.enqueue(
+        const ProgressTarget(bookId: 'b-dead', page: 99, completed: false),
+      );
+      await store.enqueue(
+        const ProgressTarget(bookId: 'b-good', page: 5, completed: false),
+      );
+
+      final container = ProviderContainer(
+        overrides: <Override>[
+          serverStoreProvider.overrideWithValue(
+            InMemoryServerStore(
+              StoredServer(
+                address: ServerAddress.parse('http://127.0.0.1:${server.port}'),
+                apiKey: 'KEY',
+                accountEmail: 'me@example.com',
+              ),
+            ),
+          ),
+          progressStoreProvider.overrideWithValue(store),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      container.read(sessionProvider);
+      for (var i = 0; i < 5; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+
+      await container.read(progressSyncProvider).flush();
+
+      expect(receivedPaths, <String>[
+        '/api/v1/books/b-dead/read-progress',
+        '/api/v1/books/b-good/read-progress',
+      ]);
+      expect(await store.pending(), isEmpty, reason: '坏死项与成功项都已出队，不死循环');
+    });
+  }
 }
