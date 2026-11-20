@@ -163,7 +163,7 @@
 | 层 | 内容 | 生命周期 |
 | --- | --- | --- |
 | `readerPageImageProvider` | 当前屏的原始字节（`AsyncValue`） | autoDispose：翻走即释放 |
-| `KomgaReaderRepository._pages`（`ByteLruCache`） | 最近 16 页的原始字节 | 会话内，LRU |
+| `KomgaReaderRepository._pages`（`ByteLruCache`） | 最近 64 页的原始字节（同页并发请求自动合并去重，保证单一 `Uint8List` 引用） | 会话内，LRU |
 | `PaintingBinding.imageCache` | 解码后的位图（`MemoryImage`） | Flutter 引擎管，默认 100 MB |
 | `DriftHttpCache` | 磁盘上的响应体 | 只在请求**失败**时读（`KomgaSession._cachedBytes`） |
 
@@ -189,7 +189,7 @@
 - 计划按**屏**算（`preloadPlan`），不是 `page ± 1`。双页模式一屏两页，按页码加减会
   一直漏掉每屏的第二页，表现是"翻一屏闪一次、翻一页不闪"——很难查，所以钉了单测；
 - 往前 **4 屏**、往后 **2 屏**抓字节（单页约 4 页 / 双页约 8 页），
-  最近 **2 屏**额外 `precacheImage` 预解码；
+  前后各 **2 屏**额外 `precacheImage` 预解码（兼顾连续正翻与连续回翻）；
   按 1 页/秒的阅读速度算，4 屏就是 4 秒以上的缓冲——阅读快的人不会翻两下就撞上转圈；
 - 触点在 `build` 里（`_schedulePreload`），只在 **页码或模式变化**时排一次，下一帧执行：
   保证当前页自己的请求先出去（弱网下顺序就是优先级），也避免每帧重复排；
@@ -259,10 +259,11 @@
 | 单页 | A 那页 | 白纸 + 透印 | B 那页 |
 | 双页 | A 掀起侧的半页 | B 落地侧的那页（沿书脊镜像采样） | B 掀起侧 + A 落地侧 |
 
-着色器里纸背是 `uBack` 在镜像点 `(2·spineX − q.x, q.y)` 处的像素（`uHasBack = 1`），
-纸背那页落地后的矩形是 `uBackRect`——两页宽度不同也能对上。
+着色器里纸背是 `uBack` 在镜像点 `(2·spineX − q.x, q.y)` 处的像素（`uHasBack = 0..1`），
+纸背那页落地后的裁剪矩形是 `uBackRect`、完整纹理矩形是 `uBackUvRect`——两页宽度不同或双页模式下遇到
+跨页宽图（`wideSolo` 按中线对半切分）都能严丝合缝地按书脊铰接卷曲，不会在宽页前后退化成平移。
 
-单页↔双页交界（封面单独一屏 → 第一个跨页）页数不配对，这一下仍然走平移。
+单独居中的窄页↔双页交界（如封面单独一屏 → 第一个跨页）屏宽本身变化，这一下走平移。
 
 ### 手指运动（`curl_motion.dart`）
 
@@ -307,20 +308,19 @@
 起手、中段、收尾、往回翻中段、书脊在左的镜像；双页（平板横屏，纸背用黄底网格以便区分）：
 掀起、越过书脊、即将落地、书脊在左的镜像。
 
-### 位图（`CurlSheets`，`widgets/page_curl.dart`）
+### 位图（`CurlSheets`，`widgets/curl_sheets.dart`）
 
-- 空闲时**并发**解码**当前屏 + 前后相邻屏**（单页最多 3 张、双页最多 6 张），
-  直接从 `spread` / `nextSpread` / `previousSpread` 取页集，不依赖视口或 `_planFor`
-  （封面/宽页等 1↔2 边界也会提前把下一屏解好）；单页解码慢或失败不阻塞同批其余页；
-  翻过去后仍然需要的位图直接复用，不重新解码；
-- 换掉的位图延迟一帧释放；重复预加载合并同页的在途解码，不替换正在借用的位图。
-  切出卷页模式或换书时调用 `clear()` 立即作废在途解码并延后释放；切回卷页模式时
-  `didUpdateWidget` 立即重新排解码，不需退出重进；
-- 翻动开始时定下"这次卷不卷"（`_plan`，判定用 `_CurlPlan.requiredPages`）：
-  **只要求当前被掀起来的那一页/半页就绪**（单页看 `sheetPage`，双页往前翻看当前屏掀起侧
-  `sheetPage`、往回翻看当前屏落地侧 `backPage`）；途中位图到了会自动在下一帧显示，
-  不切换动画模式。相邻屏还没加载完时，底层由 `ReaderPage` 露出加载态，着色器缺失的那一面
-  暂用白纸（`uHasSheet` / `uHasBack`），落地帧 `r = 0` 仍按 `uHinged` 正常绘制。
+- **与 Flutter `ImageCache` 零延迟打通**：
+  - 起手瞬间（`_begin`）通过 `trySyncImageFromCache` 检查所需页的 `MemoryImage(bytes)` 是否已在
+    `PaintingBinding.instance.imageCache`（含当前屏幕已显示的 live 图与 `ReaderPreloader` 预解码图）就绪，
+    命中则**同一帧同步 `clone()` 借出**，共享底层 GPU 纹理（零额外显存、零二次解码等待），彻底消除"底图已显示但退化成平移 / 纸背纯白"的双缓存脱节；
+  - 异步解码统一走 `decodeThroughImageCache`，与 `ReaderPage` / `ReaderPreloader` 合并在途解码并双向暖缓存；
+- **历史页 LRU 保留与翻动保护**：
+  - `CurlSheets` 默认按 LRU 保留最近 **16 页**（双页约 8 屏）句柄，配合仓库 **64 页**字节 LRU（防底栏缩略图滑条挤出刚读完的页）与 `ReaderPreloader` 往后 **2 屏**预解码，连续往后翻多屏再连续往回翻时全程 0 延迟命中卷页；
+  - 翻动进行中不中断后台解码（当前卷页涉及的页通过 `pinned` 保护不被淘汰）；
+- **冷页背面视觉一致性**：
+  - 弱网下相邻屏若在起手时确实尚未下载完，深色模式采用贴合阅读器底色的哑光深灰纸面而非刺眼纯白；
+  - 若在卷动途中下载解码完成，通过 `onImageReady` 驱动 `uHasBack` / `uHasSheet` 在 160ms 内从 `0 → 1` 平滑渐显，落地无突兀跳变。
 
 **冷页交接不能只看字节缓存**：卷页的 `ui.Image` 和 Flutter `Image.memory` 的解码缓存
 是两条独立路径。纸背已在着色器里显示，不代表落地后新挂载的 `Image.memory` 已有首帧；

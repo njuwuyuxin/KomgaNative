@@ -1,8 +1,11 @@
 import 'dart:ui' as ui;
 
 import 'package:komga_native/src/data/reader_prefs.dart';
+import 'package:komga_native/src/widgets/curl_sheets.dart';
 import 'package:komga_reader_engine/komga_reader_engine.dart';
 import 'package:material_ui/material_ui.dart';
+
+export 'package:komga_native/src/widgets/curl_sheets.dart';
 
 /// 翻页动画的绘制层。
 ///
@@ -94,28 +97,41 @@ class PageCurlPainter extends CustomPainter {
   const PageCurlPainter({
     this.sheet,
     required this.sheetRect,
+    Rect? sheetUvRect,
     required this.frame,
     this.back,
     this.backRect = Rect.zero,
+    Rect? backUvRect,
     this.spineX = 0,
     bool? hinged,
-  }) : hinged = hinged ?? back != null,
+    this.sheetOpacity = 1,
+    this.backOpacity = 1,
+    this.paperColor,
+  }) : sheetUvRect = sheetUvRect ?? sheetRect,
+       backUvRect = backUvRect ?? backRect,
+       hinged = hinged ?? back != null,
        assert(sheet != null || back != null);
 
-  /// 纸面的真实页面；双页往回翻且上一屏未就绪时可为 null（画成白纸）。
+  /// 纸面的真实页面；双页往回翻且上一屏未就绪时可为 null。
   final ui.Image? sheet;
 
-  /// 纸面（页面内容）在画布上的矩形。
+  /// 被卷起纸面在画布上的几何矩形。
   final Rect sheetRect;
+
+  /// [sheet] 完整纹理对应的画布矩形（宽页对半裁切时为整张宽页矩形）。
+  final Rect sheetUvRect;
 
   /// 纸面坐标系下的几何（原点是 [sheetRect] 的左上角）。
   final CurlFrame frame;
 
-  /// 纸背的真实页面（双页模式）；null 时纸背是白纸。
+  /// 纸背的真实页面（双页模式）；null 时用纸张底色。
   final ui.Image? back;
 
-  /// [back] 落地后在画布上的矩形。
+  /// [back] 落地后在画布上的裁剪矩形。
   final Rect backRect;
+
+  /// [back] 完整纹理对应的画布矩形（宽页对半裁切时为整张宽页矩形）。
+  final Rect backUvRect;
 
   /// 书脊 x（画布坐标）：纸背沿它镜像。
   final double spineX;
@@ -123,14 +139,29 @@ class PageCurlPainter extends CustomPainter {
   /// true = 双页铰接书脊：落地帧 `radius == 0` 时仍须绘制平压的纸背。
   final bool hinged;
 
+  /// 纸面图像混合权重（0..1）；冷页在卷动途中加载完成时用于平滑淡入。
+  final double sheetOpacity;
+
+  /// 纸背图像混合权重（0..1）；冷页在卷动途中加载完成时用于平滑淡入。
+  final double backOpacity;
+
+  /// 缺省纸张底色；null 时取默认暖白纸色 `(0.975, 0.970, 0.955)`。
+  final Color? paperColor;
+
   @override
   void paint(Canvas canvas, Size size) {
     final program = PageCurlProgram.program;
     final fallback = sheet ?? back;
     if (program == null || fallback == null) return;
+    final effectiveSheet = sheet == null ? 0.0 : sheetOpacity.clamp(0.0, 1.0);
+    final effectiveBack = back == null ? 0.0 : backOpacity.clamp(0.0, 1.0);
+    final paperR = paperColor == null ? 0.975 : paperColor!.r;
+    final paperG = paperColor == null ? 0.970 : paperColor!.g;
+    final paperB = paperColor == null ? 0.955 : paperColor!.b;
+
     final shader = program.fragmentShader();
     try {
-      // 顺序必须与 .frag 里的 uniform 声明一致。
+      // 顺序必须与 .frag 里的 uniform 声明严格一致（0..29）。
       shader
         ..setFloat(0, size.width)
         ..setFloat(1, size.height)
@@ -138,20 +169,31 @@ class PageCurlPainter extends CustomPainter {
         ..setFloat(3, sheetRect.top)
         ..setFloat(4, sheetRect.width)
         ..setFloat(5, sheetRect.height)
-        ..setFloat(6, frame.axisX + sheetRect.left)
-        ..setFloat(7, frame.axisY + sheetRect.top)
-        ..setFloat(8, frame.dirX)
-        ..setFloat(9, frame.dirY)
-        ..setFloat(10, frame.radius)
-        ..setFloat(11, backRect.left)
-        ..setFloat(12, backRect.top)
-        ..setFloat(13, backRect.width)
-        ..setFloat(14, backRect.height)
-        ..setFloat(15, spineX)
-        ..setFloat(16, back == null ? 0 : 1)
-        ..setFloat(17, sheet == null ? 0 : 1)
-        ..setFloat(18, hinged ? 1 : 0)
-        // 采样器必须绑定；缺省面绑另一张兜底图，着色器按 uHasSheet/uHasBack 画白纸。
+        ..setFloat(6, sheetUvRect.left)
+        ..setFloat(7, sheetUvRect.top)
+        ..setFloat(8, sheetUvRect.width)
+        ..setFloat(9, sheetUvRect.height)
+        ..setFloat(10, frame.axisX + sheetRect.left)
+        ..setFloat(11, frame.axisY + sheetRect.top)
+        ..setFloat(12, frame.dirX)
+        ..setFloat(13, frame.dirY)
+        ..setFloat(14, frame.radius)
+        ..setFloat(15, backRect.left)
+        ..setFloat(16, backRect.top)
+        ..setFloat(17, backRect.width)
+        ..setFloat(18, backRect.height)
+        ..setFloat(19, backUvRect.left)
+        ..setFloat(20, backUvRect.top)
+        ..setFloat(21, backUvRect.width)
+        ..setFloat(22, backUvRect.height)
+        ..setFloat(23, spineX)
+        ..setFloat(24, effectiveBack)
+        ..setFloat(25, effectiveSheet)
+        ..setFloat(26, hinged ? 1 : 0)
+        ..setFloat(27, paperR)
+        ..setFloat(28, paperG)
+        ..setFloat(29, paperB)
+        // 采样器必须绑定；缺省面绑另一张兜底图，着色器按权重混合纸张底色。
         ..setImageSampler(0, sheet ?? fallback)
         ..setImageSampler(1, back ?? fallback);
 
@@ -171,119 +213,17 @@ class PageCurlPainter extends CustomPainter {
       oldDelegate.sheet != sheet ||
       oldDelegate.back != back ||
       oldDelegate.sheetRect != sheetRect ||
+      oldDelegate.sheetUvRect != sheetUvRect ||
       oldDelegate.backRect != backRect ||
+      oldDelegate.backUvRect != backUvRect ||
       oldDelegate.spineX != spineX ||
       oldDelegate.hinged != hinged ||
+      oldDelegate.sheetOpacity != sheetOpacity ||
+      oldDelegate.backOpacity != backOpacity ||
+      oldDelegate.paperColor != paperColor ||
       oldDelegate.frame.axisX != frame.axisX ||
       oldDelegate.frame.axisY != frame.axisY ||
       oldDelegate.frame.dirX != frame.dirX ||
       oldDelegate.frame.dirY != frame.dirY ||
       oldDelegate.frame.radius != frame.radius;
-}
-
-/// 卷页要用的位图，按页（0 基）索引。
-///
-/// 单页：当前页（往前翻卷走它）、上一页（往回翻把它卷回来）；
-/// 双页：当前屏 + 前后相邻屏（最多 6 张）。
-/// 页图字节本来就在仓库 LRU 里，这里只负责解码与释放；翻一页后
-/// 仍然需要的位图直接复用，不重新解码。
-/// 换掉的位图可能还被上一帧的 raster 线程引用着，立刻 `dispose()` 有时会
-/// 闪一帧空白，所以统一等下一帧结束再释放。
-class CurlSheets {
-  final Map<int, ui.Image> _images = <int, ui.Image>{};
-  final List<ui.Image> _retired = <ui.Image>[];
-  final Map<int, Future<void>> _pending = <int, Future<void>>{};
-  Set<int> _wanted = <int>{};
-  bool Function() _stillWanted = () => false;
-  int _generation = 0;
-  bool _disposed = false;
-
-  /// 第 [page] 页的位图；还没解码好时为 null。
-  ui.Image? imageFor(int page) => _images[page];
-
-  /// 只保留 [pages]，缺的并发解码；[stillWanted] 为 false 说明已不再需要，丢弃结果。
-  ///
-  /// 并发而非串行：某一张慢页在等网络时，不能阻塞当前屏或另一方向已就绪的页。
-  Future<void> ensure({
-    required Set<int> pages,
-    required Future<ui.Image?> Function(int page) decode,
-    required bool Function() stillWanted,
-  }) async {
-    if (_disposed || !stillWanted()) return;
-    _wanted = Set<int>.of(pages);
-    _stillWanted = stillWanted;
-    for (final page in _images.keys.toList()) {
-      if (!_wanted.contains(page)) _retire(_images.remove(page));
-    }
-    final generation = _generation;
-    final tasks = <Future<void>>[];
-    for (final page in pages) {
-      if (_images.containsKey(page)) continue;
-      // 动画完成和 didUpdateWidget 都会排预加载；合并同页解码，避免替换
-      // 正被 ReaderPage 借用的位图（或把刚解好的那一张释放掉）。
-      tasks.add(_pending[page] ??= _decodeAndAdopt(page, generation, decode));
-    }
-    if (tasks.isNotEmpty) {
-      await Future.wait<void>(tasks);
-    }
-  }
-
-  /// 清空所有缓存并作废在途解码（切出卷页效果或换书时调用）。
-  void clear() {
-    _generation++;
-    _wanted.clear();
-    _pending.clear();
-    for (final page in _images.keys.toList()) {
-      _retire(_images.remove(page));
-    }
-  }
-
-  Future<void> _decodeAndAdopt(
-    int page,
-    int generation,
-    Future<ui.Image?> Function(int page) decode,
-  ) async {
-    try {
-      final image = await decode(page);
-      if (image == null) return;
-      if (_disposed ||
-          generation != _generation ||
-          !_wanted.contains(page) ||
-          !_stillWanted()) {
-        image.dispose();
-        return;
-      }
-      _retire(_images[page]);
-      _images[page] = image;
-    } finally {
-      if (generation == _generation) {
-        _pending.remove(page)?.ignore();
-      }
-    }
-  }
-
-  void _retire(ui.Image? image) {
-    if (image == null) return;
-    _retired.add(image);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _flushRetired());
-  }
-
-  void _flushRetired() {
-    for (final image in _retired) {
-      image.dispose();
-    }
-    _retired.clear();
-  }
-
-  void dispose() {
-    _disposed = true;
-    _generation++;
-    _wanted.clear();
-    _pending.clear();
-    for (final image in _images.values) {
-      image.dispose();
-    }
-    _images.clear();
-    _flushRetired();
-  }
 }

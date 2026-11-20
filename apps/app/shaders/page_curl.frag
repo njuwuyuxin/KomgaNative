@@ -24,23 +24,25 @@
 // 只有一个出口：带 sampler 的 main 里多个 return 在 Windows 上可能编不过
 // （flutter issue 190809）。
 
-uniform vec2 uSize;     // 画布尺寸（逻辑像素）
-uniform vec4 uRect;     // 纸面矩形：x, y, w, h（画布坐标）
-uniform vec2 uAxis;     // 圆柱轴线经过的点（画布坐标）
-uniform vec2 uDir;      // u：单位向量，从轴线指向被卷起的一侧
-uniform float uRadius;  // 圆柱半径（px），可以为 0（折痕）
-uniform vec4 uBackRect; // 纸背那页落地后的矩形（画布坐标），uHasBack = 0 时不用
-uniform float uSpineX;  // 书脊 x（画布坐标），纸背沿它镜像
-uniform float uHasBack; // 1 = 纸背是真实页面（双页），0 = 白纸
-uniform float uHasSheet; // 1 = 纸面是真实页面，0 = 白纸（双页往回翻且上一屏未就绪）
-uniform float uHinged;  // 1 = 双页铰接书脊（落地帧 R=0 仍须绘制平压背面），0 = 单页
+uniform vec2 uSize;        // 画布尺寸（逻辑像素）
+uniform vec4 uRect;        // 被卷纸面的几何矩形：x, y, w, h（画布坐标）
+uniform vec4 uSheetUvRect; // 纸面完整纹理矩形（宽页对半裁切时为整张宽页矩形）
+uniform vec2 uAxis;        // 圆柱轴线经过的点（画布坐标）
+uniform vec2 uDir;         // u：单位向量，从轴线指向被卷起的一侧
+uniform float uRadius;     // 圆柱半径（px），可以为 0（折痕）
+uniform vec4 uBackRect;    // 纸背落地后的裁剪矩形（画布坐标），uHasBack = 0 时不用
+uniform vec4 uBackUvRect;  // 纸背完整纹理矩形（宽页对半裁切时为整张宽页矩形）
+uniform float uSpineX;     // 书脊 x（画布坐标），纸背沿它镜像
+uniform float uHasBack;    // 0..1：纸背真实页面混合权重（0 = 纸底色，1 = 真实页图，途中加载完平滑渐显）
+uniform float uHasSheet;   // 0..1：纸面真实页面混合权重（0 = 纸底色，1 = 真实页图）
+uniform float uHinged;     // 1 = 双页铰接书脊（落地帧 R=0 仍须绘制平压背面），0 = 单页
+uniform vec3 uPaper;       // 缺省纸张底色（默认暖白纸色；深色模式冷页用深色哑光纸面防刺眼闪白）
 uniform sampler2D uSheet;
 uniform sampler2D uBack;
 
 out vec4 fragColor;
 
 const float kPi = 3.14159265;
-const vec3 kPaper = vec3(0.975, 0.970, 0.955);
 
 // 纸背透出来的墨迹浓度：真实纸张会隐约透印，完全纯白反而像塑料片。
 const float kShowThrough = 0.07;
@@ -69,17 +71,21 @@ float coverage(vec2 q) {
 }
 
 vec3 sheetAt(vec2 q) {
-    vec2 uv = clamp((q - uRect.xy) / uRect.zw, 0.0, 1.0);
-    return uHasSheet > 0.5 ? texture(uSheet, uv).rgb : kPaper;
+    vec2 uv = clamp((q - uSheetUvRect.xy) / uSheetUvRect.zw, 0.0, 1.0);
+    vec3 page = texture(uSheet, uv).rgb;
+    return uHasSheet >= 0.999
+        ? page
+        : (uHasSheet <= 0.001 ? uPaper : mix(uPaper, page, uHasSheet));
 }
 
-// 纸背：双页是镜像过去的真实页面（页面外留白纸），单页是白纸 + 很淡的透印。
+// 纸背：双页是镜像过去的真实页面（页面外或冷页渐显前用纸底色），单页是纸底色 + 很淡的透印。
 vec3 backAt(vec2 q) {
-    vec3 blank = mix(kPaper, sheetAt(q), kShowThrough);
+    vec3 blank = mix(uPaper, sheetAt(q), kShowThrough);
     vec2 m = vec2(2.0 * uSpineX - q.x, q.y);
-    vec2 uv = (m - uBackRect.xy) / max(uBackRect.zw, vec2(1.0));
-    vec2 inside = step(vec2(0.0), uv) * step(uv, vec2(1.0));
-    vec3 page = texture(uBack, clamp(uv, 0.0, 1.0)).rgb;
+    vec2 clipUv = (m - uBackRect.xy) / max(uBackRect.zw, vec2(1.0));
+    vec2 inside = step(vec2(0.0), clipUv) * step(clipUv, vec2(1.0));
+    vec2 texUv = clamp((m - uBackUvRect.xy) / max(uBackUvRect.zw, vec2(1.0)), 0.0, 1.0);
+    vec3 page = texture(uBack, texUv).rgb;
     float use = uHasBack * inside.x * inside.y;
     return mix(blank, page, use);
 }

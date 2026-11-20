@@ -25,11 +25,14 @@ class ReaderPreloader {
   /// 往后预取几屏：回翻也常见，但优先级低于往前。
   static const int behindScreens = 2;
 
-  /// 预解码几屏。
+  /// 往前预解码几屏。
   ///
   /// 解码结果占的是 `ImageCache` 的 100 MB 预算（一张 1500×2200 约 13 MB），
   /// 所以比"抓字节"浅一档：只保证最近要看的这几屏翻过去首帧就有像素。
   static const int decodeAheadScreens = 2;
+
+  /// 往后预解码几屏：保证连续回翻时 `ImageCache` 与卷页同步桥接始终热命中。
+  static const int decodeBehindScreens = 2;
 
   /// 预取时最多同时飞几张页图。
   ///
@@ -92,13 +95,13 @@ class ReaderPreloader {
       ahead: aheadScreens,
       behind: behindScreens,
     );
-    // 位图：解码占的是 ImageCache 的预算，比抓字节浅一档。
+    // 位图：前后各预解码 2 屏，往前翻和连续往回翻都能在首帧同步命中 `ImageCache`。
     final decodePlan = preloadPlan(
       pageIndex: page - 1,
       pageCount: total,
       spreads: spreads,
       ahead: decodeAheadScreens,
-      behind: 0,
+      behind: decodeBehindScreens,
     ).toSet();
 
     // 整份计划重新排队：还没发的旧计划作废（分屏/位置可能已经变了），

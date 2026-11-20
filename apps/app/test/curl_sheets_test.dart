@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter_test/flutter_test.dart';
@@ -14,6 +15,18 @@ void main() {
         final pixels = await picture.toImage(2, 2);
         picture.dispose();
         return pixels;
+      }))!;
+
+  Future<Uint8List> pngBytes(WidgetTester tester) async =>
+      (await tester.runAsync(() async {
+        final recorder = ui.PictureRecorder();
+        Canvas(recorder).drawColor(const Color(0xFF4080E0), BlendMode.src);
+        final picture = recorder.endRecording();
+        final pixels = await picture.toImage(4, 4);
+        picture.dispose();
+        final data = await pixels.toByteData(format: ui.ImageByteFormat.png);
+        pixels.dispose();
+        return data!.buffer.asUint8List();
       }))!;
 
   testWidgets('重复预加载同一页合并解码，不替换已借出的位图', (tester) async {
@@ -50,9 +63,9 @@ void main() {
     expect(sheets.imageFor(0), same(pixels));
   });
 
-  testWidgets('翻走后当前页位图保留，离开的页延后一帧释放', (tester) async {
+  testWidgets('maxRetained=0 时只保留当前页，离开的页延后一帧释放', (tester) async {
     await tester.pumpWidget(const SizedBox.shrink());
-    final sheets = CurlSheets();
+    final sheets = CurlSheets(maxRetained: 0);
     addTearDown(sheets.dispose);
     final a = await image(tester);
     final b = await image(tester);
@@ -73,6 +86,47 @@ void main() {
     await tester.pump();
     expect(a.debugDisposed, isTrue);
     expect(b.debugDisposed, isFalse);
+  });
+
+  testWidgets('默认 LRU 保留已读历史页供回翻复用，超上限只淘汰最旧非保护页', (tester) async {
+    await tester.pumpWidget(const SizedBox.shrink());
+    final sheets = CurlSheets(maxRetained: 3);
+    addTearDown(sheets.dispose);
+    final p0 = await image(tester);
+    final p1 = await image(tester);
+    final p2 = await image(tester);
+    final p3 = await image(tester);
+
+    await sheets.ensure(
+      pages: <int>{0, 1},
+      decode: (page) async => page == 0 ? p0 : p1,
+      stillWanted: () => true,
+    );
+    await sheets.ensure(
+      pages: <int>{2},
+      decode: (page) async => p2,
+      stillWanted: () => true,
+    );
+    // 仍在容量 3 内：之前看过的 0、1 全保留，回翻零延迟。
+    expect(sheets.imageFor(0), same(p0));
+    expect(sheets.imageFor(1), same(p1));
+    expect(sheets.imageFor(2), same(p2));
+
+    // 加入第 4 张且把 0 设为 pinned：0 被保护不淘汰，最旧的非保护页 1 被淘汰。
+    await sheets.ensure(
+      pages: <int>{3},
+      pinned: <int>{0},
+      decode: (page) async => p3,
+      stillWanted: () => true,
+    );
+    expect(sheets.imageFor(0), same(p0));
+    expect(sheets.imageFor(1), isNull);
+    expect(sheets.imageFor(2), same(p2));
+    expect(sheets.imageFor(3), same(p3));
+    expect(p1.debugDisposed, isFalse);
+    tester.binding.scheduleFrame();
+    await tester.pump();
+    expect(p1.debugDisposed, isTrue);
   });
 
   testWidgets('过期回调不清掉新屏位图，过期解码结果也不进入缓存', (tester) async {
@@ -132,7 +186,6 @@ void main() {
       decode: (page) => page == 0 ? slow.future : Future<ui.Image?>.value(fast),
       stillWanted: () => true,
     );
-    // 给微任务跑完的机会：page 0 还没回来，但 page 1 必须已经就绪。
     await tester.runAsync(() => Future<void>.delayed(Duration.zero));
     expect(sheets.imageFor(0), isNull);
     expect(sheets.imageFor(1), same(fast));
@@ -167,7 +220,6 @@ void main() {
     expect(sheets.imageFor(0), isNull);
     expect(existing.debugDisposed, isFalse);
 
-    // clear 后同页号（如换书）立即发起的新解码不会被旧 pending 卡住。
     await sheets.ensure(
       pages: <int>{1},
       decode: (page) async => fresh,
@@ -183,5 +235,37 @@ void main() {
     tester.binding.scheduleFrame();
     await tester.pump();
     expect(existing.debugDisposed, isTrue);
+  });
+
+  testWidgets('ImageCache 同步桥接：已解码在 ImageCache 中的页零延迟借出且互不影响释放', (
+    tester,
+  ) async {
+    final bytes = await pngBytes(tester);
+    PaintingBinding.instance.imageCache.clear();
+    PaintingBinding.instance.imageCache.clearLiveImages();
+
+    // 未进 ImageCache 前同步查询无副作用地返回 null。
+    expect(trySyncImageFromCache(bytes), isNull);
+
+    // 经 decodeThroughImageCache 解码一次后，ImageCache 已被同步暖热。
+    final decoded = await tester.runAsync(() => decodeThroughImageCache(bytes));
+    expect(decoded, isNotNull);
+    expect(
+      PaintingBinding.instance.imageCache.containsKey(MemoryImage(bytes)),
+      isTrue,
+    );
+
+    // 再次同步取用：零异步等待立即返回独立 clone 句柄。
+    final borrowed = trySyncImageFromCache(bytes);
+    expect(borrowed, isNotNull);
+    expect(borrowed!.width, 4);
+
+    // 清空 ImageCache 不会把卷页侧克隆出的句柄作废；释放克隆句柄也不影响另一份。
+    PaintingBinding.instance.imageCache.clear();
+    expect(borrowed.debugDisposed, isFalse);
+    decoded!.dispose();
+    expect(borrowed.debugDisposed, isFalse);
+    borrowed.dispose();
+    expect(borrowed.debugDisposed, isTrue);
   });
 }

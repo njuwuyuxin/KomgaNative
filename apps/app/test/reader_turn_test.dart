@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
+import 'package:komga_native/src/widgets/page_curl.dart';
 import 'package:komga_native/src/widgets/reader_paged_view.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -392,6 +393,314 @@ void main() {
     expect(state.debugCurling, isTrue, reason: '从平移切回卷页后，第一次翻页就必须生效');
     expect(state.debugHinged, isTrue);
     expect(find.byKey(const Key('reader-curl-layer')), findsOneWidget);
+
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(find.text('4–5 / 6'), findsOneWidget);
+  });
+
+  testWidgets('双页模式：底图已在 ImageCache 显示但卷页缓存尚空时，零延迟同步借出走卷页且背面有图', (
+    WidgetTester tester,
+  ) async {
+    final repository = FakeReaderRepository(
+      pageCount: 6,
+      pageNames: const <String>['p1', 'p2', 'p3'],
+    );
+    await pumpReader(
+      tester,
+      repository: repository,
+      book: Book(
+        id: 'b1',
+        seriesId: 's1',
+        name: 'Vol. 1',
+        number: '1',
+        pagesCount: 6,
+        readProgress: ReadProgress(
+          page: 2,
+          completed: false,
+          lastModified: DateTime.utc(2026, 1, 1),
+        ),
+      ),
+      direction: ReadingDirection.rightToLeft,
+      initialPrefs: const ReaderPrefs(
+        global: ReaderConfig(
+          mode: ReaderModeChoice.double,
+          // 先以平移模式进入：CurlSheets 完全为空，只有 ImageCache 有已解码图。
+          pageTurn: ReaderPageTurnChoice.slide,
+        ),
+      ),
+    );
+    expect(find.text('2–3 / 6'), findsOneWidget);
+    // 让屏幕上和预加载器的 MemoryImage 解码进 Flutter ImageCache。
+    await tester.runAsync(() async {
+      await PageCurlProgram.ensureLoaded();
+      for (var p = 1; p <= 6; p++) {
+        final bytes = await repository.pageImage('b1', p);
+        final decoded = await decodeThroughImageCache(bytes);
+        decoded?.dispose();
+      }
+    });
+    await tester.pump();
+
+    // 切到卷页后**不给任何 runAsync 异步时间**立刻起手拖动：必须同步从 ImageCache 借图卷页！
+    await pickOption(tester, 'reader-turn-curl');
+    final state = tester.state<ReaderPagedViewState>(
+      find.byType(ReaderPagedView),
+    );
+    final rect = tester.getRect(find.byKey(const Key('reader-tap-layer')));
+    final gesture = await tester.startGesture(
+      rect.centerLeft + const Offset(40, 0),
+    );
+    await gesture.moveBy(Offset(rect.width * 0.5, 0));
+    await tester.pump();
+
+    expect(state.debugCurling, isTrue, reason: '底图已在 ImageCache 就绪，不得退化成平移');
+    expect(state.debugHinged, isTrue);
+    final curlPaint = tester.widget<CustomPaint>(
+      find.byKey(const Key('reader-curl-layer')),
+    );
+    final painter = curlPaint.painter! as PageCurlPainter;
+    expect(painter.sheet, isNotNull);
+    expect(painter.back, isNotNull, reason: '下一屏已在 ImageCache 中，纸背不得是纯白');
+    expect(painter.backOpacity, 1.0);
+
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(find.text('4–5 / 6'), findsOneWidget);
+  });
+
+  testWidgets('双页模式：连续往后翻多屏再连续往回翻，已看过的页面全程保持铰接卷页', (WidgetTester tester) async {
+    final repository = FakeReaderRepository(pageCount: 14);
+    await pumpReader(
+      tester,
+      repository: repository,
+      book: Book(
+        id: 'b1',
+        seriesId: 's1',
+        name: 'Vol. 1',
+        number: '1',
+        pagesCount: 14,
+        readProgress: ReadProgress(
+          page: 2,
+          completed: false,
+          lastModified: DateTime.utc(2026, 1, 1),
+        ),
+      ),
+      direction: ReadingDirection.rightToLeft,
+      initialPrefs: const ReaderPrefs(
+        global: ReaderConfig(mode: ReaderModeChoice.double),
+      ),
+    );
+    await tester.runAsync(() async {
+      await PageCurlProgram.ensureLoaded();
+      for (var p = 1; p <= 14; p++) {
+        final bytes = await repository.pageImage('b1', p);
+        final decoded = await decodeThroughImageCache(bytes);
+        decoded?.dispose();
+      }
+    });
+    await tester.pump();
+
+    final state = tester.state<ReaderPagedViewState>(
+      find.byType(ReaderPagedView),
+    );
+    // 连续往后翻 5 屏：2–3 → 4–5 → 6–7 → 8–9 → 10–11 → 12–13。
+    for (var step = 0; step < 5; step++) {
+      state.turn(1);
+      await tester.pump();
+      expect(state.debugCurling, isTrue, reason: '第 ${step + 1} 次往前翻必须走卷页');
+      expect(state.debugHinged, isTrue);
+      await tester.pump(const Duration(milliseconds: 500));
+    }
+    expect(find.text('12–13 / 14'), findsOneWidget);
+
+    // 紧接着不等待异步解码，连续往回翻 5 屏回到 2–3：每一屏都已读过，绝不能退化成平移！
+    for (var step = 0; step < 5; step++) {
+      state.turn(-1);
+      await tester.pump();
+      expect(
+        state.debugCurling,
+        isTrue,
+        reason: '第 ${step + 1} 次往回翻已读页面必须走卷页，不能退化成平移',
+      );
+      expect(state.debugHinged, isTrue);
+      final curlPaint = tester.widget<CustomPaint>(
+        find.byKey(const Key('reader-curl-layer')),
+      );
+      final painter = curlPaint.painter! as PageCurlPainter;
+      expect(painter.sheet, isNotNull, reason: '往回翻已读页纸面不得纯白');
+      expect(painter.back, isNotNull, reason: '往回翻已读页纸背不得纯白');
+      await tester.pump(const Duration(milliseconds: 500));
+    }
+    expect(find.text('2–3 / 14'), findsOneWidget);
+  });
+
+  testWidgets('双页模式：普通双页与跨页宽图（wide spread）往返翻页均保持书脊铰接卷页', (
+    WidgetTester tester,
+  ) async {
+    // 页序：0=封面(单), [1,2]=普通双页, [3]=宽页跨页大图(1600×1200), [4,5]=普通双页。
+    final repository = FakeReaderRepository(
+      pageCount: 6,
+      pageSizes: const <({int width, int height})>[
+        (width: 800, height: 1200),
+        (width: 800, height: 1200),
+        (width: 800, height: 1200),
+        (width: 1600, height: 1200),
+        (width: 800, height: 1200),
+        (width: 800, height: 1200),
+      ],
+    );
+    await pumpReader(
+      tester,
+      repository: repository,
+      book: Book(
+        id: 'b1',
+        seriesId: 's1',
+        name: 'Vol. 1',
+        number: '1',
+        pagesCount: 6,
+        readProgress: ReadProgress(
+          page: 2,
+          completed: false,
+          lastModified: DateTime.utc(2026, 1, 1),
+        ),
+      ),
+      direction: ReadingDirection.rightToLeft,
+      initialPrefs: const ReaderPrefs(
+        global: ReaderConfig(mode: ReaderModeChoice.double),
+      ),
+    );
+    await tester.runAsync(() async {
+      await PageCurlProgram.ensureLoaded();
+      for (var p = 1; p <= 6; p++) {
+        final bytes = await repository.pageImage('b1', p);
+        final decoded = await decodeThroughImageCache(bytes);
+        decoded?.dispose();
+      }
+    });
+    await tester.pump();
+    expect(find.text('2–3 / 6'), findsOneWidget);
+
+    final state = tester.state<ReaderPagedViewState>(
+      find.byType(ReaderPagedView),
+    );
+
+    // 1. 普通双页 [1,2] → 宽页 [3]：铰接卷页
+    state.turn(1);
+    await tester.pump();
+    expect(state.debugCurling, isTrue, reason: '双页翻向宽页跨页图不应退化成平移');
+    expect(state.debugHinged, isTrue);
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('4 / 6'), findsOneWidget);
+
+    // 2. 宽页 [3] → 普通双页 [4,5]：铰接卷页
+    state.turn(1);
+    await tester.pump();
+    expect(state.debugCurling, isTrue, reason: '宽页跨页图翻向双页不应退化成平移');
+    expect(state.debugHinged, isTrue);
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('5–6 / 6'), findsOneWidget);
+
+    // 3. 普通双页 [4,5] 往回翻 → 宽页 [3]：铰接卷页
+    state.turn(-1);
+    await tester.pump();
+    expect(state.debugCurling, isTrue, reason: '从双页往回翻向宽页不应退化成平移');
+    expect(state.debugHinged, isTrue);
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('4 / 6'), findsOneWidget);
+
+    // 4. 宽页 [3] 往回翻 → 普通双页 [1,2]：铰接卷页
+    state.turn(-1);
+    await tester.pump();
+    expect(state.debugCurling, isTrue, reason: '从宽页往回翻向双页不应退化成平移');
+    expect(state.debugHinged, isTrue);
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('2–3 / 6'), findsOneWidget);
+  });
+
+  testWidgets('双页模式：冷页纸背在深色背景下不用刺眼纯白，且途中下载完平滑淡入不突变', (
+    WidgetTester tester,
+  ) async {
+    // 用 3 张不同页图名，避免第 4 页循环复用第 1 页字节。
+    final repository = FakeReaderRepository(
+      pageCount: 6,
+      pageNames: const <String>['p1', 'p2', 'p3'],
+    );
+    // 闸住第 4、5 页（下一屏 [3, 4]）。
+    repository.pageGates[4] = Completer<void>();
+    repository.pageGates[5] = Completer<void>();
+    await pumpReader(
+      tester,
+      repository: repository,
+      book: Book(
+        id: 'b1',
+        seriesId: 's1',
+        name: 'Vol. 1',
+        number: '1',
+        pagesCount: 6,
+        readProgress: ReadProgress(
+          page: 2,
+          completed: false,
+          lastModified: DateTime.utc(2026, 1, 1),
+        ),
+      ),
+      direction: ReadingDirection.rightToLeft,
+      initialPrefs: const ReaderPrefs(
+        global: ReaderConfig(mode: ReaderModeChoice.double),
+      ),
+    );
+    for (var i = 0; i < 5; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 40)),
+      );
+      await tester.pump();
+    }
+
+    final rect = tester.getRect(find.byKey(const Key('reader-tap-layer')));
+    final gesture = await tester.startGesture(
+      rect.centerLeft + const Offset(40, 0),
+    );
+    await gesture.moveBy(Offset(rect.width * 0.45, 0));
+    await tester.pump();
+
+    var painter =
+        tester
+                .widget<CustomPaint>(find.byKey(const Key('reader-curl-layer')))
+                .painter!
+            as PageCurlPainter;
+    expect(painter.back, isNull);
+    expect(painter.paperColor, isNotNull);
+    expect(
+      painter.paperColor!.computeLuminance(),
+      lessThan(0.1),
+      reason: '深色模式下未就绪纸背用哑光深灰，不能闪纯白',
+    );
+
+    // 手指还按在半空中时，下一屏下载并解码完成：纸背应在卷动途中平滑淡入（0 → 1）。
+    repository.pageGates[4]!.complete();
+    repository.pageGates[5]!.complete();
+    for (var i = 0; i < 5; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 40)),
+      );
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+
+    painter =
+        tester
+                .widget<CustomPaint>(find.byKey(const Key('reader-curl-layer')))
+                .painter!
+            as PageCurlPainter;
+    expect(painter.back, isNotNull, reason: '翻动期间后台解码不中断，纸背途中即可就绪');
+    expect(painter.backOpacity, greaterThan(0.0));
+
+    await tester.pump(const Duration(milliseconds: 200));
+    painter =
+        tester
+                .widget<CustomPaint>(find.byKey(const Key('reader-curl-layer')))
+                .painter!
+            as PageCurlPainter;
+    expect(painter.backOpacity, 1.0, reason: '淡入动画完成后纸背达到完全不透明，落地无突变');
 
     await gesture.up();
     await tester.pumpAndSettle();

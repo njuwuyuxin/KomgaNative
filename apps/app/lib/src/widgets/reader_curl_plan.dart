@@ -1,5 +1,8 @@
 part of 'reader_paged_view.dart';
 
+/// 双页展开时半边书页的几何与源图矩形（宽页跨页图时 `clip` 为半页、`image` 为整张宽页）。
+typedef _HalfSheet = ({int page, Rect clip, Rect image});
+
 /// 一屏（1–2 页）的绘制矩形与页序。
 class _SpreadFrame {
   const _SpreadFrame({
@@ -8,6 +11,7 @@ class _SpreadFrame {
     required this.layout,
     required this.content,
     required this.slots,
+    this.wideSolo = false,
   });
 
   final List<int> order;
@@ -17,6 +21,44 @@ class _SpreadFrame {
 
   /// 每一页在画布上的矩形（按宽度比例切分 [content]）。
   final Map<int, Rect> slots;
+
+  /// 双页模式下单独占满整屏的一张宽页跨页图：翻页时按书脊对半铰接卷曲，不退化为平移。
+  final bool wideSolo;
+
+  /// 若这一屏对应摊开的双页书本（两张单页，或双页模式下的一张宽页跨页图），
+  /// 返回（左半页, 右半页）；单独居中页（如封面）返回 null。
+  (_HalfSheet, _HalfSheet)? get openBookHalves {
+    if (order.length == 2) {
+      final left = order[0];
+      final right = order[1];
+      final leftRect = slots[left]!;
+      final rightRect = slots[right]!;
+      if (leftRect.isEmpty || rightRect.isEmpty) return null;
+      return (
+        (page: left, clip: leftRect, image: leftRect),
+        (page: right, clip: rightRect, image: rightRect),
+      );
+    }
+    if (wideSolo && order.length == 1) {
+      final page = order.first;
+      final full = slots[page]!;
+      if (full.isEmpty) return null;
+      final midX = full.center.dx;
+      return (
+        (
+          page: page,
+          clip: Rect.fromLTRB(full.left, full.top, midX, full.bottom),
+          image: full,
+        ),
+        (
+          page: page,
+          clip: Rect.fromLTRB(midX, full.top, full.right, full.bottom),
+          image: full,
+        ),
+      );
+    }
+    return null;
+  }
 }
 
 /// 一次卷页要画什么：被卷的纸、纸背、垫在下面的页，以及手指运动。
@@ -24,15 +66,17 @@ class _SpreadFrame {
 /// 把"翻之前的屏 A"和"翻之后的屏 B"统一起来看（往前翻 A = 当前、B = 下一屏；
 /// 往回翻 A = 上一屏、B = 当前，路径倒放）：
 ///
-/// - 单页：卷的是 A 那页，下面垫 B 那页；纸背是白纸。
-/// - 双页：卷的是 A 掀起那一侧的半页（RTL 左半、LTR 右半），铰接在书脊上，
-///   翻过去平落在另一半；纸背就是 B 同侧落地的那页。下面垫 B 掀起侧 + A 落地侧。
+/// - 单页：卷的是 A 那页，下面垫 B 那页；纸背是纸底色 + 透印。
+/// - 双页（含双页与宽页跨页图互翻）：卷的是 A 掀起那一侧的半页（RTL 左半、LTR 右半），
+///   铰接在书脊上，翻过去平落在另一半；纸背就是 B 同侧落地的那半页。下面垫 B 掀起侧 + A 落地侧。
 class _CurlPlan {
   const _CurlPlan({
     required this.sheetPage,
     required this.sheetRect,
+    required this.sheetUvRect,
     required this.backPage,
     required this.backRect,
+    required this.backUvRect,
     required this.spineX,
     required this.motion,
     required this.under,
@@ -40,50 +84,36 @@ class _CurlPlan {
 
   final int sheetPage;
   final Rect sheetRect;
+  final Rect sheetUvRect;
 
-  /// 纸背那页（双页），单页为 null（白纸）。
+  /// 纸背那页（双页），单页为 null。
   final int? backPage;
   final Rect backRect;
+  final Rect backUvRect;
 
   /// 书脊 x（画布坐标）：纸背沿它镜像。
   final double spineX;
 
   final CurlMotion motion;
 
-  /// 垫在卷页下面的页与它们的矩形。
-  final List<(int, Rect)> under;
+  /// 垫在卷页下面的页与它们的裁剪/纹理矩形。
+  final List<_HalfSheet> under;
 
-  /// 空闲时要预解码的范围：纸面 + 纸背 + 露出的底层。
-  ///
-  /// 底层在这里是**预解码**对象、不是卷页条件：翻过去之后它们就是屏幕上的页，
-  /// 早解一步交接才不会空窗。
+  /// 涉及到的全部页：纸面 + 纸背 + 露出的底层。
   Set<int> get pages => <int>{
     sheetPage,
     ?backPage,
-    for (final (page, _) in under) page,
+    for (final slot in under) slot.page,
   };
 
-  /// 起手判定"这次能不能卷"至少要有的位图。
-  ///
-  /// 只需要"当前要掀起来的那张纸"：
-  /// - 单页（[backPage] 为 null）：只要求 [sheetPage]（往前翻是当前页、往回翻是上一页）；
-  ///   纸背是白纸 + 透印，底层相邻页是透出来的 widget，还在转圈也能照常卷页。
-  /// - 双页往前翻：只要求 [sheetPage]（当前屏掀起侧）；纸背（下一屏落地侧）还没解码好时
-  ///   先用白纸 + 透印，底层（下一屏掀起侧）透出自己的加载态。
-  /// - 双页往回翻：只要求 [backPage]（当前屏落地侧）；纸面（上一屏掀起侧）还没解码好时
-  ///   先用白纸，底层（上一屏落地侧）透出自己的加载态。
-  ///
-  /// 这样双页翻页不再被相邻屏的下载/解码拖垮而无规律退化成平移。
+  /// 起手判定"这次能不能卷"至少要有的位图：只要求当前屏幕上被掀起的那一页/半页就绪。
   Set<int> get requiredPages {
     final back = backPage;
     if (back == null) return <int>{sheetPage};
     return <int>{motion.forward ? sheetPage : back};
   }
 
-  /// 从屏 [before] 翻到屏 [after] 的卷页计划；页数不配对时为 null。
-  ///
-  /// 卷页的镜像：往前翻和往回翻是同一张纸的正放/倒放，用同一个角——
-  /// RTL（日漫，书脊在右）从左下角掀；LTR（书脊在左）从右下角掀。
+  /// 从屏 [before] 翻到屏 [after] 的卷页计划；封面等单双页宽度变化边界返回 null。
   static _CurlPlan? between({
     required _SpreadFrame before,
     required _SpreadFrame after,
@@ -94,17 +124,51 @@ class _CurlPlan {
     final mirrored = !rightToLeft;
     final a = before;
     final b = after;
+
+    // 摊开双页（两页并排或宽页跨页图）之间一律按书脊铰接卷页。
+    final aHalves = a.openBookHalves;
+    final bHalves = b.openBookHalves;
+    if (aHalves != null && bHalves != null) {
+      final (aLeft, aRight) = aHalves;
+      final (bLeft, bRight) = bHalves;
+      final lift = rightToLeft ? aLeft : aRight;
+      final stay = rightToLeft ? aRight : aLeft;
+      final reveal = rightToLeft ? bLeft : bRight;
+      final back = rightToLeft ? bRight : bLeft;
+      if (lift.clip.isEmpty) return null;
+      return _CurlPlan(
+        sheetPage: lift.page,
+        sheetRect: lift.clip,
+        sheetUvRect: lift.image,
+        backPage: back.page,
+        backRect: back.clip,
+        backUvRect: back.image,
+        spineX: mirrored ? lift.clip.left : lift.clip.right,
+        motion: CurlMotion(
+          forward: forward,
+          width: lift.clip.width,
+          height: lift.clip.height,
+          exitX: lift.clip.width,
+          hinged: true,
+        ),
+        under: <_HalfSheet>[reveal, stay],
+      );
+    }
+
     if (a.order.length == 1 && b.order.length == 1) {
       final page = a.order.first;
       final rect = a.slots[page]!;
       if (rect.isEmpty) return null;
-      // 卷筒要滑出**屏幕**另一侧，而不是只滑出纸面。
+      final nextPage = b.order.first;
+      final nextRect = b.slots[nextPage]!;
       final exitX = mirrored ? rect.right : viewportWidth - rect.left;
       return _CurlPlan(
         sheetPage: page,
         sheetRect: rect,
+        sheetUvRect: rect,
         backPage: null,
         backRect: rect,
+        backUvRect: rect,
         spineX: mirrored ? rect.left : rect.right,
         motion: CurlMotion(
           forward: forward,
@@ -112,40 +176,16 @@ class _CurlPlan {
           height: rect.height,
           exitX: exitX,
         ),
-        under: <(int, Rect)>[(b.order.first, b.slots[b.order.first]!)],
+        under: <_HalfSheet>[(page: nextPage, clip: nextRect, image: nextRect)],
       );
     }
-    if (a.order.length != 2 || b.order.length != 2) return null;
-
-    // 视觉顺序里掀起的那一侧：RTL 是左边（下标 0），LTR 是右边。
-    final lift = rightToLeft ? 0 : 1;
-    final sheet = a.order[lift];
-    final stay = a.order[1 - lift];
-    final back = b.order[1 - lift];
-    final reveal = b.order[lift];
-    final rect = a.slots[sheet]!;
-    if (rect.isEmpty) return null;
-    return _CurlPlan(
-      sheetPage: sheet,
-      sheetRect: rect,
-      backPage: back,
-      backRect: b.slots[back]!,
-      spineX: mirrored ? rect.left : rect.right,
-      motion: CurlMotion(
-        forward: forward,
-        width: rect.width,
-        height: rect.height,
-        exitX: rect.width,
-        hinged: true,
-      ),
-      under: <(int, Rect)>[(reveal, b.slots[reveal]!), (stay, a.slots[stay]!)],
-    );
+    return null;
   }
 }
 
-/// 规划与预加载和翻页控制器分离：当前屏和底层共用卷页像素。
+/// 规划、与 `ImageCache` 同步桥接及后台预解码。
 extension _TurnImages on _PageTurn {
-  /// 某个方向的卷页计划；不适合卷页（单页↔双页、尚未布局）时为 null。
+  /// 某个方向的卷页计划；不适合卷页（封面单页↔双页、尚未布局）时为 null。
   _CurlPlan? _planFor(bool forward) {
     if (widget.style.effect != PageTurnEffect.curl) return null;
     if (_viewport.isEmpty) return null;
@@ -161,27 +201,45 @@ extension _TurnImages on _PageTurn {
     );
   }
 
-  /// 空闲时把当前屏及前后相邻屏要用的位图并发解码好，开始拖的那一刻就有图可用。
+  /// 先查卷页缓存，未命中时**同步**从 Flutter `ImageCache` 借出已解码位图。
   ///
-  /// 不依赖 `_planFor`（避免首帧视口未布局或封面/宽页等 1↔2 过渡时跳过下一屏预解码）；
-  /// 解码失败只跳过该页，不阻塞同屏其余页。
+  /// 只要页面已在屏幕上渲染好或已被 `ReaderPreloader` 预解码，这里就能在同一帧内
+  /// 0 延迟拿到 `ui.Image`，彻底消除"底图已显示却退化成平移 / 背面纯白"的双缓存脱节。
+  ui.Image? _imageOrAdoptSync(int pageIndex) {
+    final existing = _sheets.imageFor(pageIndex);
+    if (existing != null) return existing;
+    final bytes = ref
+        .read(readerRepositoryProvider)
+        .cachedPageImage(widget.bookId, pageIndex + 1);
+    if (bytes == null) return null;
+    final adopted = trySyncImageFromCache(bytes);
+    if (adopted != null) _sheets.putSync(pageIndex, adopted);
+    return _sheets.imageFor(pageIndex);
+  }
+
+  /// 并发预解码当前屏、前后相邻屏及进行中翻页涉及的位图。
+  ///
+  /// **翻动期间不中断**：通过 `pinned` 保护当前卷页图层不被淘汰，让尚未下载完的纸背
+  /// 能在卷动途中继续解码并平滑渐显，避免落地瞬间才从空白突变成图片。
   void _scheduleSheets() {
     if (widget.style.effect != PageTurnEffect.curl) return;
     if (_sheetsScheduled) return;
     _sheetsScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _sheetsScheduled = false;
-      if (!mounted || _phase != _TurnPhase.idle) return;
-      if (widget.style.effect != PageTurnEffect.curl) return;
+      if (!mounted || widget.style.effect != PageTurnEffect.curl) return;
       final bookId = widget.bookId;
+      final pinned = _plan?.pages ?? const <int>{};
       final pages = <int>{
         ...widget.spread,
         ...?widget.nextSpread,
         ...?widget.previousSpread,
+        ...pinned,
       };
       unawaited(
         _sheets.ensure(
           pages: pages,
+          pinned: pinned,
           decode: _decodePage,
           stillWanted: () =>
               mounted &&
@@ -193,24 +251,25 @@ extension _TurnImages on _PageTurn {
   }
 
   Future<ui.Image?> _decodePage(int pageIndex) async {
+    final bookId = widget.bookId;
     final repository = ref.read(readerRepositoryProvider);
     final page = pageIndex + 1;
-    Uint8List? bytes = repository.cachedPageImage(widget.bookId, page);
-    try {
-      bytes ??= await repository.pageImage(widget.bookId, page);
-    } on ShelfFailure {
-      return null;
+    Uint8List? bytes = repository.cachedPageImage(bookId, page);
+    if (bytes != null) {
+      final sync = trySyncImageFromCache(bytes);
+      if (sync != null) return sync;
+    } else {
+      try {
+        bytes = await repository.pageImage(bookId, page);
+      } on ShelfFailure {
+        return null;
+      }
     }
-    ui.Codec? codec;
-    try {
-      codec = await ui.instantiateImageCodec(bytes);
-      final frame = await codec.getNextFrame();
-      return frame.image;
-    } on Object {
-      // 单页解码失败返回空，不中断同屏其余页的并发解码。
-      return null;
-    } finally {
-      codec?.dispose();
-    }
+    if (!mounted || widget.bookId != bookId) return null;
+    return decodeThroughImageCache(
+      bytes,
+      onRegisterCancel: (VoidCallback cancel) =>
+          _sheets.registerCancel(pageIndex, cancel),
+    );
   }
 }

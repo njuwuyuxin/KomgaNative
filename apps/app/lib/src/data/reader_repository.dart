@@ -22,7 +22,12 @@ abstract interface class ReaderRepository {
 }
 
 class KomgaReaderRepository implements ReaderRepository {
-  static const int defaultPageCacheCapacity = 16;
+  /// 页图字节内存 LRU 容量。
+  ///
+  /// 需同时容纳 `ReaderPreloader`（前后共 6 屏 ≈ 双页 12 页）、底栏缩略图滑条
+  /// 可见项以及最近翻过的历史跨页；太小（如早期 16）会在打开缩略图滑条或连续翻几屏后
+  /// 把刚读过的页挤出内存，导致往回翻时重拉网络并丢失 `ImageCache` 键引用。
+  static const int defaultPageCacheCapacity = 64;
 
   KomgaReaderRepository(
     this._session,
@@ -33,6 +38,8 @@ class KomgaReaderRepository implements ReaderRepository {
   final KomgaSession _session;
   final ProgressSyncService _sync;
   final ByteLruCache _pages;
+  final Map<String, Future<Uint8List>> _inFlight =
+      <String, Future<Uint8List>>{};
 
   KomgaSession get debugSession => _session;
 
@@ -58,17 +65,28 @@ class KomgaReaderRepository implements ReaderRepository {
   }
 
   @override
-  Future<Uint8List> pageImage(String bookId, int page) async {
+  Future<Uint8List> pageImage(String bookId, int page) {
     final key = '$bookId#$page';
     final cached = _pages.get(key);
-    if (cached != null) return cached;
+    if (cached != null) return Future<Uint8List>.value(cached);
+    // 合并同页并发请求：避免预取、页面显示、缩略图与卷页解码并发拉取产生多份
+    // 不同引用的 Uint8List，保证 `MemoryImage(bytes)` 在 `ImageCache` 里始终命中同一键。
+    return _inFlight[key] ??= _fetchAndCachePage(key, bookId, page);
+  }
 
+  Future<Uint8List> _fetchAndCachePage(
+    String key,
+    String bookId,
+    int page,
+  ) async {
     try {
       final bytes = await _session.fetchPageImage(bookId, page);
       _pages.put(key, bytes);
       return bytes;
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);
+    } finally {
+      _inFlight.remove(key)?.ignore();
     }
   }
 

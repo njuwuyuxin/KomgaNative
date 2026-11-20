@@ -17,6 +17,7 @@ import 'package:material_ui/material_ui.dart';
 
 part 'reader_curl_plan.dart';
 part 'reader_page_turn.dart';
+part 'reader_turn_layers.dart';
 part 'reader_zoom.dart';
 
 /// 一次翻页所处的阶段。
@@ -229,12 +230,20 @@ class ReaderPagedViewState extends ConsumerState<ReaderPagedView>
       slots[index] = Rect.fromLTWH(left, top, w, fitted);
       left += w;
     }
+    final wideSolo =
+        widget.doublePage &&
+        order.length == 1 &&
+        PageAspect(
+          width: widget.pages[order.first].width?.toDouble(),
+          height: widget.pages[order.first].height?.toDouble(),
+        ).isWide();
     return _SpreadFrame(
       order: order,
       sizes: sizes,
       layout: layout,
       content: content,
       slots: slots,
+      wideSolo: wideSolo,
     );
   }
 
