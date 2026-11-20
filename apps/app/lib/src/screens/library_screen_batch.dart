@@ -21,7 +21,7 @@ mixin _ShelfBatch on ConsumerState<LibraryScreen> {
     for (final id in ids) {
       try {
         await reader.setRead(id, read: read);
-      } catch (_) {
+      } on ShelfFailure {
         failed++;
       }
     }

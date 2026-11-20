@@ -121,4 +121,27 @@ void main() {
     expect(repository.seriesReadCalls.length, 2, reason: '一个失败不影响下一个');
     expect(container.read(shelfSelectionProvider).ids, isEmpty);
   });
+
+  testWidgets('列表视图（ShelfView.list）多选模式下长按系列行触发勾选而非弹菜单', (
+    WidgetTester tester,
+  ) async {
+    final container = await pumpShelf(tester);
+
+    await tester.tap(find.byKey(const Key('shelf-view-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('shelf-view-list')));
+    await tester.pumpAndSettle();
+
+    await enterSelection(tester);
+
+    await tester.longPress(find.byKey(const Key('series-s1')));
+    await tester.pumpAndSettle();
+
+    expect(container.read(shelfSelectionProvider).ids, <String>{'s1'});
+    expect(find.text('View details'), findsNothing);
+
+    await tester.longPress(find.byKey(const Key('series-s1')));
+    await tester.pumpAndSettle();
+    expect(container.read(shelfSelectionProvider).ids, isEmpty);
+  });
 }

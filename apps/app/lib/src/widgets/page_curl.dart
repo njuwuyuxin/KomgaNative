@@ -223,7 +223,7 @@ class CurlSheets {
       }
       _images[page] = image;
     } finally {
-      _pending.remove(page);
+      _pending.remove(page)?.ignore();
     }
   }
 

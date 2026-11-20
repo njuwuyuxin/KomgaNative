@@ -188,15 +188,17 @@ class SeriesShelfRow extends ConsumerWidget {
         child: PressableScale(
           child: InkWell(
             onTap: onTap,
-            onLongPress: () => unawaited(
-              showSeriesMenu(
-                context,
-                ref,
-                series,
-                heroTag: tag,
-                pinned: pinned,
-              ),
-            ),
+            onLongPress:
+                onLongPress ??
+                () => unawaited(
+                  showSeriesMenu(
+                    context,
+                    ref,
+                    series,
+                    heroTag: tag,
+                    pinned: pinned,
+                  ),
+                ),
             child: Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.md,

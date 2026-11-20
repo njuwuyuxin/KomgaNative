@@ -230,7 +230,7 @@ chrome 永远压在漫画画面上：浅色模式下用浅色毛玻璃，白底�
 ## 触感反馈开关
 
 设置页「触感反馈」（`settings-haptics`）→ `SettingsState.haptics`（默认开启）→
-`KomgaApp` 每次 build 同步到 `AppHaptics.enabled`。存储在 `komganative.settings.v1`
+由 `SettingsController`（恢复/更新时）与 `KomgaApp` 的 `ref.listen` 同步到 `AppHaptics.enabled`（不在 `build` 主体产生写入副作用）。存储在 `komganative.settings.v1`
 的 JSON blob 里（与语言同一个 blob，写入是"读出 → 改一个字段 → 写回"，互不覆盖）。
 
 ## 验证

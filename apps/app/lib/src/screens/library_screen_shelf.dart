@@ -138,6 +138,11 @@ mixin _ShelfSlivers on ConsumerState<LibraryScreen> {
                 onTap: () => selection.active
                     ? ref.read(shelfSelectionProvider.notifier).toggle(item.id)
                     : unawaited(_openSeries(item)),
+                onLongPress: selection.active
+                    ? () => ref
+                          .read(shelfSelectionProvider.notifier)
+                          .toggle(item.id)
+                    : null,
               );
             }, childCount: series.length),
           ),
@@ -157,6 +162,11 @@ mixin _ShelfSlivers on ConsumerState<LibraryScreen> {
               onTap: () => selection.active
                   ? ref.read(shelfSelectionProvider.notifier).toggle(item.id)
                   : unawaited(_openSeries(item)),
+              onLongPress: selection.active
+                  ? () => ref
+                        .read(shelfSelectionProvider.notifier)
+                        .toggle(item.id)
+                  : null,
             );
           }, childCount: series.length),
         ),

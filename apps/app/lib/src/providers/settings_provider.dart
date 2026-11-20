@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_native/src/data/app_settings.dart';
 import 'package:komga_native/src/data/settings_store.dart';
 import 'package:komga_platform/komga_platform.dart';
@@ -85,22 +86,26 @@ class SettingsController extends Notifier<SettingsState> {
 
   Future<void> _restore() async {
     final saved = await _store.load();
+    final nextHaptics = _hapticsTouched ? state.haptics : saved.haptics;
+    AppHaptics.enabled = nextHaptics;
     state = state.copyWith(
       themeMode: _themeTouched ? null : saved.themeMode,
       forceEink: _einkTouched ? null : saved.forceEink,
       language: _languageTouched ? null : appLanguageFromCode(saved.language),
-      haptics: _hapticsTouched ? null : saved.haptics,
+      haptics: nextHaptics,
     );
   }
 
   /// 整份替换（SET-02 导入备份）。
   ///
-  /// 三个"用户手动改过"的标记一并置位：导入之后不该再被系统/墨水平板探测覆盖。
+  /// 四个"用户手动改过"的标记一并置位：导入之后不该再被异步恢复覆盖。
   Future<void> replaceAll(AppSettings next) async {
     _themeTouched = true;
     _einkTouched = true;
     _languageTouched = true;
+    _hapticsTouched = true;
     await _store.update((AppSettings _) => next);
+    AppHaptics.enabled = next.haptics;
     state = state.copyWith(
       themeMode: next.themeMode,
       forceEink: next.forceEink,
@@ -135,6 +140,7 @@ class SettingsController extends Notifier<SettingsState> {
   void setHaptics(bool enabled) {
     if (enabled == state.haptics) return;
     _hapticsTouched = true;
+    AppHaptics.enabled = enabled;
     state = state.copyWith(haptics: enabled);
     unawaited(_store.update((AppSettings s) => s.copyWith(haptics: enabled)));
   }

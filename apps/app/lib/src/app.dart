@@ -24,8 +24,11 @@ class KomgaApp extends ConsumerWidget {
     final einkTheme = AppTheme.eink();
     // 自动探测 + 手动强制统一由 `effectiveEinkProvider` 决定，阅读器等页面读同一个值。
     final useEink = ref.watch(effectiveEinkProvider);
-    // 触感反馈的总开关只在这里同步一次，页面统一走 AppHaptics。
-    AppHaptics.enabled = settings.haptics;
+    // 触感反馈的总开关由状态变更监听驱动，避免在 build 主体写静态全局变量。
+    ref.listen<bool>(
+      settingsProvider.select((SettingsState s) => s.haptics),
+      (_, bool enabled) => AppHaptics.enabled = enabled,
+    );
 
     return ProgressSyncScope(
       child: MaterialApp.router(
