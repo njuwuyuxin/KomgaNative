@@ -137,13 +137,14 @@ void main() {
     );
   });
 
-  /// 多选态（LIB-03）：顶部换成"已选 N / 全选 / 取消"，底部出批量条。
+  /// 多选态（LIB-03）：顶部换成"已选 N / 全选 / 取消"，底部批量条悬浮在 dock 栏上方，不挤占封面。
   testWidgets('library_selection@phone_light', (WidgetTester tester) async {
     await pumpShelfGolden(
       tester,
       name: 'library_selection@phone_light',
       size: GoldenSizes.phone,
       theme: AppTheme.light(),
+      withNavBar: true,
       act: (WidgetTester tester) async {
         await tester.tap(find.byKey(const Key('shelf-select-button')));
         await tester.pumpAndSettle();

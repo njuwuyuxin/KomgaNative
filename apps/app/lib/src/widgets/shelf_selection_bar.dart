@@ -59,7 +59,10 @@ class ShelfSelectionBar extends StatelessWidget {
   }
 }
 
-/// 多选时的底部批量条：支持标记已读/未读，以及可选的第三项（加入收藏集 / 加入阅读列表）。
+/// 多选时的底部悬浮批量条：支持标记已读/未读，以及可选的第三项（加入收藏集 / 加入阅读列表）。
+///
+/// 与底部导航条（`FloatingNavBar`）同一套液态玻璃胶囊形态：图标在上、标签在下，
+/// 按下轻微缩放与触感反馈；墨水屏由 token 自动退化为纸底墨框。
 class ShelfBatchBar extends StatelessWidget {
   const ShelfBatchBar({
     required this.count,
@@ -92,45 +95,34 @@ class ShelfBatchBar extends StatelessWidget {
     return GlassSurface(
       key: const Key('shelf-batch-bar'),
       shape: AppShapes.of(context, AppShapes.bar),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.xs,
-          vertical: AppSpacing.xxs,
-        ),
-        child: Row(
-          children: <Widget>[
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: _BatchAction(
+              key: const Key('shelf-batch-read'),
+              icon: Icons.done_all,
+              label: l10n.markAllRead,
+              onPressed: disabled ? null : () => unawaited(onMarkRead()),
+            ),
+          ),
+          Expanded(
+            child: _BatchAction(
+              key: const Key('shelf-batch-unread'),
+              icon: Icons.remove_done,
+              label: l10n.markAllUnread,
+              onPressed: disabled ? null : () => unawaited(onMarkUnread()),
+            ),
+          ),
+          if (hasExtra)
             Expanded(
               child: _BatchAction(
-                key: const Key('shelf-batch-read'),
-                icon: Icons.done_all,
-                label: l10n.markAllRead,
-                stacked: hasExtra,
-                onPressed: disabled ? null : () => unawaited(onMarkRead()),
+                key: extraKey,
+                icon: extraIcon!,
+                label: extraLabel!,
+                onPressed: disabled ? null : () => unawaited(onExtraAction!()),
               ),
             ),
-            Expanded(
-              child: _BatchAction(
-                key: const Key('shelf-batch-unread'),
-                icon: Icons.remove_done,
-                label: l10n.markAllUnread,
-                stacked: hasExtra,
-                onPressed: disabled ? null : () => unawaited(onMarkUnread()),
-              ),
-            ),
-            if (hasExtra)
-              Expanded(
-                child: _BatchAction(
-                  key: extraKey,
-                  icon: extraIcon!,
-                  label: extraLabel!,
-                  stacked: true,
-                  onPressed: disabled
-                      ? null
-                      : () => unawaited(onExtraAction!()),
-                ),
-              ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -140,45 +132,68 @@ class _BatchAction extends StatelessWidget {
   const _BatchAction({
     required this.icon,
     required this.label,
-    required this.stacked,
     required this.onPressed,
     super.key,
   });
 
   final IconData icon;
   final String label;
-  final bool stacked;
   final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
-    if (!stacked) {
-      return TextButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon, size: AppSizes.iconSm),
-        label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
-      );
+    final enabled = onPressed != null;
+    final baseColor = GlassControlColors.resolve(context).foreground;
+    final foreground = enabled ? baseColor : baseColor.withValues(alpha: 0.38);
+
+    void handleTap() {
+      final callback = onPressed;
+      if (callback == null) return;
+      unawaited(AppHaptics.selection());
+      callback();
     }
-    return TextButton(
-      onPressed: onPressed,
-      style: TextButton.styleFrom(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.xs,
-          vertical: AppSpacing.xs,
-        ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Icon(icon, size: AppSizes.iconSm),
-          const SizedBox(height: AppSpacing.xxs),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.labelSmall,
+
+    return Semantics(
+      container: true,
+      button: true,
+      enabled: enabled,
+      label: label,
+      onTap: enabled ? handleTap : null,
+      child: ExcludeSemantics(
+        child: PressableScale(
+          enabled: enabled,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: enabled ? handleTap : null,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                minHeight: AppSizes.navBarHeight,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm,
+                  vertical: AppSpacing.xs,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    Icon(icon, size: AppSizes.iconLg, color: foreground),
+                    const SizedBox(height: AppSpacing.xxs),
+                    Text(
+                      label,
+                      maxLines: 1,
+                      softWrap: false,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.of(context).label
+                          .copyWith(color: foreground),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
-        ],
+        ),
       ),
     );
   }

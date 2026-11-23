@@ -741,8 +741,9 @@
   竞品 Panels 也是"长按出菜单、多选走按钮"。这一处是**有意的偏离**，理由记录在此。
 - `ShelfSelectionState { active, ids }`：把"在多选态"和"选了几项"分开——
   刚进多选时一项都没选，用"非空即多选"会让批量条一进来就消失。
-- 顶部换成 `ShelfSelectionBar`（✕ / 已选 N / 全选），底部 `persistentFooterButtons`
-  放 `ShelfBatchBar`（标记已读 / 未读），并抬到悬浮导航条之上（否则点不到）。
+- 顶部换成 `ShelfSelectionBar`（✕ / 已选 N / 全选），底部 `ShelfBatchBar`
+  （标记全部已读 / 标记全部未读 / 收藏集）采用与底部 dock 相同的液态玻璃悬浮层，
+  直接浮在 dock 栏上方，不挤占原页面滚动视口。
 - 批量标记逐个调用（Komga 的"整系列已读"本身就是按系列的），失败项不中断，
   结束后统一提示"已更新 N 个"或"N 个成功，M 个失败"。下载按计划等 SER-03。
 - **把页面拆开了**：`library_screen.dart` 在 LIB-02 后已 371 行（超 350 上限），

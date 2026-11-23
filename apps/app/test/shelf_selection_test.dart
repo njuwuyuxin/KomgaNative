@@ -8,6 +8,7 @@ import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/providers/shelf_selection_provider.dart';
 import 'package:komga_native/src/screens/library_screen.dart';
+import 'package:komga_native/src/widgets/floating_nav_bar.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_library.dart';
@@ -141,6 +142,101 @@ void main() {
     expect(find.text('View details'), findsNothing);
 
     await tester.longPress(find.byKey(const Key('series-s1')));
+    await tester.pumpAndSettle();
+    expect(container.read(shelfSelectionProvider).ids, isEmpty);
+  });
+
+  testWidgets('多选工具栏悬浮在 dock 栏上方且不挤占原页面空间', (WidgetTester tester) async {
+    repository = FakeLibraryRepository(series: demoShelf());
+    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.devicePixelRatio = 3;
+    tester.view.padding = const FakeViewPadding(bottom: 34 * 3);
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          libraryRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: appLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          theme: AppTheme.light(),
+          home: Scaffold(
+            extendBody: true,
+            body: const LibraryScreen(),
+            bottomNavigationBar: FloatingNavBar(
+              tabs: const <GlassNavDestination>[
+                GlassNavDestination(
+                  icon: Icons.auto_stories_outlined,
+                  label: 'Reading',
+                ),
+                GlassNavDestination(
+                  icon: Icons.grid_view_outlined,
+                  label: 'Library',
+                  key: Key('dock-library-tab'),
+                ),
+                GlassNavDestination(
+                  icon: Icons.collections_bookmark_outlined,
+                  label: 'Saved',
+                ),
+                GlassNavDestination(
+                  icon: Icons.settings_outlined,
+                  label: 'Settings',
+                ),
+              ],
+              selectedTab: 1,
+              onTabSelected: (_) {},
+              search: const GlassNavDestination(
+                icon: Icons.search,
+                label: 'Search',
+              ),
+              onSearch: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final scrollBefore = tester.getRect(find.byKey(const Key('shelf-scroll')));
+    final firstCardBefore = tester.getRect(find.byKey(const Key('series-s1')));
+    final thirdCardBefore = tester.getRect(find.byKey(const Key('series-s3')));
+
+    await enterSelection(tester);
+
+    // 原本页面的滚动视口和卡片位置完全不受影响（0 像素位移）。
+    expect(
+      tester.getRect(find.byKey(const Key('shelf-scroll'))),
+      equals(scrollBefore),
+    );
+    expect(
+      tester.getRect(find.byKey(const Key('series-s1'))),
+      equals(firstCardBefore),
+    );
+    expect(
+      tester.getRect(find.byKey(const Key('series-s3'))),
+      equals(thirdCardBefore),
+    );
+
+    // 批量条左右留白与 dock 一致，底部紧贴在 dock 胶囊上方 AppSpacing.sm 处。
+    final batchRect = tester.getRect(find.byKey(const Key('shelf-batch-bar')));
+    final dockTabRect = tester.getRect(
+      find.byKey(const Key('dock-library-tab')),
+    );
+    expect(batchRect.left, AppSpacing.md);
+    expect(batchRect.right, 390 - AppSpacing.md);
+    expect(batchRect.bottom, dockTabRect.top - AppSpacing.sm);
+
+    // 未选任何系列（按钮禁用）时点击悬浮条，事件不穿透到下方封面卡片。
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(LibraryScreen)),
+    );
+    await tester.tap(
+      find.byKey(const Key('shelf-batch-read')),
+      warnIfMissed: false,
+    );
     await tester.pumpAndSettle();
     expect(container.read(shelfSelectionProvider).ids, isEmpty);
   });
