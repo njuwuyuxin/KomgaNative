@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/physics.dart';
+import 'package:komga_design_system/src/components/sliding_selection_math.dart';
 import 'package:komga_design_system/src/motion.dart';
 import 'package:komga_design_system/src/tokens.dart';
 import 'package:material_ui/material_ui.dart';
@@ -33,6 +35,7 @@ class SlidingSelectionTrack extends StatefulWidget {
     required this.itemBuilder,
     required this.pillColor,
     required this.pillShape,
+    this.position,
     this.padding = EdgeInsets.zero,
     this.pillInset = EdgeInsets.zero,
     this.gap = AppSpacing.xs,
@@ -45,6 +48,10 @@ class SlidingSelectionTrack extends StatefulWidget {
 
   /// 当前选中的槽位；null = 没有选中项（导航条停在搜索页时），胶囊淡出。
   final int? selectedIndex;
+
+  /// 外部连续选中位置（例如 `TabController.animation`，取值 `[0, itemCount - 1]`）。
+  /// 传值时胶囊位置与逐项权重直接随它插值，不另起内部弹簧，与页面滑动保持同步。
+  final ValueListenable<double>? position;
 
   /// 每个槽位的内容；`selection` 用于颜色插值，见 [SlidingSelectionItemBuilder]。
   final SlidingSelectionItemBuilder itemBuilder;
@@ -110,6 +117,17 @@ class _SlidingSelectionTrackState extends State<SlidingSelectionTrack>
       _controller.value = 1;
       return;
     }
+    if (widget.position != null) {
+      if (oldWidget.position == null && _controller.isAnimating) {
+        _controller.stop();
+        _controller.value = 1;
+      }
+      return;
+    }
+    if (oldWidget.position != null) {
+      _snapToTarget();
+      return;
+    }
     if (widget.selectedIndex != oldWidget.selectedIndex) {
       _animateToTarget(AppMotion.of(context));
     }
@@ -118,12 +136,15 @@ class _SlidingSelectionTrackState extends State<SlidingSelectionTrack>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // 动画中途切到墨水屏 / 打开"减少动态效果"：不要继续跑完弹簧。
     if (!AppMotion.of(context).enabled && _controller.isAnimating) {
-      _fromRect = _toRect = _targetRect();
-      _fromWeights = _toWeights = _targetWeights();
-      _controller.value = 1;
+      _snapToTarget();
     }
+  }
+
+  void _snapToTarget() {
+    _fromRect = _toRect = _targetRect();
+    _fromWeights = _toWeights = _targetWeights();
+    _controller.value = 1;
   }
 
   @override
@@ -133,14 +154,8 @@ class _SlidingSelectionTrackState extends State<SlidingSelectionTrack>
   }
 
   /// 目标槽位每个选项应有的选中进度。
-  List<double> _targetWeights() {
-    final weights = List<double>.filled(widget.itemCount, 0);
-    final index = widget.selectedIndex;
-    if (index != null && index >= 0 && index < widget.itemCount) {
-      weights[index] = 1;
-    }
-    return weights;
-  }
+  List<double> _targetWeights() =>
+      targetSlotWeights(widget.itemCount, widget.selectedIndex);
 
   /// 目标胶囊矩形（相对 Stack）；没有选中项或还没量到几何时为 null。
   Rect? _targetRect() {
@@ -156,20 +171,13 @@ class _SlidingSelectionTrackState extends State<SlidingSelectionTrack>
     return Rect.lerp(from, to, _controller.value);
   }
 
-  List<double> _currentWeights() {
-    final count = widget.itemCount;
-    if (_fromWeights.length != count || _toWeights.length != count) {
-      return _targetWeights();
-    }
-    final t = _controller.value;
-    return <double>[
-      for (var i = 0; i < count; i++)
-        (_fromWeights[i] + (_toWeights[i] - _fromWeights[i]) * t).clamp(
-          0.0,
-          1.0,
-        ),
-    ];
-  }
+  List<double> _currentWeights() => lerpSlotWeights(
+    _fromWeights,
+    _toWeights,
+    widget.itemCount,
+    _controller.value,
+    widget.selectedIndex,
+  );
 
   /// 从胶囊当前所在位置弹到新选中项；中断时会接着当前位置走，不跳。
   void _animateToTarget(AppMotion motion) {
@@ -219,7 +227,7 @@ class _SlidingSelectionTrackState extends State<SlidingSelectionTrack>
       final offset = box.localToGlobal(Offset.zero, ancestor: stackBox);
       slots.add(offset & box.size);
     }
-    if (_sameRects(slots, _slots)) return;
+    if (sameSlotRects(slots, _slots)) return;
 
     final motion = AppMotion.of(context);
     final currentRect = _currentRect();
@@ -228,14 +236,13 @@ class _SlidingSelectionTrackState extends State<SlidingSelectionTrack>
 
     setState(() {
       _slots = slots;
+      if (widget.position != null) return;
       final targetRect = _targetRect();
       if (!motion.enabled ||
           !wasAnimating ||
           currentRect == null ||
           targetRect == null) {
-        _fromRect = _toRect = targetRect;
-        _fromWeights = _toWeights = _targetWeights();
-        _controller.value = 1;
+        _snapToTarget();
         return;
       }
       // 动画中布局变了（字体宽度等）：从当前摆位续弹到新目标。
@@ -248,15 +255,6 @@ class _SlidingSelectionTrackState extends State<SlidingSelectionTrack>
     });
   }
 
-  static bool _sameRects(List<Rect> a, List<Rect> b) {
-    if (a.length != b.length) return false;
-    for (var i = 0; i < a.length; i++) {
-      if (a[i] != b[i]) return false;
-    }
-    return true;
-  }
-
-  /// 槽位 key 按索引复用到当前选项数量；量矩形时用它拿每格的 RenderBox。
   void _ensureItemKeys() {
     while (_itemKeys.length < widget.itemCount) {
       _itemKeys.add(GlobalKey(debugLabel: 'sliding-item-${_itemKeys.length}'));
@@ -265,14 +263,14 @@ class _SlidingSelectionTrackState extends State<SlidingSelectionTrack>
 
   @override
   Widget build(BuildContext context) {
-    // 注册动画偏好依赖：墨水屏 / 减少动态效果切换时能收到重建。
-    AppMotion.of(context);
+    final motion = AppMotion.of(context);
     _ensureItemKeys();
     _scheduleMeasure();
 
     final content = AnimatedBuilder(
-      animation: _controller,
-      builder: (BuildContext context, Widget? child) => _buildTrack(context),
+      animation: widget.position ?? _controller,
+      builder: (BuildContext context, Widget? child) =>
+          _buildTrack(context, motion),
     );
 
     if (!widget.scrollable) {
@@ -285,9 +283,19 @@ class _SlidingSelectionTrackState extends State<SlidingSelectionTrack>
     );
   }
 
-  Widget _buildTrack(BuildContext context) {
-    final weights = _currentWeights();
-    final pillRect = _currentRect();
+  Widget _buildTrack(BuildContext context, AppMotion motion) {
+    final external = widget.position;
+    final resolved = external == null
+        ? null
+        : resolveContinuousSelection(
+            position: external.value,
+            itemCount: widget.itemCount,
+            slots: _slots,
+            pillInset: widget.pillInset,
+            motionEnabled: motion.enabled,
+          );
+    final weights = resolved?.weights ?? _currentWeights();
+    final pillRect = resolved != null ? resolved.pillRect : _currentRect();
     final opacity = weights
         .fold<double>(0, (double sum, double weight) => sum + weight)
         .clamp(0.0, 1.0);

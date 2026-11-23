@@ -48,11 +48,11 @@ chrome 永远压在漫画画面上：浅色模式下用浅色毛玻璃，白底�
 | `LiquidGlassShaderSurface` | 液态玻璃着色器版（`liquid_glass_shader.dart` + `shaders/liquid_glass.frag`），Impeller 真机上由 `FrostedSurface` 自动选用 | 墨水屏 / 非 Impeller / 加载失败 → 合成版 |
 | `PressableScale` | 按下缩到 0.97、松开用 `snappy` 弹簧回弹；用 `Listener` 监听原始指针，不抢子组件的点击/长按/滚动 | 墨水屏 / 减少动态效果时完全透传 |
 | `SelectionBadge` | 书架多选态圆形选择指示器（未选为空心环、选中为主色实心圆 + 对勾）；`onCover: true` 时带烟熏底/白边轻投影以在任意配色封面上分离 | 纯黑白高对比空心圆 / 墨底纸色对勾，无阴影无动画 |
-| `SlidingSelectionTrack` | 会滑动的选中胶囊：同一块胶囊从旧槽位用弹簧弹到新槽位，槽位内容按 `selection` 进度过渡文字/图标颜色；等分与按内容定宽共用一套几何（布局后量槽位） | 不跑弹簧，直接到终值；胶囊颜色由调用方给 |
+| `SlidingSelectionTrack` | 会滑动的选中胶囊：同一块胶囊从旧槽位用弹簧弹到新槽位，槽位内容按 `selection` 进度过渡文字/图标颜色；可选 `position`（如 `TabController.animation`）接管外部连续进度以与横向滑动 1:1 同步；等分与按内容定宽共用一套几何（布局后量槽位） | 不跑弹簧，直接到终值（连续进度按四舍五入瞬切）；胶囊颜色由调用方给 |
 | `GlassIconButton` | 独立玻璃圆球（返回 / 搜索 / 更多），52×52、图标 24、`label` 同时做读屏与长按提示 | 纸底墨边的圆球（与导航条搜索球一致） |
 | `GlassBarAction` | 玻璃条**内部**的图标格（44×44、无自带玻璃底、选中嵌中性胶囊） | 选中反白 |
 | `GlassPillButton` | 玻璃胶囊主按钮（继续阅读 / 开始阅读 / 连接 / 重试），可带图标、`expanded`、`busy` | 墨底纸字、直角 |
-| `GlassSegmentedControl` | 玻璃分段控件；`scrollable` 时按内容定宽并横向滚动（库筛选），否则等分（主题 / 语言 / 收藏集）。选中胶囊由 `SlidingSelectionTrack` 绘制，切换时从旧段弹到新段 | 选中反白、直角；不做滑动（直接到终值） |
+| `GlassSegmentedControl` | 玻璃分段控件；`scrollable` 时按内容定宽并横向滚动（库筛选），否则等分（主题 / 语言 / 收藏集）。选中胶囊由 `SlidingSelectionTrack` 绘制，支持传入 `position` 与 `TabBarView` 实时同步滑动 | 选中反白、直角；不做滑动（直接到终值） |
 | `GlassSearchField` | 玻璃胶囊搜索框，左放大镜、有内容才出现清除键；边框/填充全关掉 | 纸底墨边、直角 |
 | `GlassMenuButton` | 玻璃图标 + `OverlayPortal` **动画玻璃菜单**（排序 / 筛选 / 视图 / 更多）：展开/收回按锚点角落做缩放 + 淡入淡出过渡（`AppMotion.standard`/`quick`）；菜单项由调用方给 `GlassMenuItemButton`，key 挂在项上 | 纸底墨框菜单，直接显隐不播动画 |
 | `GlassMenuItemButton` | 菜单里的一行：文本按菜单中线居中；对勾/图标用 `Positioned` 叠在左侧，不参与文本排版（不会把文字往右挤） | 同菜单 |

@@ -296,6 +296,194 @@ void main() {
       final selectedLabel = tester.widget<Text>(find.text('Read lists'));
       expect(selectedLabel.style?.color, AppTheme.einkPaper);
     });
+
+    testWidgets('传入连续 position 时，胶囊与文字颜色实时同步且钳位边界', (
+      WidgetTester tester,
+    ) async {
+      final position = ValueNotifier<double>(0);
+      addTearDown(position.dispose);
+
+      await tester.pumpWidget(
+        host(
+          SizedBox(
+            width: 320,
+            child: GlassSegmentedControl<int>(
+              segments: const <GlassSegment<int>>[
+                GlassSegment<int>(
+                  value: 0,
+                  label: 'Collections',
+                  key: Key('seg-collections'),
+                ),
+                GlassSegment<int>(
+                  value: 1,
+                  label: 'Read lists',
+                  key: Key('seg-read-lists'),
+                ),
+              ],
+              selected: 0,
+              position: position,
+              onSelected: (_) {},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final slot0 = tester.getRect(find.byKey(const Key('seg-collections')));
+      final slot1 = tester.getRect(find.byKey(const Key('seg-read-lists')));
+      final pillFinder = find.byKey(const Key('sliding-selection-pill'));
+
+      expect(
+        tester.getRect(pillFinder).left,
+        moreOrLessEquals(slot0.left, epsilon: 0.01),
+      );
+
+      // 滑动到 40%：无需等待 settled，单帧即同步到 40% 位置。
+      position.value = 0.4;
+      await tester.pump();
+      final at40 = tester.getRect(pillFinder);
+      expect(
+        at40.left,
+        moreOrLessEquals(
+          slot0.left + (slot1.left - slot0.left) * 0.4,
+          epsilon: 0.01,
+        ),
+      );
+      expect(
+        tester.widget<Text>(find.text('Collections')).style?.fontWeight,
+        FontWeight.w600,
+      );
+
+      // 过半（60%）：胶囊与字重同步切换。
+      position.value = 0.6;
+      await tester.pump();
+      final at60 = tester.getRect(pillFinder);
+      expect(
+        at60.left,
+        moreOrLessEquals(
+          slot0.left + (slot1.left - slot0.left) * 0.6,
+          epsilon: 0.01,
+        ),
+      );
+      expect(
+        tester.widget<Text>(find.text('Read lists')).style?.fontWeight,
+        FontWeight.w600,
+      );
+
+      // 越界值被钳位到两端槽位。
+      position.value = -0.3;
+      await tester.pump();
+      expect(
+        tester.getRect(pillFinder).left,
+        moreOrLessEquals(slot0.left, epsilon: 0.01),
+      );
+      position.value = 1.4;
+      await tester.pump();
+      expect(
+        tester.getRect(pillFinder).left,
+        moreOrLessEquals(slot1.left, epsilon: 0.01),
+      );
+    });
+
+    testWidgets('连续 position 在 RTL 下从右向左插值，在墨水屏下过半瞬切', (
+      WidgetTester tester,
+    ) async {
+      final position = ValueNotifier<double>(0.25);
+      addTearDown(position.dispose);
+
+      // RTL：槽位 0 在右、槽位 1 在左。
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: Directionality(
+            textDirection: TextDirection.rtl,
+            child: Scaffold(
+              body: Center(
+                child: SizedBox(
+                  width: 320,
+                  child: GlassSegmentedControl<int>(
+                    segments: const <GlassSegment<int>>[
+                      GlassSegment<int>(
+                        value: 0,
+                        label: 'A',
+                        key: Key('seg-a'),
+                      ),
+                      GlassSegment<int>(
+                        value: 1,
+                        label: 'B',
+                        key: Key('seg-b'),
+                      ),
+                    ],
+                    selected: 0,
+                    position: position,
+                    onSelected: (_) {},
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final slot0 = tester.getRect(find.byKey(const Key('seg-a')));
+      final slot1 = tester.getRect(find.byKey(const Key('seg-b')));
+      expect(slot0.left, greaterThan(slot1.left));
+      final pillRtl = tester.getRect(
+        find.byKey(const Key('sliding-selection-pill')),
+      );
+      expect(
+        pillRtl.left,
+        moreOrLessEquals(
+          slot0.left + (slot1.left - slot0.left) * 0.25,
+          epsilon: 0.01,
+        ),
+      );
+
+      // 墨水屏：0.4 钉在槽位 0，0.6 瞬切到槽位 1，不画灰阶过渡。
+      position.value = 0.4;
+      await tester.pumpWidget(
+        host(
+          SizedBox(
+            width: 320,
+            child: GlassSegmentedControl<int>(
+              segments: const <GlassSegment<int>>[
+                GlassSegment<int>(value: 0, label: 'A', key: Key('seg-a')),
+                GlassSegment<int>(value: 1, label: 'B', key: Key('seg-b')),
+              ],
+              selected: 0,
+              position: position,
+              onSelected: (_) {},
+            ),
+          ),
+          theme: AppTheme.eink(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final einkSlot0 = tester.getRect(find.byKey(const Key('seg-a')));
+      final einkSlot1 = tester.getRect(find.byKey(const Key('seg-b')));
+      final pillFinder = find.byKey(const Key('sliding-selection-pill'));
+      expect(
+        tester.getRect(pillFinder).left,
+        moreOrLessEquals(einkSlot0.left, epsilon: 0.01),
+      );
+      expect(
+        tester.widget<Text>(find.text('A')).style?.color,
+        AppTheme.einkPaper,
+      );
+
+      position.value = 0.6;
+      await tester.pump();
+      expect(
+        tester.getRect(pillFinder).left,
+        moreOrLessEquals(einkSlot1.left, epsilon: 0.01),
+      );
+      expect(
+        tester.widget<Text>(find.text('B')).style?.color,
+        AppTheme.einkPaper,
+      );
+    });
   });
 
   group('GlassSearchField', () {

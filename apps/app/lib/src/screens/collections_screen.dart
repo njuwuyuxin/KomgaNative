@@ -14,18 +14,49 @@ class CollectionsScreen extends ConsumerStatefulWidget {
 }
 
 class _CollectionsScreenState extends ConsumerState<CollectionsScreen>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tab = TabController(length: 2, vsync: this);
+    with TickerProviderStateMixin {
+  TabController? _tab;
+  TabController? _pendingDispose;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final duration = AppMotion.of(context).standard;
+    final current = _tab;
+    if (current == null) {
+      _tab = TabController(length: 2, vsync: this, animationDuration: duration);
+      return;
+    }
+    if (current.animationDuration == duration) return;
+    final next = TabController(
+      length: 2,
+      initialIndex: current.index,
+      vsync: this,
+      animationDuration: duration,
+    );
+    _tab = next;
+    _pendingDispose?.dispose();
+    _pendingDispose = current;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_pendingDispose == current) {
+        _pendingDispose = null;
+        current.dispose();
+      }
+    });
+  }
 
   @override
   void dispose() {
-    _tab.dispose();
+    _pendingDispose?.dispose();
+    _pendingDispose = null;
+    _tab?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final tab = _tab!;
     final topInset =
         MediaQuery.paddingOf(context).top + AppSizes.glassHeaderClearance;
 
@@ -34,7 +65,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen>
         child: Stack(
           children: <Widget>[
             TabBarView(
-              controller: _tab,
+              controller: tab,
               children: <Widget>[
                 CollectionsTab(topPadding: topInset),
                 ReadListsTab(topPadding: topInset),
@@ -50,7 +81,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen>
                   padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                   child: GlassHeader(
                     bar: AnimatedBuilder(
-                      animation: _tab,
+                      animation: tab,
                       builder: (BuildContext context, _) =>
                           GlassSegmentedControl<int>(
                             segments: <GlassSegment<int>>[
@@ -63,8 +94,9 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen>
                                 label: l10n.readListsTab,
                               ),
                             ],
-                            selected: _tab.index,
-                            onSelected: _tab.animateTo,
+                            selected: tab.index,
+                            position: tab.animation,
+                            onSelected: tab.animateTo,
                           ),
                     ),
                   ),

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:komga_design_system/src/components/glass_control_colors.dart';
 import 'package:komga_design_system/src/components/glass_surface.dart';
 import 'package:komga_design_system/src/components/pressable_scale.dart';
@@ -42,6 +43,7 @@ class GlassSegmentedControl<T> extends StatelessWidget {
     required this.segments,
     required this.selected,
     required this.onSelected,
+    this.position,
     this.scrollable = false,
     super.key,
   });
@@ -49,6 +51,10 @@ class GlassSegmentedControl<T> extends StatelessWidget {
   final List<GlassSegment<T>> segments;
   final T selected;
   final ValueChanged<T> onSelected;
+
+  /// 外部连续选中位置（例如 `TabController.animation`，取值 `[0, segments.length - 1]`）。
+  /// 传值时胶囊与文字颜色随该位置实时同步，与 `TabBarView` 滑动保持一致。
+  final ValueListenable<double>? position;
 
   /// true = 不拉伸、按内容排并允许横向滚动（选项数量不定时用）。
   final bool scrollable;
@@ -69,6 +75,7 @@ class GlassSegmentedControl<T> extends StatelessWidget {
         child: SlidingSelectionTrack(
           itemCount: segments.length,
           selectedIndex: selectedIndex < 0 ? null : selectedIndex,
+          position: position,
           padding: const EdgeInsets.all(AppSizes.glassControlInset),
           pillColor: selectedColors.fill ?? Colors.transparent,
           pillShape: shape,
@@ -167,7 +174,7 @@ class _GlassSegmentButton<T> extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.labelLarge?.copyWith(
-                        fontWeight: selected
+                        fontWeight: selection >= 0.5
                             ? FontWeight.w600
                             : FontWeight.w500,
                         color: foreground,
