@@ -20,6 +20,7 @@ export 'src/components/liquid_glass_shader.dart' show LiquidGlassProgram;
 export 'src/components/list_group.dart';
 export 'src/components/page_background.dart';
 export 'src/components/pressable_scale.dart';
+export 'src/components/selection_badge.dart';
 export 'src/components/series_tile.dart';
 export 'src/components/skeleton.dart';
 export 'src/components/sliding_selection_track.dart';

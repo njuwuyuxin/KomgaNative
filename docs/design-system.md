@@ -21,7 +21,7 @@
 | `AppMotion` | `motion.dart` | 时长 quick 150 / standard 300 / emphasized 450 ms；曲线 standard（easeOutCubic）、emphasized（轻微过冲）、exit；弹簧 snappy / gentle | 时长 0、曲线线性、`enabled = false`（调用方直接跳终值） |
 | `AppMaterial` | `materials.dart` | `chrome`（阅读器，深色强模糊，不跟随深浅色）/ `bar`（液态玻璃：更透 + 提饱和 + `GlassOptics`）/ `sheet`，各有深浅两档 | 不模糊、不透明纸色底 + 1px 墨色描边 |
 | `GlassOptics` | `glass_optics.dart` | 液态玻璃光学参数：饱和度、外缘折射（拉进距离 / 环带宽）、内缘聚光、8 方向镜面高光、轮廓、选中嵌入胶囊底色；`light` / `dark` 两档 | 墨水屏为 null |
-| `AppShadows` | `materials.dart` | cover / card / floating：大半径、低透明度、向下偏移 | 空列表 |
+| `AppShadows` | `materials.dart` | cover / selectedCover（选中封面居中主色光晕）/ card / floating：大半径、低透明度、向下偏移 | 空列表 |
 | `AppShapes` | `shapes.dart` | cover / card / panel 用 `ContinuousRectangleBorder`（squircle 近似），sheet 只圆顶角，bar 是胶囊 | 直角；sheet 改描边 |
 | `AppTypography` | `typography.dart` | largeTitle / title / headline / body / caption / label / pageNumber（等宽数字） | —（字号跟随系统缩放） |
 
@@ -47,6 +47,7 @@ chrome 永远压在漫画画面上：浅色模式下用浅色毛玻璃，白底�
 | `GlassRefraction` / `GlassLightPainter` | 液态玻璃合成版（fallback）的两块光学零件（`glass_optics_layers.dart`），只由 `FrostedSurface` 组装，页面不要直接用 | 墨水屏不会建出来 |
 | `LiquidGlassShaderSurface` | 液态玻璃着色器版（`liquid_glass_shader.dart` + `shaders/liquid_glass.frag`），Impeller 真机上由 `FrostedSurface` 自动选用 | 墨水屏 / 非 Impeller / 加载失败 → 合成版 |
 | `PressableScale` | 按下缩到 0.97、松开用 `snappy` 弹簧回弹；用 `Listener` 监听原始指针，不抢子组件的点击/长按/滚动 | 墨水屏 / 减少动态效果时完全透传 |
+| `SelectionBadge` | 书架多选态圆形选择指示器（未选为空心环、选中为主色实心圆 + 对勾）；`onCover: true` 时带烟熏底/白边轻投影以在任意配色封面上分离 | 纯黑白高对比空心圆 / 墨底纸色对勾，无阴影无动画 |
 | `SlidingSelectionTrack` | 会滑动的选中胶囊：同一块胶囊从旧槽位用弹簧弹到新槽位，槽位内容按 `selection` 进度过渡文字/图标颜色；等分与按内容定宽共用一套几何（布局后量槽位） | 不跑弹簧，直接到终值；胶囊颜色由调用方给 |
 | `GlassIconButton` | 独立玻璃圆球（返回 / 搜索 / 更多），52×52、图标 24、`label` 同时做读屏与长按提示 | 纸底墨边的圆球（与导航条搜索球一致） |
 | `GlassBarAction` | 玻璃条**内部**的图标格（44×44、无自带玻璃底、选中嵌中性胶囊） | 选中反白 |
@@ -261,7 +262,7 @@ chrome 永远压在漫画画面上：浅色模式下用浅色毛玻璃，白底�
   （端头间隙）与 `library_nav@phone_light`：导航条本身 + 真实首页形态（见上一节）。
   分段控件改为"等分 + 段间 4px 间隙"后，`collections@*`、`connection@*`、`settings@eink`
   的选中胶囊与旧基线相差约 2–3px（末端段变窄、其余略变宽）——只影响几何，颜色/材质不变。
-- 页面基线：`library@*`（含 `text1.3` / `library_nav` / `library_sort_menu` / `library_offline`、
+- 页面基线：`library@*`（含 `text1.3` / `library_nav` / `library_selection@{phone_light,tablet_dark,eink}` / `library_list_selection@phone_light` / `library_sort_menu` / `library_offline`、
   以及墨水屏的 `library_sort_menu@eink`）、`reading_now@*`、`settings@eink`、`search@*`、
   `collections@*`、`collection_detail@*`、`readlist_detail@*`、`downloads@*`、`series@*`、
   `series_loading@*`、`connection@*` 一起钉住标题栏高度、玻璃控件排布、分组卡与墨水屏退化。

@@ -311,4 +311,34 @@ void main() {
     expect(find.byKey(const Key('shelf-sort-menu')), findsNothing);
     expect(find.byKey(const Key('shelf-batch-read')), findsOneWidget);
   });
+
+  testWidgets('多选卡片用封面内角标与柔和视觉表达选中，不再套外框线', (WidgetTester tester) async {
+    await pumpShelf(tester);
+
+    // 常态浏览无选择徽章。
+    expect(find.byType(SelectionBadge), findsNothing);
+
+    await enterSelection(tester);
+
+    // 进入管理模式后，每张可见卡片都出现空心选择环，但尚未出现对勾。
+    expect(find.byType(SelectionBadge), findsWidgets);
+    expect(find.byIcon(Icons.check_rounded), findsNothing);
+
+    await tester.tap(find.byKey(const Key('series-s1')));
+    await tester.pumpAndSettle();
+
+    // 仅选中的卡片出现对勾，且整个卡片外部没有 hairline 线框 DecoratedBox。
+    expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+    final selectedTile = find.byKey(const Key('series-s1'));
+    final ancestorWireframes = tester
+        .widgetList<DecoratedBox>(
+          find.ancestor(of: selectedTile, matching: find.byType(DecoratedBox)),
+        )
+        .where(
+          (DecoratedBox box) =>
+              box.decoration is BoxDecoration &&
+              (box.decoration as BoxDecoration).border != null,
+        );
+    expect(ancestorWireframes, isEmpty);
+  });
 }

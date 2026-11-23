@@ -110,10 +110,14 @@ mixin _ShelfSlivers on ConsumerState<LibraryScreen> {
               final item = pinned[index];
               return SeriesShelfTile(
                 series: item,
+                selecting: selection.active,
                 selected: selection.contains(item.id),
                 onTap: () => selection.active
-                    ? ref.read(shelfSelectionProvider.notifier).toggle(item.id)
+                    ? _toggleSelect(item.id)
                     : unawaited(_openSeries(item)),
+                onLongPress: selection.active
+                    ? () => _toggleSelect(item.id)
+                    : null,
               );
             }, childCount: pinned.length),
           ),
@@ -134,14 +138,13 @@ mixin _ShelfSlivers on ConsumerState<LibraryScreen> {
               final item = series[index];
               return SeriesShelfTile(
                 series: item,
+                selecting: selection.active,
                 selected: selection.contains(item.id),
                 onTap: () => selection.active
-                    ? ref.read(shelfSelectionProvider.notifier).toggle(item.id)
+                    ? _toggleSelect(item.id)
                     : unawaited(_openSeries(item)),
                 onLongPress: selection.active
-                    ? () => ref
-                          .read(shelfSelectionProvider.notifier)
-                          .toggle(item.id)
+                    ? () => _toggleSelect(item.id)
                     : null,
               );
             }, childCount: series.length),
@@ -158,14 +161,13 @@ mixin _ShelfSlivers on ConsumerState<LibraryScreen> {
               key: Key('series-${item.id}'),
               series: item,
               coverSize: state.coverSize,
+              selecting: selection.active,
               selected: selection.contains(item.id),
               onTap: () => selection.active
-                  ? ref.read(shelfSelectionProvider.notifier).toggle(item.id)
+                  ? _toggleSelect(item.id)
                   : unawaited(_openSeries(item)),
               onLongPress: selection.active
-                  ? () => ref
-                        .read(shelfSelectionProvider.notifier)
-                        .toggle(item.id)
+                  ? () => _toggleSelect(item.id)
                   : null,
             );
           }, childCount: series.length),
@@ -177,6 +179,11 @@ mixin _ShelfSlivers on ConsumerState<LibraryScreen> {
         ),
       ),
     ];
+  }
+
+  void _toggleSelect(String seriesId) {
+    unawaited(AppHaptics.selection());
+    ref.read(shelfSelectionProvider.notifier).toggle(seriesId);
   }
 
   /// 进系列页；回来时原地刷新进度（别把列表清空跳回顶部）。

@@ -195,6 +195,41 @@ abstract final class AppShadows {
 
   static const List<BoxShadow> none = <BoxShadow>[];
 
+  /// 选中封面时的柔和主题色光晕投影：不用硬线框，靠主色弥散光晕 + 轻接触影托出选中感。
+  ///
+  /// 墨水屏返回 [none]。
+  static List<BoxShadow> selectedCover(
+    BuildContext context, {
+    required Color color,
+  }) {
+    final theme = Theme.of(context);
+    return resolveSelectedCover(
+      color,
+      eink: AppTheme.isEink(theme),
+      dark: theme.brightness == Brightness.dark,
+    );
+  }
+
+  /// 纯函数版本，便于单测验证深浅色与墨水屏退化。
+  static List<BoxShadow> resolveSelectedCover(
+    Color color, {
+    required bool eink,
+    required bool dark,
+  }) {
+    if (eink) return none;
+    return <BoxShadow>[
+      BoxShadow(
+        color: Color(dark ? 0x33000000 : 0x1A000000),
+        blurRadius: 8,
+        offset: const Offset(0, 3),
+      ),
+      BoxShadow(
+        color: color.withValues(alpha: dark ? 0.28 : 0.22),
+        blurRadius: 16,
+      ),
+    ];
+  }
+
   /// 按主题退化：墨水屏返回 [none]。
   static List<BoxShadow> resolve(
     List<BoxShadow> shadow, {

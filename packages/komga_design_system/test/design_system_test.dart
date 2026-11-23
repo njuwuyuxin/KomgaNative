@@ -1,3 +1,5 @@
+import 'dart:ui' show Tristate;
+
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:komga_design_system/komga_design_system.dart';
@@ -166,6 +168,128 @@ void main() {
       );
       await tester.tap(find.byType(SeriesTile));
       expect(tapped, isTrue);
+    });
+
+    testWidgets('多选态：未选展示空心选择环，选中后缩放封面、呈现对勾与 selected 语义', (
+      WidgetTester tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      const series = Series(
+        id: 's1',
+        libraryId: 'l1',
+        title: 'Frieren',
+        booksCount: 10,
+        booksReadCount: 4,
+      );
+
+      Widget buildTile({required bool selecting, required bool selected}) =>
+          MaterialApp(
+            theme: AppTheme.light(),
+            home: Scaffold(
+              body: SizedBox(
+                width: 180,
+                height: 280,
+                child: SeriesTile(
+                  series: series,
+                  selecting: selecting,
+                  selected: selected,
+                  onTap: () {},
+                ),
+              ),
+            ),
+          );
+
+      // 非多选态不渲染选择徽章。
+      await tester.pumpWidget(buildTile(selecting: false, selected: false));
+      expect(find.byKey(const Key('series-selection-badge')), findsNothing);
+
+      // 进入多选但未选中：右上角空心选择环出现，无对勾，无障碍 selected=false。
+      await tester.pumpWidget(buildTile(selecting: true, selected: false));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('series-selection-badge')), findsOneWidget);
+      expect(find.byIcon(Icons.check_rounded), findsNothing);
+      final unselectedScale = tester.widget<AnimatedScale>(
+        find.byType(AnimatedScale),
+      );
+      expect(unselectedScale.scale, 1.0);
+      expect(
+        tester.getSemantics(find.byType(SeriesTile)).flagsCollection.isSelected,
+        Tristate.isFalse,
+      );
+
+      // 选中后：封面柔和内收、呈现对勾、无障碍 selected=true。
+      await tester.pumpWidget(buildTile(selecting: true, selected: true));
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+      final selectedScale = tester.widget<AnimatedScale>(
+        find.byType(AnimatedScale),
+      );
+      expect(selectedScale.scale, lessThan(1.0));
+      expect(
+        tester.getSemantics(find.byType(SeriesTile)).flagsCollection.isSelected,
+        Tristate.isTrue,
+      );
+
+      handle.dispose();
+    });
+
+    testWidgets('墨水屏多选态：保持 1.0 原比例不缩放且无阴影', (WidgetTester tester) async {
+      const series = Series(
+        id: 's1',
+        libraryId: 'l1',
+        title: 'Frieren',
+        booksCount: 10,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.eink(),
+          home: const Scaffold(
+            body: SizedBox(
+              width: 180,
+              height: 280,
+              child: SeriesTile(
+                series: series,
+                selecting: true,
+                selected: true,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+      final scale = tester.widget<AnimatedScale>(find.byType(AnimatedScale));
+      expect(scale.scale, 1.0);
+      final badgeBox = tester.widget<AnimatedContainer>(
+        find.descendant(
+          of: find.byType(SelectionBadge),
+          matching: find.byType(AnimatedContainer),
+        ),
+      );
+      final decoration = badgeBox.decoration! as BoxDecoration;
+      expect(decoration.color, AppTheme.einkInk);
+      expect(decoration.boxShadow, isNull);
+    });
+  });
+
+  group('SelectionBadge', () {
+    testWidgets('列表模式（onCover=false）选中与未选态切换清晰', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: const Scaffold(body: SelectionBadge(selected: false)),
+        ),
+      );
+      expect(find.byIcon(Icons.check_rounded), findsNothing);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          home: const Scaffold(body: SelectionBadge(selected: true)),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.check_rounded), findsOneWidget);
     });
   });
 }

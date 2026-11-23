@@ -212,6 +212,27 @@ void main() {
         expect(shadow.offset.dy, greaterThanOrEqualTo(0));
       }
     });
+
+    test('选中封面光晕投影：墨水屏清零，深浅色保留柔和居中光晕', () {
+      expect(
+        AppShadows.resolveSelectedCover(AppTheme.seed, eink: true, dark: false),
+        isEmpty,
+      );
+      final light = AppShadows.resolveSelectedCover(
+        AppTheme.seed,
+        eink: false,
+        dark: false,
+      );
+      final dark = AppShadows.resolveSelectedCover(
+        AppTheme.seed,
+        eink: false,
+        dark: true,
+      );
+      expect(light, hasLength(2));
+      expect(dark, hasLength(2));
+      expect(light.last.offset, Offset.zero);
+      expect(dark.last.offset, Offset.zero);
+    });
   });
 
   group('AppShapes', () {

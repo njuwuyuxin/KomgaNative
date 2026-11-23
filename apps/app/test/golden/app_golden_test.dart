@@ -138,7 +138,16 @@ void main() {
   });
 
   /// 管理书籍态（LIB-03）：顶部栏原地形变为「管理书籍」胶囊 + 退出圆球 + 全标已读/未读/收藏集三格胶囊，
-  /// 大标题行切换为「已选 N / 全选」，底部不再叠加重复批量条。
+  /// 大标题行切换为「已选 N / 全选」，选中封面轻微内收并呈现柔光遮罩 + 右上角对勾，未选封面呈现空心环。
+  Future<void> enterAndSelectShelf(WidgetTester tester) async {
+    await tester.tap(find.byKey(const Key('shelf-select-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('series-s1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('series-s2')));
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('library_selection@phone_light', (WidgetTester tester) async {
     await pumpShelfGolden(
       tester,
@@ -146,13 +155,44 @@ void main() {
       size: GoldenSizes.phone,
       theme: AppTheme.light(),
       withNavBar: true,
+      act: enterAndSelectShelf,
+    );
+  });
+
+  testWidgets('library_selection@tablet_dark', (WidgetTester tester) async {
+    await pumpShelfGolden(
+      tester,
+      name: 'library_selection@tablet_dark',
+      size: GoldenSizes.tablet,
+      theme: AppTheme.dark(),
+      act: enterAndSelectShelf,
+    );
+  });
+
+  testWidgets('library_selection@eink', (WidgetTester tester) async {
+    await pumpShelfGolden(
+      tester,
+      name: 'library_selection@eink',
+      size: GoldenSizes.eink,
+      theme: AppTheme.eink(),
+      act: enterAndSelectShelf,
+    );
+  });
+
+  testWidgets('library_list_selection@phone_light', (
+    WidgetTester tester,
+  ) async {
+    await pumpShelfGolden(
+      tester,
+      name: 'library_list_selection@phone_light',
+      size: GoldenSizes.phone,
+      theme: AppTheme.light(),
       act: (WidgetTester tester) async {
-        await tester.tap(find.byKey(const Key('shelf-select-button')));
+        await tester.tap(find.byKey(const Key('shelf-view-menu')));
         await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const Key('series-s1')));
+        await tester.tap(find.text('List'));
         await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const Key('series-s2')));
-        await tester.pumpAndSettle();
+        await enterAndSelectShelf(tester);
       },
     );
   });

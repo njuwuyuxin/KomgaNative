@@ -22,6 +22,7 @@ class SeriesShelfTile extends ConsumerWidget {
     required this.series,
     this.onTap,
     this.onLongPress,
+    this.selecting = false,
     this.selected = false,
     this.heroTag,
     super.key,
@@ -30,6 +31,7 @@ class SeriesShelfTile extends ConsumerWidget {
   final Series series;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
+  final bool selecting;
   final bool selected;
   final String? heroTag;
 
@@ -44,6 +46,7 @@ class SeriesShelfTile extends ConsumerWidget {
     final tag = heroTag ?? seriesHeroTag(series.id);
     final pinned =
         ref.watch(pinnedSeriesIdsProvider).value?.contains(series.id) ?? false;
+    final unread = series.booksCount - series.booksReadCount;
 
     final tile = SeriesTile(
       key: Key('series-${series.id}'),
@@ -51,6 +54,9 @@ class SeriesShelfTile extends ConsumerWidget {
       semanticsLabel:
           '${series.title}, '
           '${l10n.readOfTotal(series.booksReadCount, series.booksCount)}',
+      selecting: selecting,
+      selected: selected,
+      topStartBadge: unread > 0 ? UnreadBadge(count: unread) : null,
       onTap: onTap,
       onLongPress:
           onLongPress ??
@@ -59,33 +65,13 @@ class SeriesShelfTile extends ConsumerWidget {
           ),
       cover: bytes == null || bytes.isEmpty ? null : CoverImage(bytes: bytes),
     );
-    final badged = _withSelection(
-      context,
-      _withUnreadBadge(series, tile),
-      selected,
-    );
 
-    if (AppTheme.isEink(Theme.of(context))) return badged;
+    if (AppTheme.isEink(Theme.of(context))) return tile;
     return Hero(
       tag: tag,
-      child: Material(type: MaterialType.transparency, child: badged),
+      child: Material(type: MaterialType.transparency, child: tile),
     );
   }
-}
-
-Widget _withSelection(BuildContext context, Widget child, bool selected) {
-  if (!selected) return child;
-  final eink = AppTheme.isEink(Theme.of(context));
-  return DecoratedBox(
-    decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(AppRadii.md),
-      border: Border.all(
-        color: eink ? AppTheme.einkInk : Theme.of(context).colorScheme.primary,
-        width: AppSizes.hairline,
-      ),
-    ),
-    child: child,
-  );
 }
 
 Widget _withUnreadBadge(Series series, Widget child) {
@@ -111,6 +97,7 @@ class SeriesShelfRow extends ConsumerWidget {
     required this.coverSize,
     this.onTap,
     this.onLongPress,
+    this.selecting = false,
     this.selected = false,
     this.heroTag,
     this.trailing,
@@ -121,6 +108,7 @@ class SeriesShelfRow extends ConsumerWidget {
   final ShelfCoverSize coverSize;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
+  final bool selecting;
   final bool selected;
   final String? heroTag;
 
@@ -131,12 +119,17 @@ class SeriesShelfRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final eink = AppTheme.isEink(theme);
+    final dark = theme.brightness == Brightness.dark;
+    final motion = AppMotion.of(context);
+    final showSelection = selecting || selected;
     final cover = ref.watch(seriesCoverProvider(series.id));
     final Uint8List? bytes = switch (cover) {
       AsyncData<Uint8List?>(:final value) => value,
       _ => null,
     };
-    final shape = AppShapes.of(context, AppShapes.cover);
+    final coverShape = AppShapes.of(context, AppShapes.cover);
+    final rowShape = AppShapes.of(context, AppShapes.card);
     final progressLabel = l10n.readOfTotal(
       series.booksReadCount,
       series.booksCount,
@@ -145,95 +138,158 @@ class SeriesShelfRow extends ConsumerWidget {
     final pinned =
         ref.watch(pinnedSeriesIdsProvider).value?.contains(series.id) ?? false;
 
-    final coverBox = DecoratedBox(
-      decoration: ShapeDecoration(
-        shape: shape,
-        shadows: AppShadows.of(context, AppShadows.cover),
-      ),
-      child: ClipPath(
-        clipper: ShapeBorderClipper(shape: shape),
-        child: SizedBox.fromSize(
-          size: coverSize.rowCover,
-          child: bytes == null || bytes.isEmpty
-              ? ColoredBox(color: theme.colorScheme.surfaceContainerHighest)
-              : CoverImage(bytes: bytes),
+    final coverBox = AnimatedScale(
+      scale: (!eink && selected) ? 0.94 : 1.0,
+      duration: motion.quick,
+      curve: motion.standardCurve,
+      child: DecoratedBox(
+        decoration: ShapeDecoration(
+          shape: coverShape,
+          shadows: selected
+              ? AppShadows.selectedCover(
+                  context,
+                  color: theme.colorScheme.primary,
+                )
+              : AppShadows.of(context, AppShadows.cover),
+        ),
+        child: ClipPath(
+          clipper: ShapeBorderClipper(shape: coverShape),
+          child: SizedBox.fromSize(
+            size: coverSize.rowCover,
+            child: Stack(
+              fit: StackFit.expand,
+              children: <Widget>[
+                bytes == null || bytes.isEmpty
+                    ? ColoredBox(
+                        color: theme.colorScheme.surfaceContainerHighest,
+                      )
+                    : CoverImage(bytes: bytes),
+                IgnorePointer(
+                  child: AnimatedOpacity(
+                    opacity: selected ? 1 : 0,
+                    duration: motion.quick,
+                    curve: motion.standardCurve,
+                    child: ColoredBox(
+                      color: eink
+                          ? AppTheme.einkPaper.withValues(alpha: 0.32)
+                          : Color.lerp(
+                              Colors.black,
+                              theme.colorScheme.primary,
+                              0.4,
+                            )!.withValues(alpha: dark ? 0.34 : 0.24),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
-    final coverWidget = AppTheme.isEink(theme)
-        ? coverBox
-        : Hero(tag: tag, child: coverBox);
+    final coverWidget = eink ? coverBox : Hero(tag: tag, child: coverBox);
+    final rowFill = !selected
+        ? Colors.transparent
+        : eink
+        ? AppTheme.einkInk.withValues(alpha: 0.08)
+        : theme.colorScheme.primary.withValues(alpha: dark ? 0.18 : 0.10);
 
     final row = Semantics(
       container: true,
       button: onTap != null,
+      selected: showSelection ? selected : null,
       label: '${series.title}, $progressLabel',
       onTap: onTap,
       child: ExcludeSemantics(
         child: PressableScale(
-          child: InkWell(
-            onTap: onTap,
-            onLongPress:
-                onLongPress ??
-                () => unawaited(
-                  showSeriesMenu(
-                    context,
-                    ref,
-                    series,
-                    heroTag: tag,
-                    pinned: pinned,
-                  ),
-                ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: AppSpacing.sm,
-              ),
-              child: Row(
-                children: <Widget>[
-                  coverWidget,
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        Text(
-                          series.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.xxs),
-                        Text(
-                          progressLabel,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  SizedBox(
-                    width: AppSizes.valueColumn,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(AppRadii.sm),
-                      child: LinearProgressIndicator(
-                        value: series.progress,
-                        minHeight: AppSizes.progressBar,
-                        backgroundColor:
-                            theme.colorScheme.surfaceContainerHighest,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm,
+              vertical: AppSpacing.xxs,
+            ),
+            child: AnimatedContainer(
+              duration: motion.quick,
+              curve: motion.standardCurve,
+              decoration: ShapeDecoration(color: rowFill, shape: rowShape),
+              child: InkWell(
+                customBorder: rowShape,
+                onTap: onTap,
+                onLongPress:
+                    onLongPress ??
+                    () => unawaited(
+                      showSeriesMenu(
+                        context,
+                        ref,
+                        series,
+                        heroTag: tag,
+                        pinned: pinned,
                       ),
                     ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.sm,
+                    vertical: AppSpacing.sm - AppSpacing.xxs,
                   ),
-                  if (trailing != null) ...<Widget>[
-                    const SizedBox(width: AppSpacing.xs),
-                    trailing!,
-                  ],
-                ],
+                  child: Row(
+                    children: <Widget>[
+                      coverWidget,
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            Text(
+                              series.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: selected && eink
+                                    ? FontWeight.w700
+                                    : FontWeight.w600,
+                                color: selected
+                                    ? (eink
+                                          ? AppTheme.einkInk
+                                          : theme.colorScheme.primary)
+                                    : null,
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.xxs),
+                            Text(
+                              progressLabel,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      SizedBox(
+                        width: AppSizes.valueColumn,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(AppRadii.sm),
+                          child: LinearProgressIndicator(
+                            value: series.progress,
+                            minHeight: AppSizes.progressBar,
+                            backgroundColor:
+                                theme.colorScheme.surfaceContainerHighest,
+                          ),
+                        ),
+                      ),
+                      if (showSelection) ...<Widget>[
+                        const SizedBox(width: AppSpacing.md),
+                        SelectionBadge(
+                          key: const Key('series-selection-badge'),
+                          selected: selected,
+                        ),
+                      ],
+                      if (trailing != null) ...<Widget>[
+                        const SizedBox(width: AppSpacing.xs),
+                        trailing!,
+                      ],
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
@@ -241,6 +297,6 @@ class SeriesShelfRow extends ConsumerWidget {
       ),
     );
 
-    return _withSelection(context, _withUnreadBadge(series, row), selected);
+    return _withUnreadBadge(series, row);
   }
 }
