@@ -477,11 +477,26 @@ void main() {
         ),
       );
 
-      // 展开动画中途：菜单已挂载，但透明度和缩放正在过渡中。
+      // 展开动画中途：菜单已挂载，透明度和缩放正在过渡中，且 GlassSurface / BackdropFilter
+      // 外层不能套 Opacity（避免 OpacityLayer 隔断背景采样导致展开末尾跳变）。
       await tester.tap(find.byType(GlassMenuButton));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 80));
       expect(find.text('Action A'), findsOneWidget);
+      final menuSurfaceFinder = find
+          .ancestor(
+            of: find.text('Action A'),
+            matching: find.byType(GlassSurface),
+          )
+          .first;
+      final openingSurface = tester.widget<GlassSurface>(menuSurfaceFinder);
+      expect(openingSurface.opacity, greaterThan(0));
+      expect(openingSurface.opacity, lessThan(1));
+      expect(
+        find.ancestor(of: menuSurfaceFinder, matching: find.byType(Opacity)),
+        findsNothing,
+        reason: '菜单玻璃外层不能套 Opacity，否则会隔断 BackdropFilter 读取背景',
+      );
       final openingOpacity = tester.widget<Opacity>(
         find
             .ancestor(of: find.text('Action A'), matching: find.byType(Opacity))
@@ -491,12 +506,16 @@ void main() {
       expect(openingOpacity.opacity, lessThan(1));
 
       await tester.pumpAndSettle();
-      final openOpacity = tester.widget<Opacity>(
-        find
-            .ancestor(of: find.text('Action A'), matching: find.byType(Opacity))
-            .first,
+      final openSurface = tester.widget<GlassSurface>(menuSurfaceFinder);
+      expect(openSurface.opacity, 1.0);
+      expect(
+        find.ancestor(
+          of: find.text('Action A'),
+          matching: find.byType(Opacity),
+        ),
+        findsNothing,
+        reason: '稳态不挂多余 Opacity 层',
       );
-      expect(openOpacity.opacity, 1.0);
 
       // 点击菜单项：派发回调并播收回动画（中途仍在场，结束后卸载）。
       await tester.tap(find.text('Action A'));
@@ -504,6 +523,12 @@ void main() {
       expect(picked, isTrue);
       await tester.pump(const Duration(milliseconds: 50));
       expect(find.text('Action A'), findsOneWidget);
+      final closingSurface = tester.widget<GlassSurface>(menuSurfaceFinder);
+      expect(closingSurface.opacity, lessThan(1));
+      expect(
+        find.ancestor(of: menuSurfaceFinder, matching: find.byType(Opacity)),
+        findsNothing,
+      );
       final closingOpacity = tester.widget<Opacity>(
         find
             .ancestor(of: find.text('Action A'), matching: find.byType(Opacity))
@@ -536,15 +561,15 @@ void main() {
       await tester.tap(find.byType(GlassMenuButton));
       await tester.pump();
       expect(find.text('E-ink item'), findsOneWidget);
-      final openOpacity = tester.widget<Opacity>(
+      final openSurface = tester.widget<GlassSurface>(
         find
             .ancestor(
               of: find.text('E-ink item'),
-              matching: find.byType(Opacity),
+              matching: find.byType(GlassSurface),
             )
             .first,
       );
-      expect(openOpacity.opacity, 1.0);
+      expect(openSurface.opacity, 1.0);
 
       await tester.tap(find.text('E-ink item'));
       await tester.pump();

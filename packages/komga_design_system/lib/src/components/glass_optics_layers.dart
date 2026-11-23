@@ -20,17 +20,23 @@ import 'package:material_ui/material_ui.dart';
 /// 为什么要自己写 render object：缩放矩阵必须以"玻璃中心在当前图层里的位置"
 /// 为原点，这个位置只有 paint 时才知道（滚动、按下缩放都会变）。
 class GlassRefraction extends StatelessWidget {
-  const GlassRefraction({required this.optics, required this.shape, super.key});
+  const GlassRefraction({
+    required this.optics,
+    required this.shape,
+    this.strength = 1,
+    super.key,
+  });
 
   final GlassOptics optics;
   final ShapeBorder shape;
+  final double strength;
 
   @override
   Widget build(BuildContext context) {
     return IgnorePointer(
       child: ClipPath(
         clipper: _RingClipper(shape: shape, band: optics.refractionBand),
-        child: _Lens(pull: optics.refraction),
+        child: _Lens(pull: optics.refraction * strength.clamp(0.0, 1.0)),
       ),
     );
   }

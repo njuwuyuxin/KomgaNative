@@ -23,6 +23,7 @@ uniform float u_specular; // 镜面高光强度
 uniform float u_rimWidth; // 镜面高光线宽（物理像素）
 uniform float u_glow;     // 斜面柔光强度
 uniform float u_blur;     // 着色器内轻模糊半径（物理像素）
+uniform float u_opacity;  // 玻璃可见度（0..1）：在着色器内与原背景混合，避免外层 OpacityLayer 隔断背景采样
 uniform sampler2D u_texture;
 
 out vec4 frag_color;
@@ -56,57 +57,64 @@ vec3 sampleBlur(vec2 p) {
 
 void main() {
   vec2 p = FlutterFragCoord().xy;
-  vec2 halfSize = u_rect.zw * 0.5;
-  vec2 center = u_rect.xy + halfSize;
-  vec2 local = p - center;
-  float r = min(u_radius, min(halfSize.x, halfSize.y));
-
-  float d = sdRoundBox(local, halfSize, r);
-  // 外法线：SDF 梯度。
-  vec2 e = vec2(1.0, 0.0);
-  vec2 grad = vec2(
-    sdRoundBox(local + e.xy, halfSize, r) - sdRoundBox(local - e.xy, halfSize, r),
-    sdRoundBox(local + e.yx, halfSize, r) - sdRoundBox(local - e.yx, halfSize, r)
-  );
-  vec2 n = length(grad) > 1e-4 ? normalize(grad) : vec2(0.0, -1.0);
-
-  float depth = max(-d, 0.0);                 // 离外缘多深
-  float x = clamp(depth / u_bezel, 0.0, 1.0); // 0 = 外缘，1 = 斜面内沿
-  float edge = 1.0 - x;
-
-  // 斜面是凸的：越靠外缘越陡，光线越往里折——向内采样，外缘位移最大。
-  // 曲线取 squircle 斜面的近似（外缘陡、向内很快变平）。
-  float disp = u_refract * edge * edge * (3.0 - 2.0 * edge) * edge;
-  vec2 dir = -n;
-  vec3 col;
-  if (u_chroma > 0.0 && disp > 0.25) {
-    col.r = sampleBlur(p + dir * disp * (1.0 + u_chroma)).r;
-    col.g = sampleBlur(p + dir * disp).g;
-    col.b = sampleBlur(p + dir * disp * (1.0 - u_chroma)).b;
+  if (u_opacity <= 0.001) {
+    frag_color = vec4(sampleAt(p), 1.0);
   } else {
-    col = sampleBlur(p + dir * disp);
+    vec2 halfSize = u_rect.zw * 0.5;
+    vec2 center = u_rect.xy + halfSize;
+    vec2 local = p - center;
+    float r = min(u_radius, min(halfSize.x, halfSize.y));
+
+    float d = sdRoundBox(local, halfSize, r);
+    // 外法线：SDF 梯度。
+    vec2 e = vec2(1.0, 0.0);
+    vec2 grad = vec2(
+      sdRoundBox(local + e.xy, halfSize, r) - sdRoundBox(local - e.xy, halfSize, r),
+      sdRoundBox(local + e.yx, halfSize, r) - sdRoundBox(local - e.yx, halfSize, r)
+    );
+    vec2 n = length(grad) > 1e-4 ? normalize(grad) : vec2(0.0, -1.0);
+
+    float depth = max(-d, 0.0);                 // 离外缘多深
+    float x = clamp(depth / u_bezel, 0.0, 1.0); // 0 = 外缘，1 = 斜面内沿
+    float edge = 1.0 - x;
+
+    // 斜面是凸的：越靠外缘越陡，光线越往里折——向内采样，外缘位移最大。
+    // 曲线取 squircle 斜面的近似（外缘陡、向内很快变平）。
+    float disp = u_refract * u_opacity * edge * edge * (3.0 - 2.0 * edge) * edge;
+    vec2 dir = -n;
+    vec3 col;
+    if (u_chroma > 0.0 && disp > 0.25) {
+      col.r = sampleBlur(p + dir * disp * (1.0 + u_chroma)).r;
+      col.g = sampleBlur(p + dir * disp).g;
+      col.b = sampleBlur(p + dir * disp * (1.0 - u_chroma)).b;
+    } else {
+      col = sampleBlur(p + dir * disp);
+    }
+
+    // 背后颜色"透"出来：提饱和、提亮，再压一层底色。
+    float luma = dot(col, vec3(0.2126, 0.7152, 0.0722));
+    col = mix(vec3(luma), col, u_saturation);
+    col = clamp(col + u_brightness, 0.0, 1.0);
+    col = mix(col, u_tint.rgb, u_tint.a);
+
+    // 光从左上来（屏幕 y 向下）。
+    vec2 light = normalize(vec2(-0.55, -1.0));
+    float facing = dot(n, light);
+    float lit = pow(max(facing, 0.0), 1.5);           // 迎光面
+    float reflected = pow(max(-facing, 0.0), 2.0);    // 背光面的内反射
+
+    // 斜面柔光：厚玻璃把光聚在边上。
+    float glow = u_glow * pow(edge, 3.0) * (0.35 + 0.65 * lit + 0.4 * reflected);
+    col = mix(col, vec3(1.0), clamp(glow, 0.0, 1.0));
+
+    // 镜面高光：贴着轮廓的一条细亮线，亮度随方向变。
+    float rim = 1.0 - smoothstep(0.0, u_rimWidth, depth);
+    float spec = u_specular * rim * (0.18 + 0.82 * lit + 0.55 * reflected);
+    col = mix(col, vec3(1.0), clamp(spec, 0.0, 1.0));
+
+    if (u_opacity < 0.999) {
+      col = mix(sampleAt(p), col, u_opacity);
+    }
+    frag_color = vec4(col, 1.0);
   }
-
-  // 背后颜色"透"出来：提饱和、提亮，再压一层底色。
-  float luma = dot(col, vec3(0.2126, 0.7152, 0.0722));
-  col = mix(vec3(luma), col, u_saturation);
-  col = clamp(col + u_brightness, 0.0, 1.0);
-  col = mix(col, u_tint.rgb, u_tint.a);
-
-  // 光从左上来（屏幕 y 向下）。
-  vec2 light = normalize(vec2(-0.55, -1.0));
-  float facing = dot(n, light);
-  float lit = pow(max(facing, 0.0), 1.5);           // 迎光面
-  float reflected = pow(max(-facing, 0.0), 2.0);    // 背光面的内反射
-
-  // 斜面柔光：厚玻璃把光聚在边上。
-  float glow = u_glow * pow(edge, 3.0) * (0.35 + 0.65 * lit + 0.4 * reflected);
-  col = mix(col, vec3(1.0), clamp(glow, 0.0, 1.0));
-
-  // 镜面高光：贴着轮廓的一条细亮线，亮度随方向变。
-  float rim = 1.0 - smoothstep(0.0, u_rimWidth, depth);
-  float spec = u_specular * rim * (0.18 + 0.82 * lit + 0.55 * reflected);
-  col = mix(col, vec3(1.0), clamp(spec, 0.0, 1.0));
-
-  frag_color = vec4(col, 1.0);
 }

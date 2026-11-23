@@ -42,8 +42,8 @@ chrome 永远压在漫画画面上：浅色模式下用浅色毛玻璃，白底�
 
 | 组件 | 作用 | 退化 |
 |---|---|---|
-| `FrostedSurface` | 裁剪 →（液态玻璃档）外缘折射 → `BackdropFilter` 模糊（+ 提饱和）→ 半透明底色 → 体内反光 →（液态玻璃档）内缘聚光 + 方向性镜面高光边 + 轮廓（可传 `shape`） | 墨水屏不建 `BackdropFilter`、不画反光与光学层 |
-| `GlassSurface` | `FrostedSurface` + 浮层阴影，默认胶囊形（导航条 / 搜索圆球） | 墨水屏不模糊、不反光、无阴影，只剩纸底 + 墨边 |
+| `FrostedSurface` | 裁剪 →（液态玻璃档）外缘折射 → `BackdropFilter` 模糊（+ 提饱和）→ 半透明底色 → 体内反光 →（液态玻璃档）内缘聚光 + 方向性镜面高光边 + 轮廓（可传 `shape` / `opacity`；淡入淡出必须经 `opacity`，勿在外层套 `Opacity`，否则 `OpacityLayer` 会隔断背景读取） | 墨水屏不建 `BackdropFilter`、不画反光与光学层 |
+| `GlassSurface` | `FrostedSurface` + 浮层阴影，默认胶囊形（导航条 / 搜索圆球），支持 `opacity` 同步淡入阴影与玻璃 | 墨水屏不模糊、不反光、无阴影，只剩纸底 + 墨边 |
 | `GlassRefraction` / `GlassLightPainter` | 液态玻璃合成版（fallback）的两块光学零件（`glass_optics_layers.dart`），只由 `FrostedSurface` 组装，页面不要直接用 | 墨水屏不会建出来 |
 | `LiquidGlassShaderSurface` | 液态玻璃着色器版（`liquid_glass_shader.dart` + `shaders/liquid_glass.frag`），Impeller 真机上由 `FrostedSurface` 自动选用 | 墨水屏 / 非 Impeller / 加载失败 → 合成版 |
 | `PressableScale` | 按下缩到 0.97、松开用 `snappy` 弹簧回弹；用 `Listener` 监听原始指针，不抢子组件的点击/长按/滚动 | 墨水屏 / 减少动态效果时完全透传 |

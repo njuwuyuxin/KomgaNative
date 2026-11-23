@@ -132,24 +132,21 @@ class _GlassMenuButtonState extends State<GlassMenuButton>
                 AppSpacing.xl)
             .clamp(AppSizes.minTouch, double.infinity);
 
-    final panel = GlassSurface(
-      shape: AppShapes.of(context, AppShapes.panel),
-      shadows: AppShadows.floating,
-      child: Material(
-        type: MaterialType.transparency,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            minWidth: AppSpacing.xxl * 3,
-            maxHeight: maxMenuHeight,
-          ),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-            child: IntrinsicWidth(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: widget.menuChildren,
-              ),
+    final panelShape = AppShapes.of(context, AppShapes.panel);
+    final menuContent = Material(
+      type: MaterialType.transparency,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          minWidth: AppSpacing.xxl * 3,
+          maxHeight: maxMenuHeight,
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+          child: IntrinsicWidth(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: widget.menuChildren,
             ),
           ),
         ),
@@ -182,7 +179,7 @@ class _GlassMenuButtonState extends State<GlassMenuButton>
                 isClosing: () => !_opening,
                 child: AnimatedBuilder(
                   animation: _controller,
-                  child: panel,
+                  child: menuContent,
                   builder: (BuildContext context, Widget? child) {
                     final v = _controller.value;
                     final reversing =
@@ -194,12 +191,16 @@ class _GlassMenuButtonState extends State<GlassMenuButton>
                         (reversing ? motion.exitCurve : motion.standardCurve)
                             .transform(v)
                             .clamp(0.0, 1.0);
-                    return Opacity(
-                      opacity: fadeT,
-                      child: Transform.scale(
-                        scale: 0.86 + 0.14 * scaleT,
-                        alignment: origin,
-                        child: child,
+                    // 不用外层 Opacity 包 GlassSurface：OpacityLayer 会隔断
+                    // BackdropFilter 对屏幕背景的采样，导致展开末尾从实心跳变到透明。
+                    return Transform.scale(
+                      scale: 0.86 + 0.14 * scaleT,
+                      alignment: origin,
+                      child: GlassSurface(
+                        shape: panelShape,
+                        shadows: AppShadows.floating,
+                        opacity: fadeT,
+                        child: child!,
                       ),
                     );
                   },

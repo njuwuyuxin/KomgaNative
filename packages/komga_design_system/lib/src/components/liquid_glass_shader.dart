@@ -44,12 +44,14 @@ class LiquidGlassShaderSurface extends StatelessWidget {
     required this.params,
     required this.shape,
     required this.child,
+    this.opacity = 1,
     super.key,
   });
 
   final LiquidShaderParams params;
   final ShapeBorder shape;
   final Widget child;
+  final double opacity;
 
   @override
   Widget build(BuildContext context) {
@@ -60,6 +62,7 @@ class LiquidGlassShaderSurface extends StatelessWidget {
         params: params,
         shape: shape,
         devicePixelRatio: dpr,
+        opacity: opacity.clamp(0.0, 1.0),
         child: child,
       ),
     );
@@ -71,18 +74,21 @@ class _LiquidLens extends SingleChildRenderObjectWidget {
     required this.params,
     required this.shape,
     required this.devicePixelRatio,
+    required this.opacity,
     super.child,
   });
 
   final LiquidShaderParams params;
   final ShapeBorder shape;
   final double devicePixelRatio;
+  final double opacity;
 
   @override
   RenderObject createRenderObject(BuildContext context) => _RenderLiquidLens(
     params: params,
     shape: shape,
     devicePixelRatio: devicePixelRatio,
+    opacity: opacity,
   );
 
   @override
@@ -93,7 +99,8 @@ class _LiquidLens extends SingleChildRenderObjectWidget {
     renderObject
       ..params = params
       ..shape = shape
-      ..devicePixelRatio = devicePixelRatio;
+      ..devicePixelRatio = devicePixelRatio
+      ..opacity = opacity;
   }
 }
 
@@ -102,9 +109,11 @@ class _RenderLiquidLens extends RenderProxyBox {
     required LiquidShaderParams params,
     required ShapeBorder shape,
     required double devicePixelRatio,
+    required double opacity,
   }) : _params = params,
        _shape = shape,
-       _dpr = devicePixelRatio;
+       _dpr = devicePixelRatio,
+       _opacity = opacity;
 
   LiquidShaderParams _params;
   set params(LiquidShaderParams value) {
@@ -124,6 +133,13 @@ class _RenderLiquidLens extends RenderProxyBox {
   set devicePixelRatio(double value) {
     if (value == _dpr) return;
     _dpr = value;
+    markNeedsPaint();
+  }
+
+  double _opacity;
+  set opacity(double value) {
+    if (value == _opacity) return;
+    _opacity = value;
     markNeedsPaint();
   }
 
@@ -199,7 +215,8 @@ class _RenderLiquidLens extends RenderProxyBox {
       ..setFloat(16, p.specular)
       ..setFloat(17, p.rimWidth * px)
       ..setFloat(18, p.glow)
-      ..setFloat(19, p.blurSigma * px);
+      ..setFloat(19, p.blurSigma * px * _opacity)
+      ..setFloat(20, _opacity);
     final filter = ui.ImageFilter.shader(shader);
     final existing = layer;
     if (existing == null) {

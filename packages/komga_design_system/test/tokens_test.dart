@@ -430,14 +430,83 @@ void main() {
       await tester.pumpWidget(surface(AppTheme.eink()));
       expect(find.byType(BackdropFilter), findsNothing);
     });
+
+    testWidgets('opacity 过渡时不在 BackdropFilter 外套 Opacity，且 0/0.5/1 边界正确', (
+      tester,
+    ) async {
+      Widget buildAt(double opacity) => MaterialApp(
+        key: UniqueKey(),
+        theme: AppTheme.light(),
+        home: FrostedSurface(opacity: opacity, child: const Text('Glass')),
+      );
+
+      // opacity = 0（及负值越界）：不建 BackdropFilter / 折射层，内容透明。
+      await tester.pumpWidget(buildAt(-0.2));
+      expect(find.byType(BackdropFilter), findsNothing);
+      expect(find.byType(GlassRefraction), findsNothing);
+      expect(
+        tester
+            .widget<Opacity>(
+              find
+                  .ancestor(
+                    of: find.text('Glass'),
+                    matching: find.byType(Opacity),
+                  )
+                  .first,
+            )
+            .opacity,
+        0.0,
+      );
+
+      // opacity = 0.5：BackdropFilter 祖先没有 Opacity（避免 OpacityLayer 隔断背景），
+      // 内容在 BackdropFilter 内部淡入。
+      await tester.pumpWidget(buildAt(0.5));
+      expect(find.byType(BackdropFilter), findsOneWidget);
+      expect(
+        find.ancestor(
+          of: find.byType(BackdropFilter),
+          matching: find.byType(Opacity),
+        ),
+        findsNothing,
+        reason: 'BackdropFilter 外层不能套 Opacity，否则会隔断屏幕背景采样',
+      );
+      expect(
+        tester
+            .widget<Opacity>(
+              find
+                  .ancestor(
+                    of: find.text('Glass'),
+                    matching: find.byType(Opacity),
+                  )
+                  .first,
+            )
+            .opacity,
+        0.5,
+      );
+      expect(
+        tester.widget<GlassRefraction>(find.byType(GlassRefraction)).strength,
+        0.5,
+      );
+
+      // opacity = 1（及 > 1 越界）：稳态无额外 Opacity 层。
+      await tester.pumpWidget(buildAt(1.5));
+      expect(find.byType(BackdropFilter), findsOneWidget);
+      expect(
+        find.ancestor(of: find.text('Glass'), matching: find.byType(Opacity)),
+        findsNothing,
+      );
+    });
   });
 
   group('GlassSurface', () {
-    Widget surface(ThemeData theme) => MaterialApp(
+    Widget surface(ThemeData theme, {double opacity = 1}) => MaterialApp(
       key: UniqueKey(),
       theme: theme,
-      home: const Center(
-        child: GlassSurface(child: SizedBox(width: 120, height: 48)),
+      home: Center(
+        child: GlassSurface(
+          opacity: opacity,
+          child: const SizedBox(width: 120, height: 48),
+        ),
       ),
     );
 
@@ -489,6 +558,39 @@ void main() {
         boxes.any((ShapeDecoration d) => d.shadows?.isNotEmpty ?? false),
         isFalse,
       );
+    });
+
+    testWidgets('opacity 同步缩放阴影透明度且不在外层套 Opacity', (tester) async {
+      await tester.pumpWidget(surface(AppTheme.dark(), opacity: 0.5));
+      final halfShadows = tester
+          .widgetList<DecoratedBox>(find.byType(DecoratedBox))
+          .map((DecoratedBox box) => box.decoration)
+          .whereType<ShapeDecoration>()
+          .where((ShapeDecoration d) => d.shadows?.isNotEmpty ?? false)
+          .first
+          .shadows!;
+      expect(
+        halfShadows.first.color.a,
+        moreOrLessEquals(
+          AppShadows.floating.first.color.a * 0.5,
+          epsilon: 0.01,
+        ),
+      );
+      expect(
+        find.ancestor(
+          of: find.byType(GlassSurface),
+          matching: find.byType(Opacity),
+        ),
+        findsNothing,
+      );
+
+      await tester.pumpWidget(surface(AppTheme.dark(), opacity: 0));
+      final zeroShadowed = tester
+          .widgetList<DecoratedBox>(find.byType(DecoratedBox))
+          .map((DecoratedBox box) => box.decoration)
+          .whereType<ShapeDecoration>()
+          .where((ShapeDecoration d) => d.shadows?.isNotEmpty ?? false);
+      expect(zeroShadowed, isEmpty);
     });
   });
 }

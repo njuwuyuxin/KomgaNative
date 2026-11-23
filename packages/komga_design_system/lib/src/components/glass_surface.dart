@@ -20,6 +20,7 @@ class GlassSurface extends StatelessWidget {
     this.shape,
     this.kind = AppMaterialKind.bar,
     this.shadows,
+    this.opacity = 1,
     super.key,
   });
 
@@ -34,17 +35,34 @@ class GlassSurface extends StatelessWidget {
   /// 浮层阴影；为空时按主题取（浅色更淡），墨水屏自动清空。
   final List<BoxShadow>? shadows;
 
+  /// 整体可见度（0..1）；淡入/淡出动画请传此参数，勿在外层套 `Opacity`。
+  final double opacity;
+
   @override
   Widget build(BuildContext context) {
+    final effectiveOpacity = opacity.clamp(0.0, 1.0);
     final outline = shape ?? const StadiumBorder();
+    final rawShadows = shadows == null
+        ? AppShadows.floatingOf(context)
+        : AppShadows.of(context, shadows!);
+    final resolvedShadows = effectiveOpacity >= 1
+        ? rawShadows
+        : effectiveOpacity <= 0
+        ? const <BoxShadow>[]
+        : <BoxShadow>[
+            for (final s in rawShadows)
+              s.copyWith(
+                color: s.color.withValues(alpha: s.color.a * effectiveOpacity),
+              ),
+          ];
     return DecoratedBox(
-      decoration: ShapeDecoration(
+      decoration: ShapeDecoration(shape: outline, shadows: resolvedShadows),
+      child: FrostedSurface(
+        kind: kind,
         shape: outline,
-        shadows: shadows == null
-            ? AppShadows.floatingOf(context)
-            : AppShadows.of(context, shadows!),
+        opacity: effectiveOpacity,
+        child: child,
       ),
-      child: FrostedSurface(kind: kind, shape: outline, child: child),
     );
   }
 }

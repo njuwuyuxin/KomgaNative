@@ -63,6 +63,23 @@ class AppMaterial {
     );
   }
 
+  /// 按可见度缩放的背景滤镜：避免在 `BackdropFilter` 外层套 `Opacity`
+  /// （`OpacityLayer` 会隔断背景读取，动画结尾 `opacity == 1` 撤掉离屏层时产生跳变）。
+  ImageFilter? filterForOpacity(double opacity) {
+    final t = opacity.clamp(0.0, 1.0);
+    if (t >= 1) return filter;
+    final sigma = blurSigma * t;
+    if (sigma <= 0.05) return null;
+    final blur = ImageFilter.blur(sigmaX: sigma, sigmaY: sigma);
+    final rawSaturation = optics?.saturation ?? 1;
+    final saturation = 1 + (rawSaturation - 1) * t;
+    if ((saturation - 1).abs() < 0.01) return blur;
+    return ImageFilter.compose(
+      outer: ColorFilter.matrix(GlassOptics.saturationMatrix(saturation)),
+      inner: blur,
+    );
+  }
+
   /// 按主题取一种材质。
   ///
   /// [dark] 指的是"材质压在什么上面"：阅读器 chrome 永远压在画面上，
