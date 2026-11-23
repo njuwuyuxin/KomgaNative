@@ -10,11 +10,20 @@ import 'package:komga_native/src/l10n/failure_text.dart';
 import 'package:komga_native/src/providers/pinned_series_provider.dart';
 import 'package:komga_native/src/providers/series_read_provider.dart';
 import 'package:komga_native/src/screens/series_detail_args.dart';
+import 'package:komga_native/src/widgets/collection_picker_sheet.dart';
 import 'package:komga_native/src/widgets/context_menu.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 长按系列卡片能做的事（UI-P2-5）。
-enum SeriesMenuAction { markRead, markUnread, viewDetails, pin, unpin }
+enum SeriesMenuAction {
+  removeFromCollection,
+  addToCollection,
+  markRead,
+  markUnread,
+  viewDetails,
+  pin,
+  unpin,
+}
 
 /// 长按系列的上下文菜单（UI-P2-5 / ARC-05 / ARC-12 独立文件），网格卡片与列表行共用。
 Future<void> showSeriesMenu(
@@ -23,6 +32,7 @@ Future<void> showSeriesMenu(
   Series series, {
   String? heroTag,
   bool pinned = false,
+  Future<void> Function()? onRemoveFromCollection,
 }) async {
   final l10n = AppLocalizations.of(context);
   unawaited(AppHaptics.light());
@@ -30,6 +40,17 @@ Future<void> showSeriesMenu(
     context: context,
     anchor: context,
     entries: <ContextMenuEntry<SeriesMenuAction>>[
+      if (onRemoveFromCollection != null)
+        ContextMenuEntry(
+          value: SeriesMenuAction.removeFromCollection,
+          label: l10n.removeFromCollection,
+          icon: Icons.remove_circle_outline,
+        ),
+      ContextMenuEntry(
+        value: SeriesMenuAction.addToCollection,
+        label: l10n.addToCollection,
+        icon: Icons.collections_bookmark_outlined,
+      ),
       ContextMenuEntry(
         value: SeriesMenuAction.markRead,
         label: l10n.markAllRead,
@@ -62,6 +83,10 @@ Future<void> showSeriesMenu(
   if (action == null || !context.mounted) return;
   final messenger = ScaffoldMessenger.maybeOf(context);
   switch (action) {
+    case SeriesMenuAction.removeFromCollection:
+      await onRemoveFromCollection?.call();
+    case SeriesMenuAction.addToCollection:
+      await showCollectionPickerSheet(context, seriesIds: <String>[series.id]);
     case SeriesMenuAction.viewDetails:
       await context.push(
         '/series/${series.id}',

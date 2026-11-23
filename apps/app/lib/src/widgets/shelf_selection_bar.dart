@@ -59,16 +59,17 @@ class ShelfSelectionBar extends StatelessWidget {
   }
 }
 
-/// 多选时的底部批量条。
-///
-/// 只放"一次能对一整个系列做完"的动作。下载没接（等 SER-03 的系列下载链），
-/// 先不摆一个按了没反应的按钮。
+/// 多选时的底部批量条：支持标记已读/未读，以及可选的第三项（加入收藏集 / 加入阅读列表）。
 class ShelfBatchBar extends StatelessWidget {
   const ShelfBatchBar({
     required this.count,
     required this.busy,
     required this.onMarkRead,
     required this.onMarkUnread,
+    this.extraLabel,
+    this.extraIcon,
+    this.extraKey,
+    this.onExtraAction,
     super.key,
   });
 
@@ -76,35 +77,108 @@ class ShelfBatchBar extends StatelessWidget {
   final bool busy;
   final Future<void> Function() onMarkRead;
   final Future<void> Function() onMarkUnread;
+  final String? extraLabel;
+  final IconData? extraIcon;
+  final Key? extraKey;
+  final Future<void> Function()? onExtraAction;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final disabled = busy || count == 0;
+    final hasExtra =
+        onExtraAction != null && extraLabel != null && extraIcon != null;
+
     return GlassSurface(
       key: const Key('shelf-batch-bar'),
       shape: AppShapes.of(context, AppShapes.bar),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xs,
+          vertical: AppSpacing.xxs,
+        ),
         child: Row(
           children: <Widget>[
             Expanded(
-              child: TextButton.icon(
+              child: _BatchAction(
                 key: const Key('shelf-batch-read'),
-                onPressed: busy ? null : () => unawaited(onMarkRead()),
-                icon: const Icon(Icons.done_all, size: AppSizes.iconSm),
-                label: Text(l10n.markAllRead, maxLines: 1),
+                icon: Icons.done_all,
+                label: l10n.markAllRead,
+                stacked: hasExtra,
+                onPressed: disabled ? null : () => unawaited(onMarkRead()),
               ),
             ),
             Expanded(
-              child: TextButton.icon(
+              child: _BatchAction(
                 key: const Key('shelf-batch-unread'),
-                onPressed: busy ? null : () => unawaited(onMarkUnread()),
-                icon: const Icon(Icons.remove_done, size: AppSizes.iconSm),
-                label: Text(l10n.markAllUnread, maxLines: 1),
+                icon: Icons.remove_done,
+                label: l10n.markAllUnread,
+                stacked: hasExtra,
+                onPressed: disabled ? null : () => unawaited(onMarkUnread()),
               ),
             ),
+            if (hasExtra)
+              Expanded(
+                child: _BatchAction(
+                  key: extraKey,
+                  icon: extraIcon!,
+                  label: extraLabel!,
+                  stacked: true,
+                  onPressed: disabled
+                      ? null
+                      : () => unawaited(onExtraAction!()),
+                ),
+              ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _BatchAction extends StatelessWidget {
+  const _BatchAction({
+    required this.icon,
+    required this.label,
+    required this.stacked,
+    required this.onPressed,
+    super.key,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool stacked;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!stacked) {
+      return TextButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, size: AppSizes.iconSm),
+        label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+      );
+    }
+    return TextButton(
+      onPressed: onPressed,
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xs,
+          vertical: AppSpacing.xs,
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Icon(icon, size: AppSizes.iconSm),
+          const SizedBox(height: AppSpacing.xxs),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelSmall,
+          ),
+        ],
       ),
     );
   }

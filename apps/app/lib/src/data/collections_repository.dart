@@ -11,6 +11,10 @@ abstract interface class CollectionsRepository {
     int size = 20,
   });
 
+  Future<KomgaCollection?> collectionById(String collectionId);
+
+  Future<List<KomgaCollection>> seriesCollections(String seriesId);
+
   /// 新建收藏集：必须至少带一个系列（Komga 实测拒绝空集合）。
   Future<KomgaCollection> createCollection({
     required String name,
@@ -19,6 +23,13 @@ abstract interface class CollectionsRepository {
   });
 
   Future<void> renameCollection(String collectionId, String name);
+
+  Future<void> updateCollection(
+    String collectionId, {
+    String? name,
+    bool? ordered,
+    List<String>? seriesIds,
+  });
 
   Future<void> deleteCollection(String collectionId);
 
@@ -29,6 +40,28 @@ abstract interface class CollectionsRepository {
   });
 
   Future<PageResult<ReadList>> readLists({int page = 0, int size = 20});
+
+  Future<ReadList?> readListById(String readListId);
+
+  Future<List<ReadList>> bookReadLists(String bookId);
+
+  /// 新建阅读列表：必须至少带一本书（Komga 实测拒绝空列表）。
+  Future<ReadList> createReadList({
+    required String name,
+    String summary = '',
+    required List<String> bookIds,
+    bool ordered = false,
+  });
+
+  Future<void> updateReadList(
+    String readListId, {
+    String? name,
+    String? summary,
+    bool? ordered,
+    List<String>? bookIds,
+  });
+
+  Future<void> deleteReadList(String readListId);
 
   Future<PageResult<Book>> readListBooks(
     String readListId, {
@@ -58,6 +91,26 @@ class KomgaCollectionsRepository implements CollectionsRepository {
   }
 
   @override
+  Future<KomgaCollection?> collectionById(String collectionId) async {
+    try {
+      return await _session.fetchCollection(collectionId);
+    } on KomgaNotFoundError {
+      return null;
+    } on KomgaError catch (error) {
+      throw shelfFailureOf(error);
+    }
+  }
+
+  @override
+  Future<List<KomgaCollection>> seriesCollections(String seriesId) async {
+    try {
+      return await _session.fetchSeriesCollections(seriesId);
+    } on KomgaError catch (error) {
+      throw shelfFailureOf(error);
+    }
+  }
+
+  @override
   Future<KomgaCollection> createCollection({
     required String name,
     required List<String> seriesIds,
@@ -75,9 +128,23 @@ class KomgaCollectionsRepository implements CollectionsRepository {
   }
 
   @override
-  Future<void> renameCollection(String collectionId, String name) async {
+  Future<void> renameCollection(String collectionId, String name) =>
+      updateCollection(collectionId, name: name);
+
+  @override
+  Future<void> updateCollection(
+    String collectionId, {
+    String? name,
+    bool? ordered,
+    List<String>? seriesIds,
+  }) async {
     try {
-      await _session.renameCollection(collectionId, name);
+      await _session.updateCollection(
+        collectionId,
+        name: name,
+        ordered: ordered,
+        seriesIds: seriesIds,
+      );
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);
     }
@@ -113,6 +180,75 @@ class KomgaCollectionsRepository implements CollectionsRepository {
   Future<PageResult<ReadList>> readLists({int page = 0, int size = 20}) async {
     try {
       return await _session.fetchReadLists(page: page, size: size);
+    } on KomgaError catch (error) {
+      throw shelfFailureOf(error);
+    }
+  }
+
+  @override
+  Future<ReadList?> readListById(String readListId) async {
+    try {
+      return await _session.fetchReadList(readListId);
+    } on KomgaNotFoundError {
+      return null;
+    } on KomgaError catch (error) {
+      throw shelfFailureOf(error);
+    }
+  }
+
+  @override
+  Future<List<ReadList>> bookReadLists(String bookId) async {
+    try {
+      return await _session.fetchBookReadLists(bookId);
+    } on KomgaError catch (error) {
+      throw shelfFailureOf(error);
+    }
+  }
+
+  @override
+  Future<ReadList> createReadList({
+    required String name,
+    String summary = '',
+    required List<String> bookIds,
+    bool ordered = false,
+  }) async {
+    try {
+      return await _session.createReadList(
+        name: name,
+        summary: summary,
+        bookIds: bookIds,
+        ordered: ordered,
+      );
+    } on KomgaError catch (error) {
+      throw shelfFailureOf(error);
+    }
+  }
+
+  @override
+  Future<void> updateReadList(
+    String readListId, {
+    String? name,
+    String? summary,
+    bool? ordered,
+    List<String>? bookIds,
+  }) async {
+    try {
+      await _session.updateReadList(
+        readListId,
+        name: name,
+        summary: summary,
+        ordered: ordered,
+        bookIds: bookIds,
+      );
+    } on KomgaError catch (error) {
+      throw shelfFailureOf(error);
+    }
+  }
+
+  @override
+  Future<void> deleteReadList(String readListId) async {
+    try {
+      await _session.deleteReadList(readListId);
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);
     }

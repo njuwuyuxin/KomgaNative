@@ -26,13 +26,45 @@ class FakeLibraryRepository
     this.ondeckFailure,
     this.coverDirectory = 'test/fixtures/covers',
     this.coverNames = const <String>['c1', 'c2', 'c3', 'c4', 'c5', 'c6'],
+    List<KomgaCollection>? collections,
+    List<ReadList>? readLists,
   }) : librariesData = libraries ?? const <Library>[],
        seriesData = series ?? const <Series>[],
        ondeckData = ondeck ?? const <Book>[] {
     for (var i = 0; i < seriesData.length; i++) {
       _coverBySeries[seriesData[i].id] = coverNames[i % coverNames.length];
     }
+    collectionsData = collections != null
+        ? List<KomgaCollection>.of(collections)
+        : <KomgaCollection>[
+            KomgaCollection(
+              id: 'c1',
+              name: 'Reading order',
+              ordered: true,
+              seriesIds: seriesData.take(2).map((Series s) => s.id).toList(),
+            ),
+            const KomgaCollection(
+              id: 'c2',
+              name: 'Empty shelf',
+              ordered: false,
+              seriesIds: <String>[],
+            ),
+          ];
+    readListsData = readLists != null
+        ? List<ReadList>.of(readLists)
+        : <ReadList>[
+            ReadList(
+              id: 'r1',
+              name: 'Weekend reading',
+              summary: 'Two books for the weekend',
+              ordered: false,
+              bookIds: ondeckData.map((Book b) => b.id).toList(),
+            ),
+          ];
   }
+
+  late List<KomgaCollection> collectionsData;
+  late List<ReadList> readListsData;
 
   final List<Library> librariesData;
   final List<Series> seriesData;
@@ -238,10 +270,18 @@ class FakeLibraryRepository
     return null;
   }
 
-  /// 新建/改名/删除的记录，测试里断言用。
+  /// 新建/改名/更新/删除的记录，测试里断言用。
   final List<KomgaCollection> createdCollections = <KomgaCollection>[];
   final Map<String, String> renamedCollections = <String, String>{};
+  final Map<String, List<String>> updatedCollectionSeries =
+      <String, List<String>>{};
   final List<String> deletedCollections = <String>[];
+
+  final List<ReadList> createdReadLists = <ReadList>[];
+  final Map<String, ({String? name, String? summary, List<String>? bookIds})>
+  updatedReadLists =
+      <String, ({String? name, String? summary, List<String>? bookIds})>{};
+  final List<String> deletedReadLists = <String>[];
 
   /// 人为让写操作失败。
   ShelfFailure? collectionFailure;
@@ -251,26 +291,34 @@ class FakeLibraryRepository
     int page = 0,
     int size = 20,
   }) async {
+    final start = page * size;
+    final items = start >= collectionsData.length
+        ? const <KomgaCollection>[]
+        : collectionsData.sublist(
+            start,
+            math.min(start + size, collectionsData.length),
+          );
     return PageResult<KomgaCollection>(
-      items: <KomgaCollection>[
-        KomgaCollection(
-          id: 'c1',
-          name: 'Reading order',
-          ordered: true,
-          seriesIds: seriesData.take(2).map((Series s) => s.id).toList(),
-        ),
-        const KomgaCollection(
-          id: 'c2',
-          name: 'Empty shelf',
-          ordered: false,
-          seriesIds: <String>[],
-        ),
-      ],
-      totalElements: 2,
+      items: items,
+      totalElements: collectionsData.length,
       page: page,
       size: size,
     );
   }
+
+  @override
+  Future<KomgaCollection?> collectionById(String collectionId) async {
+    for (final c in collectionsData) {
+      if (c.id == collectionId) return c;
+    }
+    return null;
+  }
+
+  @override
+  Future<List<KomgaCollection>> seriesCollections(String seriesId) async =>
+      collectionsData
+          .where((KomgaCollection c) => c.seriesIds.contains(seriesId))
+          .toList(growable: false);
 
   @override
   Future<KomgaCollection> createCollection({
@@ -278,6 +326,7 @@ class FakeLibraryRepository
     required List<String> seriesIds,
     bool ordered = false,
   }) async {
+    if (collectionFailure != null) throw collectionFailure!;
     if (name.trim().isEmpty || seriesIds.isEmpty) {
       throw const ProtocolFailure();
     }
@@ -285,22 +334,53 @@ class FakeLibraryRepository
       id: 'c${createdCollections.length + 10}',
       name: name,
       ordered: ordered,
-      seriesIds: seriesIds,
+      seriesIds: List<String>.of(seriesIds),
     );
     createdCollections.add(created);
+    collectionsData.add(created);
     return created;
   }
 
   @override
-  Future<void> renameCollection(String collectionId, String name) async {
+  Future<void> renameCollection(String collectionId, String name) =>
+      updateCollection(collectionId, name: name);
+
+  @override
+  Future<void> updateCollection(
+    String collectionId, {
+    String? name,
+    bool? ordered,
+    List<String>? seriesIds,
+  }) async {
     if (collectionFailure != null) throw collectionFailure!;
-    renamedCollections[collectionId] = name;
+    if (seriesIds != null && seriesIds.isEmpty) {
+      throw const ProtocolFailure();
+    }
+    if (name != null) renamedCollections[collectionId] = name;
+    if (seriesIds != null) {
+      updatedCollectionSeries[collectionId] = List<String>.of(seriesIds);
+    }
+    final idx = collectionsData.indexWhere(
+      (KomgaCollection c) => c.id == collectionId,
+    );
+    if (idx != -1) {
+      final old = collectionsData[idx];
+      collectionsData[idx] = KomgaCollection(
+        id: old.id,
+        name: name ?? old.name,
+        ordered: ordered ?? old.ordered,
+        seriesIds: seriesIds ?? old.seriesIds,
+        createdDate: old.createdDate,
+        lastModifiedDate: old.lastModifiedDate,
+      );
+    }
   }
 
   @override
   Future<void> deleteCollection(String collectionId) async {
     if (collectionFailure != null) throw collectionFailure!;
     deletedCollections.add(collectionId);
+    collectionsData.removeWhere((KomgaCollection c) => c.id == collectionId);
   }
 
   @override
@@ -309,15 +389,19 @@ class FakeLibraryRepository
     int page = 0,
     int size = 20,
   }) async {
-    final ids = collectionId == 'c1'
-        ? seriesData.take(2).map((Series s) => s.id).toSet()
-        : const <String>{};
-    final items = seriesData
-        .where((Series s) => ids.contains(s.id))
-        .toList(growable: false);
+    final collection = await collectionById(collectionId);
+    final byId = <String, Series>{for (final s in seriesData) s.id: s};
+    final ordered = <Series>[
+      for (final id in collection?.seriesIds ?? const <String>[])
+        if (byId[id] != null) byId[id]!,
+    ];
+    final start = page * size;
+    final items = start >= ordered.length
+        ? const <Series>[]
+        : ordered.sublist(start, math.min(start + size, ordered.length));
     return PageResult<Series>(
       items: items,
-      totalElements: items.length,
+      totalElements: ordered.length,
       page: page,
       size: size,
     );
@@ -325,20 +409,94 @@ class FakeLibraryRepository
 
   @override
   Future<PageResult<ReadList>> readLists({int page = 0, int size = 20}) async {
+    final start = page * size;
+    final items = start >= readListsData.length
+        ? const <ReadList>[]
+        : readListsData.sublist(
+            start,
+            math.min(start + size, readListsData.length),
+          );
     return PageResult<ReadList>(
-      items: <ReadList>[
-        ReadList(
-          id: 'r1',
-          name: 'Weekend reading',
-          summary: 'Two books for the weekend',
-          ordered: false,
-          bookIds: ondeckData.map((Book b) => b.id).toList(),
-        ),
-      ],
-      totalElements: 1,
+      items: items,
+      totalElements: readListsData.length,
       page: page,
       size: size,
     );
+  }
+
+  @override
+  Future<ReadList?> readListById(String readListId) async {
+    for (final list in readListsData) {
+      if (list.id == readListId) return list;
+    }
+    return null;
+  }
+
+  @override
+  Future<List<ReadList>> bookReadLists(String bookId) async => readListsData
+      .where((ReadList r) => r.bookIds.contains(bookId))
+      .toList(growable: false);
+
+  @override
+  Future<ReadList> createReadList({
+    required String name,
+    String summary = '',
+    required List<String> bookIds,
+    bool ordered = false,
+  }) async {
+    if (collectionFailure != null) throw collectionFailure!;
+    if (name.trim().isEmpty || bookIds.isEmpty) {
+      throw const ProtocolFailure();
+    }
+    final created = ReadList(
+      id: 'r${createdReadLists.length + 10}',
+      name: name,
+      summary: summary,
+      ordered: ordered,
+      bookIds: List<String>.of(bookIds),
+    );
+    createdReadLists.add(created);
+    readListsData.add(created);
+    return created;
+  }
+
+  @override
+  Future<void> updateReadList(
+    String readListId, {
+    String? name,
+    String? summary,
+    bool? ordered,
+    List<String>? bookIds,
+  }) async {
+    if (collectionFailure != null) throw collectionFailure!;
+    if (bookIds != null && bookIds.isEmpty) {
+      throw const ProtocolFailure();
+    }
+    updatedReadLists[readListId] = (
+      name: name,
+      summary: summary,
+      bookIds: bookIds == null ? null : List<String>.of(bookIds),
+    );
+    final idx = readListsData.indexWhere((ReadList r) => r.id == readListId);
+    if (idx != -1) {
+      final old = readListsData[idx];
+      readListsData[idx] = ReadList(
+        id: old.id,
+        name: name ?? old.name,
+        summary: summary ?? old.summary,
+        ordered: ordered ?? old.ordered,
+        bookIds: bookIds ?? old.bookIds,
+        createdDate: old.createdDate,
+        lastModifiedDate: old.lastModifiedDate,
+      );
+    }
+  }
+
+  @override
+  Future<void> deleteReadList(String readListId) async {
+    if (collectionFailure != null) throw collectionFailure!;
+    deletedReadLists.add(readListId);
+    readListsData.removeWhere((ReadList r) => r.id == readListId);
   }
 
   @override
@@ -347,12 +505,20 @@ class FakeLibraryRepository
     int page = 0,
     int size = 20,
   }) async {
-    final items = readListId == 'r1'
-        ? List<Book>.of(ondeckData)
-        : const <Book>[];
+    final list = await readListById(readListId);
+    final byId = <String, Book>{for (final b in ondeckData) b.id: b};
+    final ordered = <Book>[
+      for (final id in list?.bookIds ?? const <String>[])
+        byId[id] ??
+            Book(id: id, seriesId: 's1', name: 'Book $id', pagesCount: 3),
+    ];
+    final start = page * size;
+    final items = start >= ordered.length
+        ? const <Book>[]
+        : ordered.sublist(start, math.min(start + size, ordered.length));
     return PageResult<Book>(
       items: items,
-      totalElements: items.length,
+      totalElements: ordered.length,
       page: page,
       size: size,
     );

@@ -11,6 +11,7 @@ import 'package:komga_native/src/providers/collections_controller.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/screens/collections_screen.dart';
 import 'package:komga_native/src/widgets/collection_covers.dart';
+import 'package:komga_native/src/widgets/curation_dialogs.dart';
 import 'package:komga_native/src/widgets/load_more_footer.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -161,7 +162,14 @@ class _CollectionsTabState extends ConsumerState<CollectionsTab> {
     final action = await _promptManageAction(context, l10n);
     if (action == null || !context.mounted) return;
     if (action == 'rename') {
-      final name = await _promptCollectionRename(context, l10n, collection);
+      final name = await promptCollectionName(
+        context,
+        title: l10n.collectionRename,
+        initial: collection.name,
+        dialogKey: const Key('collection-rename-dialog'),
+        fieldKey: const Key('collection-rename-field'),
+        okKey: const Key('collection-rename-ok'),
+      );
       if (name == null || name.isEmpty || name == collection.name) return;
       if (!context.mounted) return;
       await _runWrite(
@@ -170,7 +178,7 @@ class _CollectionsTabState extends ConsumerState<CollectionsTab> {
             .read(collectionsControllerProvider.notifier)
             .rename(collection.id, name),
       );
-    } else if (await _confirmCollectionDelete(context, l10n, collection)) {
+    } else if (await confirmCollectionDelete(context, collection.name)) {
       if (!context.mounted) return;
       await _runWrite(
         context,
@@ -281,64 +289,3 @@ Future<String?> _promptManageAction(
     ),
   ),
 );
-
-Future<String?> _promptCollectionRename(
-  BuildContext context,
-  AppLocalizations l10n,
-  KomgaCollection collection,
-) async {
-  final controller = TextEditingController(text: collection.name);
-  final name = await showDialog<String>(
-    context: context,
-    builder: (BuildContext context) => AlertDialog(
-      key: const Key('collection-rename-dialog'),
-      title: Text(l10n.collectionRename),
-      content: TextField(
-        key: const Key('collection-rename-field'),
-        controller: controller,
-        autofocus: true,
-        decoration: InputDecoration(hintText: l10n.collectionNameHint),
-      ),
-      actions: <Widget>[
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(l10n.cancel),
-        ),
-        TextButton(
-          key: const Key('collection-rename-ok'),
-          onPressed: () => Navigator.of(context).pop(controller.text.trim()),
-          child: Text(l10n.save),
-        ),
-      ],
-    ),
-  );
-  controller.dispose();
-  return name;
-}
-
-Future<bool> _confirmCollectionDelete(
-  BuildContext context,
-  AppLocalizations l10n,
-  KomgaCollection collection,
-) async {
-  final confirmed = await showDialog<bool>(
-    context: context,
-    builder: (BuildContext context) => AlertDialog(
-      key: const Key('collection-delete-confirm'),
-      title: Text(l10n.collectionDeleteTitle),
-      content: Text(l10n.collectionDeleteBody(collection.name)),
-      actions: <Widget>[
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: Text(l10n.cancel),
-        ),
-        TextButton(
-          key: const Key('collection-delete-ok'),
-          onPressed: () => Navigator.of(context).pop(true),
-          child: Text(l10n.delete),
-        ),
-      ],
-    ),
-  );
-  return confirmed == true;
-}

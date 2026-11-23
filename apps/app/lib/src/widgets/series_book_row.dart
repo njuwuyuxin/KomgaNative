@@ -13,6 +13,7 @@ import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/widgets/book_download_button.dart';
 import 'package:komga_native/src/widgets/context_menu.dart';
 import 'package:komga_native/src/widgets/cover_image.dart';
+import 'package:komga_native/src/widgets/readlist_picker_sheet.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 一本书：封图 + 标题 + 页数/已读状态，点进去读。
@@ -26,6 +27,8 @@ class SeriesBookRow extends ConsumerWidget {
     this.selected = false,
     this.onToggleSelect,
     this.onMarkPrevious,
+    this.onRemoveFromReadList,
+    this.trailingAction,
     super.key,
   });
 
@@ -40,6 +43,12 @@ class SeriesBookRow extends ConsumerWidget {
 
   /// 长按菜单里"标记之前所有为已读/未读"（SER-02）。为空时不显示这两项。
   final Future<void> Function({required bool read})? onMarkPrevious;
+
+  /// 在阅读列表详情页中，长按菜单顶部提供「从阅读列表移出」。
+  final Future<void> Function()? onRemoveFromReadList;
+
+  /// 行尾附加动作（例如阅读列表详情页里的移出按钮）。
+  final Widget? trailingAction;
 
   /// 搜索结果里书是**脱离系列**出现的：标题前要补系列名，
   /// 否则一屏都是 "Vol. 1 / Vol. 2"，分不清是哪套书（FIX-06）。
@@ -110,6 +119,7 @@ class SeriesBookRow extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
               BookDownloadButton(book: book),
+              if (trailingAction != null) trailingAction!,
               Icon(
                 completed ? Icons.check_circle : Icons.chevron_right,
                 color: completed
@@ -125,7 +135,7 @@ class SeriesBookRow extends ConsumerWidget {
     );
   }
 
-  /// 长按一本书：标记这一本已读/未读；在系列页还可以"标记之前所有"。
+  /// 长按一本书：加入/移出阅读列表、标记已读/未读；在系列页还可以"标记之前所有"。
   Future<void> _showMenu(BuildContext context, WidgetRef ref) async {
     final l10n = AppLocalizations.of(context);
     unawaited(AppHaptics.light());
@@ -135,6 +145,17 @@ class SeriesBookRow extends ConsumerWidget {
       context: context,
       anchor: context,
       entries: <ContextMenuEntry<BookMenuAction>>[
+        if (onRemoveFromReadList != null)
+          ContextMenuEntry(
+            value: BookMenuAction.removeFromReadList,
+            label: l10n.removeFromReadList,
+            icon: Icons.playlist_remove,
+          ),
+        ContextMenuEntry(
+          value: BookMenuAction.addToReadList,
+          label: l10n.addToReadList,
+          icon: Icons.playlist_add,
+        ),
         ContextMenuEntry(
           value: BookMenuAction.markRead,
           label: l10n.bookMarkRead,
@@ -162,6 +183,10 @@ class SeriesBookRow extends ConsumerWidget {
     if (action == null || !context.mounted) return;
     final messenger = ScaffoldMessenger.maybeOf(context);
     switch (action) {
+      case BookMenuAction.removeFromReadList:
+        await onRemoveFromReadList?.call();
+      case BookMenuAction.addToReadList:
+        await showReadListPickerSheet(context, bookIds: <String>[book.id]);
       case BookMenuAction.markPreviousRead:
         await onMarkPrevious?.call(read: true);
       case BookMenuAction.markPreviousUnread:
@@ -193,6 +218,8 @@ class SeriesBookRow extends ConsumerWidget {
 
 /// 书行长按菜单的动作。
 enum BookMenuAction {
+  removeFromReadList,
+  addToReadList,
   markRead,
   markUnread,
   markPreviousRead,

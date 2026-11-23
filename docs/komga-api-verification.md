@@ -129,16 +129,26 @@ Invoke-WebRequest 'http://127.0.0.1:25600/api/v1/libraries/<libId>/scan' -Method
 // 空 body（实测 page=0 的 400）
 ```
 
-### 3.8 收藏集 / 阅读列表（UI-P3-8）
+### 3.8 收藏集 / 阅读列表（UI-P3-8 / 2026-11-23 增补完整读写）
 
-在本地 1.30.1 实例上创建了一个收藏集与一个阅读列表，抓了四份真实响应：
+在本地 1.30.1 实例上验证了收藏集与阅读列表的全部读写端点，抓了真实响应：
 
 | 端点 | 真实形状 / 结论 | fixture |
 |---|---|---|
-| `GET /api/v1/collections?page=0&size=20` | 分页对象；`content[]` 带 `id/name/ordered/seriesIds/createdDate/lastModifiedDate/filtered` | `collections.json` |
+| `GET /api/v1/collections?page=0&size=20` | 分页对象；`content[]` 带 `id/name/ordered/seriesIds/createdDate/lastModifiedDate/filtered`；`unpaged=true` 在 1.30.1 上仍按 `size=20` 分页（客户端取全量需翻页） | `collections.json` |
+| `GET /api/v1/collections/{id}` | 单个 `CollectionDto` | — |
 | `GET /api/v1/collections/{id}/series?size=20` | 普通 `PageSeriesDto`，元素与 `/series` 完全同形 | `collection-series.json` |
+| `GET /api/v1/series/{seriesId}/collections` | **裸数组** `[CollectionDto, ...]`（非分页对象） | `series_collections.json` |
+| `POST /api/v1/collections` | 200 返回 `CollectionDto`；`seriesIds: []` 返回 **400** | `collection_created_200.json` |
+| `PATCH /api/v1/collections/{id}` | 204（支持局部更新 `name`/`ordered`/`seriesIds`）；`seriesIds: []` 返回 **400 空 body**（清空必须走 `DELETE`） | — |
+| `DELETE /api/v1/collections/{id}` | 204 | — |
 | `GET /api/v1/readlists?page=0&size=20` | 分页对象；`content[]` 带 `id/name/summary/ordered/bookIds/...` | `readlists.json` |
+| `GET /api/v1/readlists/{id}` | 单个 `ReadListDto` | — |
 | `GET /api/v1/readlists/{id}/books?size=20` | 普通 `PageBookDto`，元素与系列书列表完全同形 | `readlist-books.json` |
+| `GET /api/v1/books/{bookId}/readlists` | **裸数组** `[ReadListDto, ...]`（非分页对象） | `book_readlists.json` |
+| `POST /api/v1/readlists` | 200 返回 `ReadListDto`；`bookIds: []` 返回 **400 空 body** | `readlist_created_200.json` |
+| `PATCH /api/v1/readlists/{id}` | 204（支持局部更新 `name`/`summary`/`ordered`/`bookIds`）；`bookIds: []` 返回 **400 空 body**（清空必须走 `DELETE`） | — |
+| `DELETE /api/v1/readlists/{id}` | 204 | — |
 
 `GET /api/v1/books?search=akira&size=20` 也是普通 `PageBookDto`，`content[]` 带 `seriesTitle`；响应存入 `books-search.json`，用于 P3-9 的全局书搜索。
 

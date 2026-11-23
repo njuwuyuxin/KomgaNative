@@ -11,6 +11,7 @@ import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/providers/pinned_series_provider.dart';
 import 'package:komga_native/src/providers/shelf_selection_provider.dart';
 import 'package:komga_native/src/session/session_controller.dart';
+import 'package:komga_native/src/widgets/collection_picker_sheet.dart';
 import 'package:komga_native/src/widgets/offline_banner.dart';
 import 'package:komga_native/src/widgets/phase_fade.dart';
 import 'package:komga_native/src/widgets/shelf_active_filters.dart';
@@ -102,6 +103,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                   busy: _batchBusy,
                   onMarkRead: () => _markSelected(read: true),
                   onMarkUnread: () => _markSelected(read: false),
+                  extraLabel: l10n.batchAddToCollection,
+                  extraIcon: Icons.collections_bookmark_outlined,
+                  extraKey: const Key('shelf-batch-collection'),
+                  onExtraAction: _addSelectedToCollection,
                 ),
               ),
             ],

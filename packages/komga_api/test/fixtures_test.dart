@@ -80,6 +80,74 @@ void main() {
       expect(page.items.first.name, 'Akira v01');
     });
 
+    test('系列所属收藏集：真实响应为裸数组', () async {
+      final session = _sessionWith(_replay(fixture('series_collections.json')));
+      final collections = await session.fetchSeriesCollections('S1');
+      expect(collections, hasLength(1));
+      expect(collections.single.name, 'Test Collection');
+      expect(collections.single.seriesIds, hasLength(2));
+    });
+
+    test('书籍所属阅读列表：真实响应为裸数组', () async {
+      final session = _sessionWith(_replay(fixture('book_readlists.json')));
+      final lists = await session.fetchBookReadLists('B1');
+      expect(lists, hasLength(1));
+      expect(lists.single.name, 'Test ReadList');
+      expect(lists.single.bookIds, hasLength(2));
+    });
+
+    test('新建阅读列表：解析真实 200 响应并携带 name/summary/ordered/bookIds', () async {
+      final adapter = FakeAdapter(
+        (_) async => rawResponse(fixture('readlist_created_200.json')),
+      );
+      final session = _sessionWith(adapter);
+      final created = await session.createReadList(
+        name: 'ApiVerifyRL',
+        summary: 'test summary',
+        bookIds: const <String>['0S8NJYAVHZCCY', '0S8NJYAVNZ9DF'],
+      );
+      expect(created.name, 'ApiVerifyRL');
+      expect(created.summary, 'test summary');
+      expect(created.bookIds, hasLength(2));
+      expect(adapter.requests.single.method, 'POST');
+      expect(adapter.requests.single.data, <String, Object?>{
+        'name': 'ApiVerifyRL',
+        'summary': 'test summary',
+        'ordered': false,
+        'bookIds': const <String>['0S8NJYAVHZCCY', '0S8NJYAVNZ9DF'],
+      });
+    });
+
+    test('更新收藏集 seriesIds 与更新/删除阅读列表发送正确载荷', () async {
+      final adapter = FakeAdapter((_) async => rawResponse('', status: 204));
+      final session = _sessionWith(adapter);
+
+      await session.updateCollection(
+        'C1',
+        seriesIds: const <String>['S1', 'S2'],
+      );
+      await session.updateReadList(
+        'R1',
+        name: 'Renamed',
+        summary: 'New desc',
+        bookIds: const <String>['B1'],
+      );
+      await session.deleteReadList('R1');
+
+      expect(adapter.requests, hasLength(3));
+      expect(adapter.requests[0].method, 'PATCH');
+      expect(adapter.requests[0].data, <String, Object?>{
+        'seriesIds': const <String>['S1', 'S2'],
+      });
+      expect(adapter.requests[1].method, 'PATCH');
+      expect(adapter.requests[1].data, <String, Object?>{
+        'name': 'Renamed',
+        'summary': 'New desc',
+        'bookIds': const <String>['B1'],
+      });
+      expect(adapter.requests[2].method, 'DELETE');
+    });
+
     test('书籍搜索：/books?search= 返回 PageBookDto', () async {
       final session = _sessionWith(_replay(fixture('books-search.json')));
       final page = await session.searchBooks('akira');

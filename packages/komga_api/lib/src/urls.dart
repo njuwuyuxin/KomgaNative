@@ -91,13 +91,27 @@ class KomgaUrls {
   /// 且 seriesIds 至少一个（空收藏集会被拒 400）。
   String collectionsCreate() => '$_base/api/v1/collections';
 
-  /// 单个收藏集（`PATCH` 改名 / `DELETE` 删除）。
+  /// 单个收藏集（`GET` 详情 / `PATCH` 改名或更新 seriesIds / `DELETE` 删除）。
   String collection(String collectionId) =>
       '$_base/api/v1/collections/$collectionId';
+
+  /// 系列所属的收藏集（`GET /api/v1/series/{seriesId}/collections`，实测返回裸数组）。
+  String seriesCollections(String seriesId) =>
+      '$_base/api/v1/series/$seriesId/collections';
 
   /// 阅读列表（`GET /api/v1/readlists`）。
   String readLists({int page = 0, int size = 20}) =>
       _withQuery('$_base/api/v1/readlists', {'page': '$page', 'size': '$size'});
+
+  /// 新建阅读列表（`POST /api/v1/readlists`）。实测 1.30.1：bookIds 至少一本（空列表 400）。
+  String readListsCreate() => '$_base/api/v1/readlists';
+
+  /// 单个阅读列表（`GET` 详情 / `PATCH` 改名、简介或更新 bookIds / `DELETE` 删除）。
+  String readList(String readListId) => '$_base/api/v1/readlists/$readListId';
+
+  /// 书所属的阅读列表（`GET /api/v1/books/{bookId}/readlists`，实测返回裸数组）。
+  String bookReadLists(String bookId) =>
+      '$_base/api/v1/books/$bookId/readlists';
 
   /// 阅读列表里的书（`GET /api/v1/readlists/{id}/books`）。
   String readListBooks(String readListId, {int page = 0, int size = 20}) =>

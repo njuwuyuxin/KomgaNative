@@ -113,6 +113,7 @@ class SeriesShelfRow extends ConsumerWidget {
     this.onLongPress,
     this.selected = false,
     this.heroTag,
+    this.trailing,
     super.key,
   });
 
@@ -122,6 +123,9 @@ class SeriesShelfRow extends ConsumerWidget {
   final VoidCallback? onLongPress;
   final bool selected;
   final String? heroTag;
+
+  /// 行尾附加动作（例如收藏集详情页的「移出」按钮）。
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -223,6 +227,10 @@ class SeriesShelfRow extends ConsumerWidget {
                       ),
                     ),
                   ),
+                  if (trailing != null) ...<Widget>[
+                    const SizedBox(width: AppSpacing.xs),
+                    trailing!,
+                  ],
                 ],
               ),
             ),

@@ -284,13 +284,16 @@ void main() {
     expect(find.byKey(const Key('series-error')), findsOneWidget);
     expect(find.text('Series'), findsWidgets, reason: '兜底标题（AppBar + 头部）');
   });
-  testWidgets('新建收藏集：填名字后以本系列创建（SER-04）', (WidgetTester tester) async {
+  testWidgets('新建收藏集：从菜单打开收藏集面板并新建（SER-04）', (WidgetTester tester) async {
     final repository = FakeLibraryRepository(series: demoShelf());
     await pumpDetail(tester, repository);
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('series-mark-menu')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('series-create-collection')));
+    await tester.tap(find.byKey(const Key('series-add-to-collection')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('collection-picker-create')));
     await tester.pumpAndSettle();
 
     await tester.enterText(

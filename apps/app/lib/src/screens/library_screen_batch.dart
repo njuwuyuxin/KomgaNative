@@ -39,4 +39,14 @@ mixin _ShelfBatch on ConsumerState<LibraryScreen> {
       ),
     );
   }
+
+  /// 对选中的系列批量加入收藏集。
+  Future<void> _addSelectedToCollection() async {
+    final ids = ref.read(shelfSelectionProvider).ids.toList();
+    if (ids.isEmpty || _batchBusy) return;
+    final changed = await showCollectionPickerSheet(context, seriesIds: ids);
+    if (changed && mounted) {
+      ref.read(shelfSelectionProvider.notifier).exit();
+    }
+  }
 }
