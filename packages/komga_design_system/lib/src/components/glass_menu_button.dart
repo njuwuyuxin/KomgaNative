@@ -1,25 +1,23 @@
+import 'dart:async';
+
+import 'package:flutter/services.dart';
 import 'package:komga_design_system/src/components/glass_icon_button.dart';
 import 'package:komga_design_system/src/components/glass_surface.dart';
 import 'package:komga_design_system/src/materials.dart';
+import 'package:komga_design_system/src/motion.dart';
 import 'package:komga_design_system/src/shapes.dart';
 import 'package:komga_design_system/src/tokens.dart';
 import 'package:material_ui/material_ui.dart';
 
-/// 玻璃图标 + 弹出菜单（排序 / 筛选 / 视图 / 更多）。
+part 'glass_menu_button_parts.dart';
+
+/// 玻璃图标 + 带展开/收回动画的弹出玻璃菜单（排序 / 筛选 / 视图 / 更多）。
 ///
-/// 用 `MenuAnchor` 而不是 `PopupMenuButton`：后者的水波纹与直角卡片是安卓味，
-/// 而且没法把触发器做成玻璃；这里触发器复用标题栏里的 [GlassBarAction]
-/// 或独立的 [GlassIconButton]。
-///
-/// 菜单面板自己也是液态玻璃（[GlassSurface]）：`MenuAnchor` 的 Material 底
-/// 设成全透明，真正画出来的是里面那块玻璃卡——二级菜单也要和一级控件同材质。
-///
-/// **`clipBehavior: Clip.none` 不能省**：`MenuAnchor` 默认 `Clip.hardEdge`，
-/// 会按 `MenuStyle.shape`（这里是零圆角的矩形）裁掉玻璃卡自己的阴影，
-/// 圆角外就露出一块方形的硬边阴影（真机上很明显）。玻璃卡内部已经由
-/// [FrostedSurface] 自己按形状裁剪，这里再包一层透明 Material 承接水波纹，
-/// 让点击反馈仍然裁在圆角内。
-class GlassMenuButton extends StatelessWidget {
+/// 为什么自己用 `OverlayPortal` 而不是 `MenuAnchor`：
+/// Flutter M3 的 `MenuAnchor` 开关没有过渡动画（瞬间闪现/消失）。
+/// 这里在展开时从触发按钮所在角缩放 + 淡入，收回时反向缩回并淡出，
+/// 动画结束后才卸载浮层；墨水屏或"减少动态效果"下退化为瞬切。
+class GlassMenuButton extends StatefulWidget {
   const GlassMenuButton({
     required this.icon,
     required this.label,
@@ -34,7 +32,7 @@ class GlassMenuButton extends StatelessWidget {
   /// 读屏标签 / 长按提示。
   final String label;
 
-  /// 菜单项：由调用方构造 [GlassMenuItemButton] / `MenuDivider`，key 挂在项上。
+  /// 菜单项：由调用方构造 [GlassMenuItemButton] / `Divider`，key 挂在项上。
   final List<Widget> menuChildren;
 
   /// true = 独立玻璃圆球；false = 玻璃条内部的图标（标题栏动作）。
@@ -43,137 +41,196 @@ class GlassMenuButton extends StatelessWidget {
   final bool selected;
 
   @override
-  Widget build(BuildContext context) {
-    return MenuAnchor(
-      alignmentOffset: const Offset(0, AppSpacing.xs),
-      // 不裁面板：见类注释。玻璃卡自己会裁内容，阴影必须能画到面板矩形外。
-      clipBehavior: Clip.none,
-      // 面板本体透明：可见的玻璃底由下面 menuChildren 里的 GlassSurface 画。
-      // 不用 Material 的 elevation 阴影（测试渲染器上高 elevation 会画成一圈
-      // 生硬黑边），浮起感交给 GlassSurface 的 AppShadows.floating。
-      style: const MenuStyle(
-        backgroundColor: WidgetStatePropertyAll<Color>(Colors.transparent),
-        surfaceTintColor: WidgetStatePropertyAll<Color>(Colors.transparent),
-        elevation: WidgetStatePropertyAll<double>(0),
-        shadowColor: WidgetStatePropertyAll<Color>(Colors.transparent),
-        side: WidgetStatePropertyAll<BorderSide>(BorderSide.none),
-        shape: WidgetStatePropertyAll<OutlinedBorder>(RoundedRectangleBorder()),
-        padding: WidgetStatePropertyAll<EdgeInsets>(EdgeInsets.zero),
-      ),
-      menuChildren: <Widget>[
-        GlassSurface(
-          shape: AppShapes.of(context, AppShapes.panel),
-          shadows: AppShadows.floating,
-          child: Material(
-            // 透明的内层 Material 只负责接住 MenuItemButton 的水波纹：
-            // 它在外层 Clip.none 之后、玻璃卡裁剪之内，反馈不会溢出圆角。
-            type: MaterialType.transparency,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+  State<GlassMenuButton> createState() => _GlassMenuButtonState();
+}
+
+class _GlassMenuButtonState extends State<GlassMenuButton>
+    with SingleTickerProviderStateMixin {
+  final OverlayPortalController _portal = OverlayPortalController();
+  final GlobalKey _anchorKey = GlobalKey();
+  late final AnimationController _controller = AnimationController(vsync: this)
+    ..addStatusListener(_onStatus);
+
+  Rect _anchorRect = Rect.zero;
+  bool _opening = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onStatus(AnimationStatus status) {
+    if (status == AnimationStatus.dismissed && _portal.isShowing && !_opening) {
+      _portal.hide();
+    }
+  }
+
+  void _open() {
+    final anchorBox =
+        _anchorKey.currentContext?.findRenderObject() as RenderBox?;
+    final overlayBox =
+        Overlay.maybeOf(context)?.context.findRenderObject() as RenderBox?;
+    if (anchorBox != null && overlayBox != null && anchorBox.hasSize) {
+      final topLeft = anchorBox.localToGlobal(
+        Offset.zero,
+        ancestor: overlayBox,
+      );
+      _anchorRect = topLeft & anchorBox.size;
+    } else {
+      _anchorRect = Rect.zero;
+    }
+    _opening = true;
+    if (!_portal.isShowing) _portal.show();
+    final motion = AppMotion.of(context);
+    if (!motion.enabled) {
+      _controller.value = 1;
+      return;
+    }
+    _controller
+      ..duration = motion.standard
+      ..reverseDuration = motion.quick;
+    unawaited(_controller.forward());
+  }
+
+  void _close() {
+    if (!_portal.isShowing) return;
+    _opening = false;
+    final motion = AppMotion.of(context);
+    if (!motion.enabled) {
+      _controller.value = 0;
+      _portal.hide();
+      return;
+    }
+    _controller.reverseDuration = motion.quick;
+    unawaited(_controller.reverse());
+  }
+
+  void _toggle() {
+    if (_opening && _portal.isShowing) {
+      _close();
+    } else {
+      _open();
+    }
+  }
+
+  Widget _buildOverlay(BuildContext context) {
+    final motion = AppMotion.of(context);
+    final media = MediaQuery.of(context);
+    final overlaySize = media.size;
+    final alignRight = _anchorRect.center.dx > overlaySize.width / 2;
+    final spaceBelow =
+        overlaySize.height - media.padding.bottom - _anchorRect.bottom;
+    final spaceAbove = _anchorRect.top - media.padding.top;
+    final openUpward =
+        spaceBelow < AppSizes.shelfRowHeight && spaceAbove > spaceBelow;
+    final origin = Alignment(alignRight ? 1.0 : -1.0, openUpward ? 1.0 : -1.0);
+    final maxMenuHeight =
+        (overlaySize.height -
+                media.padding.top -
+                media.padding.bottom -
+                AppSpacing.xl)
+            .clamp(AppSizes.minTouch, double.infinity);
+
+    final panel = GlassSurface(
+      shape: AppShapes.of(context, AppShapes.panel),
+      shadows: AppShadows.floating,
+      child: Material(
+        type: MaterialType.transparency,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minWidth: AppSpacing.xxl * 3,
+            maxHeight: maxMenuHeight,
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+            child: IntrinsicWidth(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: menuChildren,
+                children: widget.menuChildren,
               ),
             ),
           ),
         ),
-      ],
-      builder:
-          (BuildContext context, MenuController controller, Widget? child) {
-            void toggle() {
-              if (controller.isOpen) {
-                controller.close();
-              } else {
-                controller.open();
-              }
-            }
+      ),
+    );
 
-            if (orb) {
-              return GlassIconButton(
-                icon: icon,
-                label: label,
-                selected: selected,
-                onPressed: toggle,
-              );
-            }
-            return GlassBarAction(
-              icon: icon,
-              label: label,
-              selected: selected,
-              onPressed: toggle,
-            );
-          },
+    return CallbackShortcuts(
+      bindings: <ShortcutActivator, VoidCallback>{
+        const SingleActivator(LogicalKeyboardKey.escape): _close,
+      },
+      child: FocusScope(
+        autofocus: true,
+        child: Stack(
+          children: <Widget>[
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: _close,
+              ),
+            ),
+            CustomSingleChildLayout(
+              delegate: _GlassMenuLayoutDelegate(
+                anchor: _anchorRect,
+                padding: media.padding,
+                alignRight: alignRight,
+                openUpward: openUpward,
+              ),
+              child: _GlassMenuScope(
+                close: _close,
+                isClosing: () => !_opening,
+                child: AnimatedBuilder(
+                  animation: _controller,
+                  child: panel,
+                  builder: (BuildContext context, Widget? child) {
+                    final v = _controller.value;
+                    final reversing =
+                        _controller.status == AnimationStatus.reverse;
+                    final scaleT =
+                        (reversing ? motion.exitCurve : motion.emphasizedCurve)
+                            .transform(v);
+                    final fadeT =
+                        (reversing ? motion.exitCurve : motion.standardCurve)
+                            .transform(v)
+                            .clamp(0.0, 1.0);
+                    return Opacity(
+                      opacity: fadeT,
+                      child: Transform.scale(
+                        scale: 0.86 + 0.14 * scaleT,
+                        alignment: origin,
+                        child: child,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
-}
-
-/// 玻璃菜单里的一行：**文本始终居中**，选中对勾放在左侧独立槽位。
-///
-/// 为什么不用 `MenuItemButton(leadingIcon: check)`：leadingIcon 会把文本往右挤，
-/// 不同项（有没有对勾）之间的文字会左右跳。这里把对勾放进等宽的左槽位，
-/// 右边再放一个同宽空槽位，文本的中心始终等于菜单的中心线。
-class GlassMenuItemButton extends StatelessWidget {
-  const GlassMenuItemButton({
-    required this.label,
-    required this.onPressed,
-    this.checked = false,
-    this.icon,
-    this.enabled = true,
-    super.key,
-  });
-
-  final String label;
-  final VoidCallback onPressed;
-  final bool checked;
-
-  /// 未选中时可选的左侧图标（排序/筛选菜单目前不用，留给后续）。
-  final IconData? icon;
-
-  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return MenuItemButton(
-      onPressed: enabled ? onPressed : null,
-      // 对勾用 Positioned 叠在左侧，**不参与** Row 的宽度分配：
-      // 文本始终按整条菜单的中线居中，不管这一项有没有对勾。
-      child: Stack(
-        alignment: Alignment.center,
-        children: <Widget>[
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSizes.iconLg),
-            child: Text(
-              label,
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.labelLarge,
-            ),
-          ),
-          if (checked)
-            const Positioned(
-              left: AppSpacing.xs,
-              top: 0,
-              bottom: 0,
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Icon(Icons.check, size: AppSizes.iconXs),
-              ),
-            )
-          else if (icon != null)
-            Positioned(
-              left: AppSpacing.xs,
-              top: 0,
-              bottom: 0,
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Icon(icon, size: AppSizes.iconXs),
-              ),
-            ),
-        ],
-      ),
+    final trigger = widget.orb
+        ? GlassIconButton(
+            icon: widget.icon,
+            label: widget.label,
+            selected: widget.selected,
+            onPressed: _toggle,
+          )
+        : GlassBarAction(
+            icon: widget.icon,
+            label: widget.label,
+            selected: widget.selected,
+            onPressed: _toggle,
+          );
+    return OverlayPortal(
+      controller: _portal,
+      overlayChildBuilder: _buildOverlay,
+      child: KeyedSubtree(key: _anchorKey, child: trigger),
     );
   }
 }

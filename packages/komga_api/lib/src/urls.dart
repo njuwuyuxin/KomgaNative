@@ -133,6 +133,12 @@ class KomgaUrls {
     return _withQuery('$_base/api/v1/books/$bookId/pages/$page', q);
   }
 
+  /// 单页低精度缩略图（Komga 服务端缩放至长边 300px 的 JPEG，页码 1 基）。
+  ///
+  /// 实测 Komga 1.30.1：200 `image/jpeg`，`page=0` 返回 400（见 `docs/komga-api-verification.md`）。
+  String pageThumbnail(String bookId, int page) =>
+      '$_base/api/v1/books/$bookId/pages/$page/thumbnail';
+
   String bookThumbnail(String bookId) =>
       '$_base/api/v1/books/$bookId/thumbnail';
 

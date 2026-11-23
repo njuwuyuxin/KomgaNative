@@ -4,12 +4,11 @@ import 'package:komga_native/src/providers/reader_providers.dart';
 import 'package:komga_native/src/widgets/reader_palette.dart';
 import 'package:material_ui/material_ui.dart';
 
-/// 一张页缩略图：懒加载 + 解码降采样 + 加载/失败态。
+/// 一张页缩略图：优先走低精度页缩略图端点 + 解码降采样 + 加载/失败态。
 ///
-/// Komga **没有**页级缩略图端点（`/books/{id}/thumbnail` 是整本封面），页级只有
-/// 全尺寸的 `/pages/{n}`，所以这里用页面原图 + `cacheWidth` 降采样解码。
-/// 只加载可见页靠调用方：只有被构建出来的实例才会去请求字节（见
-/// `ReaderThumbnailStrip` 的 `ListView.builder`）。
+/// 使用 Komga `/api/v1/books/{id}/pages/{n}/thumbnail`（长边 300px JPEG），
+/// 比全尺寸原图小 1–2 个数量级，先于实际页面原图快速加载显示，且不挤占原图 LRU。
+/// 若原图或缩略图已在内存缓存里则首帧同步直出，不闪烁占位块。
 class PageThumbnailImage extends ConsumerWidget {
   const PageThumbnailImage({
     required this.bookId,
@@ -34,10 +33,23 @@ class PageThumbnailImage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final image = ref.watch(
-      readerPageImageProvider((bookId: bookId, page: page)),
-    );
-    final bytes = image.value;
+    final request = (bookId: bookId, page: page);
+    final repo = ref.watch(readerRepositoryProvider);
+    final syncThumb = repo.cachedPageThumbnail(bookId, page);
+    final syncFull = syncThumb == null
+        ? repo.cachedPageImage(bookId, page)
+        : null;
+    if (syncThumb != null || syncFull != null) {
+      return Image.memory(
+        syncThumb ?? syncFull!,
+        fit: fit,
+        cacheWidth: cacheWidth,
+        gaplessPlayback: true,
+      );
+    }
+
+    final thumb = ref.watch(readerPageThumbnailProvider(request));
+    final bytes = thumb.value;
     if (bytes != null) {
       return Image.memory(
         bytes,
@@ -46,7 +58,7 @@ class PageThumbnailImage extends ConsumerWidget {
         gaplessPlayback: true,
       );
     }
-    if (image.hasError) {
+    if (thumb.hasError) {
       return Center(
         child: Icon(
           Icons.broken_image_outlined,

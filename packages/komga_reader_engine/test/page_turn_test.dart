@@ -325,6 +325,17 @@ void main() {
       expectSpineFlat(f, 'overdrag');
       expect(f.radius, closeTo(0, 1e-9));
     });
+
+    test('临近落地时半径减速收敛且折线回正到书脊', () {
+      final f95 = hinged.frame(hinged.fingerAt(0.95), mirrored: false);
+      final f98 = hinged.frame(hinged.fingerAt(0.98), mirrored: false);
+      final f100 = hinged.frame(hinged.fingerAt(1.0), mirrored: false);
+      // smoothstep 收尾：越接近终点，半径收缩越平缓（不会末帧骤降）。
+      expect(f98.radius - f100.radius, lessThan(f95.radius - f98.radius));
+      // 临近翻完前折线已基本竖直贴合书脊。
+      expect(f95.dirY.abs(), lessThan(0.02));
+      expect(f98.dirY.abs(), lessThan(0.005));
+    });
   });
 
   group('CurlMotion', () {

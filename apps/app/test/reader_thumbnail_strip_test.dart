@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
 import 'package:komga_native/src/widgets/reader_palette.dart';
+import 'package:komga_native/src/widgets/reader_thumbnail_strip.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_reader.dart';
@@ -178,6 +181,105 @@ void main() {
     await tapMiddle(tester);
 
     expect(find.byKey(const Key('reader-thumb-strip')), findsNothing);
+  });
+
+  testWidgets('上滑放大缩略图（单张变大、一行显示更少），下滑缩小恢复默认档位', (WidgetTester tester) async {
+    await pumpReader(
+      tester,
+      repository: FakeReaderRepository(pageCount: 20),
+      book: demoReaderBook(),
+    );
+
+    final compactHeight = tester
+        .getSize(find.byType(ReaderThumbnailStrip))
+        .height;
+    final compactThumb = tester.getSize(
+      find.byKey(const Key('reader-thumb-1')),
+    );
+    expect(compactHeight, AppSizes.thumbStripHeight);
+    expect(compactThumb.width, AppSizes.thumb.width + AppSpacing.xs);
+
+    // 上滑展开到大缩略图档位。
+    await tester.drag(
+      find.byKey(const Key('reader-thumb-resize-area')),
+      const Offset(0, -100),
+    );
+    await tester.pump(const Duration(milliseconds: 80));
+    final midHeight = tester.getSize(find.byType(ReaderThumbnailStrip)).height;
+    expect(midHeight, greaterThan(compactHeight));
+
+    await tester.pumpAndSettle();
+    final expandedHeight = tester
+        .getSize(find.byType(ReaderThumbnailStrip))
+        .height;
+    final expandedThumb = tester.getSize(
+      find.byKey(const Key('reader-thumb-1')),
+    );
+    expect(expandedHeight, closeTo(AppSizes.thumbStripExpandedHeight, 0.5));
+    expect(
+      expandedThumb.width,
+      closeTo(AppSizes.thumbExpanded.width + AppSpacing.sm, 0.5),
+    );
+    expect(expandedThumb.width, greaterThan(compactThumb.width * 1.5));
+
+    // 下滑收回至小缩略图档位。
+    await tester.drag(
+      find.byKey(const Key('reader-thumb-resize-area')),
+      const Offset(0, 100),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester.getSize(find.byType(ReaderThumbnailStrip)).height,
+      closeTo(AppSizes.thumbStripHeight, 0.5),
+    );
+    expect(
+      tester.getSize(find.byKey(const Key('reader-thumb-1'))).width,
+      closeTo(compactThumb.width, 0.5),
+    );
+  });
+
+  testWidgets('缩略图滑条走低精度 thumbnail 接口，且主画面在原图未返回前先展示低清预览', (
+    WidgetTester tester,
+  ) async {
+    final fullGate = Completer<void>();
+    final repository = FakeReaderRepository(pageCount: 20)
+      ..pageGates[1] = fullGate
+      ..fastThumbnails.add(1);
+    final book = Book(
+      id: 'b1',
+      seriesId: 's1',
+      name: 'Vol. 1',
+      number: '1',
+      pagesCount: 20,
+      readProgress: ReadProgress(
+        page: 1,
+        completed: false,
+        lastModified: DateTime.utc(2026, 1, 1),
+      ),
+    );
+
+    await pumpReader(tester, repository: repository, book: book, settle: false);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pump();
+
+    // 第 1 页（0 基索引 0）原图被 gate 阻塞时，先展示低清缩略图预览。
+    expect(repository.thumbnailRequests, containsAll(<int>[1, 2, 3, 4]));
+    expect(find.byKey(const Key('reader-thumb-preview-0')), findsOneWidget);
+
+    // 横向拖动滑条露出后面的页：只请求低清 thumbnail，不拉全尺寸 pageImage。
+    await tester.drag(
+      find.byKey(const Key('reader-thumb-strip')),
+      const Offset(-360, 0),
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(repository.thumbnailRequests, contains(10));
+    expect(repository.pageRequests, isNot(contains(10)));
+
+    fullGate.complete();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('reader-thumb-preview-0')), findsNothing);
   });
 }
 

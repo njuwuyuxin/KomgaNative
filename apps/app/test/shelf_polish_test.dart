@@ -144,6 +144,26 @@ void main() {
       // 大标题已经滚走。
       expect(find.text('Library'), findsNothing);
     });
+
+    testWidgets('书架右上角排序/筛选/视图三颗按钮统一装在液态玻璃胶囊里', (WidgetTester tester) async {
+      await pumpScreen(tester, const LibraryScreen(), theme: AppTheme.light());
+      await tester.pumpAndSettle();
+
+      for (final key in <String>[
+        'shelf-sort-menu',
+        'shelf-filter-menu',
+        'shelf-view-menu',
+      ]) {
+        expect(
+          find.ancestor(
+            of: find.byKey(Key(key)),
+            matching: find.byType(GlassSurface),
+          ),
+          findsWidgets,
+          reason: '$key 应落在独立的液态玻璃表面内以保证在封面上方的可读性',
+        );
+      }
+    });
   });
 
   group('P2-8 骨架与三态过渡', () {

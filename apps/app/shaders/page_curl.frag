@@ -70,6 +70,25 @@ float coverage(vec2 q) {
     return clamp(edgeDistance(q) + 0.5, 0.0, 1.0);
 }
 
+// 双页铰接时忽略书脊那条边的 1px 边缘淡出：书脊是连续铰链而非悬空切边，
+// 若在书脊处把覆盖率淡到 0.5，落地前中缝会透出底层旧页。
+float hingedCoverage(vec2 q, bool spineOnRight) {
+    vec2 lo = q - uRect.xy;
+    vec2 hi = uRect.xy + uRect.zw - q;
+    if (spineOnRight) {
+        if (hi.x < 0.0) return 0.0;
+        hi.x = 1e6;
+    } else {
+        if (lo.x < 0.0) return 0.0;
+        lo.x = 1e6;
+    }
+    vec2 inside = min(lo, hi);
+    float inner = min(inside.x, inside.y);
+    vec2 outside = max(-inside, vec2(0.0));
+    float d = inner > 0.0 ? inner : -length(outside);
+    return clamp(d + 0.5, 0.0, 1.0);
+}
+
 vec3 sheetAt(vec2 q) {
     vec2 uv = clamp((q - uSheetUvRect.xy) / uSheetUvRect.zw, 0.0, 1.0);
     vec3 page = texture(uSheet, uv).rgb;
@@ -79,9 +98,15 @@ vec3 sheetAt(vec2 q) {
 }
 
 // 纸背：双页是镜像过去的真实页面（页面外或冷页渐显前用纸底色），单页是纸底色 + 很淡的透印。
-vec3 backAt(vec2 q) {
+// 双页时以 uBackRect 自身的书脊边为锚点镜像，相邻跨页宽度略有差异时中缝也不会露白条。
+vec3 backAt(vec2 q, bool spineOnRight) {
     vec3 blank = mix(uPaper, sheetAt(q), kShowThrough);
-    vec2 m = vec2(2.0 * uSpineX - q.x, q.y);
+    float backSpineX = spineOnRight ? uBackRect.x : uBackRect.x + uBackRect.z;
+    float mx = backSpineX + (uSpineX - q.x);
+    if (uHinged > 0.5) {
+        mx = spineOnRight ? max(mx, backSpineX) : min(mx, backSpineX);
+    }
+    vec2 m = vec2(mx, q.y);
     vec2 clipUv = (m - uBackRect.xy) / max(uBackRect.zw, vec2(1.0));
     vec2 inside = step(vec2(0.0), clipUv) * step(clipUv, vec2(1.0));
     vec2 texUv = clamp((m - uBackUvRect.xy) / max(uBackUvRect.zw, vec2(1.0)), 0.0, 1.0);
@@ -147,6 +172,10 @@ void main() {
     float r = max(uRadius, 0.0);
     float d = dot(p - uAxis, u);
     bool flatSide = d <= 0.0;
+    bool isHinged = uHinged > 0.5;
+    bool spineOnRight = uSpineX > uRect.x + uRect.z * 0.5;
+    // 卷筒抬起系数：半径收拢到 0 时阴影与外沿高光平滑淡出，避免临近书脊落地瞬间突灭。
+    float rollLift = smoothstep(0.0, 8.0, r);
 
     // ---- 接收面上的阴影 ----
     float shadow = 0.0;
@@ -154,7 +183,7 @@ void main() {
         // 翻过去的那片纸平压在高度 ~2R 处，影子沿它的轮廓向外柔和衰减。
         // 被它盖住的地方影子不可见（上层会盖住），不用额外裁剪。
         shadow = flapShadowAt(p, u, d, r);
-    } else {
+    } else if (rollLift > 0.001) {
         // 卷筒投在露出来的下层上：沿轴向多采几条线，侧边才是软的。
         float soft = 2.0 + 0.9 * r;
         float acc = 0.0;
@@ -169,12 +198,20 @@ void main() {
                 acc += strength * exp(-beyond / soft);
             }
         }
-        shadow = kRollShadow * acc / 5.0;
+        shadow = kRollShadow * rollLift * acc / 5.0;
     }
 
     // ---- 1. 平铺在原位的正面（d <= 0），其余位置是露出来的下层 ----
     vec4 color;
-    float flatCov = flatSide ? coverage(p) : 0.0;
+    float flatCov = 0.0;
+    if (flatSide) {
+        if (isHinged) {
+            bool pastSpine = spineOnRight ? (p.x > uSpineX) : (p.x < uSpineX);
+            flatCov = pastSpine ? 0.0 : hingedCoverage(p, spineOnRight);
+        } else {
+            flatCov = coverage(p);
+        }
+    }
     vec3 flatRgb = sheetAt(p) * (1.0 - shadow);
     color = vec4(flatRgb * flatCov, flatCov);
     // 下层（下一页 / 页面外的背景）只叠一层半透明黑。
@@ -192,23 +229,28 @@ void main() {
         // 正面越往上卷离那片纸越近、受光越少：影子从轴线处连续延续过来。
         vec3 rgbF = sheetAt(qF) * relShade(nF) *
                     (1.0 - flapShadowAt(p, u, d, r) * cos(thetaF));
-        color = over(color, rgbF, coverage(qF) * rim);
+        float covF = isHinged ? hingedCoverage(qF, spineOnRight) : coverage(qF);
+        color = over(color, rgbF, covF * rim);
 
         float thetaB = kPi - base;
         vec2 qB = p + u * (r * thetaB - d);
         vec2 nB = vec2(sin(thetaB), -cos(thetaB));
-        // 卷筒外沿的一道亮边（θ ≈ 110°），到 θ = π 处衰减为 0，和平压的纸背接得上。
-        float sheen = 0.16 * exp(-pow((thetaB - 1.92) / 0.38, 2.0));
-        vec3 rgbB = backAt(qB) * relShade(nB) + vec3(sheen);
-        color = over(color, rgbB, coverage(qB) * rim);
+        // 卷筒外沿的一道亮边（θ ≈ 110°），到 θ = π 及半径收拢为 0 时均衰减为 0。
+        float sheen = 0.16 * rollLift * exp(-pow((thetaB - 1.92) / 0.38, 2.0));
+        vec3 rgbB = backAt(qB, spineOnRight) * relShade(nB) + vec3(sheen);
+        float covB = isHinged ? hingedCoverage(qB, spineOnRight) : coverage(qB);
+        color = over(color, rgbB, covB * rim);
     }
 
     // ---- 4. 翻过去平压在上面的背面（d <= 0，最高的一层）----
     // 双页落地那一帧 R = 0、纸整张平压在另一半上，这一层必须照画（即使纸背还在加载）；
     // 单页 R = 0 只出现在起手（还没卷），跳过以免角上留半像素的边。
-    if (flatSide && (r > 0.01 || uHinged > 0.5)) {
+    if (flatSide && (r > 0.01 || isHinged)) {
         vec2 qFlip = p + u * (kPi * r - 2.0 * d);
-        color = over(color, backAt(qFlip), coverage(qFlip));
+        float covFlip = isHinged
+            ? hingedCoverage(qFlip, spineOnRight)
+            : coverage(qFlip);
+        color = over(color, backAt(qFlip, spineOnRight), covFlip);
     }
 
     fragColor = color;

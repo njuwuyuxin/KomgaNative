@@ -34,6 +34,7 @@ class KomgaApp extends ConsumerWidget {
       child: MaterialApp.router(
         title: 'KomgaNative',
         debugShowCheckedModeBanner: false,
+        scrollBehavior: const _NoOverscrollBehavior(),
         locale: settings.language.locale,
         localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
@@ -44,4 +45,22 @@ class KomgaApp extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// 全局关掉 Android 拉伸/辉光过度滚动效果。
+///
+/// Android 12+ 的 `StretchingOverscrollIndicator` 会给整条滚动层施加拉伸矩阵，
+/// 而液态玻璃着色器按屏幕坐标采样背景（`liquid_glass.frag`），下拉/拖动时会读到
+/// 变换后的空图层或错位纹理，导致正在读卡片、搜索栏、设置分段控件变黑/变灰、
+/// 书详情按钮边缘溢彩。`RefreshIndicator` 仅依赖 `OverscrollNotification`，
+/// iOS 仍保持默认弹性滚动，二者都不受影响。
+class _NoOverscrollBehavior extends MaterialScrollBehavior {
+  const _NoOverscrollBehavior();
+
+  @override
+  Widget buildOverscrollIndicator(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) => child;
 }

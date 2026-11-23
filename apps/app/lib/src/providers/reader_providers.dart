@@ -52,6 +52,17 @@ final readerPageImageProvider = FutureProvider.family<Uint8List, PageRequest>((
   return ref.watch(readerRepositoryProvider).pageImage(req.bookId, req.page);
 }, isAutoDispose: true);
 
+/// 单页低精度缩略图字节（服务端 300px JPEG，autoDispose）。
+///
+/// 供底栏缩略图滑条、跳页面板以及原图到达前的低清渐进占位使用：体积仅为原图的 1%–5%，
+/// 且走仓库独立 LRU，不会把正在阅读的原图挤出内存。
+final readerPageThumbnailProvider =
+    FutureProvider.family<Uint8List, PageRequest>((Ref ref, PageRequest req) {
+      return ref
+          .watch(readerRepositoryProvider)
+          .pageThumbnail(req.bookId, req.page);
+    }, isAutoDispose: true);
+
 /// 一页的**页边主色**（动态背景用，UI-P1-5）。
 ///
 /// 也是 autoDispose：它依赖页图字节，必须跟着一起回收——否则读一本 200 页的书，

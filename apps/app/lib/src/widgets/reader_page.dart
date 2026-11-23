@@ -55,15 +55,21 @@ class ReaderPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final page = pageIndex + 1;
     final request = (bookId: bookId, page: page);
+    final repo = ref.watch(readerRepositoryProvider);
     final async = ref.watch(readerPageImageProvider(request));
 
     // 同步问一句"这页的字节现在在不在内存里"：在就直接画第一帧。
     // 只等 provider 的话，autoDispose 的 provider 每换一页都会先给一次
     // AsyncLoading，那一帧就是用户看到的闪烁。
-    final bytes =
-        async.value ??
-        ref.watch(readerRepositoryProvider).cachedPageImage(bookId, page);
+    final bytes = async.value ?? repo.cachedPageImage(bookId, page);
     final error = async.error;
+
+    // 低精度缩略图优先占位：原图未就绪时先用 300px 缩略图快速显像，
+    // 原图到达后在 `frameBuilder` 中无缝衔接直到首帧解码完成，不闪黑。
+    final Uint8List? thumbBytes = bytes == null && decodedImage == null
+        ? (repo.cachedPageThumbnail(bookId, page) ??
+              ref.watch(readerPageThumbnailProvider(request)).value)
+        : repo.cachedPageThumbnail(bookId, page);
 
     if (bytes != null) {
       final crop = trimBorders
@@ -83,8 +89,18 @@ class ReaderPage extends ConsumerWidget {
         gaplessPlayback: true,
         filterQuality: FilterQuality.medium,
         frameBuilder: (context, child, frame, synchronous) {
+          if (frame != null) return child;
           final image = decodedImage;
-          return frame == null && image != null ? _decoded(image) : child;
+          if (image != null) return _decoded(image);
+          if (thumbBytes != null) {
+            return Image.memory(
+              thumbBytes,
+              fit: BoxFit.contain,
+              gaplessPlayback: true,
+              filterQuality: FilterQuality.low,
+            );
+          }
+          return child;
         },
       );
     }
@@ -93,6 +109,15 @@ class ReaderPage extends ConsumerWidget {
       return KeyedSubtree(
         key: Key('reader-image-$pageIndex'),
         child: _decoded(image),
+      );
+    }
+    if (thumbBytes != null && error == null) {
+      return Image.memory(
+        thumbBytes,
+        key: Key('reader-thumb-preview-$pageIndex'),
+        fit: BoxFit.contain,
+        gaplessPlayback: true,
+        filterQuality: FilterQuality.low,
       );
     }
     if (error != null) {

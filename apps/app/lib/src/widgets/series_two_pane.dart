@@ -23,6 +23,8 @@ class SeriesSinglePane extends StatelessWidget {
     required this.onRefresh,
     required this.onRetry,
     required this.onOpenBook,
+    this.topPadding = 0,
+    this.offlineBanner,
     this.toolbar,
     this.filtered = false,
     this.selected = const <String>{},
@@ -41,6 +43,8 @@ class SeriesSinglePane extends StatelessWidget {
 
   /// 封面 Hero tag（由 `SeriesDetailArgs` 带过来，见 `seriesHeroTag`）。
   final String heroTag;
+  final double topPadding;
+  final Widget? offlineBanner;
   final Future<void> Function() onRefresh;
   final VoidCallback onRetry;
   final OpenSeriesBook onOpenBook;
@@ -64,6 +68,7 @@ class SeriesSinglePane extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
+      edgeOffset: topPadding,
       onRefresh: onRefresh,
       child: CustomScrollView(
         key: const Key('series-scroll'),
@@ -74,6 +79,7 @@ class SeriesSinglePane extends StatelessWidget {
               series: series,
               seriesId: seriesId,
               heroTag: heroTag,
+              topPadding: topPadding,
               books: books?.items,
               metadataLoading: metadataLoading,
               booksLoading: books == null && failure == null,
@@ -85,6 +91,7 @@ class SeriesSinglePane extends StatelessWidget {
               ),
             ),
           ),
+          if (offlineBanner != null) SliverToBoxAdapter(child: offlineBanner),
           PhaseFade(
             phase: seriesBooksPhase(books: books, failure: failure),
             slivers: seriesBookPhaseSlivers(
@@ -124,6 +131,8 @@ class SeriesTwoPane extends StatelessWidget {
     required this.onRefresh,
     required this.onRetry,
     required this.onOpenBook,
+    this.topPadding = 0,
+    this.offlineBanner,
     this.toolbar,
     this.filtered = false,
     this.selected = const <String>{},
@@ -142,6 +151,8 @@ class SeriesTwoPane extends StatelessWidget {
 
   /// 封面 Hero tag（由 `SeriesDetailArgs` 带过来，见 `seriesHeroTag`）。
   final String heroTag;
+  final double topPadding;
+  final Widget? offlineBanner;
   final Future<void> Function() onRefresh;
   final VoidCallback onRetry;
   final OpenSeriesBook onOpenBook;
@@ -165,6 +176,7 @@ class SeriesTwoPane extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
+      edgeOffset: topPadding,
       onRefresh: onRefresh,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -176,6 +188,7 @@ class SeriesTwoPane extends StatelessWidget {
                 series: series,
                 seriesId: seriesId,
                 heroTag: heroTag,
+                topPadding: topPadding,
                 books: books?.items,
                 metadataLoading: metadataLoading,
                 booksLoading: books == null && failure == null,
@@ -195,6 +208,10 @@ class SeriesTwoPane extends StatelessWidget {
               key: const Key('series-scroll'),
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: <Widget>[
+                if (topPadding > 0)
+                  SliverToBoxAdapter(child: SizedBox(height: topPadding)),
+                if (offlineBanner != null)
+                  SliverToBoxAdapter(child: offlineBanner),
                 PhaseFade(
                   phase: seriesBooksPhase(books: books, failure: failure),
                   slivers: seriesBookPhaseSlivers(

@@ -46,9 +46,21 @@ class FakeReaderRepository implements ReaderRepository {
   /// 预加载测试用它断言"翻过去之前就已经取过"，而不是只看总数。
   final List<int> pageRequests = <int>[];
 
+  /// 每次 `pageThumbnail` 被请求的页码（1 基，按调用顺序）。
+  final List<int> thumbnailRequests = <int>[];
+
   /// 给某几页装一道闸：`pageImage` 会停在这里，直到测试手动放行。
   /// 用来造"这一页还没加载好"的状态（冷页 loading 态）。
   final Map<int, Completer<void>> pageGates = <int, Completer<void>>{};
+
+  /// 单独卡住缩略图请求的闸；未配置时回退沿用 [pageGates]（兼容旧冷页测试）。
+  final Map<int, Completer<void>> thumbnailGates = <int, Completer<void>>{};
+
+  /// 缩略图请求错误注入（不设时沿用 [imageFailure]）。
+  ShelfFailure? thumbnailFailure;
+
+  /// 标记为已放行缩略图的页（即使 [pageGates] 卡住原图，缩略图也可先返回以测低清优先）。
+  final Set<int> fastThumbnails = <int>{};
 
   /// 只让这些页（1 基）取图失败。
   ///
@@ -58,6 +70,8 @@ class FakeReaderRepository implements ReaderRepository {
   final Set<int> failingPages = <int>{};
 
   final Map<String, Uint8List> _bytes = <String, Uint8List>{};
+  final Map<String, Uint8List> _thumbBytes = <String, Uint8List>{};
+  final Map<String, Uint8List> _fixtureBytes = <String, Uint8List>{};
 
   @override
   Future<Book?> book(String bookId) async =>
@@ -112,6 +126,41 @@ class FakeReaderRepository implements ReaderRepository {
     final gate = pageGates[page];
     if (gate != null && !gate.isCompleted) return null;
     return _bytes[pageNames[(page - 1) % pageNames.length]];
+  }
+
+  @override
+  Future<Uint8List> pageThumbnail(String bookId, int page) async {
+    thumbnailRequests.add(page);
+    final gate =
+        thumbnailGates[page] ??
+        (fastThumbnails.contains(page) ? null : pageGates[page]);
+    if (gate != null) await gate.future;
+    if (failingPages.contains(page)) throw const NetworkFailure();
+    final failure = thumbnailFailure ?? imageFailure;
+    if (failure != null) throw failure;
+
+    final key = '$bookId#$page';
+    final cached = _thumbBytes[key];
+    if (cached != null) return cached;
+
+    final name = pageNames[(page - 1) % pageNames.length];
+    final fixture = _fixtureBytes[name] ?? _bytes[name];
+    if (fixture != null) return _thumbBytes[key] = fixture;
+
+    final file = File('$pageDirectory/$name.png');
+    if (!file.existsSync()) {
+      throw StateError('缺少页图 fixture: ${file.path}');
+    }
+    return _thumbBytes[key] = _fixtureBytes[name] = file.readAsBytesSync();
+  }
+
+  @override
+  Uint8List? cachedPageThumbnail(String bookId, int page) {
+    final gate =
+        thumbnailGates[page] ??
+        (fastThumbnails.contains(page) ? null : pageGates[page]);
+    if (gate != null && !gate.isCompleted) return null;
+    return _thumbBytes['$bookId#$page'];
   }
 
   Future<void> uploadProgress(

@@ -60,6 +60,7 @@ List<_Call> _calls() {
     _Call('get', urls.bookPages('B1')),
     _Call('get', urls.pageImage('B1', 1)),
     _Call('get', urls.pageImage('B1', 1, convertToJpeg: true)),
+    _Call('get', urls.pageThumbnail('B1', 1)),
     _Call('get', urls.bookThumbnail('B1')),
     _Call('get', urls.seriesThumbnail('S1')),
     _Call('patch', urls.bookReadProgress('B1')),

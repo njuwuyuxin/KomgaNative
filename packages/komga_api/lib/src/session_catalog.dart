@@ -139,6 +139,10 @@ extension KomgaSessionCatalog on KomgaSession {
     bool convertToJpeg = false,
   }) => _getBytes(_urls.pageImage(bookId, page, convertToJpeg: convertToJpeg));
 
+  /// 单页低精度缩略图（长边 300px JPEG，页码 **1 基**）。
+  Future<Uint8List> fetchPageThumbnail(String bookId, int page) =>
+      _getBytes(_urls.pageThumbnail(bookId, page));
+
   /// 缩略图：**只接受 `image/jpeg`**（实测 `Accept: application/json` → 406）。
   Future<Uint8List> fetchSeriesThumbnail(String seriesId) =>
       _getBytes(_urls.seriesThumbnail(seriesId));

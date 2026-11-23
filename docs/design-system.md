@@ -17,7 +17,7 @@
 |---|---|---|---|
 | `AppSpacing` | `tokens.dart` | xxs 2 / xs 4 / sm 8 / md 16 / lg 24 / xl 32 / xxl 48 | — |
 | `AppRadii` | `tokens.dart` | xs 6（封面）/ sm 8 / md 12 / lg 20 / xl 28（面板顶角） | 主题与 `AppShapes` 压成 0 |
-| `AppSizes` | `tokens.dart` | 分隔线、图标 16/18/20/24、进度条、最小触控 48、拖动条、货架封面 96×136、阅读器缩略图 36×52 与滑条高 68、卡片行小封面 44×62、悬浮导航条高 64 / 底部留白 112、顶部玻璃标题栏高 56 / 占位 72、玻璃圆球 52、玻璃搜索框 44、玻璃分段条 48 / 内缩 4 | — |
+| `AppSizes` | `tokens.dart` | 分隔线、图标 16/18/20/24、进度条、最小触控 48、拖动条、货架封面 96×136、阅读器缩略图 36×52 / 放大 72×104 与滑条高 68 / 放大 124、卡片行小封面 44×62、悬浮导航条高 64 / 底部留白 112、顶部玻璃标题栏高 56 / 占位 72、玻璃圆球 52、玻璃搜索框 44、玻璃分段条 48 / 内缩 4 | — |
 | `AppMotion` | `motion.dart` | 时长 quick 150 / standard 300 / emphasized 450 ms；曲线 standard（easeOutCubic）、emphasized（轻微过冲）、exit；弹簧 snappy / gentle | 时长 0、曲线线性、`enabled = false`（调用方直接跳终值） |
 | `AppMaterial` | `materials.dart` | `chrome`（阅读器，深色强模糊，不跟随深浅色）/ `bar`（液态玻璃：更透 + 提饱和 + `GlassOptics`）/ `sheet`，各有深浅两档 | 不模糊、不透明纸色底 + 1px 墨色描边 |
 | `GlassOptics` | `glass_optics.dart` | 液态玻璃光学参数：饱和度、外缘折射（拉进距离 / 环带宽）、内缘聚光、8 方向镜面高光、轮廓、选中嵌入胶囊底色；`light` / `dark` 两档 | 墨水屏为 null |
@@ -53,7 +53,7 @@ chrome 永远压在漫画画面上：浅色模式下用浅色毛玻璃，白底�
 | `GlassPillButton` | 玻璃胶囊主按钮（继续阅读 / 开始阅读 / 连接 / 重试），可带图标、`expanded`、`busy` | 墨底纸字、直角 |
 | `GlassSegmentedControl` | 玻璃分段控件；`scrollable` 时按内容定宽并横向滚动（库筛选），否则等分（主题 / 语言 / 收藏集）。选中胶囊由 `SlidingSelectionTrack` 绘制，切换时从旧段弹到新段 | 选中反白、直角；不做滑动（直接到终值） |
 | `GlassSearchField` | 玻璃胶囊搜索框，左放大镜、有内容才出现清除键；边框/填充全关掉 | 纸底墨边、直角 |
-| `GlassMenuButton` | 玻璃图标 + `MenuAnchor` **玻璃菜单**（排序 / 筛选 / 视图 / 更多）；菜单项由调用方给 `GlassMenuItemButton`，key 挂在项上；`clipBehavior: Clip.none` 保证玻璃卡阴影不被面板矩形裁出方角 | 纸底墨框菜单 |
+| `GlassMenuButton` | 玻璃图标 + `OverlayPortal` **动画玻璃菜单**（排序 / 筛选 / 视图 / 更多）：展开/收回按锚点角落做缩放 + 淡入淡出过渡（`AppMotion.standard`/`quick`）；菜单项由调用方给 `GlassMenuItemButton`，key 挂在项上 | 纸底墨框菜单，直接显隐不播动画 |
 | `GlassMenuItemButton` | 菜单里的一行：文本按菜单中线居中；对勾/图标用 `Positioned` 叠在左侧，不参与文本排版（不会把文字往右挤） | 同菜单 |
 | `GlassHeader` | 顶部悬浮玻璃标题栏内容行：`leading` 圆球 + 中间胶囊（标题/动作，或用 `bar` 整条替换；标题与 `bar` 都不给时不画胶囊）+ `trailing` 圆球 | 直角、纸底墨边、整条可见 |
 | `GlassHeaderSliver` / `GlassTopBar` | 标题栏的两种落位：滚动页钉在顶部（占状态栏 + 72）；非滚动页作 `Scaffold.appBar`（`preferredSize` = 72，状态栏由 `SafeArea` 补） | 顶部状态栏区域用整块纸色 |
@@ -116,10 +116,10 @@ chrome 永远压在漫画画面上：浅色模式下用浅色毛玻璃，白底�
 中间胶囊默认是"标题 + 动作"；也可以整条替换（`bar`），或者**什么都不放**：
 
 - **系列详情**：标题已经在头部（封面右边）出现，标题栏不再重复放标题，
-  只保留返回 / 更多两个独立圆球（`GlassHeader(leading: …, trailing: …)`）；
-
-- **书架**：`bar: Row(搜索框 + 三颗动作的玻璃胶囊)`——没有标题文字，
-  搜索与动作合成一行，比"标题栏 + 搜索框"省掉整整一行；
+  只保留返回 / 下载与更多圆球（`GlassHeader(leading: …, trailing: …)`，右侧两颗圆球间隔 `AppSpacing.sm`），
+  配合 `extendBodyBehindAppBar: true` 悬浮在全出血模糊封面背景上；
+- **书架**：`bar: Row(搜索框 + 选择圆球 + 排序/筛选/视图三键液态玻璃胶囊)`——没有标题文字，
+  搜索与动作合成一行，三颗菜单按钮统一装在独立的 `GlassSurface` 胶囊里以保证在封面上方清晰突出；
 - **搜索页**：`bar: GlassSearchField(...)`，搜索框就是标题栏；
 - **收藏集**：`bar: GlassSegmentedControl(...)`，它是 dock 的一个 tab，没有返回键。
 
@@ -146,11 +146,10 @@ chrome 永远压在漫画画面上：浅色模式下用浅色毛玻璃，白底�
 排序/筛选/视图收进右侧的三格玻璃胶囊，收藏集入口搬到了底部 dock（见下一节）；
 背后是 `GlassPageBackground` 的两团极淡光晕，让玻璃有东西可折射，墨水屏直接透传成纸色。
 
-> **玻璃 + 下拉刷新（Android）**：默认的拉伸过度滚动会给整条滚动层加一个 `Transform`，
-> 液态玻璃着色器按屏幕坐标采样背景，就会读到变换后的空图层——顶部控件整块变黑。
-> 书架用 `ScrollConfiguration(...copyWith(overscroll: false))` 关掉拉伸/辉光；
-> `RefreshIndicator` 仍然靠 `OverscrollNotification` 工作，`library_screen_test` 里有一条
-> "下拉刷新：拖动后重新请求第一页"钉住它没被一起关掉。iOS 的 Bouncing 不受影响。
+> **玻璃 + 下拉过度滚动（Android）**：Android 12+ 默认的 `StretchingOverscrollIndicator` 会给整条滚动子树加非恒等拉伸 `Transform`，
+> 液态玻璃着色器按屏幕坐标采样背景，会读到错位/空图层——造成正在读、搜索、设置、详情等页下拉时玻璃控件变黑、变灰或边缘色散。
+> `KomgaApp` 在全局 `MaterialApp.router(scrollBehavior: _NoOverscrollBehavior())` 统一关闭拉伸/辉光指示器，
+> 所有页面共享修复；`RefreshIndicator` 仍然靠 `OverscrollNotification` 正常工作（`library_screen_test` 钉住），iOS 的 Bouncing 不受影响。
 
 ## 底部 dock：四个 tab + 搜索
 

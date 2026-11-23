@@ -233,9 +233,15 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
     final wide =
         WindowSizeClass.of(MediaQuery.sizeOf(context).width) ==
         WindowSizeClass.expanded;
+    // 顶部悬浮玻璃栏高度（含状态栏）：主体从屏幕最上端开始铺满，头部模糊背景贯通到顶，
+    // 前景内容与列表通过 topPadding 让开顶部浮层。
+    final topPadding =
+        MediaQuery.paddingOf(context).top + AppSizes.glassHeaderClearance;
+    final offlineBanner = OfflineBanner(onRetry: () => unawaited(_refresh()));
 
     return EdgeSwipeBack(
       child: Scaffold(
+        extendBodyBehindAppBar: true,
         // 多选批量条：与书架一致，放在 footer 而不是浮层，避免盖住最后一行。
         persistentFooterButtons: selection.active
             ? <Widget>[
@@ -263,6 +269,7 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                   seriesId: seriesId,
                   books: page?.items ?? const <Book>[],
                 ),
+                const SizedBox(width: AppSpacing.sm),
                 GlassMenuButton(
                   key: const Key('series-mark-menu'),
                   orb: true,
@@ -292,50 +299,47 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
             ),
           ),
         ),
-        body: Column(
-          children: <Widget>[
-            OfflineBanner(onRetry: () => unawaited(_refresh())),
-            Expanded(
-              child: wide
-                  ? SeriesTwoPane(
-                      series: series,
-                      books: page,
-                      failure: failure,
-                      metadataLoading: metadataLoading,
-                      seriesId: seriesId,
-                      heroTag: heroTag,
-                      onRefresh: _refresh,
-                      onRetry: () => unawaited(_refresh()),
-                      onLoadMore: _loadMore,
-                      onOpenBook: _openBook,
-                      toolbar: toolbar,
-                      filtered: filtered,
-                      selected: selection.ids,
-                      selecting: selection.active,
-                      onToggleSelect: selecting.toggle,
-                      onMarkManyBooks: _markManyBooks,
-                    )
-                  : SeriesSinglePane(
-                      series: series,
-                      books: page,
-                      failure: failure,
-                      metadataLoading: metadataLoading,
-                      seriesId: seriesId,
-                      heroTag: heroTag,
-                      onRefresh: _refresh,
-                      onRetry: () => unawaited(_refresh()),
-                      onLoadMore: _loadMore,
-                      onOpenBook: _openBook,
-                      toolbar: toolbar,
-                      filtered: filtered,
-                      selected: selection.ids,
-                      selecting: selection.active,
-                      onToggleSelect: selecting.toggle,
-                      onMarkManyBooks: _markManyBooks,
-                    ),
-            ),
-          ],
-        ),
+        body: wide
+            ? SeriesTwoPane(
+                series: series,
+                books: page,
+                failure: failure,
+                metadataLoading: metadataLoading,
+                seriesId: seriesId,
+                heroTag: heroTag,
+                topPadding: topPadding,
+                offlineBanner: offlineBanner,
+                onRefresh: _refresh,
+                onRetry: () => unawaited(_refresh()),
+                onLoadMore: _loadMore,
+                onOpenBook: _openBook,
+                toolbar: toolbar,
+                filtered: filtered,
+                selected: selection.ids,
+                selecting: selection.active,
+                onToggleSelect: selecting.toggle,
+                onMarkManyBooks: _markManyBooks,
+              )
+            : SeriesSinglePane(
+                series: series,
+                books: page,
+                failure: failure,
+                metadataLoading: metadataLoading,
+                seriesId: seriesId,
+                heroTag: heroTag,
+                topPadding: topPadding,
+                offlineBanner: offlineBanner,
+                onRefresh: _refresh,
+                onRetry: () => unawaited(_refresh()),
+                onLoadMore: _loadMore,
+                onOpenBook: _openBook,
+                toolbar: toolbar,
+                filtered: filtered,
+                selected: selection.ids,
+                selecting: selection.active,
+                onToggleSelect: selecting.toggle,
+                onMarkManyBooks: _markManyBooks,
+              ),
       ),
     );
   }

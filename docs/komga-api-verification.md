@@ -101,6 +101,7 @@ Invoke-WebRequest 'http://127.0.0.1:25600/api/v1/libraries/<libId>/scan' -Method
 |---|---|
 | `GET /books/{id}/thumbnail` + `Accept: application/json` | **406** `Acceptable representations: [image/jpeg]` |
 | 同上 + `Accept: image/jpeg` | 200，`image/jpeg`（约 2.4 KB） |
+| `GET /books/{id}/pages/{n}/thumbnail` + `Accept: image/*,image/jpeg` | 200，`image/jpeg`（长边 300px，页码 1 基；`n=0` → **400**） |
 
 → 影响：旧代码在 Dio 全局 `headers` 里写死 `Accept: application/json`，**所有缩略图/封面都会 406**。修复：全局不设 `Accept`，JSON 请求与图片请求各自声明（`session.dart`）。
 

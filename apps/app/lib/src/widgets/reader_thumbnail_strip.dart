@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:ui' show lerpDouble;
 
+import 'package:flutter/physics.dart' show SpringSimulation;
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/widgets/page_thumbnail.dart';
@@ -7,15 +9,16 @@ import 'package:komga_native/src/widgets/reader_layout.dart';
 import 'package:komga_native/src/widgets/reader_palette.dart';
 import 'package:material_ui/material_ui.dart';
 
+part 'reader_thumbnail_strip_item.dart';
+
 /// 底栏上方的横向页缩略图滑条（UI-P1-2）。
 ///
-/// 与"查看全部"的网格面板（`page_navigator_sheet.dart`）互补：滑条用于邻页微调，
-/// 网格用于跳到远处，两者都保留。
+/// 支持紧凑 / 放大两档缩略图尺寸：在滑条上**上滑**平滑放大（单张更大、一行显示更少），
+/// **下滑**平滑缩回紧凑档；拖动与松手落位全程以当前居中页为锚点，不左右跳动。
 ///
 /// 三条约束：
 /// - **按屏分组**：双页模式下一条缩略图代表一跨页，和翻页粒度一致（见 [ReaderLayout.screenAt]）；
-/// - **懒加载**：`ListView.builder` + 固定 `itemExtent`，只有可见范围内的实例会被构建，
-///   也才会去请求页图字节；
+/// - **懒加载**：`ListView.builder` + 固定 `itemExtent`，只有可见范围内的实例会被构建；
 /// - **方向镜像**：RTL 用 `reverse: true`，起点在右侧，和翻页方向一致。
 class ReaderThumbnailStrip extends StatefulWidget {
   const ReaderThumbnailStrip({
@@ -48,8 +51,13 @@ class ReaderThumbnailStrip extends StatefulWidget {
   State<ReaderThumbnailStrip> createState() => _ReaderThumbnailStripState();
 }
 
-class _ReaderThumbnailStripState extends State<ReaderThumbnailStrip> {
+class _ReaderThumbnailStripState extends State<ReaderThumbnailStrip>
+    with SingleTickerProviderStateMixin {
   final ScrollController _controller = ScrollController();
+
+  /// 两档缩放进度：0 = 紧凑档，1 = 放大档。
+  late final AnimationController _expand = AnimationController(vsync: this)
+    ..addListener(_onExpandTick);
 
   /// 视口宽度：居中偏移要它才能算（`LayoutBuilder` 里缓存）。
   double _viewport = 0;
@@ -60,7 +68,27 @@ class _ReaderThumbnailStripState extends State<ReaderThumbnailStrip> {
   /// 上一次触发触感反馈的下标（拖动时每经过一屏振一次）。
   int _haptic = -1;
 
-  double get _extent => AppSizes.thumb.width + AppSpacing.xs;
+  /// 当前是否处于放大档（供松手判定是否切换档位并触发触感）。
+  bool _expanded = false;
+
+  /// 缩放过程中锁定的逻辑位置锚点（条目下标 + 视口内相对位置），
+  /// 避免 `itemExtent` 变化时列表横向漂移（首尾贴边、中部居中）。
+  ({double item, double screenFraction})? _resizeAnchor;
+
+  static const double _kFlingVelocity = 250;
+
+  double get _t => _expand.value.clamp(0.0, 1.0);
+  double _thumbWidth(double t) =>
+      lerpDouble(AppSizes.thumb.width, AppSizes.thumbExpanded.width, t)!;
+  double _thumbHeight(double t) =>
+      lerpDouble(AppSizes.thumb.height, AppSizes.thumbExpanded.height, t)!;
+  double _gap(double t) => lerpDouble(AppSpacing.xs, AppSpacing.sm, t)!;
+  double _extentAt(double t) => _thumbWidth(t) + _gap(t);
+  double _stripHeight(double t) => lerpDouble(
+    AppSizes.thumbStripHeight,
+    AppSizes.thumbStripExpandedHeight,
+    t,
+  )!;
 
   @override
   void initState() {
@@ -80,28 +108,84 @@ class _ReaderThumbnailStripState extends State<ReaderThumbnailStrip> {
 
   @override
   void dispose() {
+    _expand.dispose();
     _controller.dispose();
     super.dispose();
   }
 
-  /// 等这一帧布局完再滚：`initState` 里还没有视口宽度。
-  void _scheduleCenter() {
+  void _onExpandTick() {
+    setState(() {});
+    _syncAnchor();
+  }
+
+  void _syncAnchor() {
+    final anchor = _resizeAnchor;
+    if (anchor == null || !_controller.hasClients || _viewport <= 0) return;
+    final target = _offsetForAnchor(anchor, _t);
+    if (target <= _controller.position.maxScrollExtent) {
+      _controller.jumpTo(target);
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _centerTo(_centered, animate: false);
+      if (!mounted || !_controller.hasClients) return;
+      final current = _resizeAnchor;
+      if (current != null) _controller.jumpTo(_offsetForAnchor(current, _t));
     });
   }
 
-  double _offsetFor(int index) {
-    final count = widget.layout.screenCount;
-    final limit = (count * _extent - _viewport).clamp(0.0, double.infinity);
-    final target = index * _extent - (_viewport - AppSizes.thumb.width) / 2;
+  ({double item, double screenFraction}) _captureAnchor(double t) {
+    if (!_controller.hasClients || _viewport <= 0) {
+      return (item: _centered.toDouble(), screenFraction: 0.5);
+    }
+    final max = _controller.position.maxScrollExtent;
+    final offset = _controller.offset;
+    final half = _viewport / 2;
+    final double fraction;
+    if (max <= 0) {
+      fraction = 0.0;
+    } else if (offset < half) {
+      fraction = (offset / half) * 0.5;
+    } else if (max - offset < half) {
+      fraction = 1.0 - ((max - offset) / half) * 0.5;
+    } else {
+      fraction = 0.5;
+    }
+    final item = (offset + fraction * _viewport) / _extentAt(t);
+    return (item: item, screenFraction: fraction);
+  }
+
+  double _offsetForAnchor(
+    ({double item, double screenFraction}) anchor,
+    double t,
+  ) {
+    final extent = _extentAt(t);
+    final limit = (widget.layout.screenCount * extent - _viewport).clamp(
+      0.0,
+      double.infinity,
+    );
+    final target = anchor.item * extent - anchor.screenFraction * _viewport;
+    return target.clamp(0.0, limit);
+  }
+
+  void _scheduleCenter() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _centerTo(_centered, animate: false);
+    });
+  }
+
+  double _offsetForFraction(double index, double t) {
+    final extent = _extentAt(t);
+    final limit = (widget.layout.screenCount * extent - _viewport).clamp(
+      0.0,
+      double.infinity,
+    );
+    final target = index * extent - (_viewport - _thumbWidth(t)) / 2;
     return target.clamp(0.0, limit);
   }
 
   void _centerTo(int index, {required bool animate}) {
     if (!_controller.hasClients || _viewport <= 0) return;
-    final target = _offsetFor(index);
+    final target = _offsetForFraction(index.toDouble(), _t);
     final motion = AppMotion.of(context);
     if (!animate || !motion.enabled) {
       _controller.jumpTo(target);
@@ -116,13 +200,66 @@ class _ReaderThumbnailStripState extends State<ReaderThumbnailStrip> {
     );
   }
 
-  /// 拖动时"每经过一屏"给一次 selection 触感。
+  void _onVerticalDragStart(DragStartDetails _) {
+    _expand.stop();
+    _resizeAnchor = _captureAnchor(_t);
+  }
+
+  void _onVerticalDragUpdate(DragUpdateDetails details) {
+    const span = AppSizes.thumbStripExpandedHeight - AppSizes.thumbStripHeight;
+    if (span <= 0) return;
+    _expand.value = (_expand.value - details.delta.dy / span).clamp(0.0, 1.0);
+  }
+
+  void _onVerticalDragEnd(DragEndDetails details) {
+    final velocity = details.primaryVelocity ?? 0;
+    final targetExpanded = velocity < -_kFlingVelocity
+        ? true
+        : (velocity > _kFlingVelocity ? false : _expand.value >= 0.5);
+    _settleExpand(targetExpanded, velocityPx: -velocity);
+  }
+
+  void _onVerticalDragCancel() => _settleExpand(_expand.value >= 0.5);
+
+  void _toggleExpanded() {
+    _resizeAnchor = _captureAnchor(_t);
+    _settleExpand(!_expanded);
+  }
+
+  void _settleExpand(bool targetExpanded, {double velocityPx = 0}) {
+    if (targetExpanded != _expanded) {
+      _expanded = targetExpanded;
+      unawaited(AppHaptics.selection());
+    }
+    final target = targetExpanded ? 1.0 : 0.0;
+    final motion = AppMotion.of(context);
+    if (!motion.enabled) {
+      _expand.value = target;
+      _syncAnchor();
+      _resizeAnchor = null;
+      return;
+    }
+    const span = AppSizes.thumbStripExpandedHeight - AppSizes.thumbStripHeight;
+    final sim = SpringSimulation(
+      motion.snappy,
+      _expand.value,
+      target,
+      span > 0 ? velocityPx / span : 0.0,
+    );
+    unawaited(
+      _expand.animateWith(sim).whenComplete(() {
+        if (mounted) _resizeAnchor = null;
+      }),
+    );
+  }
+
   bool _onScroll(ScrollNotification notification) {
     if (notification is! ScrollUpdateNotification) return false;
     if (notification.dragDetails == null || _viewport <= 0) return false;
+    final t = _t;
     final center =
-        (notification.metrics.pixels + (_viewport - AppSizes.thumb.width) / 2) /
-        _extent;
+        (notification.metrics.pixels + (_viewport - _thumbWidth(t)) / 2) /
+        _extentAt(t);
     final index = center.round().clamp(0, widget.layout.screenCount - 1);
     if (index == _haptic) return false;
     _haptic = index;
@@ -134,169 +271,75 @@ class _ReaderThumbnailStripState extends State<ReaderThumbnailStrip> {
       ? '${pages.first + 1}–${pages.last + 1}'
       : '${pages.first + 1}';
 
-  Future<void> _showActions(BuildContext context, int page) async {
-    final l10n = AppLocalizations.of(context);
-    final action = await showModalBottomSheet<_PageAction>(
-      context: context,
-      backgroundColor: widget.palette.background,
-      builder: (BuildContext context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            if (widget.onSharePage != null)
-              ListTile(
-                key: const Key('reader-page-share'),
-                leading: Icon(
-                  Icons.ios_share,
-                  color: widget.palette.foreground,
-                ),
-                title: Text(
-                  l10n.sharePage,
-                  style: TextStyle(color: widget.palette.foreground),
-                ),
-                onTap: () => Navigator.of(context).pop(_PageAction.share),
-              ),
-            if (widget.onGroupFrom != null)
-              ListTile(
-                key: const Key('reader-page-group'),
-                leading: Icon(
-                  Icons.grid_view_outlined,
-                  color: widget.palette.foreground,
-                ),
-                title: Text(
-                  l10n.groupFromPage,
-                  style: TextStyle(color: widget.palette.foreground),
-                ),
-                onTap: () => Navigator.of(context).pop(_PageAction.group),
-              ),
-          ],
-        ),
-      ),
-    );
-    if (!mounted || action == null) return;
-    switch (action) {
-      case _PageAction.share:
-        await widget.onSharePage?.call(page);
-      case _PageAction.group:
-        widget.onGroupFrom?.call(page);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final layout = widget.layout;
-    // 缩略图按显示尺寸 ×DPR 解码：既够清晰，又不会把整页原图塞进内存。
+    final t = _t;
+    final thumbW = _thumbWidth(t);
+    final thumbH = _thumbHeight(t);
+    final gap = _gap(t);
     final cacheWidth =
-        (AppSizes.thumb.width * MediaQuery.devicePixelRatioOf(context)).round();
-    return SizedBox(
-      height: AppSizes.thumbStripHeight,
-      child: LayoutBuilder(
-        builder: (BuildContext context, BoxConstraints constraints) {
-          _viewport = constraints.maxWidth;
-          return NotificationListener<ScrollNotification>(
-            onNotification: _onScroll,
-            child: ListView.builder(
-              key: const Key('reader-thumb-strip'),
-              controller: _controller,
-              scrollDirection: Axis.horizontal,
-              reverse: widget.rightToLeft,
-              itemExtent: _extent,
-              padding: EdgeInsets.zero,
-              itemCount: layout.screenCount,
-              itemBuilder: (BuildContext context, int index) {
-                final pages = layout.screenAt(index);
-                return _StripThumb(
-                  key: Key('reader-thumb-${pages.first + 1}'),
-                  bookId: widget.bookId,
-                  page: pages.first + 1,
-                  label: _label(pages),
-                  current: index == layout.screenIndex,
-                  palette: widget.palette,
-                  cacheWidth: cacheWidth,
-                  onTap: () => widget.onJump(pages.first + 1),
-                  onLongPress:
-                      widget.onSharePage == null && widget.onGroupFrom == null
-                      ? null
-                      : () => _showActions(context, pages.first + 1),
-                );
-              },
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-enum _PageAction { share, group }
-
-class _StripThumb extends StatelessWidget {
-  const _StripThumb({
-    required this.bookId,
-    required this.page,
-    required this.label,
-    required this.current,
-    required this.palette,
-    required this.cacheWidth,
-    required this.onTap,
-    this.onLongPress,
-    super.key,
-  });
-
-  final String bookId;
-  final int page;
-  final String label;
-  final bool current;
-  final ReaderPalette palette;
-  final int cacheWidth;
-  final VoidCallback onTap;
-  final VoidCallback? onLongPress;
-
-  @override
-  Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(AppRadii.xs);
-    return Semantics(
-      container: true,
-      button: true,
-      selected: current,
-      label: label,
-      onTap: onTap,
-      onLongPress: onLongPress,
-      child: ExcludeSemantics(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: onTap,
-            onLongPress: onLongPress,
-            child: Center(
-              child: SizedBox(
-                width: AppSizes.thumb.width,
-                height: AppSizes.thumb.height,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: palette.background,
-                    borderRadius: radius,
-                    border: Border.all(
-                      color: current ? palette.foreground : palette.outline,
-                      width: current
-                          ? AppSizes.hairline * 2
-                          : AppSizes.hairline,
+        (AppSizes.thumbExpanded.width * MediaQuery.devicePixelRatioOf(context))
+            .round();
+    return GestureDetector(
+      key: const Key('reader-thumb-resize-area'),
+      behavior: HitTestBehavior.translucent,
+      onVerticalDragStart: _onVerticalDragStart,
+      onVerticalDragUpdate: _onVerticalDragUpdate,
+      onVerticalDragEnd: _onVerticalDragEnd,
+      onVerticalDragCancel: _onVerticalDragCancel,
+      child: SizedBox(
+        height: _stripHeight(t),
+        child: Column(
+          children: <Widget>[
+            _StripGrabber(palette: widget.palette, onTap: _toggleExpanded),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (BuildContext context, BoxConstraints constraints) {
+                  _viewport = constraints.maxWidth;
+                  return NotificationListener<ScrollNotification>(
+                    onNotification: _onScroll,
+                    child: ListView.builder(
+                      key: const Key('reader-thumb-strip'),
+                      controller: _controller,
+                      scrollDirection: Axis.horizontal,
+                      reverse: widget.rightToLeft,
+                      itemExtent: thumbW + gap,
+                      padding: EdgeInsets.zero,
+                      itemCount: layout.screenCount,
+                      itemBuilder: (BuildContext context, int index) {
+                        final pages = layout.screenAt(index);
+                        return _StripThumb(
+                          key: Key('reader-thumb-${pages.first + 1}'),
+                          bookId: widget.bookId,
+                          page: pages.first + 1,
+                          label: _label(pages),
+                          current: index == layout.screenIndex,
+                          palette: widget.palette,
+                          width: thumbW,
+                          height: thumbH,
+                          horizontalPadding: gap / 2,
+                          cacheWidth: cacheWidth,
+                          onTap: () => widget.onJump(pages.first + 1),
+                          onLongPress:
+                              widget.onSharePage == null &&
+                                  widget.onGroupFrom == null
+                              ? null
+                              : () => _showThumbnailPageActions(
+                                  context,
+                                  palette: widget.palette,
+                                  page: pages.first + 1,
+                                  onSharePage: widget.onSharePage,
+                                  onGroupFrom: widget.onGroupFrom,
+                                ),
+                        );
+                      },
                     ),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: radius,
-                    child: PageThumbnailImage(
-                      bookId: bookId,
-                      page: page,
-                      palette: palette,
-                      cacheWidth: cacheWidth,
-                    ),
-                  ),
-                ),
+                  );
+                },
               ),
             ),
-          ),
+          ],
         ),
       ),
     );

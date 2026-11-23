@@ -95,11 +95,17 @@ abstract final class AppSizes {
   /// 横向货架整行高度：封面 + 两行文字。
   static const double shelfRowHeight = 196;
 
-  /// 阅读器底部缩略图滑条里的单张缩略图。
+  /// 阅读器底部缩略图滑条里的单张缩略图（紧凑档）。
   static const Size thumb = Size(36, 52);
 
-  /// 缩略图滑条整行高度：缩略图 + 上下留白。
+  /// 缩略图滑条整行高度（紧凑档）：顶把 + 缩略图 + 上下留白。
   static const double thumbStripHeight = 68;
+
+  /// 阅读器底部缩略图滑条放大档单张尺寸（上滑展开，一行显示更少、单张更大）。
+  static const Size thumbExpanded = Size(72, 104);
+
+  /// 缩略图滑条整行高度（放大档）：顶把 + 放大缩略图 + 上下留白。
+  static const double thumbStripExpandedHeight = 124;
 
   /// 卡片行里的小封面（书末"下一本"卡片）。
   static const Size rowCover = Size(44, 62);

@@ -12,6 +12,7 @@ import 'package:komga_native/src/providers/reader_providers.dart';
 import 'package:komga_native/src/screens/library_screen.dart';
 import 'package:komga_native/src/screens/reader_screen.dart';
 import 'package:komga_native/src/screens/series_detail_screen.dart';
+import 'package:komga_native/src/widgets/series_header.dart';
 import 'package:komga_native/src/widgets/series_hero_tag.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/l10n/l10n.dart';
@@ -333,5 +334,26 @@ void main() {
       (page: 1, size: 100),
       (page: 2, size: 100),
     ]);
+  });
+
+  testWidgets('顶部玻璃栏悬浮在全出血模糊背景之上，且右上角两颗圆球保持间距', (WidgetTester tester) async {
+    await pumpDetail(tester, FakeLibraryRepository(series: demoShelf()));
+    await tester.pumpAndSettle();
+
+    final scaffold = tester.widget<Scaffold>(find.byType(Scaffold).first);
+    expect(scaffold.extendBodyBehindAppBar, isTrue);
+
+    final headerRect = tester.getRect(find.byType(SeriesHeader));
+    expect(headerRect.top, 0, reason: '模糊背景应贯通到屏幕最顶端');
+
+    final dlRect = tester.getRect(
+      find.byKey(const Key('series-download-menu')),
+    );
+    final markRect = tester.getRect(find.byKey(const Key('series-mark-menu')));
+    expect(
+      markRect.left - dlRect.right,
+      greaterThanOrEqualTo(AppSpacing.sm - 0.5),
+      reason: '右上角下载与更多圆球之间要有清晰间距',
+    );
   });
 }

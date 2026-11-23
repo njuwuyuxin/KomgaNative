@@ -19,6 +19,12 @@ abstract interface class ReaderRepository {
 
   /// 第 [page] 页的字节**此刻**在不在内存里（1 基）；不在返回 null。
   Uint8List? cachedPageImage(String bookId, int page);
+
+  /// 第 [page] 页的低精度缩略图字节（1 基，优先服务端 300px JPEG，离线已下载时回退原图）。
+  Future<Uint8List> pageThumbnail(String bookId, int page);
+
+  /// 第 [page] 页的缩略图字节**此刻**在不在内存里（1 基）；不在返回 null。
+  Uint8List? cachedPageThumbnail(String bookId, int page);
 }
 
 class KomgaReaderRepository implements ReaderRepository {
@@ -29,16 +35,24 @@ class KomgaReaderRepository implements ReaderRepository {
   /// 把刚读过的页挤出内存，导致往回翻时重拉网络并丢失 `ImageCache` 键引用。
   static const int defaultPageCacheCapacity = 64;
 
+  /// 页缩略图字节内存 LRU 容量：单张 300px JPEG 仅约 10–25 KB，独立缓存不挤占原图 LRU。
+  static const int defaultThumbnailCacheCapacity = 128;
+
   KomgaReaderRepository(
     this._session,
     this._sync, {
     int pageCacheCapacity = defaultPageCacheCapacity,
-  }) : _pages = ByteLruCache(capacity: pageCacheCapacity);
+    int thumbnailCacheCapacity = defaultThumbnailCacheCapacity,
+  }) : _pages = ByteLruCache(capacity: pageCacheCapacity),
+       _thumbnails = ByteLruCache(capacity: thumbnailCacheCapacity);
 
   final KomgaSession _session;
   final ProgressSyncService _sync;
   final ByteLruCache _pages;
+  final ByteLruCache _thumbnails;
   final Map<String, Future<Uint8List>> _inFlight =
+      <String, Future<Uint8List>>{};
+  final Map<String, Future<Uint8List>> _thumbInFlight =
       <String, Future<Uint8List>>{};
 
   KomgaSession get debugSession => _session;
@@ -93,4 +107,42 @@ class KomgaReaderRepository implements ReaderRepository {
   @override
   Uint8List? cachedPageImage(String bookId, int page) =>
       _pages.peek('$bookId#$page');
+
+  @override
+  Future<Uint8List> pageThumbnail(String bookId, int page) {
+    final key = '$bookId#$page';
+    final cached = _thumbnails.get(key);
+    if (cached != null) return Future<Uint8List>.value(cached);
+    return _thumbInFlight[key] ??= _fetchAndCacheThumbnail(key, bookId, page);
+  }
+
+  Future<Uint8List> _fetchAndCacheThumbnail(
+    String key,
+    String bookId,
+    int page,
+  ) async {
+    try {
+      final bytes = await _session.fetchPageThumbnail(bookId, page);
+      _thumbnails.put(key, bytes);
+      return bytes;
+    } on KomgaError catch (error) {
+      // 整本离线下载只缓存了原图页，未拉取缩略图；断网时自动回退到原图缓存。
+      final fullCached = _pages.peek(key);
+      if (fullCached != null) return fullCached;
+      if (error is KomgaNetworkError || error is KomgaServerError) {
+        try {
+          return await pageImage(bookId, page);
+        } on ShelfFailure {
+          throw shelfFailureOf(error);
+        }
+      }
+      throw shelfFailureOf(error);
+    } finally {
+      _thumbInFlight.remove(key)?.ignore();
+    }
+  }
+
+  @override
+  Uint8List? cachedPageThumbnail(String bookId, int page) =>
+      _thumbnails.peek('$bookId#$page');
 }

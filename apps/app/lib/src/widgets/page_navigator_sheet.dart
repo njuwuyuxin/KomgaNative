@@ -10,9 +10,8 @@ typedef PageNavigatorChoice = ({int page, bool groupFrom});
 
 /// 缩略图跳页面板。
 ///
-/// 为什么不用 Komga 的页缩略图接口：**它没有**。`/books/{id}/thumbnail` 是整本书的封面，
-/// 页级只有 `/pages/{n}` 全尺寸图。所以这里用页面图 + `cacheWidth` 解码降采样；
-/// 网格是懒构建的，只有滚到的页才会真正下载。
+/// 走 Komga 页级缩略图端点 `/api/v1/books/{id}/pages/{n}/thumbnail`（长边 300px JPEG）
+/// 并配合 `cacheWidth` 降采样，网格懒构建，仅请求可见项。
 ///
 /// 双页模式下长按某一页 = "从这一页开始重新分组"（UI-P3-5），通过
 /// [onGroupFrom] 回传；不传时没有长按行为。

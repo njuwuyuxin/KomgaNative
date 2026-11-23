@@ -227,4 +227,12 @@ void main() {
     expect(find.text('Connect to your Komga server'), findsOneWidget);
     expect(await store.load(), isNull);
   });
+
+  testWidgets('全局关闭过度滚动拉伸/辉光指示器，避免下拉时液态玻璃控件发黑或边缘色散', (
+    WidgetTester tester,
+  ) async {
+    await pumpApp(tester, store: InMemoryServerStore(storedServer()));
+    expect(find.byType(StretchingOverscrollIndicator), findsNothing);
+    expect(find.byType(GlowingOverscrollIndicator), findsNothing);
+  });
 }

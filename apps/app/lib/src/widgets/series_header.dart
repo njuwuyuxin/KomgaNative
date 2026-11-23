@@ -20,6 +20,7 @@ class SeriesHeader extends ConsumerWidget {
     required this.metadataLoading,
     required this.booksLoading,
     required this.onOpenBook,
+    this.topPadding = 0,
     super.key,
   });
 
@@ -30,6 +31,9 @@ class SeriesHeader extends ConsumerWidget {
   final bool metadataLoading;
   final bool booksLoading;
   final void Function(Book book) onOpenBook;
+
+  /// 为悬浮顶栏与状态栏让出的上方留白；背景模糊色会贯通铺满这一段直达屏幕顶端。
+  final double topPadding;
 
   static const int summaryMaxLines = 4;
 
@@ -49,7 +53,12 @@ class SeriesHeader extends ConsumerWidget {
     final summary = series?.summary?.trim() ?? '';
 
     final content = Padding(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        topPadding + AppSpacing.sm,
+        AppSpacing.md,
+        AppSpacing.md,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -123,9 +132,11 @@ class SeriesHeader extends ConsumerWidget {
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
+                stops: const <double>[0.0, 0.55, 1.0],
                 colors: <Color>[
+                  theme.colorScheme.surface.withValues(alpha: 0.42),
                   theme.colorScheme.surface.withValues(alpha: 0.72),
-                  theme.colorScheme.surface.withValues(alpha: 0.94),
+                  theme.colorScheme.surface,
                 ],
               ),
             ),

@@ -147,4 +147,47 @@ void main() {
     // 封面 [0]（距离 3 屏）不进入预解码。
     expect(decoded, isNot(contains(1)));
   });
+
+  test('pageThumbnail 请求低精度缩略图端点，去重并独立缓存；网络失败时回退到原图', () async {
+    var failThumbnail = false;
+    final adapter = _Adapter((RequestOptions options) async {
+      final path = options.uri.path;
+      if (path.endsWith('/thumbnail')) {
+        if (failThumbnail) {
+          throw DioException.connectionError(
+            requestOptions: options,
+            reason: 'offline',
+          );
+        }
+        return ResponseBody.fromBytes(<int>[9, 9, 1], 200);
+      }
+      return ResponseBody.fromBytes(<int>[1, 2, 3, 4], 200);
+    });
+    final repo = _repository(adapter);
+
+    final thumb = await repo.pageThumbnail('b1', 3);
+    expect(thumb, <int>[9, 9, 1]);
+    expect(
+      adapter.requests.single.uri.path,
+      '/api/v1/books/b1/pages/3/thumbnail',
+    );
+    expect(identical(repo.cachedPageThumbnail('b1', 3), thumb), isTrue);
+
+    // 命中内存缓存时不发第二次网络请求。
+    final again = await repo.pageThumbnail('b1', 3);
+    expect(identical(again, thumb), isTrue);
+    expect(adapter.requests, hasLength(1));
+
+    // 低清缩略图不可用时（例如离线已下载整本），回退到 pageImage。
+    failThumbnail = true;
+    final fallback = await repo.pageThumbnail('b1', 4);
+    expect(fallback, <int>[1, 2, 3, 4]);
+    expect(
+      adapter.requests.map((RequestOptions r) => r.uri.path),
+      containsAllInOrder(<String>[
+        '/api/v1/books/b1/pages/4/thumbnail',
+        '/api/v1/books/b1/pages/4',
+      ]),
+    );
+  });
 }

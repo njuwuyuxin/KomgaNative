@@ -459,6 +459,97 @@ void main() {
       final check = tester.getRect(find.byIcon(Icons.check));
       expect(check.right, lessThan(shortRect.left), reason: '对勾在文本左侧且不重叠');
     });
+
+    testWidgets('展开与收回带缩放和淡入淡出动画，点击菜单项后收回并派发回调', (WidgetTester tester) async {
+      var picked = false;
+      await tester.pumpWidget(
+        host(
+          GlassMenuButton(
+            icon: Icons.more_horiz,
+            label: 'More',
+            menuChildren: <Widget>[
+              GlassMenuItemButton(
+                label: 'Action A',
+                onPressed: () => picked = true,
+              ),
+            ],
+          ),
+        ),
+      );
+
+      // 展开动画中途：菜单已挂载，但透明度和缩放正在过渡中。
+      await tester.tap(find.byType(GlassMenuButton));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 80));
+      expect(find.text('Action A'), findsOneWidget);
+      final openingOpacity = tester.widget<Opacity>(
+        find
+            .ancestor(of: find.text('Action A'), matching: find.byType(Opacity))
+            .first,
+      );
+      expect(openingOpacity.opacity, greaterThan(0));
+      expect(openingOpacity.opacity, lessThan(1));
+
+      await tester.pumpAndSettle();
+      final openOpacity = tester.widget<Opacity>(
+        find
+            .ancestor(of: find.text('Action A'), matching: find.byType(Opacity))
+            .first,
+      );
+      expect(openOpacity.opacity, 1.0);
+
+      // 点击菜单项：派发回调并播收回动画（中途仍在场，结束后卸载）。
+      await tester.tap(find.text('Action A'));
+      await tester.pump();
+      expect(picked, isTrue);
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(find.text('Action A'), findsOneWidget);
+      final closingOpacity = tester.widget<Opacity>(
+        find
+            .ancestor(of: find.text('Action A'), matching: find.byType(Opacity))
+            .first,
+      );
+      expect(closingOpacity.opacity, lessThan(1));
+
+      await tester.pumpAndSettle();
+      expect(find.text('Action A'), findsNothing);
+    });
+
+    testWidgets('墨水屏下菜单直接显隐，不播展开收回动画', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.eink(),
+          home: Scaffold(
+            body: Center(
+              child: GlassMenuButton(
+                icon: Icons.more_horiz,
+                label: 'More',
+                menuChildren: <Widget>[
+                  GlassMenuItemButton(label: 'E-ink item', onPressed: () {}),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byType(GlassMenuButton));
+      await tester.pump();
+      expect(find.text('E-ink item'), findsOneWidget);
+      final openOpacity = tester.widget<Opacity>(
+        find
+            .ancestor(
+              of: find.text('E-ink item'),
+              matching: find.byType(Opacity),
+            )
+            .first,
+      );
+      expect(openOpacity.opacity, 1.0);
+
+      await tester.tap(find.text('E-ink item'));
+      await tester.pump();
+      expect(find.text('E-ink item'), findsNothing);
+    });
   });
 
   group('AppListGroup', () {

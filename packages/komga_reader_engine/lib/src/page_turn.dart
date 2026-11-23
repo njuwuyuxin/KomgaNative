@@ -73,11 +73,12 @@ double curlRadiusFor(double reach, double maxRadius) {
 
 /// 铰接（双页）时半径的收拢系数：角离落点 `2·width` 还剩 [remaining] 时。
 ///
-/// 和 [curlRadiusFor] 同一条 `t(2 − t)` 曲线倒过来用，落地前斜率连续为 0。
+/// 用 smoothstep `t²(3 − 2t)`：起收（`t = 1`）与落地（`t = 0`）两端斜率都为 0，
+/// 避免临近书脊落地最后几帧半径以最大速度骤降造成中缝割裂。
 double _landingTaper(double remaining, double maxRadius) {
   if (maxRadius <= 0) return 0;
   final t = (remaining / (4 * maxRadius)).clamp(0.0, 1.0);
-  return t * (2 - t);
+  return t * t * (3 - 2 * t);
 }
 
 /// 某一帧的卷页几何（纸面坐标，单位与纸面矩形一致）。
@@ -259,7 +260,10 @@ double curlTravel({
     hinged: hinged,
     radiusRatio: radiusRatio,
   );
-  final arch = width * kCurlArchRatio * math.sin(math.pi * p);
+  final sine = math.sin(math.pi * p);
+  // 双页铰接用 sin²(πp)：起手与落地斜率均为 0 且前后严格对称，
+  // 临近翻完前折线已平滑回正到竖直书脊，不会在最后几帧绕书脊底端急甩。
+  final arch = width * kCurlArchRatio * (hinged ? sine * sine : sine);
   return (x: travel * p, y: height - arch + liftY);
 }
 
