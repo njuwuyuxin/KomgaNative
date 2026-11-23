@@ -168,6 +168,14 @@ void main() {
       );
       await tester.tap(find.byType(SeriesTile));
       expect(tapped, isTrue);
+      // 按压反馈由 PressableScale 承担，外层不再套 InkWell（避免点击/选中时在封面与标题外露出圆角深色水波纹框）。
+      expect(
+        find.descendant(
+          of: find.byType(SeriesTile),
+          matching: find.byType(InkWell),
+        ),
+        findsNothing,
+      );
     });
 
     testWidgets('多选态：未选展示空心选择环，选中后缩放封面、呈现对勾与 selected 语义', (

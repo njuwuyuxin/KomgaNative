@@ -112,10 +112,10 @@ class SeriesTile extends StatelessWidget {
       // 读屏时只播报上面这一句，而不是把封面首字、角标、标题逐条念一遍。
       child: ExcludeSemantics(
         child: PressableScale(
-          child: InkWell(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onTap: onTap,
             onLongPress: onLongPress,
-            borderRadius: BorderRadius.circular(AppRadii.md),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
