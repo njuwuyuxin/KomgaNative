@@ -689,15 +689,21 @@ void main() {
     required Size size,
     required ThemeData theme,
   }) async {
+    final data = demoShelf();
+    final repository = FakeLibraryRepository(series: data);
+    final covers = <Uint8List>[];
+    for (final s in data) {
+      final bytes = await repository.seriesCover(s.id);
+      if (bytes != null) covers.add(bytes);
+    }
     await pumpGoldenScreen(
       tester,
       screen: const CollectionsScreen(),
       size: size,
       theme: theme,
+      precacheImages: covers,
       overrides: <Override>[
-        libraryRepositoryProvider.overrideWithValue(
-          FakeLibraryRepository(series: demoShelf()),
-        ),
+        libraryRepositoryProvider.overrideWithValue(repository),
       ],
     );
     await expectGolden(tester, name);

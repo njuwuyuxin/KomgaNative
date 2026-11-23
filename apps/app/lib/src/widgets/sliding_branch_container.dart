@@ -163,18 +163,24 @@ class _SlidingBranchContainerState extends State<SlidingBranchContainer>
                     offstage: !isVisible(i),
                     child: TickerMode(
                       enabled: isVisible(i),
-                      child: FractionalTranslation(
-                        translation: Offset(
-                          _offsetFor(
-                            i,
-                            animating,
-                            progress,
-                            direction,
-                            axisSign,
+                      // Offstage 不会阻止 HeroController 收集子树里的 Hero；
+                      // 只让当前激活的分支参与共享元素飞行，避免隐藏 tab（例如书架）
+                      // 劫持收藏集/搜索等页面推入退出时的封面动画。
+                      child: HeroMode(
+                        enabled: i == widget.currentIndex,
+                        child: FractionalTranslation(
+                          translation: Offset(
+                            _offsetFor(
+                              i,
+                              animating,
+                              progress,
+                              direction,
+                              axisSign,
+                            ),
+                            0,
                           ),
-                          0,
+                          child: widget.children[i],
                         ),
-                        child: widget.children[i],
                       ),
                     ),
                   ),

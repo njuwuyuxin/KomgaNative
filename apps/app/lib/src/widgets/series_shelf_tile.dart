@@ -145,6 +145,25 @@ class SeriesShelfRow extends ConsumerWidget {
     final pinned =
         ref.watch(pinnedSeriesIdsProvider).value?.contains(series.id) ?? false;
 
+    final coverBox = DecoratedBox(
+      decoration: ShapeDecoration(
+        shape: shape,
+        shadows: AppShadows.of(context, AppShadows.cover),
+      ),
+      child: ClipPath(
+        clipper: ShapeBorderClipper(shape: shape),
+        child: SizedBox.fromSize(
+          size: coverSize.rowCover,
+          child: bytes == null || bytes.isEmpty
+              ? ColoredBox(color: theme.colorScheme.surfaceContainerHighest)
+              : CoverImage(bytes: bytes),
+        ),
+      ),
+    );
+    final coverWidget = AppTheme.isEink(theme)
+        ? coverBox
+        : Hero(tag: tag, child: coverBox);
+
     final row = Semantics(
       container: true,
       button: onTap != null,
@@ -172,24 +191,7 @@ class SeriesShelfRow extends ConsumerWidget {
               ),
               child: Row(
                 children: <Widget>[
-                  DecoratedBox(
-                    decoration: ShapeDecoration(
-                      shape: shape,
-                      shadows: AppShadows.of(context, AppShadows.cover),
-                    ),
-                    child: ClipPath(
-                      clipper: ShapeBorderClipper(shape: shape),
-                      child: SizedBox.fromSize(
-                        size: coverSize.rowCover,
-                        child: bytes == null || bytes.isEmpty
-                            ? ColoredBox(
-                                color:
-                                    theme.colorScheme.surfaceContainerHighest,
-                              )
-                            : CoverImage(bytes: bytes),
-                      ),
-                    ),
-                  ),
+                  coverWidget,
                   const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: Column(
@@ -239,15 +241,6 @@ class SeriesShelfRow extends ConsumerWidget {
       ),
     );
 
-    final badged = _withSelection(
-      context,
-      _withUnreadBadge(series, row),
-      selected,
-    );
-    if (AppTheme.isEink(theme)) return badged;
-    return Hero(
-      tag: tag,
-      child: Material(type: MaterialType.transparency, child: badged),
-    );
+    return _withSelection(context, _withUnreadBadge(series, row), selected);
   }
 }

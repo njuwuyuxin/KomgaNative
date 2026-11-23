@@ -8,14 +8,17 @@ import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/shelf_view_options.dart';
 import 'package:komga_native/src/l10n/failure_text.dart';
 import 'package:komga_native/src/screens/reader_args.dart';
+import 'package:komga_native/src/screens/series_detail_args.dart';
 import 'package:komga_native/src/widgets/load_more_footer.dart';
 import 'package:komga_native/src/widgets/series_book_row.dart';
+import 'package:komga_native/src/widgets/series_hero_tag.dart';
 import 'package:komga_native/src/widgets/series_shelf_tile.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 收藏集详情页的系列列表 sliver（支持左滑移出、行尾移出按钮、长按菜单）。
 class CollectionSeriesSliver extends StatelessWidget {
   const CollectionSeriesSliver({
+    required this.collectionId,
     required this.async,
     required this.hiddenIds,
     required this.onRetry,
@@ -25,12 +28,17 @@ class CollectionSeriesSliver extends StatelessWidget {
     super.key,
   });
 
+  final String collectionId;
   final AsyncValue<PageResult<Series>> async;
   final Set<String> hiddenIds;
   final VoidCallback onRetry;
   final VoidCallback onLoadMore;
   final Future<bool> Function(Series series, {bool fromSwipe}) onRemove;
-  final Future<void> Function(BuildContext context, Series series)
+  final Future<void> Function(
+    BuildContext context,
+    Series series,
+    String heroTag,
+  )
   onLongPressSeries;
 
   @override
@@ -80,24 +88,34 @@ class CollectionSeriesSliver extends StatelessWidget {
               icon: Icons.remove_circle_outline,
             ),
             child: Builder(
-              builder: (BuildContext rowContext) => SeriesShelfRow(
-                series: series,
-                coverSize: ShelfCoverSize.medium,
-                onTap: () => context.push('/series/${series.id}'),
-                onLongPress: () =>
-                    unawaited(onLongPressSeries(rowContext, series)),
-                trailing: IconButton(
-                  key: Key('collection-remove-${series.id}'),
-                  tooltip: l10n.removeFromCollection,
-                  visualDensity: VisualDensity.compact,
-                  icon: Icon(
-                    Icons.remove_circle_outline,
-                    size: AppSizes.iconSm,
-                    color: theme.colorScheme.onSurfaceVariant,
+              builder: (BuildContext rowContext) {
+                final heroTag = seriesHeroTag(
+                  series.id,
+                  scope: 'collection-$collectionId',
+                );
+                return SeriesShelfRow(
+                  series: series,
+                  coverSize: ShelfCoverSize.medium,
+                  heroTag: heroTag,
+                  onTap: () => context.push(
+                    '/series/${series.id}',
+                    extra: SeriesDetailArgs(heroTag: heroTag),
                   ),
-                  onPressed: () => unawaited(onRemove(series)),
-                ),
-              ),
+                  onLongPress: () =>
+                      unawaited(onLongPressSeries(rowContext, series, heroTag)),
+                  trailing: IconButton(
+                    key: Key('collection-remove-${series.id}'),
+                    tooltip: l10n.removeFromCollection,
+                    visualDensity: VisualDensity.compact,
+                    icon: Icon(
+                      Icons.remove_circle_outline,
+                      size: AppSizes.iconSm,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    onPressed: () => unawaited(onRemove(series)),
+                  ),
+                );
+              },
             ),
           ),
         LoadMoreFooter(

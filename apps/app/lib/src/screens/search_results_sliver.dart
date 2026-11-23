@@ -9,9 +9,11 @@ import 'package:komga_native/src/data/shelf_view_options.dart';
 import 'package:komga_native/src/l10n/failure_text.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/screens/reader_args.dart';
+import 'package:komga_native/src/screens/series_detail_args.dart';
 import 'package:komga_native/src/widgets/load_more_footer.dart';
 import 'package:komga_native/src/widgets/search_facets.dart';
 import 'package:komga_native/src/widgets/series_book_row.dart';
+import 'package:komga_native/src/widgets/series_hero_tag.dart';
 import 'package:komga_native/src/widgets/series_shelf_tile.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -126,7 +128,13 @@ class SearchResultsSliver extends ConsumerWidget {
             SeriesShelfRow(
               series: item,
               coverSize: ShelfCoverSize.small,
-              onTap: () => context.push('/series/${item.id}'),
+              heroTag: seriesHeroTag(item.id, scope: 'search'),
+              onTap: () => context.push(
+                '/series/${item.id}',
+                extra: SeriesDetailArgs(
+                  heroTag: seriesHeroTag(item.id, scope: 'search'),
+                ),
+              ),
             ),
           if (series.value != null)
             LoadMoreFooter(

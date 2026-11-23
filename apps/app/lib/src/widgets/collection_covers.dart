@@ -43,7 +43,7 @@ class CollectionCovers extends StatelessWidget {
         ),
       );
     }
-    // 2–4 张：两列网格。2 张时是上下两格，3 张时右下补一个首字母块。
+    // 2–4 张：2×2 网格，数量不足 4 张时其余槽位保持透明，不画占位图。
     return SizedBox(
       width: size,
       height: size,
@@ -70,8 +70,7 @@ class CollectionCovers extends StatelessWidget {
     if (index < ids.length) {
       return _Cover(seriesId: ids[index], size: size, flat: true);
     }
-    // 3 张封面时右下角空一格：补首字母块，比留白更像"卡"。
-    return _InitialBadge(name: name, size: size, flat: true);
+    return const SizedBox.shrink();
   }
 }
 
@@ -106,17 +105,10 @@ class _Cover extends ConsumerWidget {
 
 /// 没有封面时的首字母色块：颜色由名字的哈希决定，同一本书每次打开都是同一个色。
 class _InitialBadge extends StatelessWidget {
-  const _InitialBadge({
-    required this.name,
-    required this.size,
-    this.flat = false,
-  });
+  const _InitialBadge({required this.name, required this.size});
 
   final String name;
   final double size;
-
-  /// 拼贴内的格子不自己圆角，靠外层统一裁。
-  final bool flat;
 
   @override
   Widget build(BuildContext context) {
@@ -139,7 +131,7 @@ class _InitialBadge extends StatelessWidget {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: color,
-        borderRadius: BorderRadius.circular(flat ? 0 : AppRadii.sm),
+        borderRadius: BorderRadius.circular(AppRadii.sm),
       ),
       child: Text(
         initial,

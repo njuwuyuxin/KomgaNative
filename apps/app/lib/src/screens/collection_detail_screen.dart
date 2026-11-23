@@ -257,6 +257,7 @@ class _CollectionDetailScreenState
               ),
             ),
             CollectionSeriesSliver(
+              collectionId: widget.collectionId,
               async: async,
               hiddenIds: _hiddenIds,
               onRetry: () => ref.invalidate(provider),
@@ -270,21 +271,23 @@ class _CollectionDetailScreenState
                     page: async.value,
                     fromSwipe: fromSwipe,
                   ),
-              onLongPressSeries: (BuildContext ctx, Series series) =>
-                  showSeriesMenu(
-                    ctx,
-                    ref,
-                    series,
-                    pinned: pinnedIds.contains(series.id),
-                    onRemoveFromCollection: () async {
-                      await _removeSeries(
+              onLongPressSeries:
+                  (BuildContext ctx, Series series, String heroTag) =>
+                      showSeriesMenu(
+                        ctx,
+                        ref,
                         series,
-                        displayName: displayName,
-                        detail: detail,
-                        page: async.value,
-                      );
-                    },
-                  ),
+                        heroTag: heroTag,
+                        pinned: pinnedIds.contains(series.id),
+                        onRemoveFromCollection: () async {
+                          await _removeSeries(
+                            series,
+                            displayName: displayName,
+                            detail: detail,
+                            page: async.value,
+                          );
+                        },
+                      ),
             ),
             const SliverToBoxAdapter(
               child: SizedBox(height: AppSizes.navBarClearance),

@@ -14,6 +14,7 @@ import 'package:komga_native/src/screens/collections_screen.dart';
 import 'package:komga_native/src/screens/library_screen.dart';
 import 'package:komga_native/src/screens/readlist_detail_screen.dart';
 import 'package:komga_native/src/screens/series_detail_screen.dart';
+import 'package:komga_native/src/widgets/series_hero_tag.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_library.dart';
@@ -322,6 +323,37 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(repo.updatedReadLists['r1']?.name, 'Holiday list');
+    });
+
+    testWidgets('收藏集详情的系列 Hero 带独立作用域且只包裹封面', (WidgetTester tester) async {
+      final repo = FakeLibraryRepository(series: demoShelf());
+      await pumpApp(
+        tester,
+        repo,
+        const CollectionDetailScreen(
+          collectionId: 'c1',
+          title: 'Reading order',
+        ),
+      );
+
+      final scoped = seriesHeroTag('s1', scope: 'collection-c1');
+      final heroFinder = find.byWidgetPredicate(
+        (Widget w) => w is Hero && w.tag == scoped,
+      );
+      expect(heroFinder, findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (Widget w) => w is Hero && w.tag == seriesHeroTag('s1'),
+        ),
+        findsNothing,
+        reason: '不能与书架默认 tag 撞车，否则进出收藏集时会与隐藏书架乱飞',
+      );
+      final heroRect = tester.getRect(heroFinder);
+      expect(
+        heroRect.width,
+        lessThan(100),
+        reason: 'Hero 只包裹缩略图封面，不能包裹整行导致与详情页封面变形错位',
+      );
     });
   });
 }

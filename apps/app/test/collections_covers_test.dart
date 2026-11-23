@@ -48,11 +48,12 @@ void main() {
     expect(find.text('0 series'), findsOneWidget);
   });
 
-  testWidgets('没有封面时用首字母色块（不崩）', (WidgetTester tester) async {
+  testWidgets('不足 4 个系列时拼贴空位保持透明，不用首字母色块占位', (WidgetTester tester) async {
     await pumpCollections(tester);
-    // 假仓库不返回封面字节：两张卡都应该退回首字母块。
-    expect(find.text('R'), findsWidgets);
+    // "Empty shelf" 有 0 个系列，走空收藏集首字母 'E'；
+    // "Reading order" 有 2 个系列（不足 4 格），其余 2 格透明留空，不画 'R' 占位。
     expect(find.text('E'), findsOneWidget);
+    expect(find.text('R'), findsNothing);
   });
 
   testWidgets('搜索过滤收藏集，无结果走空态', (WidgetTester tester) async {

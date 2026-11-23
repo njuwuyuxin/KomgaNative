@@ -152,6 +152,31 @@ void main() {
     expect(find.text('page 0'), findsOneWidget);
     expect(find.text('count 1'), findsOneWidget, reason: 'Offstage 而不是销毁');
   });
+
+  testWidgets('隐藏分支禁用 HeroMode，不劫持推入页面的 Hero 动画', (WidgetTester tester) async {
+    final index = ValueNotifier<int>(1);
+    addTearDown(index.dispose);
+    await pumpContainer(
+      tester,
+      index,
+      children: const <Widget>[_Page(index: 0), _Page(index: 1)],
+    );
+
+    final modes = tester
+        .widgetList<HeroMode>(find.byType(HeroMode, skipOffstage: false))
+        .toList();
+    expect(modes, hasLength(2));
+    expect(modes[0].enabled, isFalse, reason: '隐藏的分支不能参与 Hero 匹配');
+    expect(modes[1].enabled, isTrue, reason: '当前激活分支保留 Hero 能力');
+
+    index.value = 0;
+    await tester.pumpAndSettle();
+    final after = tester
+        .widgetList<HeroMode>(find.byType(HeroMode, skipOffstage: false))
+        .toList();
+    expect(after[0].enabled, isTrue);
+    expect(after[1].enabled, isFalse);
+  });
 }
 
 class _Page extends StatelessWidget {
