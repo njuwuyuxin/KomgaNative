@@ -186,7 +186,7 @@ void main() {
     expect(container.read(shelfSelectionProvider).ids, isEmpty);
   });
 
-  testWidgets('进入管理模式后三个批量按钮原地形变到顶部栏，底部无重复悬浮条且页面零位移', (
+  testWidgets('进入管理模式后三个批量按钮原地形变到顶部栏，底部无重复悬浮条且视口不被压缩', (
     WidgetTester tester,
   ) async {
     repository = FakeLibraryRepository(series: demoShelf());
@@ -243,8 +243,6 @@ void main() {
     await tester.pumpAndSettle();
 
     final scrollBefore = tester.getRect(find.byKey(const Key('shelf-scroll')));
-    final firstCardBefore = tester.getRect(find.byKey(const Key('series-s1')));
-    final thirdCardBefore = tester.getRect(find.byKey(const Key('series-s3')));
     final sortBefore = tester.getRect(find.byKey(const Key('shelf-sort-menu')));
     final filterBefore = tester.getRect(
       find.byKey(const Key('shelf-filter-menu')),
@@ -264,19 +262,13 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    // 原本页面的滚动视口和卡片位置完全不受影响（0 像素位移）。
+    // 滚动视口本身不被压缩（底部无新增悬浮条）；多选紧凑信息行展开。
     expect(
       tester.getRect(find.byKey(const Key('shelf-scroll'))),
       equals(scrollBefore),
     );
-    expect(
-      tester.getRect(find.byKey(const Key('series-s1'))),
-      equals(firstCardBefore),
-    );
-    expect(
-      tester.getRect(find.byKey(const Key('series-s3'))),
-      equals(thirdCardBefore),
-    );
+    expect(find.byKey(const Key('shelf-selection-count')), findsOneWidget);
+    expect(find.byKey(const Key('shelf-selection-all')), findsOneWidget);
 
     // 顶部左侧搜索栏变为「Manage books」，中间圆球原地形变为退出键，
     // 右侧三格原地形变为全标已读 / 全标未读 / 收藏集（与原按钮坐标一致）。

@@ -85,12 +85,12 @@ void main() {
     handle.dispose();
   });
 
-  testWidgets('2.0× 字号下书架标题不被裁掉（能换行/滚动）', (WidgetTester tester) async {
+  testWidgets('2.0× 字号下书架卡片标题不被裁掉（能正常排版与滚动）', (WidgetTester tester) async {
     await pump(tester, const LibraryScreen(), textScale: 2);
 
-    // 标题仍在，且渲染高度随字号变大——说明没有被固定高度的盒子裁掉。
-    final title = find.text('Library');
+    // 系列标题仍在，且渲染高度随字号变大——说明没有被固定高度的盒子裁掉。
+    final title = find.text('Frieren');
     expect(title, findsOneWidget);
-    expect(tester.getSize(title).height, greaterThan(30));
+    expect(tester.getSize(title).height, greaterThan(24));
   });
 }

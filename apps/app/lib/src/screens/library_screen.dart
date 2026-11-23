@@ -137,120 +137,16 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                             ),
                           ),
                         ),
-                        // 大标题 + 系列数（LIB-01）：跟内容一起滚走，不常驻占高度；
-                        // 管理模式下同位切换为已选数量与全选动作，保持零布局位移。
+                        // 多选态紧凑信息行：常态不占高度，直接展示书架内容；
+                        // 进入管理模式后平滑展开已选数量与全选动作（墨水屏直接瞬切）。
                         SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(
-                              AppSpacing.md,
-                              AppSpacing.md,
-                              AppSpacing.md,
-                              AppSpacing.xs,
-                            ),
-                            child: Row(
-                              children: <Widget>[
-                                Expanded(
-                                  child: Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.baseline,
-                                    textBaseline: TextBaseline.alphabetic,
-                                    children: <Widget>[
-                                      Flexible(
-                                        child: Text(
-                                          l10n.libraryTitle,
-                                          style: AppTypography.of(context)
-                                              .largeTitle,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      const SizedBox(width: AppSpacing.sm),
-                                      AnimatedSwitcher(
-                                        duration: motion.quick,
-                                        child: selection.active
-                                            ? Text(
-                                                l10n.selectedCount(
-                                                  selection.ids.length,
-                                                ),
-                                                key: const Key(
-                                                  'shelf-selection-count',
-                                                ),
-                                                style: Theme.of(context)
-                                                    .textTheme
-                                                    .bodySmall
-                                                    ?.copyWith(
-                                                      color: Theme.of(context)
-                                                          .colorScheme
-                                                          .primary,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                      fontFeatures:
-                                                          AppTypography
-                                                              .tabularFigures,
-                                                    ),
-                                              )
-                                            : Text(
-                                                l10n.seriesCount(
-                                                  state.totalElements,
-                                                ),
-                                                key: const Key('shelf-count'),
-                                                style: Theme.of(context)
-                                                    .textTheme
-                                                    .bodySmall
-                                                    ?.copyWith(
-                                                      color: Theme.of(context)
-                                                          .colorScheme
-                                                          .onSurfaceVariant,
-                                                    ),
-                                              ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                AnimatedSwitcher(
-                                  duration: motion.quick,
-                                  transitionBuilder:
-                                      (
-                                        Widget child,
-                                        Animation<double> animation,
-                                      ) => FadeTransition(
-                                        opacity: animation,
-                                        child: ScaleTransition(
-                                          scale: Tween<double>(
-                                            begin: 0.9,
-                                            end: 1.0,
-                                          ).animate(animation),
-                                          child: child,
-                                        ),
-                                      ),
-                                  child: selection.active
-                                      ? TextButton(
-                                          key: const Key('shelf-selection-all'),
-                                          style: TextButton.styleFrom(
-                                            tapTargetSize: MaterialTapTargetSize
-                                                .shrinkWrap,
-                                            minimumSize: Size.zero,
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: AppSpacing.sm,
-                                              vertical: AppSpacing.xs,
-                                            ),
-                                          ),
-                                          onPressed: allSelected
-                                              ? null
-                                              : () => selecting.selectAll(
-                                                  state.series.map(
-                                                    (Series s) => s.id,
-                                                  ),
-                                                ),
-                                          child: Text(l10n.selectAll),
-                                        )
-                                      : const SizedBox.shrink(
-                                          key: ValueKey<String>(
-                                            'no-select-all',
-                                          ),
-                                        ),
-                                ),
-                              ],
+                          child: _SelectionInfoRow(
+                            active: selection.active,
+                            selectedCount: selection.ids.length,
+                            allSelected: allSelected,
+                            motion: motion,
+                            onSelectAll: () => selecting.selectAll(
+                              state.series.map((Series s) => s.id),
                             ),
                           ),
                         ),
@@ -290,6 +186,76 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
           ),
         ],
       ),
+    );
+  }
+}
+
+/// 多选态紧凑信息行：常态不占高度，进入管理模式后展开已选数量与全选动作。
+class _SelectionInfoRow extends StatelessWidget {
+  const _SelectionInfoRow({
+    required this.active,
+    required this.selectedCount,
+    required this.allSelected,
+    required this.motion,
+    required this.onSelectAll,
+  });
+
+  final bool active;
+  final int selectedCount;
+  final bool allSelected;
+  final AppMotion motion;
+  final VoidCallback onSelectAll;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final content = active
+        ? Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.xs,
+              AppSpacing.md,
+              AppSpacing.xs,
+            ),
+            child: Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    l10n.selectedCount(selectedCount),
+                    key: const Key('shelf-selection-count'),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.w600,
+                      fontFeatures: AppTypography.tabularFigures,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  key: const Key('shelf-selection-all'),
+                  style: TextButton.styleFrom(
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    minimumSize: Size.zero,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.sm,
+                      vertical: AppSpacing.xs,
+                    ),
+                  ),
+                  onPressed: allSelected ? null : onSelectAll,
+                  child: Text(l10n.selectAll),
+                ),
+              ],
+            ),
+          )
+        : const SizedBox.shrink();
+
+    // 墨水屏（motion.enabled == false）下直接瞬切，避免 AnimatedSize(Duration.zero)
+    // 在 performLayout 中同步触发 markNeedsLayout 断言。
+    if (!motion.enabled) return content;
+    return AnimatedSize(
+      duration: motion.quick,
+      curve: motion.standardCurve,
+      alignment: Alignment.topCenter,
+      child: content,
     );
   }
 }

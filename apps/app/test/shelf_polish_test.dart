@@ -109,16 +109,17 @@ void main() {
       );
     });
 
-    testWidgets('书架顶部：搜索框 + 三颗动作钉住，大标题与计数随内容滚走', (WidgetTester tester) async {
+    testWidgets('书架顶部：搜索框 + 三颗动作钉住，直接展示漫画内容无冗余大标题', (
+      WidgetTester tester,
+    ) async {
       await pumpScreen(tester, const LibraryScreen(), theme: AppTheme.light());
       await tester.pumpAndSettle();
 
       expect(find.byType(GlassHeaderSliver), findsOneWidget);
-      // LIB-01：大标题 + 系列数回来了，但它是**内容**的一部分（滚动即让位），
-      // 不是钉住的装饰。
-      expect(find.text('Library'), findsOneWidget);
-      expect(find.byKey(const Key('shelf-count')), findsOneWidget);
-      expect(find.text('6 series'), findsOneWidget);
+      // 底部 dock 已标明在书架页，顶部不再占行画大标题与计数。
+      expect(find.text('Library'), findsNothing);
+      expect(find.byKey(const Key('shelf-count')), findsNothing);
+      expect(find.text('Frieren'), findsOneWidget);
       for (final key in <String>[
         'shelf-sort-menu',
         'shelf-filter-menu',
@@ -141,8 +142,6 @@ void main() {
         tester.getTopLeft(find.byKey(const Key('shelf-sort-menu'))).dy,
         before.dy,
       );
-      // 大标题已经滚走。
-      expect(find.text('Library'), findsNothing);
     });
 
     testWidgets('书架右上角排序/筛选/视图三颗按钮统一装在液态玻璃胶囊里', (WidgetTester tester) async {
