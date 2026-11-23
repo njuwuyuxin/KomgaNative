@@ -15,8 +15,7 @@ import 'package:komga_native/src/widgets/collection_picker_sheet.dart';
 import 'package:komga_native/src/widgets/offline_banner.dart';
 import 'package:komga_native/src/widgets/phase_fade.dart';
 import 'package:komga_native/src/widgets/shelf_active_filters.dart';
-import 'package:komga_native/src/widgets/shelf_query_buttons.dart';
-import 'package:komga_native/src/widgets/shelf_selection_bar.dart';
+import 'package:komga_native/src/widgets/shelf_header_bar.dart';
 import 'package:komga_native/src/widgets/shelf_pinch_detector.dart';
 import 'package:komga_native/src/widgets/shelf_side_rail.dart';
 import 'package:komga_native/src/widgets/shelf_views.dart';
@@ -83,10 +82,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final motion = AppMotion.of(context);
     final state = ref.watch(shelfProvider);
     final controller = ref.read(shelfProvider.notifier);
     final selection = ref.watch(shelfSelectionProvider);
     final selecting = ref.read(shelfSelectionProvider.notifier);
+    final allSelected =
+        state.series.isNotEmpty && selection.ids.length == state.series.length;
 
     return Scaffold(
       body: Row(
@@ -94,218 +96,200 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
           // 平板（≥1024）才显示左侧库导航（PLT-01）：手机上它会挤掉两列封面。
           if (_twoPane(context)) const ShelfSideRail(),
           Expanded(
-            child: Stack(
-              fit: StackFit.expand,
-              children: <Widget>[
-                GlassPageBackground(
-                  child: RefreshIndicator(
-                    // 标题栏是钉住的浮层：下拉刷新的转圈要出现在它下面，不能被玻璃压住。
-                    edgeOffset:
-                        MediaQuery.paddingOf(context).top +
-                        AppSizes.glassHeaderClearance,
-                    onRefresh: _refresh,
-                    child: NotificationListener<ScrollNotification>(
-                      onNotification: (ScrollNotification notification) {
-                        if (state.hasMore &&
-                            notification.metrics.extentAfter <
-                                _prefetchExtent) {
-                          unawaited(controller.loadMore());
-                        }
-                        return false;
-                      },
-                      child: ShelfPinchDetector(
-                        enabled:
-                            state.view == ShelfView.grid &&
-                            state.series.isNotEmpty,
-                        onPinch: _pinchCover,
-                        child: CustomScrollView(
-                          key: const Key('shelf-scroll'),
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          slivers: <Widget>[
-                            // 顶部只保留有用的东西：搜索框 + 右侧三颗动作。
-                            // 不再放页面标题——标题既不提供信息，又占掉一整行。
-                            GlassHeaderSliver(
-                              header: GlassHeader(
-                                bar: selection.active
-                                    ? ShelfSelectionBar(
-                                        count: selection.ids.length,
-                                        total: state.series.length,
-                                        allSelected:
-                                            state.series.isNotEmpty &&
-                                            selection.ids.length ==
-                                                state.series.length,
-                                        onSelectAll: () => selecting.selectAll(
-                                          state.series.map((Series s) => s.id),
+            child: GlassPageBackground(
+              child: RefreshIndicator(
+                // 标题栏是钉住的浮层：下拉刷新的转圈要出现在它下面，不能被玻璃压住。
+                edgeOffset:
+                    MediaQuery.paddingOf(context).top +
+                    AppSizes.glassHeaderClearance,
+                onRefresh: _refresh,
+                child: NotificationListener<ScrollNotification>(
+                  onNotification: (ScrollNotification notification) {
+                    if (state.hasMore &&
+                        notification.metrics.extentAfter < _prefetchExtent) {
+                      unawaited(controller.loadMore());
+                    }
+                    return false;
+                  },
+                  child: ShelfPinchDetector(
+                    enabled:
+                        state.view == ShelfView.grid && state.series.isNotEmpty,
+                    onPinch: _pinchCover,
+                    child: CustomScrollView(
+                      key: const Key('shelf-scroll'),
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      slivers: <Widget>[
+                        // 顶部常驻液态玻璃栏：常态为搜索框 + 管理圆球 + 三格工具胶囊；
+                        // 进入管理书籍后原地形变为「管理书籍」+ 退出圆球 + 全标已读/未读/收藏集。
+                        GlassHeaderSliver(
+                          header: GlassHeader(
+                            bar: ShelfHeaderBar(
+                              selecting: selection.active,
+                              selectedCount: selection.ids.length,
+                              batchBusy: _batchBusy,
+                              searchController: _searchController,
+                              onSearchChanged: controller.search,
+                              onEnterSelection: selecting.enter,
+                              onExitSelection: selecting.exit,
+                              onMarkRead: () => _markSelected(read: true),
+                              onMarkUnread: () => _markSelected(read: false),
+                              onAddToCollection: _addSelectedToCollection,
+                            ),
+                          ),
+                        ),
+                        // 大标题 + 系列数（LIB-01）：跟内容一起滚走，不常驻占高度；
+                        // 管理模式下同位切换为已选数量与全选动作，保持零布局位移。
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(
+                              AppSpacing.md,
+                              AppSpacing.md,
+                              AppSpacing.md,
+                              AppSpacing.xs,
+                            ),
+                            child: Row(
+                              children: <Widget>[
+                                Expanded(
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.baseline,
+                                    textBaseline: TextBaseline.alphabetic,
+                                    children: <Widget>[
+                                      Flexible(
+                                        child: Text(
+                                          l10n.libraryTitle,
+                                          style: AppTypography.of(context)
+                                              .largeTitle,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
-                                        onClose: selecting.exit,
-                                      )
-                                    : Row(
-                                        children: <Widget>[
-                                          Expanded(
-                                            child: GlassSearchField(
-                                              key: const Key(
-                                                'shelf-search-field',
+                                      ),
+                                      const SizedBox(width: AppSpacing.sm),
+                                      AnimatedSwitcher(
+                                        duration: motion.quick,
+                                        child: selection.active
+                                            ? Text(
+                                                l10n.selectedCount(
+                                                  selection.ids.length,
+                                                ),
+                                                key: const Key(
+                                                  'shelf-selection-count',
+                                                ),
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .bodySmall
+                                                    ?.copyWith(
+                                                      color: Theme.of(context)
+                                                          .colorScheme
+                                                          .primary,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      fontFeatures:
+                                                          AppTypography
+                                                              .tabularFigures,
+                                                    ),
+                                              )
+                                            : Text(
+                                                l10n.seriesCount(
+                                                  state.totalElements,
+                                                ),
+                                                key: const Key('shelf-count'),
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .bodySmall
+                                                    ?.copyWith(
+                                                      color: Theme.of(context)
+                                                          .colorScheme
+                                                          .onSurfaceVariant,
+                                                    ),
                                               ),
-                                              controller: _searchController,
-                                              hintText: l10n.searchSeriesHint,
-                                              clearLabel: l10n.closeSearch,
-                                              onChanged: controller.search,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                AnimatedSwitcher(
+                                  duration: motion.quick,
+                                  transitionBuilder:
+                                      (
+                                        Widget child,
+                                        Animation<double> animation,
+                                      ) => FadeTransition(
+                                        opacity: animation,
+                                        child: ScaleTransition(
+                                          scale: Tween<double>(
+                                            begin: 0.9,
+                                            end: 1.0,
+                                          ).animate(animation),
+                                          child: child,
+                                        ),
+                                      ),
+                                  child: selection.active
+                                      ? TextButton(
+                                          key: const Key('shelf-selection-all'),
+                                          style: TextButton.styleFrom(
+                                            tapTargetSize: MaterialTapTargetSize
+                                                .shrinkWrap,
+                                            minimumSize: Size.zero,
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: AppSpacing.sm,
+                                              vertical: AppSpacing.xs,
                                             ),
                                           ),
-                                          const SizedBox(width: AppSpacing.sm),
-                                          const _LibraryActions(),
-                                        ],
-                                      ),
-                              ),
-                            ),
-                            // 大标题 + 系列数（LIB-01）：跟内容一起滚走，不常驻占高度。
-                            SliverToBoxAdapter(
-                              child: Padding(
-                                padding: const EdgeInsets.fromLTRB(
-                                  AppSpacing.md,
-                                  AppSpacing.md,
-                                  AppSpacing.md,
-                                  AppSpacing.xs,
-                                ),
-                                child: Row(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.baseline,
-                                  textBaseline: TextBaseline.alphabetic,
-                                  children: <Widget>[
-                                    Flexible(
-                                      child: Text(
-                                        l10n.libraryTitle,
-                                        style: AppTypography.of(context)
-                                            .largeTitle,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    const SizedBox(width: AppSpacing.sm),
-                                    Text(
-                                      l10n.seriesCount(state.totalElements),
-                                      key: const Key('shelf-count'),
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall
-                                          ?.copyWith(
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .onSurfaceVariant,
+                                          onPressed: allSelected
+                                              ? null
+                                              : () => selecting.selectAll(
+                                                  state.series.map(
+                                                    (Series s) => s.id,
+                                                  ),
+                                                ),
+                                          child: Text(l10n.selectAll),
+                                        )
+                                      : const SizedBox.shrink(
+                                          key: ValueKey<String>(
+                                            'no-select-all',
                                           ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            // 断网时提示"看的是缓存"，并给一次重新联网的机会。
-                            SliverToBoxAdapter(
-                              child: OfflineBanner(
-                                onRetry: () => unawaited(_refresh()),
-                              ),
-                            ),
-                            SliverToBoxAdapter(
-                              child: LibraryFilterBar(
-                                selected: state.libraryId,
-                                onSelected: controller.selectLibrary,
-                              ),
-                            ),
-                            // 生效中的筛选条件（排序/状态/库），可单独清除（LIB-01）。
-                            const SliverToBoxAdapter(
-                              child: ShelfActiveFilters(),
-                            ),
-                            const SliverToBoxAdapter(
-                              child: SizedBox(height: AppSpacing.sm),
-                            ),
-                            PhaseFade(
-                              phase: _phaseOf(state),
-                              slivers: <Widget>[
-                                ..._shelfSlivers(l10n, state, controller),
-                                // 底部留白：悬浮导航条压在内容之上，最后一行要能让开它。
-                                const SliverToBoxAdapter(
-                                  child: SizedBox(
-                                    height: AppSizes.navBarClearance,
-                                  ),
+                                        ),
                                 ),
                               ],
                             ),
+                          ),
+                        ),
+                        // 断网时提示"看的是缓存"，并给一次重新联网的机会。
+                        SliverToBoxAdapter(
+                          child: OfflineBanner(
+                            onRetry: () => unawaited(_refresh()),
+                          ),
+                        ),
+                        SliverToBoxAdapter(
+                          child: LibraryFilterBar(
+                            selected: state.libraryId,
+                            onSelected: controller.selectLibrary,
+                          ),
+                        ),
+                        // 生效中的筛选条件（排序/状态/库），可单独清除（LIB-01）。
+                        const SliverToBoxAdapter(child: ShelfActiveFilters()),
+                        const SliverToBoxAdapter(
+                          child: SizedBox(height: AppSpacing.sm),
+                        ),
+                        PhaseFade(
+                          phase: _phaseOf(state),
+                          slivers: <Widget>[
+                            ..._shelfSlivers(l10n, state, controller),
+                            // 底部留白：悬浮导航条压在内容之上，最后一行要能让开它。
+                            const SliverToBoxAdapter(
+                              child: SizedBox(height: AppSizes.navBarClearance),
+                            ),
                           ],
                         ),
-                      ),
+                      ],
                     ),
                   ),
                 ),
-                // 多选批量条采用与底部 dock 相同的悬浮玻璃层逻辑：
-                // 手机形态下 `AdaptiveShell` 的 `extendBody` 已将安全区底边距
-                // 抬到 dock 顶部，这里经 `SafeArea` + `AppSpacing.sm` 直接浮在
-                // dock 上方，不压缩滚动视口，原页面布局零位移。
-                if (selection.active)
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: SafeArea(
-                      top: false,
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          AppSpacing.md,
-                          0,
-                          AppSpacing.md,
-                          AppSpacing.sm,
-                        ),
-                        child: ShelfBatchBar(
-                          count: selection.ids.length,
-                          busy: _batchBusy,
-                          onMarkRead: () => _markSelected(read: true),
-                          onMarkUnread: () => _markSelected(read: false),
-                          extraLabel: l10n.batchAddToCollection,
-                          extraIcon: Icons.collections_bookmark_outlined,
-                          extraKey: const Key('shelf-batch-collection'),
-                          onExtraAction: _addSelectedToCollection,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
+              ),
             ),
           ),
         ],
       ),
-    );
-  }
-}
-
-/// 书架顶部右侧动作：多选圆球 + 排序/筛选/视图三格液态玻璃胶囊。
-///
-/// 三颗菜单动作合进同一块玻璃胶囊，向下滚动悬浮在漫画封面上时依然清晰可辨。
-class _LibraryActions extends StatelessWidget {
-  const _LibraryActions();
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        const ShelfSelectButton(),
-        const SizedBox(width: AppSpacing.xs),
-        GlassSurface(
-          shape: AppShapes.of(context, AppShapes.bar),
-          child: const SizedBox(
-            height: AppSizes.glassOrb,
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: AppSpacing.xs),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  ShelfSortButton(),
-                  ShelfFilterButton(),
-                  ShelfViewButton(),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

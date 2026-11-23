@@ -109,7 +109,9 @@ class GlassBarAction extends StatelessWidget {
 
   final IconData icon;
   final String label;
-  final VoidCallback onPressed;
+
+  /// null = 不可点（保留槽位不跳版，降低前景色不透明度）。
+  final VoidCallback? onPressed;
   final bool selected;
 
   /// 默认比主前景低一档：标题栏里一排图标不该比标题更抢眼。
@@ -122,31 +124,39 @@ class GlassBarAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final enabled = onPressed != null;
     final colors = GlassControlColors.resolve(
       context,
       selected: selected,
       subdued: subdued,
     );
+    final foreground = enabled
+        ? colors.foreground
+        : colors.foreground.withValues(alpha: 0.38);
     final motion = AppMotion.of(context);
 
     void handleTap() {
+      final callback = onPressed;
+      if (callback == null) return;
       unawaited(AppHaptics.selection());
-      onPressed();
+      callback();
     }
 
     return Semantics(
       container: true,
       button: true,
+      enabled: enabled,
       selected: selected,
       label: label,
-      onTap: handleTap,
+      onTap: enabled ? handleTap : null,
       child: ExcludeSemantics(
         child: Tooltip(
           message: label,
           child: PressableScale(
+            enabled: enabled,
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: handleTap,
+              onTap: enabled ? handleTap : null,
               child: SizedBox(
                 width: size,
                 height: size,
@@ -158,10 +168,17 @@ class GlassBarAction extends StatelessWidget {
                     color: colors.fill ?? Colors.transparent,
                   ),
                   child: Center(
-                    child: Icon(
-                      icon,
-                      size: AppSizes.iconMd,
-                      color: colors.foreground,
+                    child: TweenAnimationBuilder<Color?>(
+                      tween: ColorTween(end: foreground),
+                      duration: motion.quick,
+                      curve: motion.standardCurve,
+                      builder:
+                          (BuildContext context, Color? color, Widget? _) =>
+                              Icon(
+                                icon,
+                                size: AppSizes.iconMd,
+                                color: color ?? foreground,
+                              ),
                     ),
                   ),
                 ),

@@ -97,6 +97,7 @@
   "@selectedCount": { "placeholders": { "count": {} } },
   "selectAll": "Select all",
   "selectSeries": "Select series",
+  "manageBooks": "Manage books",
   "saveCurrentFilter": "Save current filter",
   "booksCount": "{count} books",
   "markPreviousRead": "Mark previous as read",

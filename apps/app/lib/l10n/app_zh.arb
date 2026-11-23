@@ -78,6 +78,7 @@
   "selectedCount": "已选 {count} 个",
   "selectAll": "全选",
   "selectSeries": "选择系列",
+  "manageBooks": "管理书籍",
   "saveCurrentFilter": "保存当前筛选",
   "booksCount": "{count} 本",
   "markPreviousRead": "标记之前所有为已读",

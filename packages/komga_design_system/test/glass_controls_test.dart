@@ -55,6 +55,44 @@ void main() {
     });
   });
 
+  group('GlassBarAction', () {
+    testWidgets('支持禁用态：不触发回调且语义标记为 disabled', (WidgetTester tester) async {
+      final handle = tester.ensureSemantics();
+      var taps = 0;
+      await tester.pumpWidget(
+        host(
+          const GlassBarAction(
+            icon: Icons.done_all,
+            label: 'Mark all read',
+            onPressed: null,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final node = tester.getSemantics(find.bySemanticsLabel('Mark all read'));
+      expect(node.flagsCollection.isEnabled, Tristate.isFalse);
+      await tester.tap(find.byType(GlassBarAction), warnIfMissed: false);
+      await tester.pumpAndSettle();
+      expect(taps, 0);
+
+      await tester.pumpWidget(
+        host(
+          GlassBarAction(
+            icon: Icons.done_all,
+            label: 'Mark all read',
+            onPressed: () => taps++,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(GlassBarAction));
+      await tester.pumpAndSettle();
+      expect(taps, 1);
+      handle.dispose();
+    });
+  });
+
   group('GlassPillButton', () {
     testWidgets('点按派发；busy 时不派发也不可点', (WidgetTester tester) async {
       var taps = 0;

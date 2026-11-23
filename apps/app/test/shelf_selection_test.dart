@@ -146,7 +146,9 @@ void main() {
     expect(container.read(shelfSelectionProvider).ids, isEmpty);
   });
 
-  testWidgets('多选工具栏悬浮在 dock 栏上方且不挤占原页面空间', (WidgetTester tester) async {
+  testWidgets('进入管理模式后三个批量按钮原地形变到顶部栏，底部无重复悬浮条且页面零位移', (
+    WidgetTester tester,
+  ) async {
     repository = FakeLibraryRepository(series: demoShelf());
     tester.view.physicalSize = const Size(390 * 3, 844 * 3);
     tester.view.devicePixelRatio = 3;
@@ -203,8 +205,24 @@ void main() {
     final scrollBefore = tester.getRect(find.byKey(const Key('shelf-scroll')));
     final firstCardBefore = tester.getRect(find.byKey(const Key('series-s1')));
     final thirdCardBefore = tester.getRect(find.byKey(const Key('series-s3')));
+    final sortBefore = tester.getRect(find.byKey(const Key('shelf-sort-menu')));
+    final filterBefore = tester.getRect(
+      find.byKey(const Key('shelf-filter-menu')),
+    );
+    final viewBefore = tester.getRect(find.byKey(const Key('shelf-view-menu')));
+    final selectOrbBefore = tester.getRect(
+      find.byKey(const Key('shelf-select-button')),
+    );
 
-    await enterSelection(tester);
+    // 点击管理按钮后在形变过渡中段（120ms）新旧按钮同场交叉过渡。
+    await tester.tap(find.byKey(const Key('shelf-select-button')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 120));
+    expect(find.text('Manage books'), findsOneWidget);
+    expect(find.byKey(const Key('shelf-batch-read')), findsOneWidget);
+    expect(find.byKey(const Key('shelf-sort-menu')), findsOneWidget);
+
+    await tester.pumpAndSettle();
 
     // 原本页面的滚动视口和卡片位置完全不受影响（0 像素位移）。
     expect(
@@ -220,16 +238,36 @@ void main() {
       equals(thirdCardBefore),
     );
 
-    // 批量条左右留白与 dock 一致，底部紧贴在 dock 胶囊上方 AppSpacing.sm 处。
+    // 顶部左侧搜索栏变为「Manage books」，中间圆球原地形变为退出键，
+    // 右侧三格原地形变为全标已读 / 全标未读 / 收藏集（与原按钮坐标一致）。
+    expect(find.text('Manage books'), findsOneWidget);
+    expect(find.byKey(const Key('shelf-search-field')), findsNothing);
+    expect(
+      tester.getRect(find.byKey(const Key('shelf-selection-close'))),
+      equals(selectOrbBefore),
+    );
+    expect(
+      tester.getRect(find.byKey(const Key('shelf-batch-read'))),
+      equals(sortBefore),
+    );
+    expect(
+      tester.getRect(find.byKey(const Key('shelf-batch-unread'))),
+      equals(filterBefore),
+    );
+    expect(
+      tester.getRect(find.byKey(const Key('shelf-batch-collection'))),
+      equals(viewBefore),
+    );
+
+    // 顶部批量条位于页面顶部，与底部 dock 保持远距（底部无悬浮条）。
     final batchRect = tester.getRect(find.byKey(const Key('shelf-batch-bar')));
     final dockTabRect = tester.getRect(
       find.byKey(const Key('dock-library-tab')),
     );
-    expect(batchRect.left, AppSpacing.md);
-    expect(batchRect.right, 390 - AppSpacing.md);
-    expect(batchRect.bottom, dockTabRect.top - AppSpacing.sm);
+    expect(batchRect.top, lessThan(AppSizes.glassHeaderClearance));
+    expect(dockTabRect.top - batchRect.bottom, greaterThan(400));
 
-    // 未选任何系列（按钮禁用）时点击悬浮条，事件不穿透到下方封面卡片。
+    // 未选任何系列（按钮禁用）时点击批量按钮不会触发批量标记。
     final container = ProviderScope.containerOf(
       tester.element(find.byType(LibraryScreen)),
     );
@@ -239,5 +277,38 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(container.read(shelfSelectionProvider).ids, isEmpty);
+    expect(repository.seriesReadCalls, isEmpty);
+  });
+
+  testWidgets('墨水屏下进出管理模式直接瞬切，不播形变动画', (WidgetTester tester) async {
+    repository = FakeLibraryRepository(series: demoShelf());
+    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          libraryRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: MaterialApp(
+          locale: const Locale('zh'),
+          localizationsDelegates: appLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          theme: AppTheme.eink(),
+          home: const LibraryScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('shelf-select-button')));
+    await tester.pump();
+
+    expect(find.text('管理书籍'), findsOneWidget);
+    expect(find.byKey(const Key('shelf-selection-bar')), findsOneWidget);
+    expect(find.byKey(const Key('shelf-search-field')), findsNothing);
+    expect(find.byKey(const Key('shelf-sort-menu')), findsNothing);
+    expect(find.byKey(const Key('shelf-batch-read')), findsOneWidget);
   });
 }

@@ -137,7 +137,8 @@ void main() {
     );
   });
 
-  /// 多选态（LIB-03）：顶部换成"已选 N / 全选 / 取消"，底部批量条悬浮在 dock 栏上方，不挤占封面。
+  /// 管理书籍态（LIB-03）：顶部栏原地形变为「管理书籍」胶囊 + 退出圆球 + 全标已读/未读/收藏集三格胶囊，
+  /// 大标题行切换为「已选 N / 全选」，底部不再叠加重复批量条。
   testWidgets('library_selection@phone_light', (WidgetTester tester) async {
     await pumpShelfGolden(
       tester,
