@@ -118,15 +118,19 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
     ref.invalidate(seriesBooksProvider);
     ref.invalidate(seriesDetailProvider(seriesId));
     final l10n = AppLocalizations.of(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          failed == 0
-              ? l10n.booksBatchDone(bookIds.length - failed)
-              : l10n.batchPartialDone(bookIds.length - failed, failed),
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            failed == 0
+                ? (read
+                      ? l10n.batchMarkedRead(bookIds.length - failed)
+                      : l10n.batchMarkedUnread(bookIds.length - failed))
+                : l10n.batchPartialDone(bookIds.length - failed, failed),
+          ),
         ),
-      ),
-    );
+      );
   }
 
   Future<void> _openCollectionsPicker() =>

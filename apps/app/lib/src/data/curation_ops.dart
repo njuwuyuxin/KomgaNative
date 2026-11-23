@@ -51,12 +51,26 @@ List<String> removeMatchingIds(
 
 /// 一次勾选保存产生的服务端变更计划：更新项 + 因变空而需删除的项。
 class MembershipChangePlan {
-  const MembershipChangePlan({required this.updates, required this.deletions});
+  const MembershipChangePlan({
+    required this.updates,
+    required this.deletions,
+    this.hasAdditions = false,
+    this.hasRemovals = false,
+  });
 
   final List<({String id, List<String> nextIds})> updates;
   final List<({String id, String name})> deletions;
 
+  /// 是否包含把目标项加入某个容器的变更。
+  final bool hasAdditions;
+
+  /// 是否包含把目标项从某个容器移出（或导致容器变空删除）的变更。
+  final bool hasRemovals;
+
   bool get isEmpty => updates.isEmpty && deletions.isEmpty;
+
+  /// 本次保存是否纯粹是「加入」操作（无移出、无删除）。
+  bool get isPureAddition => hasAdditions && !hasRemovals && deletions.isEmpty;
 }
 
 /// 根据用户在勾选面板里的目标状态，生成最小变更计划。
@@ -72,6 +86,8 @@ MembershipChangePlan planMembershipChanges({
 }) {
   final updates = <({String id, List<String> nextIds})>[];
   final deletions = <({String id, String name})>[];
+  var hasAdditions = false;
+  var hasRemovals = false;
   if (targetIds.isEmpty) {
     return MembershipChangePlan(updates: updates, deletions: deletions);
   }
@@ -85,15 +101,23 @@ MembershipChangePlan planMembershipChanges({
       final next = mergeUniqueIds(container.memberIds, targetIds);
       if (next.length != container.memberIds.length) {
         updates.add((id: container.id, nextIds: next));
+        hasAdditions = true;
       }
     } else {
       final next = removeMatchingIds(container.memberIds, targetIds);
       if (next.isEmpty) {
         deletions.add((id: container.id, name: container.name));
+        hasRemovals = true;
       } else if (next.length != container.memberIds.length) {
         updates.add((id: container.id, nextIds: next));
+        hasRemovals = true;
       }
     }
   }
-  return MembershipChangePlan(updates: updates, deletions: deletions);
+  return MembershipChangePlan(
+    updates: updates,
+    deletions: deletions,
+    hasAdditions: hasAdditions,
+    hasRemovals: hasRemovals,
+  );
 }

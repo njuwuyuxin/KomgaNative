@@ -73,6 +73,7 @@ void main() {
     expect(repository.bookReadCalls.every((c) => c.read), isTrue);
     expect(container.read(bookSelectionProvider).ids, isEmpty);
     expect(find.byKey(const Key('shelf-selection-bar')), findsNothing);
+    expect(find.text('Marked 4 books as read'), findsOneWidget);
   });
 
   testWidgets('长按书行："标记之前所有为已读"只动前面那几本', (WidgetTester tester) async {

@@ -29,15 +29,19 @@ mixin _ShelfBatch on ConsumerState<LibraryScreen> {
     setState(() => _batchBusy = false);
     ref.read(shelfSelectionProvider.notifier).exit();
     final l10n = AppLocalizations.of(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          failed == 0
-              ? l10n.batchDone(ids.length)
-              : l10n.batchPartialDone(ids.length - failed, failed),
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            failed == 0
+                ? (read
+                      ? l10n.batchMarkedRead(ids.length)
+                      : l10n.batchMarkedUnread(ids.length))
+                : l10n.batchPartialDone(ids.length - failed, failed),
+          ),
         ),
-      ),
-    );
+      );
   }
 
   /// 对选中的系列批量加入收藏集。

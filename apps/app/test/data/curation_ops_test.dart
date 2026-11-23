@@ -89,6 +89,33 @@ void main() {
       expect(plan.deletions, hasLength(1));
       expect(plan.deletions.single.id, 'c3');
       expect(plan.deletions.single.name, 'Becomes empty');
+      expect(plan.hasAdditions, isTrue);
+      expect(plan.hasRemovals, isTrue);
+      expect(plan.isPureAddition, isFalse);
+    });
+
+    test('仅勾选加入时 isPureAddition 为 true；仅移出时为 false', () {
+      final addOnly = planMembershipChanges(
+        containers: const <({String id, String name, List<String> memberIds})>[
+          (id: 'c1', name: 'Add here', memberIds: <String>['s1']),
+        ],
+        targetIds: const <String>['s2', 's3'],
+        desiredStates: const <String, MembershipState>{
+          'c1': MembershipState.all,
+        },
+      );
+      expect(addOnly.isPureAddition, isTrue);
+
+      final removeOnly = planMembershipChanges(
+        containers: const <({String id, String name, List<String> memberIds})>[
+          (id: 'c1', name: 'Remove here', memberIds: <String>['s1', 's2']),
+        ],
+        targetIds: const <String>['s2'],
+        desiredStates: const <String, MembershipState>{
+          'c1': MembershipState.none,
+        },
+      );
+      expect(removeOnly.isPureAddition, isFalse);
     });
 
     test('目标未变化时计划为空', () {
@@ -102,6 +129,7 @@ void main() {
         },
       );
       expect(plan.isEmpty, isTrue);
+      expect(plan.isPureAddition, isFalse);
     });
   });
 }

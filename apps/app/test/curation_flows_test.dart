@@ -92,6 +92,52 @@ void main() {
         repo.updatedCollectionSeries['c1'],
         containsAll(<String>['s1', 's2', 's3', 's4']),
       );
+      expect(find.text('Added 2 books to collection'), findsOneWidget);
+    });
+
+    testWidgets('中文环境下书架多选加入收藏集弹出明确提示文案', (WidgetTester tester) async {
+      final repo = FakeLibraryRepository(
+        series: demoShelf(),
+        libraries: demoLibraries(),
+      );
+      tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+
+      final db = HttpCacheDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: <Override>[
+            libraryRepositoryProvider.overrideWithValue(repo),
+            httpCacheDatabaseProvider.overrideWithValue(db),
+          ],
+          child: MaterialApp(
+            locale: const Locale('zh'),
+            localizationsDelegates: appLocalizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            theme: AppTheme.light(),
+            home: const LibraryScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('shelf-select-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('series-s3')));
+      await tester.tap(find.byKey(const Key('series-s4')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('shelf-batch-collection')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('collection-pick-c1')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('collection-picker-save')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('已将 2 本书加入收藏集'), findsOneWidget);
     });
 
     testWidgets('收藏集详情：移出系列 + 撤销恢复，以及移出最后一个时确认删除', (WidgetTester tester) async {
@@ -261,6 +307,7 @@ void main() {
         repo.updatedReadLists['r1']?.bookIds,
         containsAll(<String>['s1-b1', 's5-b2', 's1-b2', 's1-b3']),
       );
+      expect(find.text('Added 2 books to read list'), findsOneWidget);
     });
 
     testWidgets('阅读列表详情：移出书 + 撤销恢复 + 移出最后一本书时确认删除', (

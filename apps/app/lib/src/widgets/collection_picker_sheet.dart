@@ -89,21 +89,22 @@ class _CollectionPickerSheetState
     setState(() => _saving = true);
     final messenger = ScaffoldMessenger.of(context);
     try {
-      final created = await ref
+      await ref
           .read(collectionsControllerProvider.notifier)
           .create(name: name, seriesIds: widget.seriesIds);
       if (!mounted) return;
       final hasPendingEdits = !_planFor(current).isEmpty;
+      final message = l10n.batchAddedToCollection(widget.seriesIds.length);
       if (!hasPendingEdits) {
         Navigator.of(context).pop(true);
-        messenger.showSnackBar(
-          SnackBar(content: Text(l10n.collectionAddedTo(created.name))),
-        );
+        messenger
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(message)));
       } else {
         setState(() => _saving = false);
-        messenger.showSnackBar(
-          SnackBar(content: Text(l10n.collectionAddedTo(created.name))),
-        );
+        messenger
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(message)));
       }
     } on ShelfFailure catch (failure) {
       if (!mounted) return;
@@ -141,7 +142,12 @@ class _CollectionPickerSheetState
           .applyCollectionPlan(plan, affectedSeriesIds: widget.seriesIds);
       if (!mounted) return;
       Navigator.of(context).pop(true);
-      messenger.showSnackBar(SnackBar(content: Text(l10n.collectionSaved)));
+      final message = plan.isPureAddition
+          ? l10n.batchAddedToCollection(widget.seriesIds.length)
+          : l10n.collectionSaved;
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(message)));
     } on ShelfFailure catch (failure) {
       if (!mounted) return;
       setState(() => _saving = false);

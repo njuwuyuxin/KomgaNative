@@ -142,7 +142,12 @@ class _ReadListPickerSheetState extends ConsumerState<_ReadListPickerSheet> {
           .applyReadListPlan(plan);
       if (!mounted) return;
       Navigator.of(context).pop(true);
-      messenger.showSnackBar(SnackBar(content: Text(l10n.readListSaved)));
+      final message = plan.isPureAddition
+          ? l10n.batchAddedToReadList(widget.bookIds.length)
+          : l10n.readListSaved;
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(message)));
     } on ShelfFailure catch (failure) {
       if (!mounted) return;
       setState(() => _saving = false);

@@ -104,6 +104,46 @@ void main() {
     expect(repository.seriesReadCalls.every((c) => c.read), isTrue);
     expect(container.read(shelfSelectionProvider).ids, isEmpty);
     expect(find.byKey(const Key('shelf-selection-bar')), findsNothing);
+    expect(find.text('Marked 2 books as read'), findsOneWidget);
+  });
+
+  testWidgets('中文环境下批量标为已读/未读弹出明确操作文案', (WidgetTester tester) async {
+    repository = FakeLibraryRepository(series: demoShelf());
+    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          libraryRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: MaterialApp(
+          locale: const Locale('zh'),
+          localizationsDelegates: appLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          theme: AppTheme.light(),
+          home: const LibraryScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await enterSelection(tester);
+    await tester.tap(find.byKey(const Key('series-s1')));
+    await tester.tap(find.byKey(const Key('series-s2')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('shelf-batch-read')));
+    await tester.pumpAndSettle();
+    expect(find.text('已将 2 本书标为已读'), findsOneWidget);
+
+    await enterSelection(tester);
+    await tester.tap(find.byKey(const Key('series-s1')));
+    await tester.tap(find.byKey(const Key('series-s2')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('shelf-batch-unread')));
+    await tester.pumpAndSettle();
+    expect(find.text('已将 2 本书标为未读'), findsOneWidget);
   });
 
   testWidgets('失败项不影响其余项', (WidgetTester tester) async {
