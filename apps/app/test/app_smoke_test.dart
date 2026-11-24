@@ -12,6 +12,7 @@ import 'package:komga_native/src/data/progress/progress_store.dart';
 import 'package:komga_native/src/screens/library_screen.dart';
 import 'package:komga_native/src/screens/reading_now_screen.dart';
 import 'package:komga_native/src/screens/search_screen.dart';
+import 'package:komga_native/src/screens/settings_screen.dart';
 import 'package:komga_native/src/session/connection_service.dart';
 import 'package:komga_native/src/session/server_store.dart';
 import 'package:komga_native/src/session/session_controller.dart';
@@ -271,5 +272,73 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(ReadingNowScreen), findsOneWidget);
     expect(find.byType(SearchScreen), findsNothing);
+  });
+
+  testWidgets('从设置页进入/退出搜索页的滑动方向与其他页面一致（右进右出）', (WidgetTester tester) async {
+    await pumpApp(tester, store: InMemoryServerStore(storedServer()));
+
+    // 切到设置页（分支 3）。
+    await tester.tap(find.byKey(const Key('nav-tab-3')));
+    await tester.pumpAndSettle();
+    expect(find.byType(SettingsScreen), findsOneWidget);
+
+    // 点右下角搜索圆球进入搜索页：设置页应向左滑出、搜索页从右侧滑入。
+    await tester.tap(find.byKey(const Key('nav-tab-search')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 80));
+
+    final settingsEntering = tester.getRect(find.byType(SettingsScreen));
+    final searchEntering = tester.getRect(find.byType(SearchScreen));
+    expect(settingsEntering.left, lessThan(0), reason: '设置页应向左滑出');
+    expect(searchEntering.left, greaterThan(0), reason: '搜索页应从右侧滑入');
+
+    await tester.pumpAndSettle();
+    expect(find.byType(SearchScreen), findsOneWidget);
+    expect(find.byType(SettingsScreen), findsNothing);
+
+    // 手势返回设置页：搜索页应向右滑出、设置页从左侧滑回。
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 80));
+
+    final searchExiting = tester.getRect(find.byType(SearchScreen));
+    final settingsReturning = tester.getRect(find.byType(SettingsScreen));
+    expect(searchExiting.left, greaterThan(0), reason: '搜索页退出时应向右滑出');
+    expect(settingsReturning.left, lessThan(0), reason: '设置页返回时应从左侧滑入');
+
+    await tester.pumpAndSettle();
+    expect(find.byType(SettingsScreen), findsOneWidget);
+    expect(find.byType(SearchScreen), findsNothing);
+  });
+
+  testWidgets('搜索页关闭键盘后离开，下次再次进入搜索页仍自动聚焦弹出键盘', (WidgetTester tester) async {
+    await pumpApp(tester, store: InMemoryServerStore(storedServer()));
+
+    // 首次进入搜索页：自动聚焦。
+    await tester.tap(find.byKey(const Key('nav-tab-search')));
+    await tester.pumpAndSettle();
+    final editable = tester.widget<EditableText>(
+      find.descendant(
+        of: find.byKey(const Key('search-field')),
+        matching: find.byType(EditableText),
+      ),
+    );
+    expect(editable.focusNode.hasFocus, isTrue, reason: '首次进入搜索页应自动聚焦');
+
+    // 点击空白处收起键盘。
+    final screenSize = tester.getSize(find.byType(SearchScreen));
+    await tester.tapAt(Offset(screenSize.width / 2, screenSize.height / 2));
+    await tester.pumpAndSettle();
+    expect(editable.focusNode.hasFocus, isFalse, reason: '点击空白处应失焦收起键盘');
+
+    // 返回上一页后再次进入搜索页：应重新聚焦弹出键盘。
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byType(ReadingNowScreen), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('nav-tab-search')));
+    await tester.pumpAndSettle();
+    expect(find.byType(SearchScreen), findsOneWidget);
+    expect(editable.focusNode.hasFocus, isTrue, reason: '再次进入搜索页应重新自动聚焦');
   });
 }

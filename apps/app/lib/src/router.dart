@@ -108,18 +108,20 @@ GoRouter createRouter({
           StatefulShellBranch(
             routes: <RouteBase>[
               GoRoute(
-                path: '/search',
-                builder: (BuildContext context, GoRouterState state) =>
-                    const SearchScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: <RouteBase>[
-              GoRoute(
                 path: '/settings',
                 builder: (BuildContext context, GoRouterState state) =>
                     const SettingsScreen(),
+              ),
+            ],
+          ),
+          // 搜索分支放在最后（与手机端右下角搜索球位置一致），确保从正在读 / 书架 /
+          // 收藏 / 设置任意页面进入搜索都从右侧滑入、返回时向右滑出。
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: '/search',
+                builder: (BuildContext context, GoRouterState state) =>
+                    const SearchScreen(),
               ),
             ],
           ),

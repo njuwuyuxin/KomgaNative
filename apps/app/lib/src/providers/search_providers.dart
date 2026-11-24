@@ -9,6 +9,19 @@ typedef SearchQuery = ({
   String? tag,
 });
 
+/// 每次切入或重点搜索页时自增，驱动常驻的 `SearchScreen` 重新聚焦弹出键盘。
+class SearchFocusRequestNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void request() => state++;
+}
+
+final searchFocusRequestProvider =
+    NotifierProvider<SearchFocusRequestNotifier, int>(
+      SearchFocusRequestNotifier.new,
+    );
+
 /// 全局书搜索增量分页控制器（ARC-12）。
 class SearchBooksController extends PagedListController<Book> {
   SearchBooksController(this.search);

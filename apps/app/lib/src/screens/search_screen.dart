@@ -1,9 +1,11 @@
 import 'dart:async';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
+import 'package:komga_native/src/providers/search_providers.dart';
 import 'package:komga_native/src/providers/settings_provider.dart';
 import 'package:komga_native/src/screens/search_results_sliver.dart';
 import 'package:komga_native/src/widgets/search_empty_state.dart';
@@ -41,6 +43,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     }
   }
 
+  void _requestKeyboard() {
+    if (!mounted) return;
+    if (_focusNode.hasFocus) {
+      // 焦点仍在但软键盘可能已被系统返回键收起：显式重新唤起输入法。
+      unawaited(SystemChannels.textInput.invokeMethod<void>('TextInput.show'));
+    } else {
+      _focusNode.requestFocus();
+    }
+  }
+
   void _onChanged(String value) {
     _debounce?.cancel();
     _debounce = Timer(AppMotion.of(context).emphasized, () {
@@ -74,6 +86,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<int>(searchFocusRequestProvider, (int? previous, int next) {
+      if (previous != next) _requestKeyboard();
+    });
     final l10n = AppLocalizations.of(context);
     final history = ref.watch(searchHistoryProvider);
     return GestureDetector(
