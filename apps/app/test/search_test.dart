@@ -59,4 +59,35 @@ void main() {
 
     expect(find.text('Frieren · Vol. 1'), findsOneWidget);
   });
+
+  testWidgets('进入搜索页自动聚焦，点击空白处失焦收起键盘', (WidgetTester tester) async {
+    final repository = FakeLibraryRepository(series: demoShelf());
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          libraryRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: const MaterialApp(
+          localizationsDelegates: appLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: SearchScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final editable = tester.widget<EditableText>(find.byType(EditableText));
+    expect(editable.focusNode.hasFocus, isTrue, reason: '进入搜索页应自动聚焦弹出键盘');
+
+    // 点击页面下方空白处：应失焦收起键盘。
+    final screenSize = tester.getSize(find.byType(SearchScreen));
+    await tester.tapAt(Offset(screenSize.width / 2, screenSize.height - 80));
+    await tester.pump();
+    expect(editable.focusNode.hasFocus, isFalse, reason: '点击屏幕空白处应退出键盘');
+
+    // 再次点输入框重新聚焦。
+    await tester.tap(find.byKey(const Key('search-field')));
+    await tester.pump();
+    expect(editable.focusNode.hasFocus, isTrue);
+  });
 }

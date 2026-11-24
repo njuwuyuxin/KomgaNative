@@ -54,33 +54,36 @@ class SearchFacets extends ConsumerWidget {
 
     return Padding(
       key: const Key('search-facets'),
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        AppSpacing.sm,
-        AppSpacing.md,
-        AppSpacing.xs,
-      ),
+      padding: const EdgeInsets.only(top: AppSpacing.sm, bottom: AppSpacing.xs),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Row(
-            children: <Widget>[
-              Text(l10n.searchFilter, style: theme.textTheme.labelLarge),
-              const Spacer(),
-              if (active)
-                TextButton(
-                  key: const Key('search-facets-clear'),
-                  style: TextButton.styleFrom(
-                    minimumSize: const Size(0, AppSizes.minTouch),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            child: Row(
+              children: <Widget>[
+                Text(l10n.searchFilter, style: theme.textTheme.labelLarge),
+                const Spacer(),
+                if (active)
+                  TextButton(
+                    key: const Key('search-facets-clear'),
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(0, AppSizes.minTouch),
+                    ),
+                    onPressed: onClear,
+                    child: Text(l10n.clearFilters),
                   ),
-                  onPressed: onClear,
-                  child: Text(l10n.clearFilters),
-                ),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(height: AppSpacing.xxs),
+          const SizedBox(height: AppSpacing.xs),
+          // 不裁阴影：SingleChildScrollView 默认 Clip.hardEdge 会贴着胶囊边缘切掉
+          // GlassPillButton 的 AppShadows.card，真机上会在圆角外露出方形硬边阴影
+          // （与 GlassMenuButton 同因）；横向左右溢出由外层 CustomScrollView 视口裁切。
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
+            clipBehavior: Clip.none,
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
             child: Row(
               children: <Widget>[
                 _Chip(
@@ -107,8 +110,7 @@ class SearchFacets extends ConsumerWidget {
                   selected: readStatus == SeriesReadStatus.read,
                   onTap: () => onReadStatus(SeriesReadStatus.read),
                 ),
-                for (final item in tags) ...<Widget>[
-                  const SizedBox(width: AppSpacing.xs),
+                for (final item in tags)
                   _Chip(
                     key: Key('search-facet-tag-$item'),
                     label: item,
@@ -116,7 +118,6 @@ class SearchFacets extends ConsumerWidget {
                     // 再点一次同一个标签 = 取消。
                     onTap: () => onTag(tag == item ? null : item),
                   ),
-                ],
               ],
             ),
           ),
@@ -141,7 +142,7 @@ class _Chip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(right: AppSpacing.xs),
+      padding: const EdgeInsets.only(right: AppSpacing.sm),
       child: GlassPillButton(
         label: label,
         onPressed: onTap,

@@ -44,59 +44,73 @@ class GlassSearchField extends StatelessWidget {
 
     return GlassSurface(
       shape: AppShapes.of(context, AppShapes.bar),
-      child: SizedBox(
-        height: AppSizes.glassSearchHeight,
-        // 只读一次 controller：没有内容时**不留**右侧 44 的清除键槽位，
-        // 否则窄搜索框（首页标题栏里与动作组并排）的提示文字会被提前截断。
-        child: ValueListenableBuilder<TextEditingValue>(
-          valueListenable: controller,
-          builder: (BuildContext context, TextEditingValue value, _) {
-            final showClear = value.text.isNotEmpty;
-            return TextField(
-              controller: controller,
-              focusNode: focusNode,
-              autofocus: autofocus,
-              onChanged: onChanged,
-              onSubmitted: onSubmitted,
-              textInputAction: textInputAction,
-              textAlignVertical: TextAlignVertical.center,
-              style: theme.textTheme.bodyLarge,
-              cursorColor: scheme.primary,
-              decoration: InputDecoration(
-                hintText: hintText,
-                hintStyle: theme.textTheme.bodyLarge?.copyWith(color: muted),
-                hintMaxLines: 1,
-                filled: false,
-                isDense: true,
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                contentPadding: EdgeInsets.zero,
-                prefixIcon: Icon(
-                  Icons.search,
-                  size: AppSizes.iconMd,
-                  color: muted,
-                ),
-                prefixIconConstraints: const BoxConstraints(
-                  minWidth: AppSizes.glassSearchHeight,
-                  minHeight: AppSizes.glassSearchHeight,
-                ),
-                suffixIcon: showClear ? _clearButton(muted) : null,
-                suffixIconConstraints: showClear
-                    ? const BoxConstraints(
-                        minWidth: AppSizes.glassSearchHeight,
-                        minHeight: AppSizes.glassSearchHeight,
-                      )
-                    : null,
-              ),
-            );
-          },
-        ),
+      child: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints constraints) {
+          // 放进 GlassHeader 时外层会被撑到 glassHeaderHeight（56）；
+          // 不把前缀/后缀约束同步拉高的话，InputDecorator 会按 44 顶对齐，
+          // 图标与提示词整体偏上。
+          final height =
+              constraints.hasBoundedHeight &&
+                  constraints.minHeight > AppSizes.glassSearchHeight
+              ? constraints.minHeight
+              : AppSizes.glassSearchHeight;
+          return SizedBox(
+            height: height,
+            // 只读一次 controller：没有内容时**不留**右侧 44 的清除键槽位，
+            // 否则窄搜索框（首页标题栏里与动作组并排）的提示文字会被提前截断。
+            child: ValueListenableBuilder<TextEditingValue>(
+              valueListenable: controller,
+              builder: (BuildContext context, TextEditingValue value, _) {
+                final showClear = value.text.isNotEmpty;
+                return TextField(
+                  controller: controller,
+                  focusNode: focusNode,
+                  autofocus: autofocus,
+                  onChanged: onChanged,
+                  onSubmitted: onSubmitted,
+                  textInputAction: textInputAction,
+                  textAlignVertical: TextAlignVertical.center,
+                  style: theme.textTheme.bodyLarge,
+                  cursorColor: scheme.primary,
+                  decoration: InputDecoration(
+                    hintText: hintText,
+                    hintStyle: theme.textTheme.bodyLarge?.copyWith(
+                      color: muted,
+                    ),
+                    hintMaxLines: 1,
+                    filled: false,
+                    isDense: true,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    contentPadding: EdgeInsets.zero,
+                    prefixIcon: Icon(
+                      Icons.search,
+                      size: AppSizes.iconMd,
+                      color: muted,
+                    ),
+                    prefixIconConstraints: BoxConstraints(
+                      minWidth: AppSizes.glassSearchHeight,
+                      minHeight: height,
+                    ),
+                    suffixIcon: showClear ? _clearButton(muted, height) : null,
+                    suffixIconConstraints: showClear
+                        ? BoxConstraints(
+                            minWidth: AppSizes.glassSearchHeight,
+                            minHeight: height,
+                          )
+                        : null,
+                  ),
+                );
+              },
+            ),
+          );
+        },
       ),
     );
   }
 
-  Widget _clearButton(Color muted) {
+  Widget _clearButton(Color muted, double height) {
     final clear = GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () {
@@ -105,7 +119,7 @@ class GlassSearchField extends StatelessWidget {
       },
       child: SizedBox(
         width: AppSizes.glassSearchHeight,
-        height: AppSizes.glassSearchHeight,
+        height: height,
         child: Icon(Icons.cancel, size: AppSizes.iconSm, color: muted),
       ),
     );

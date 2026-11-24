@@ -11,6 +11,7 @@ import 'package:komga_native/src/providers/reader_providers.dart';
 import 'package:komga_native/src/data/progress/progress_store.dart';
 import 'package:komga_native/src/screens/library_screen.dart';
 import 'package:komga_native/src/screens/reading_now_screen.dart';
+import 'package:komga_native/src/screens/search_screen.dart';
 import 'package:komga_native/src/session/connection_service.dart';
 import 'package:komga_native/src/session/server_store.dart';
 import 'package:komga_native/src/session/session_controller.dart';
@@ -234,5 +235,41 @@ void main() {
     await pumpApp(tester, store: InMemoryServerStore(storedServer()));
     expect(find.byType(StretchingOverscrollIndicator), findsNothing);
     expect(find.byType(GlowingOverscrollIndicator), findsNothing);
+  });
+
+  testWidgets('从书架进入搜索页后，手势返回回到书架而不是退出应用', (WidgetTester tester) async {
+    await pumpApp(tester, store: InMemoryServerStore(storedServer()));
+    expect(find.byType(ReadingNowScreen), findsOneWidget);
+
+    // 先切到书架页。
+    await tester.tap(find.byKey(const Key('nav-tab-1')));
+    await tester.pumpAndSettle();
+    expect(find.byType(LibraryScreen), findsOneWidget);
+
+    // 点右下角搜索圆球进入搜索页。
+    await tester.tap(find.byKey(const Key('nav-tab-search')));
+    await tester.pumpAndSettle();
+    expect(find.byType(SearchScreen), findsOneWidget);
+    expect(find.byType(LibraryScreen), findsNothing);
+
+    // 模拟系统手势返回：应拦截 pop 并回到书架页。
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byType(LibraryScreen), findsOneWidget);
+    expect(find.byType(SearchScreen), findsNothing);
+
+    // 从正在读页进入搜索页，返回也应回到正在读页。
+    await tester.tap(find.byKey(const Key('nav-tab-0')));
+    await tester.pumpAndSettle();
+    expect(find.byType(ReadingNowScreen), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('nav-tab-search')));
+    await tester.pumpAndSettle();
+    expect(find.byType(SearchScreen), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byType(ReadingNowScreen), findsOneWidget);
+    expect(find.byType(SearchScreen), findsNothing);
   });
 }

@@ -49,14 +49,12 @@ class ShelfActiveFilters extends ConsumerWidget {
 
     return Padding(
       key: const Key('shelf-active-filters'),
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        AppSpacing.xs,
-        AppSpacing.md,
-        0,
-      ),
+      padding: const EdgeInsets.only(top: AppSpacing.xs),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
+        // 不裁胶囊阴影，避免真机上圆角外露出方形硬边（横向由外层视口裁切）。
+        clipBehavior: Clip.none,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
         child: Row(
           children: <Widget>[
             ...chips,
@@ -94,9 +92,10 @@ class _FilterChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.only(right: AppSpacing.xs),
+      padding: const EdgeInsets.only(right: AppSpacing.sm),
       child: GlassSurface(
         shape: AppShapes.of(context, AppShapes.bar),
+        shadows: AppShadows.card,
         child: InkWell(
           onTap: onClear,
           borderRadius: BorderRadius.circular(AppRadii.xl),

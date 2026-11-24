@@ -12,7 +12,7 @@ import 'package:material_ui/material_ui.dart';
 /// 玻璃才能真的模糊到封面/列表（否则背后只有一层纯色背景，"液态玻璃"
 /// 会变成一块实心白条）。代价是页面自己要在滚动内容末尾留出
 /// `AppSizes.navBarClearance`，否则最后一行会被导航条压住。
-class AdaptiveShell extends StatelessWidget {
+class AdaptiveShell extends StatefulWidget {
   const AdaptiveShell({required this.shell, super.key});
 
   final StatefulNavigationShell shell;
@@ -28,11 +28,57 @@ class AdaptiveShell extends StatelessWidget {
   /// 否则 1.3 倍字号下会被截断（`nav_bar@phone_light_text1.3` 是这双眼睛）。
   static const List<int> _tabBranches = <int>[0, 1, 2, 4];
 
-  void _onSelect(int index) =>
-      shell.goBranch(index, initialLocation: index == shell.currentIndex);
+  @override
+  State<AdaptiveShell> createState() => _AdaptiveShellState();
+}
+
+class _AdaptiveShellState extends State<AdaptiveShell> {
+  /// 进入搜索页前所在的非搜索分支：在搜索页手势返回时回到进入前的页面，
+  /// 而不是把根壳直接 pop 掉退出应用。
+  int? _returnBranch;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.shell.currentIndex != AdaptiveShell._searchBranch) {
+      _returnBranch = widget.shell.currentIndex;
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant AdaptiveShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final current = widget.shell.currentIndex;
+    if (current != AdaptiveShell._searchBranch) {
+      _returnBranch = current;
+    }
+  }
+
+  void _onSelect(int index) {
+    final current = widget.shell.currentIndex;
+    if (index == AdaptiveShell._searchBranch &&
+        current != AdaptiveShell._searchBranch) {
+      _returnBranch = current;
+    } else if (current == AdaptiveShell._searchBranch &&
+        index != AdaptiveShell._searchBranch) {
+      FocusManager.instance.primaryFocus?.unfocus();
+    }
+    widget.shell.goBranch(index, initialLocation: index == current);
+  }
+
+  void _handlePop(bool didPop, Object? _) {
+    if (didPop) return;
+    final target = _returnBranch;
+    if (widget.shell.currentIndex == AdaptiveShell._searchBranch &&
+        target != null) {
+      FocusManager.instance.primaryFocus?.unfocus();
+      widget.shell.goBranch(target);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final shell = widget.shell;
     final l10n = AppLocalizations.of(context);
     final allDestinations =
         <({IconData icon, IconData selectedIcon, String label})>[
@@ -66,14 +112,19 @@ class AdaptiveShell extends StatelessWidget {
 
     /// 胶囊里的标签：页面标题太长时用短一档的导航文案。
     String labelFor(int branch) {
-      if (branch == _readingBranch) return l10n.navReadingNow;
-      if (branch == _collectionsBranch) return l10n.navCollections;
+      if (branch == AdaptiveShell._readingBranch) return l10n.navReadingNow;
+      if (branch == AdaptiveShell._collectionsBranch) {
+        return l10n.navCollections;
+      }
       return allDestinations[branch].label;
     }
 
+    final Widget scaffold;
     if (!sizeClass.useNavigationRail) {
-      final selectedTab = _tabBranches.indexOf(shell.currentIndex);
-      return Scaffold(
+      final selectedTab = AdaptiveShell._tabBranches.indexOf(
+        shell.currentIndex,
+      );
+      scaffold = Scaffold(
         // 内容铺到屏幕底，导航条浮在它上面（见类注释）。
         extendBody: true,
         // 键盘弹出时让导航条留在原位被键盘盖住（iOS 的行为）。
@@ -82,49 +133,60 @@ class AdaptiveShell extends StatelessWidget {
         body: shell,
         bottomNavigationBar: FloatingNavBar(
           tabs: <GlassNavDestination>[
-            for (var i = 0; i < _tabBranches.length; i++)
+            for (var i = 0; i < AdaptiveShell._tabBranches.length; i++)
               GlassNavDestination(
-                icon: allDestinations[_tabBranches[i]].icon,
-                selectedIcon: allDestinations[_tabBranches[i]].selectedIcon,
+                icon: allDestinations[AdaptiveShell._tabBranches[i]].icon,
+                selectedIcon:
+                    allDestinations[AdaptiveShell._tabBranches[i]].selectedIcon,
                 // 收藏页面的完整标题是 "Collections"，四格胶囊里放不下，
                 // 导航栏用短一档的 "Saved" / "收藏"（页面内容不变）。
-                label: labelFor(_tabBranches[i]),
-                key: Key('nav-tab-${_tabBranches[i]}'),
+                label: labelFor(AdaptiveShell._tabBranches[i]),
+                key: Key('nav-tab-${AdaptiveShell._tabBranches[i]}'),
               ),
           ],
           selectedTab: selectedTab < 0 ? null : selectedTab,
-          onTabSelected: (int index) => _onSelect(_tabBranches[index]),
+          onTabSelected: (int index) =>
+              _onSelect(AdaptiveShell._tabBranches[index]),
           search: GlassNavDestination(
-            icon: allDestinations[_searchBranch].icon,
-            label: allDestinations[_searchBranch].label,
+            icon: allDestinations[AdaptiveShell._searchBranch].icon,
+            label: allDestinations[AdaptiveShell._searchBranch].label,
             key: const Key('nav-tab-search'),
           ),
-          searchSelected: shell.currentIndex == _searchBranch,
-          onSearch: () => _onSelect(_searchBranch),
+          searchSelected: shell.currentIndex == AdaptiveShell._searchBranch,
+          onSearch: () => _onSelect(AdaptiveShell._searchBranch),
+        ),
+      );
+    } else {
+      scaffold = Scaffold(
+        body: Row(
+          children: <Widget>[
+            NavigationRail(
+              selectedIndex: shell.currentIndex,
+              onDestinationSelected: _onSelect,
+              labelType: NavigationRailLabelType.all,
+              destinations: <NavigationRailDestination>[
+                for (final d in allDestinations)
+                  NavigationRailDestination(
+                    icon: Icon(d.icon),
+                    selectedIcon: Icon(d.selectedIcon),
+                    label: Text(d.label),
+                  ),
+              ],
+            ),
+            const VerticalDivider(width: AppSizes.hairline),
+            Expanded(child: shell),
+          ],
         ),
       );
     }
 
-    return Scaffold(
-      body: Row(
-        children: <Widget>[
-          NavigationRail(
-            selectedIndex: shell.currentIndex,
-            onDestinationSelected: _onSelect,
-            labelType: NavigationRailLabelType.all,
-            destinations: <NavigationRailDestination>[
-              for (final d in allDestinations)
-                NavigationRailDestination(
-                  icon: Icon(d.icon),
-                  selectedIcon: Icon(d.selectedIcon),
-                  label: Text(d.label),
-                ),
-            ],
-          ),
-          const VerticalDivider(width: AppSizes.hairline),
-          Expanded(child: shell),
-        ],
-      ),
+    final interceptBack =
+        shell.currentIndex == AdaptiveShell._searchBranch &&
+        _returnBranch != null;
+    return PopScope(
+      canPop: !interceptBack,
+      onPopInvokedWithResult: _handlePop,
+      child: scaffold,
     );
   }
 }

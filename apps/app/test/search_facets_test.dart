@@ -108,4 +108,18 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('search-facets-clear')), findsNothing);
   });
+
+  testWidgets('筛选胶囊横向滚动区不裁切阴影（Clip.none），避免真机圆角外露方形硬边', (
+    WidgetTester tester,
+  ) async {
+    await pumpSearch(tester);
+
+    final scrollView = tester.widget<SingleChildScrollView>(
+      find.descendant(
+        of: find.byKey(const Key('search-facets')),
+        matching: find.byType(SingleChildScrollView),
+      ),
+    );
+    expect(scrollView.clipBehavior, Clip.none);
+  });
 }

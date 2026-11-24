@@ -516,6 +516,48 @@ void main() {
       expect(changes.last, isEmpty);
       expect(find.byIcon(Icons.cancel), findsNothing);
     });
+
+    testWidgets('放入 GlassHeader（高度 56）时图标、提示词与清除键均垂直居中', (
+      WidgetTester tester,
+    ) async {
+      final controller = TextEditingController();
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        host(
+          GlassHeader(
+            bar: GlassSearchField(
+              controller: controller,
+              hintText: 'Search series, books, authors...',
+              clearLabel: 'Clear',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final surfaceRect = tester.getRect(find.byType(GlassSurface));
+      expect(surfaceRect.height, AppSizes.glassHeaderHeight);
+
+      final iconRect = tester.getRect(find.byIcon(Icons.search));
+      expect(
+        iconRect.center.dy,
+        moreOrLessEquals(surfaceRect.center.dy, epsilon: 0.5),
+      );
+
+      final editableRect = tester.getRect(find.byType(EditableText));
+      expect(
+        editableRect.center.dy,
+        moreOrLessEquals(surfaceRect.center.dy, epsilon: 1.0),
+      );
+
+      await tester.enterText(find.byType(TextField), 'frieren');
+      await tester.pump();
+      final clearRect = tester.getRect(find.byIcon(Icons.cancel));
+      expect(
+        clearRect.center.dy,
+        moreOrLessEquals(surfaceRect.center.dy, epsilon: 0.5),
+      );
+    });
   });
 
   group('GlassHeader', () {
