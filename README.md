@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/assets/app_icon.png" alt="Yomu" width="120" height="120" />
+
 # Yomu
 
 **专为 [Komga](https://komga.org) 打造的跨平台原生漫画阅读客户端**
@@ -21,6 +23,14 @@
 ## 简介
 
 **Yomu** 是面向自建 [Komga](https://komga.org) 漫画服务器的跨平台原生客户端（基于 Flutter），专注于流畅的漫画阅读体验、可靠的离线与多设备进度同步，以及针对手机、平板与电子墨水屏的形态适配。
+
+## 界面预览
+
+<p align="center">
+  <img src="docs/assets/screenshots/library.png" alt="书架页" width="280" />
+  &nbsp;&nbsp;&nbsp;
+  <img src="docs/assets/screenshots/reader_curl.png" alt="单页模式真实卷页" width="280" />
+</p>
 
 ## 核心特性
 

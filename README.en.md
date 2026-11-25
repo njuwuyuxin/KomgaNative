@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/assets/app_icon.png" alt="Yomu" width="120" height="120" />
+
 # Yomu
 
 **A Cross-Platform Native Comic Reader Client for [Komga](https://komga.org)**
@@ -21,6 +23,14 @@ Reading-First Experience · Android / iOS / Android E-Ink
 ## Overview
 
 **Yomu** is a cross-platform native client for self-hosted [Komga](https://komga.org) servers built with Flutter. It focuses on a responsive comic reading experience, reliable offline access and multi-device progress synchronization, and adaptive layouts tailored for phones, tablets, and E-Ink devices.
+
+## Screenshots
+
+<p align="center">
+  <img src="docs/assets/screenshots/library.png" alt="Library shelf" width="280" />
+  &nbsp;&nbsp;&nbsp;
+  <img src="docs/assets/screenshots/reader_curl.png" alt="Single-page shader curl" width="280" />
+</p>
 
 ## Features
 
