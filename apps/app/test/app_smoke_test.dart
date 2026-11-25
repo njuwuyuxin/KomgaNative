@@ -61,6 +61,7 @@ void main() {
 
   testWidgets('未登录 → 直接落在连接页（不闪现书架）', (WidgetTester tester) async {
     await pumpApp(tester, store: InMemoryServerStore());
+    expect(find.text('Yomu'), findsOneWidget);
     expect(find.text('Connect to your Komga server'), findsOneWidget);
     expect(find.text('Library'), findsNothing);
   });

@@ -32,7 +32,7 @@ class KomgaApp extends ConsumerWidget {
 
     return ProgressSyncScope(
       child: MaterialApp.router(
-        title: 'KomgaNative',
+        title: 'Yomu',
         debugShowCheckedModeBanner: false,
         scrollBehavior: const _NoOverscrollBehavior(),
         locale: settings.language.locale,

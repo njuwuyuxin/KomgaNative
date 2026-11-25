@@ -15,7 +15,7 @@ class SplashScreen extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Text('KomgaNative', style: theme.textTheme.headlineSmall),
+            Text('Yomu', style: theme.textTheme.headlineSmall),
             const SizedBox(height: AppSpacing.lg),
             const SizedBox(
               width: AppSizes.iconMd,

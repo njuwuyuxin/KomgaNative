@@ -96,7 +96,7 @@ class MainActivity : FlutterActivity() {
 
     private fun handleSaveImage(call: MethodCall, result: MethodChannel.Result) {
         val bytes = call.argument<ByteArray>("bytes")
-        val fileName = call.argument<String>("fileName") ?: "komganative-page.png"
+        val fileName = call.argument<String>("fileName") ?: "yomu-page.png"
         val mimeType = call.argument<String>("mimeType") ?: "image/png"
         if (bytes == null || bytes.isEmpty()) {
             result.error("IO_ERROR", "Empty image bytes", null)

@@ -224,7 +224,7 @@ class SettingsScreen extends ConsumerWidget {
                           title: Text(l10n.openSourceLicenses),
                           onTap: () => showLicensePage(
                             context: context,
-                            applicationName: 'KomgaNative',
+                            applicationName: 'Yomu',
                             applicationVersion:
                                 appInfo?.version ?? kFallbackAppVersion,
                           ),

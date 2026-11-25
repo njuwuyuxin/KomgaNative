@@ -207,8 +207,8 @@ String formatSavedPageFileName({
     final b = pages[1];
     final low = a < b ? a : b;
     final high = a < b ? b : a;
-    return 'komganative-$safeBook-pages-$low-$high.$safeExt';
+    return 'yomu-$safeBook-pages-$low-$high.$safeExt';
   }
   final page = pages.isEmpty ? 1 : pages.first;
-  return 'komganative-$safeBook-page-$page.$safeExt';
+  return 'yomu-$safeBook-page-$page.$safeExt';
 }

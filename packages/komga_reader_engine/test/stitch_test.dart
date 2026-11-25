@@ -212,7 +212,7 @@ void main() {
           pages: const <int>[2],
           extension: 'jpg',
         ),
-        'komganative-b1-page-2.jpg',
+        'yomu-b1-page-2.jpg',
       );
       expect(
         formatSavedPageFileName(
@@ -220,7 +220,7 @@ void main() {
           pages: const <int>[3, 2],
           extension: 'png',
         ),
-        'komganative-book_01_a-pages-2-3.png',
+        'yomu-book_01_a-pages-2-3.png',
       );
     });
   });

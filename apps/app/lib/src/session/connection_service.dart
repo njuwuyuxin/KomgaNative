@@ -35,7 +35,7 @@ abstract interface class ConnectionService {
 }
 
 class LiveConnectionService implements ConnectionService {
-  LiveConnectionService({this.deviceLabel = 'KomgaNative'});
+  LiveConnectionService({this.deviceLabel = 'Yomu'});
 
   /// 写进 API Key 的 comment，方便用户在 Komga 后台识别并随时吊销。
   final String deviceLabel;

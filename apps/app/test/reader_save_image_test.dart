@@ -87,7 +87,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(saver.saved, hasLength(1));
-    expect(saver.saved.single.fileName, 'komganative-b1-page-2.png');
+    expect(saver.saved.single.fileName, 'yomu-b1-page-2.png');
     expect(saver.saved.single.mimeType, 'image/png');
     expect(saver.saved.single.bytes, expectedPage2);
     expect(find.text('Image saved'), findsOneWidget);
@@ -108,7 +108,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(saver.saved, hasLength(1));
-    expect(saver.saved.single.fileName, 'komganative-b1-page-1.png');
+    expect(saver.saved.single.fileName, 'yomu-b1-page-1.png');
   });
 
   testWidgets('双页模式（封面单独成屏）：只保存封面单张图片，不拼接', (WidgetTester tester) async {
@@ -129,7 +129,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(saver.saved, hasLength(1));
-    expect(saver.saved.single.fileName, 'komganative-b1-page-1.png');
+    expect(saver.saved.single.fileName, 'yomu-b1-page-1.png');
     expect(saver.saved.single.bytes, await repository.pageImage('b1', 1));
   });
 
@@ -181,7 +181,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(saver.saved, hasLength(1));
-    expect(saver.saved.single.fileName, 'komganative-b1-pages-2-3.png');
+    expect(saver.saved.single.fileName, 'yomu-b1-pages-2-3.png');
     expect(saver.saved.single.mimeType, 'image/png');
     final ltrInfo = await inspectPng(tester, saver.saved.single.bytes);
     expect(ltrInfo.width, 90);
@@ -206,7 +206,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(saver.saved, hasLength(1));
-    expect(saver.saved.single.fileName, 'komganative-b1-pages-2-3.png');
+    expect(saver.saved.single.fileName, 'yomu-b1-pages-2-3.png');
     final rtlInfo = await inspectPng(tester, saver.saved.single.bytes);
     expect(rtlInfo.width, 90);
     expect(rtlInfo.height, 60);

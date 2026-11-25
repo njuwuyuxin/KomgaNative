@@ -16,6 +16,8 @@ import 'package:komga_native/src/providers/progress_providers.dart';
 import 'package:komga_native/src/providers/reader_providers.dart';
 import 'package:komga_native/src/providers/settings_provider.dart';
 import 'package:komga_native/src/screens/settings_screen.dart';
+import 'package:komga_native/src/screens/splash_screen.dart';
+import 'package:komga_native/src/session/connection_service.dart';
 import 'package:komga_native/src/session/server_store.dart';
 import 'package:komga_native/src/session/session_controller.dart';
 import 'package:material_ui/material_ui.dart';
@@ -136,5 +138,30 @@ void main() {
     }
     expect(appLanguageFromCode('en'), AppLanguage.en);
     expect(appLanguageFromCode('zh'), AppLanguage.zh);
+  });
+
+  testWidgets('客户端品牌名称统一显示为 Yomu（启动过渡页、开源许可页、API Key 标签）', (
+    WidgetTester tester,
+  ) async {
+    expect(LiveConnectionService().deviceLabel, 'Yomu');
+
+    await tester.pumpWidget(
+      MaterialApp(theme: AppTheme.light(), home: const SplashScreen()),
+    );
+    expect(find.text('Yomu'), findsOneWidget);
+
+    final db = HttpCacheDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    await pumpSettings(tester, const Locale('zh'), db);
+    final licensesTile = find.byKey(const Key('settings-licenses'));
+    await tester.scrollUntilVisible(
+      licensesTile,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(licensesTile);
+    await tester.pumpAndSettle();
+    expect(find.text('Yomu'), findsWidgets);
   });
 }

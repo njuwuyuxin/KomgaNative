@@ -11,15 +11,15 @@ import java.io.File
 import java.io.IOException
 
 /**
- * 把漫画单页或双页拼接图写入系统默认图片存储位置（`Pictures/KomgaNative`）。
+ * 把漫画单页或双页拼接图写入系统默认图片存储位置（`Pictures/Yomu`）。
  *
  * - Android 10+（API 29+）：走分区存储 `MediaStore.Images`，无需任何存储运行时权限，
  *   写入期间置 `IS_PENDING = 1`，写完再揭晓，异常时回滚删除孤儿记录；
- * - Android 7–9（API 24–28，部分老墨水屏阅读器）：写入公开 `Pictures/KomgaNative` 目录，
+ * - Android 7–9（API 24–28，部分老墨水屏阅读器）：写入公开 `Pictures/Yomu` 目录，
  *   并主动触发 `MediaScannerConnection` 刷新系统相册索引。
  */
 internal object ImageStoreSaver {
-    private const val SUBFOLDER = "KomgaNative"
+    private const val SUBFOLDER = "Yomu"
 
     fun save(
         context: Context,
@@ -27,7 +27,7 @@ internal object ImageStoreSaver {
         rawFileName: String,
         mimeType: String,
     ): String {
-        val safeName = File(rawFileName).name.ifBlank { "komganative-page.png" }
+        val safeName = File(rawFileName).name.ifBlank { "yomu-page.png" }
         val safeMime = mimeType.ifBlank { "image/png" }
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             saveViaMediaStore(context, bytes, safeName, safeMime)

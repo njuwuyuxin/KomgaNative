@@ -22,16 +22,14 @@ void main() {
         });
 
     final bytes = Uint8List.fromList(<int>[1, 2, 3, 4]);
-    final result = await ChannelImageSaver(channel: channel).saveImage(
-      bytes,
-      fileName: 'komganative-b1-page-1.png',
-      mimeType: 'image/png',
-    );
+    final result = await ChannelImageSaver(
+      channel: channel,
+    ).saveImage(bytes, fileName: 'yomu-b1-page-1.png', mimeType: 'image/png');
 
     expect(captured?.method, 'saveImage');
     final args = captured?.arguments as Map<Object?, Object?>;
     expect(args['bytes'], bytes);
-    expect(args['fileName'], 'komganative-b1-page-1.png');
+    expect(args['fileName'], 'yomu-b1-page-1.png');
     expect(args['mimeType'], 'image/png');
     expect(result, isA<ImageSaveSuccess>());
     expect(

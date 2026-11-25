@@ -131,7 +131,7 @@
   - **单页 / 纵向连续 / 双页下的单独页（封面或跨页宽图）**：直接保存该页原始字节，按文件头魔数识别真实扩展名与 MIME（PNG / JPEG / WebP / GIF / AVIF），零二次编码损耗；
   - **双页并排跨页**：按屏幕实际的左右视觉顺序（`resolveSavePages` 复用 `visualOrder`，因此日漫 RTL 自动左放后一页、右放前一页）并发取两页字节，在原生像素尺寸下横向无缝拼接成完整 PNG 大图（两页高度不同时等比对齐到较高侧，超大图按 8192px 纹理安全上限收敛）；
 - 平台落地（`packages/komga_platform` 的 `ImageSaver` / `komganative/device` 通道）：
-  - **Android**：API 29+ 走分区存储 `MediaStore.Images` 写入 `Pictures/KomgaNative`（免存储运行时权限，`IS_PENDING` 原子揭晓，已在模拟器 release 包上实测单页原图 `.jpg` 与双页拼接 `.png` 落盘）；API 24–28 动态校验 `WRITE_EXTERNAL_STORAGE`（`maxSdkVersion="28"`）后写入公开 `Pictures/KomgaNative` 并触发 `MediaScannerConnection`；
+  - **Android**：API 29+ 走分区存储 `MediaStore.Images` 写入 `Pictures/Yomu`（免存储运行时权限，`IS_PENDING` 原子揭晓，已在模拟器 release 包上实测单页原图 `.jpg` 与双页拼接 `.png` 落盘）；API 24–28 动态校验 `WRITE_EXTERNAL_STORAGE`（`maxSdkVersion="28"`）后写入公开 `Pictures/Yomu` 并触发 `MediaScannerConnection`；
   - **iOS**：通过 `PHPhotoLibrary.requestAuthorization(for: .addOnly)`（只写不读，配 `NSPhotoLibraryAddUsageDescription`）写入系统相册（CI 编译覆盖，待 iOS 真机走查）；
 - 保存成功给轻触感与 SnackBar 提示，权限拒绝或取图/写入失败弹对应提示，不打断阅读。
 

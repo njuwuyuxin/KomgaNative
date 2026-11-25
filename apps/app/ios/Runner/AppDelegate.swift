@@ -36,9 +36,9 @@ import UIKit
       result(FlutterError(code: "IO_ERROR", message: "Empty image bytes", details: nil))
       return
     }
-    let rawName = (args["fileName"] as? String) ?? "komganative-page.png"
+    let rawName = (args["fileName"] as? String) ?? "yomu-page.png"
     let cleanName = (rawName as NSString).lastPathComponent
-    let fileName = cleanName.isEmpty ? "komganative-page.png" : cleanName
+    let fileName = cleanName.isEmpty ? "yomu-page.png" : cleanName
     let imageData = typedBytes.data
 
     PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in

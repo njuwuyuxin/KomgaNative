@@ -147,7 +147,7 @@ mixin _ReaderActions on ConsumerState<ReaderScreen>, _ReaderDerive {
           .pageImage(widget.bookId, page);
       await sharePageImage(
         bytes,
-        fileName: 'komganative-${widget.bookId}-page-$page.png',
+        fileName: 'yomu-${widget.bookId}-page-$page.png',
       );
     } on ShelfFailure catch (failure) {
       _showReaderToast(failure.message);

@@ -21,7 +21,7 @@ final class ImageSaveFailure extends ImageSaveResult {
   final String? message;
 }
 
-/// 将图片字节直接写入设备默认图片存储位置（Android 系统相册 `Pictures/KomgaNative`，
+/// 将图片字节直接写入设备默认图片存储位置（Android 系统相册 `Pictures/Yomu`，
 /// iOS 系统相册 `Photos`）。
 abstract interface class ImageSaver {
   Future<ImageSaveResult> saveImage(

@@ -93,7 +93,7 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: <Widget>[
-                    Text('KomgaNative', style: theme.textTheme.headlineMedium),
+                    Text('Yomu', style: theme.textTheme.headlineMedium),
                     const SizedBox(height: AppSpacing.xs),
                     Text(
                       l10n.connectSubtitle,
