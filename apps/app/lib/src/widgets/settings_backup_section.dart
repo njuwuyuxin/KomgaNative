@@ -108,9 +108,18 @@ class SettingsBackupSection extends ConsumerWidget {
       ref.invalidate(downloadPolicyProvider);
       if (context.mounted) _toast(context, l10n.settingsImportDone);
     } on PrefsBackupException catch (error) {
-      if (context.mounted) _toast(context, error.message);
+      if (context.mounted) _toast(context, _backupErrorText(l10n, error));
     }
   }
+
+  String _backupErrorText(AppLocalizations l10n, PrefsBackupException error) =>
+      switch (error.kind) {
+        PrefsBackupErrorKind.invalidJson => l10n.backupErrorInvalidJson,
+        PrefsBackupErrorKind.invalidFormat => l10n.backupErrorInvalidFormat,
+        PrefsBackupErrorKind.unsupportedVersion =>
+          l10n.backupErrorUnsupportedVersion(error.version ?? 0),
+        PrefsBackupErrorKind.invalidPrefs => l10n.backupErrorInvalidPrefs,
+      };
 
   void _toast(BuildContext context, String message) {
     ScaffoldMessenger.of(context)

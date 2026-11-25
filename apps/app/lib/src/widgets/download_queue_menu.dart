@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_design_system/komga_design_system.dart';
+import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/providers/download_providers.dart';
 import 'package:material_ui/material_ui.dart';
@@ -97,8 +98,14 @@ class QueueMenu extends ConsumerWidget {
     final records = ref.read(downloadedBooksProvider).value ?? const [];
     final controller = ref.read(downloadsProvider.notifier);
     for (final record in records) {
-      final book = await ref.read(bookByIdProvider(record.bookId).future);
-      if (book != null) await controller.delete(book);
+      await controller.delete(
+        Book(
+          id: record.bookId,
+          seriesId: record.seriesId,
+          name: record.bookName.isEmpty ? record.bookId : record.bookName,
+          pagesCount: record.pageCount,
+        ),
+      );
     }
   }
 }

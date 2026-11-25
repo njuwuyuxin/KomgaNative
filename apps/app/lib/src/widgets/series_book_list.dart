@@ -1,7 +1,7 @@
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/data/shelf_failure.dart';
+import 'package:komga_native/src/l10n/failure_text.dart';
 import 'package:komga_native/src/widgets/series_book_row.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -214,12 +214,12 @@ class _SeriesBooksError extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final message = failure is ShelfFailure ? failure as ShelfFailure : null;
+    final kind = failureKindOf(failure);
     return StatusView(
       key: const Key('series-error'),
       icon: Icons.cloud_off_outlined,
-      title: message?.message ?? const UnexpectedFailure('').message,
-      message: message?.hint,
+      title: l10n.failureTitle(kind),
+      message: l10n.failureHint(kind),
       actionLabel: l10n.retry,
       onAction: onRetry,
     );

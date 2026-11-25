@@ -16,6 +16,7 @@ class FakeCache implements HttpCache {
   final bool failOnRead;
 
   final Map<String, Uint8List> entries = <String, Uint8List>{};
+  final Set<String> pinnedKeys = <String>{};
   final List<String> reads = <String>[];
   final List<String> writes = <String>[];
   CacheKind? lastKind;
@@ -29,6 +30,15 @@ class FakeCache implements HttpCache {
     reads.add(_key(scope, url));
     if (failOnRead) throw StateError('模拟磁盘读失败');
     return entries[_key(scope, url)];
+  }
+
+  @override
+  Future<Uint8List?> readPinned(String scope, String url) async {
+    final key = _key(scope, url);
+    if (!pinnedKeys.contains(key)) return null;
+    reads.add(key);
+    if (failOnRead) throw StateError('模拟磁盘读失败');
+    return entries[key];
   }
 
   @override
@@ -240,6 +250,30 @@ void main() {
       expect(cache.writes, hasLength(2));
       expect(cache.writes[0], endsWith('/pages/1?zero_based=false'));
       expect(cache.writes[1], endsWith('/pages/2?zero_based=false'));
+    });
+
+    test('已整本下载（pinned）的页图直接命中本地缓存，不发网络请求', () async {
+      const body = <int>[9, 8, 7, 6];
+      final cache = FakeCache();
+      final url = KomgaUrls(address.baseUrl).pageImage('book1', 1);
+      final key = '${address.baseUrl}|$url';
+      cache.entries[key] = Uint8List.fromList(body);
+      cache.pinnedKeys.add(key);
+
+      var networkCalls = 0;
+      final session = sessionWith(
+        dio(
+          FakeAdapter((_) async {
+            networkCalls++;
+            return bytesResponse(<int>[0]);
+          }),
+        ),
+        cache: cache,
+      );
+
+      final result = await session.fetchPageImage('book1', 1);
+      expect(result, body);
+      expect(networkCalls, 0, reason: 'pinned 页图应走 Cache-First 零流量');
     });
   });
 

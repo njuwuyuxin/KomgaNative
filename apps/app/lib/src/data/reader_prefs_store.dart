@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
+import 'package:komga_native/src/data/secure_storage.dart';
 
 /// 阅读偏好的持久化。
 ///
@@ -17,7 +18,7 @@ abstract interface class ReaderPrefsStore {
 /// 真机实现：与 API Key 分开一个 key，互不影响。
 class SecureReaderPrefsStore implements ReaderPrefsStore {
   SecureReaderPrefsStore({FlutterSecureStorage? storage})
-    : _storage = storage ?? const FlutterSecureStorage();
+    : _storage = storage ?? createAppSecureStorage();
 
   static const String _key = 'komganative.reader.v1';
 
@@ -25,7 +26,17 @@ class SecureReaderPrefsStore implements ReaderPrefsStore {
 
   @override
   Future<ReaderPrefs?> load() async {
-    final raw = await _storage.read(key: _key);
+    final String? raw;
+    try {
+      raw = await _storage.read(key: _key);
+    } on Object {
+      try {
+        await _storage.delete(key: _key);
+      } on Object {
+        // 清理失败不阻断阅读器回退默认偏好。
+      }
+      return null;
+    }
     if (raw == null || raw.isEmpty) return null;
     try {
       final decoded = jsonDecode(raw);

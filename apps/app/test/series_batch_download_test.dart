@@ -112,6 +112,7 @@ class _BatchDownloadService implements DownloadService {
           scope: '',
           bookId: bookId,
           seriesId: 's1',
+          bookName: bookId,
           pageCount: 3,
           bytes: 100,
           savedAt: DateTime.utc(2026, 1, 1),

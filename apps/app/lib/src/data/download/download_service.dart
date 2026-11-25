@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:komga_api/komga_api.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/cache/http_cache_database.dart';
 
@@ -39,10 +40,12 @@ class KomgaDownloadService implements DownloadService {
     required this.pageImage,
     required this.db,
     required this.scope,
+    this.bookMeta,
   });
 
   final Future<List<PageInfo>> Function(String bookId) pages;
   final Future<Uint8List> Function(String bookId, int page) pageImage;
+  final Future<void> Function(String bookId)? bookMeta;
   final HttpCacheDatabase db;
   final String scope;
 
@@ -61,16 +64,30 @@ class KomgaDownloadService implements DownloadService {
 
     final list = await pages(book.id);
     if (list.isEmpty) return false;
+    // 顺手预热书元信息 JSON（失败不阻断下载），确保离线可直接打开书与阅读器。
+    if (bookMeta != null) {
+      try {
+        await bookMeta!(book.id);
+      } on Object {
+        // 仅作离线元信息预热，失败不影响页图下载。
+      }
+    }
 
     _cancelFlags[book.id] = false;
     var progress = DownloadProgress(done: 0, total: list.length);
     var bytes = 0;
     var completed = false;
+    final urls = scope.isEmpty ? null : KomgaUrls(scope);
     try {
+      await db.setBookPagesPinned(scope: scope, bookId: book.id, pinned: true);
       onProgress(progress);
       for (final page in list) {
         if (_cancelFlags[book.id] ?? false) return false;
-        final data = await pageImage(book.id, page.number);
+        // 断点续传：本地已缓存该页图时直接复用并钉住，避免取消/失败重试重复下载。
+        final cached = urls == null
+            ? null
+            : await db.read(scope, urls.pageImage(book.id, page.number));
+        final data = cached?.body ?? await pageImage(book.id, page.number);
         // 逐页立即钉住：即使单书总大小超过被动 LRU 预算，后续页也不会把前面的页挤掉。
         await db.setBookPagesPinned(
           scope: scope,
@@ -85,6 +102,7 @@ class KomgaDownloadService implements DownloadService {
         scope: scope,
         bookId: book.id,
         seriesId: book.seriesId,
+        bookName: book.name,
         pageCount: list.length,
         bytes: bytes,
       );

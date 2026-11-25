@@ -145,6 +145,40 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 50));
       expect(service.finished.length, 3);
     });
+
+    test('仅 Wi-Fi 开启且切换为蜂窝时，队列调度自动暂停不消耗流量', () async {
+      final service = _GatedDownloadService();
+      final db = HttpCacheDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      final container = ProviderContainer(
+        overrides: <Override>[
+          downloadServiceProvider.overrideWithValue(service),
+          httpCacheDatabaseProvider.overrideWithValue(db),
+          networkProbeProvider.overrideWithValue(
+            const _FixedProbe(NetworkKind.cellular),
+          ),
+          settingsStoreProvider.overrideWithValue(
+            InMemorySettingsStore(
+              const AppSettings().copyWith(downloadWifiOnly: true),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      container.read(downloadsProvider);
+      await container.read(downloadPolicyProvider.future);
+      await Future<void>.delayed(Duration.zero);
+
+      await container
+          .read(downloadsProvider.notifier)
+          .start(
+            const Book(id: 'b1', seriesId: 's1', name: 'Vol. 1', pagesCount: 3),
+          );
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      expect(service.started, isEmpty, reason: '蜂窝网络下不应拉起下载');
+      expect(container.read(downloadsProvider.notifier).paused, isTrue);
+    });
   });
 }
 

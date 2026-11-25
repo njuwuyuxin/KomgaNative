@@ -37,6 +37,7 @@ class FakeDownloadService implements DownloadService {
       scope: '',
       bookId: book.id,
       seriesId: book.seriesId,
+      bookName: book.name,
       pageCount: 3,
       bytes: 30,
       savedAt: DateTime.utc(2026, 11, 17),

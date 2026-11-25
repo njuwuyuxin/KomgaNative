@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/src/data/progress/progress_store.dart';
@@ -92,6 +94,31 @@ void main() {
         sync.flush(),
       ]);
       expect(uploaded, hasLength(1));
+    });
+
+    test('上一轮 flush 进行中又写入新页 → 自动续跑一轮不漏刷最后一页', () async {
+      final firstGate = Completer<void>();
+      var calls = 0;
+      final sync = ProgressSyncService(
+        store: store,
+        upload: (ProgressTarget target) async {
+          calls++;
+          if (calls == 1) await firstGate.future;
+          uploaded.add(target);
+        },
+      );
+
+      await sync.save('b1', page: 2, completed: false);
+      final firstFlush = sync.flush();
+      // 第一轮上传尚未完成时，用户又翻到第 3 页并触发 save + flush。
+      await sync.save('b1', page: 3, completed: false);
+      final secondFlush = sync.flush();
+
+      firstGate.complete();
+      await Future.wait(<Future<void>>[firstFlush, secondFlush]);
+
+      expect(uploaded.map((ProgressTarget t) => t.page), <int>[2, 3]);
+      expect(await store.pending(), isEmpty);
     });
   });
 

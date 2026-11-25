@@ -1,4 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:komga_domain/komga_domain.dart';
+import 'package:komga_native/src/providers/download_providers.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/providers/pinned_series_provider.dart';
 import 'package:komga_native/src/providers/progress_providers.dart';
@@ -37,9 +39,15 @@ class ReaderProgressCommitter {
     required Future<bool> Function() flushProgress,
     required String bookId,
     String? seriesId,
+    Book? completedBook,
   }) async {
     final wrote = await flushProgress();
     if (!wrote || _disposed) return;
+
+    if (completedBook != null) {
+      await _maybeAutoDeleteCompleted(completedBook);
+      if (_disposed) return;
+    }
 
     final sync = _ref.read(progressSyncProvider);
     // 第一阶段：本地 Outbox 已写入，立即刷新支持本地叠加的列表与继续阅读。
@@ -58,6 +66,19 @@ class ReaderProgressCommitter {
     _ref.invalidate(libraryShelfProvider);
     _ref.invalidate(collectionSeriesProvider);
     _ref.read(readStatusEpochProvider.notifier).bump();
+  }
+
+  /// 自然读完最后一页退出时按"读完自动删除"策略清理已下载副本。
+  Future<void> _maybeAutoDeleteCompleted(Book book) async {
+    try {
+      final policy = _ref.read(downloadPolicyProvider).value;
+      if (policy == null || !policy.autoDeleteRead) return;
+      final record = await _ref.read(downloadedProvider(book.id).future);
+      if (record == null || _disposed) return;
+      await _ref.read(downloadsProvider.notifier).delete(book);
+    } on Object {
+      // 自动清理属于增强行为，失败不影响进度结算。
+    }
   }
 }
 

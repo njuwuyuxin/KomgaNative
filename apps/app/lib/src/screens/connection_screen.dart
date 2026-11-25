@@ -1,11 +1,15 @@
-import 'package:material_ui/material_ui.dart';
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/l10n/connection_failure_text.dart';
+import 'package:komga_native/src/session/server_store.dart';
 import 'package:komga_native/src/session/session_controller.dart';
 import 'package:komga_native/src/widgets/certificate_panel.dart';
+import 'package:komga_native/src/widgets/saved_servers_card.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// 首次连接 / 重新连接页。
 ///
@@ -66,16 +70,14 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
     final error = failure == null ? null : l10n.connectionFailureTitle(failure);
     final hint = failure == null ? null : l10n.connectionFailureHint(failure);
     final certificate = disconnected?.certificate;
+    final savedServers =
+        ref.watch(serverListProvider).value ?? const <StoredServer>[];
 
     // HTTP + 公网时提前警告，避免用户把凭据明文发出去。
-    // 注意措辞：端口只开 HTTPS 时我们会自动换协议，但第一次尝试确实带凭据，
-    // 所以警告不能写成"可能会"。
     String? insecureWarning;
     try {
       final address = ServerAddress.parse(_url.text);
-      if (address.isInsecureRemote) {
-        insecureWarning = l10n.insecureWarning;
-      }
+      if (address.isInsecureRemote) insecureWarning = l10n.insecureWarning;
     } on FormatException {
       insecureWarning = null;
     }
@@ -90,152 +92,190 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
                 constraints: const BoxConstraints(
                   maxWidth: AppSizes.formMaxWidth,
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    Text('Yomu', style: theme.textTheme.headlineMedium),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      l10n.connectSubtitle,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xl),
-                    GlassSurface(
-                      shape: AppShapes.of(context, AppShapes.panel),
-                      shadows: AppShadows.card,
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.md),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: <Widget>[
-                            GlassSegmentedControl<_AuthMode>(
-                              segments: <GlassSegment<_AuthMode>>[
-                                GlassSegment<_AuthMode>(
-                                  value: _AuthMode.account,
-                                  label: l10n.account,
-                                  icon: Icons.person_outline,
-                                ),
-                                GlassSegment<_AuthMode>(
-                                  value: _AuthMode.apiKey,
-                                  label: l10n.apiKey,
-                                  icon: Icons.key_outlined,
-                                ),
-                              ],
-                              selected: _mode,
-                              onSelected: (mode) {
-                                if (submitting) return;
-                                setState(() => _mode = mode);
-                              },
-                            ),
-                            const SizedBox(height: AppSpacing.md),
-                            TextField(
-                              controller: _url,
-                              enabled: !submitting,
-                              keyboardType: TextInputType.url,
-                              autocorrect: false,
-                              decoration: InputDecoration(
-                                labelText: l10n.serverAddress,
-                                hintText: l10n.serverAddressHint,
-                                prefixIcon: const Icon(Icons.dns_outlined),
-                              ),
-                            ),
-                            const SizedBox(height: AppSpacing.md),
-                            if (_mode == _AuthMode.account) ...<Widget>[
-                              TextField(
-                                controller: _username,
-                                enabled: !submitting,
-                                autocorrect: false,
-                                decoration: InputDecoration(
-                                  labelText: l10n.email,
-                                  prefixIcon: const Icon(Icons.alternate_email),
-                                ),
-                              ),
-                              const SizedBox(height: AppSpacing.md),
-                              TextField(
-                                controller: _password,
-                                enabled: !submitting,
-                                obscureText: !_showPassword,
-                                decoration: InputDecoration(
-                                  labelText: l10n.password,
-                                  prefixIcon: const Icon(Icons.lock_outline),
-                                  suffixIcon: IconButton(
-                                    onPressed: () => setState(
-                                      () => _showPassword = !_showPassword,
-                                    ),
-                                    icon: Icon(
-                                      _showPassword
-                                          ? Icons.visibility_off
-                                          : Icons.visibility,
-                                    ),
-                                    tooltip: _showPassword
-                                        ? l10n.hidePassword
-                                        : l10n.showPassword,
-                                  ),
-                                ),
-                              ),
-                            ] else
-                              TextField(
-                                controller: _apiKey,
-                                enabled: !submitting,
-                                autocorrect: false,
-                                decoration: InputDecoration(
-                                  labelText: l10n.apiKey,
-                                  hintText: l10n.apiKeyHint,
-                                  prefixIcon: const Icon(Icons.key_outlined),
-                                ),
-                              ),
-                            if (insecureWarning != null) ...<Widget>[
-                              const SizedBox(height: AppSpacing.md),
-                              _Banner(
-                                icon: Icons.warning_amber_outlined,
-                                text: insecureWarning,
-                                background: theme.colorScheme.errorContainer,
-                                foreground: theme.colorScheme.onErrorContainer,
-                              ),
-                            ],
-                            if (certificate != null) ...<Widget>[
-                              const SizedBox(height: AppSpacing.md),
-                              CertificatePanel(
-                                certificate: certificate,
-                                busy: submitting,
-                                onTrust: () => ref
-                                    .read(sessionProvider.notifier)
-                                    .trustCertificate(),
-                                onCancel: () => ref
-                                    .read(sessionProvider.notifier)
-                                    .cancelCertificatePrompt(),
-                              ),
-                            ] else if (error != null) ...<Widget>[
-                              const SizedBox(height: AppSpacing.md),
-                              _Banner(
-                                icon: Icons.error_outline,
-                                text: hint == null ? error : '$error\n$hint',
-                                background: theme.colorScheme.errorContainer,
-                                foreground: theme.colorScheme.onErrorContainer,
-                              ),
-                            ],
-                            const SizedBox(height: AppSpacing.lg),
-                            GlassPillButton(
-                              expanded: true,
-                              busy: submitting,
-                              icon: Icons.login,
-                              label: l10n.connect,
-                              onPressed: submitting ? null : _submit,
-                            ),
-                          ],
+                child: AutofillGroup(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      Text('Yomu', style: theme.textTheme.headlineMedium),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        l10n.connectSubtitle,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    Text(
-                      l10n.passwordFootnote,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                      const SizedBox(height: AppSpacing.xl),
+                      GlassSurface(
+                        shape: AppShapes.of(context, AppShapes.panel),
+                        shadows: AppShadows.card,
+                        child: Padding(
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: <Widget>[
+                              GlassSegmentedControl<_AuthMode>(
+                                segments: <GlassSegment<_AuthMode>>[
+                                  GlassSegment<_AuthMode>(
+                                    value: _AuthMode.account,
+                                    label: l10n.account,
+                                    icon: Icons.person_outline,
+                                  ),
+                                  GlassSegment<_AuthMode>(
+                                    value: _AuthMode.apiKey,
+                                    label: l10n.apiKey,
+                                    icon: Icons.key_outlined,
+                                  ),
+                                ],
+                                selected: _mode,
+                                onSelected: (mode) {
+                                  if (submitting) return;
+                                  setState(() => _mode = mode);
+                                },
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              TextField(
+                                controller: _url,
+                                enabled: !submitting,
+                                keyboardType: TextInputType.url,
+                                textInputAction: TextInputAction.next,
+                                autofillHints: const <String>[
+                                  AutofillHints.url,
+                                ],
+                                autocorrect: false,
+                                onChanged: (_) => setState(() {}),
+                                decoration: InputDecoration(
+                                  labelText: l10n.serverAddress,
+                                  hintText: l10n.serverAddressHint,
+                                  prefixIcon: const Icon(Icons.dns_outlined),
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              if (_mode == _AuthMode.account) ...<Widget>[
+                                TextField(
+                                  controller: _username,
+                                  enabled: !submitting,
+                                  keyboardType: TextInputType.emailAddress,
+                                  textInputAction: TextInputAction.next,
+                                  autofillHints: const <String>[
+                                    AutofillHints.username,
+                                    AutofillHints.email,
+                                  ],
+                                  autocorrect: false,
+                                  decoration: InputDecoration(
+                                    labelText: l10n.email,
+                                    prefixIcon: const Icon(
+                                      Icons.alternate_email,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: AppSpacing.md),
+                                TextField(
+                                  controller: _password,
+                                  enabled: !submitting,
+                                  obscureText: !_showPassword,
+                                  textInputAction: TextInputAction.done,
+                                  autofillHints: const <String>[
+                                    AutofillHints.password,
+                                  ],
+                                  onSubmitted: (_) {
+                                    if (!submitting) unawaited(_submit());
+                                  },
+                                  decoration: InputDecoration(
+                                    labelText: l10n.password,
+                                    prefixIcon: const Icon(Icons.lock_outline),
+                                    suffixIcon: IconButton(
+                                      onPressed: () => setState(
+                                        () => _showPassword = !_showPassword,
+                                      ),
+                                      icon: Icon(
+                                        _showPassword
+                                            ? Icons.visibility_off
+                                            : Icons.visibility,
+                                      ),
+                                      tooltip: _showPassword
+                                          ? l10n.hidePassword
+                                          : l10n.showPassword,
+                                    ),
+                                  ),
+                                ),
+                              ] else
+                                TextField(
+                                  controller: _apiKey,
+                                  enabled: !submitting,
+                                  textInputAction: TextInputAction.done,
+                                  autocorrect: false,
+                                  onSubmitted: (_) {
+                                    if (!submitting) unawaited(_submit());
+                                  },
+                                  decoration: InputDecoration(
+                                    labelText: l10n.apiKey,
+                                    hintText: l10n.apiKeyHint,
+                                    prefixIcon: const Icon(Icons.key_outlined),
+                                  ),
+                                ),
+                              if (insecureWarning != null) ...<Widget>[
+                                const SizedBox(height: AppSpacing.md),
+                                _Banner(
+                                  icon: Icons.warning_amber_outlined,
+                                  text: insecureWarning,
+                                  background: theme.colorScheme.errorContainer,
+                                  foreground:
+                                      theme.colorScheme.onErrorContainer,
+                                ),
+                              ],
+                              if (certificate != null) ...<Widget>[
+                                const SizedBox(height: AppSpacing.md),
+                                CertificatePanel(
+                                  certificate: certificate,
+                                  busy: submitting,
+                                  onTrust: () => ref
+                                      .read(sessionProvider.notifier)
+                                      .trustCertificate(),
+                                  onCancel: () => ref
+                                      .read(sessionProvider.notifier)
+                                      .cancelCertificatePrompt(),
+                                ),
+                              ] else if (error != null) ...<Widget>[
+                                const SizedBox(height: AppSpacing.md),
+                                _Banner(
+                                  icon: Icons.error_outline,
+                                  text: hint == null ? error : '$error\n$hint',
+                                  background: theme.colorScheme.errorContainer,
+                                  foreground:
+                                      theme.colorScheme.onErrorContainer,
+                                ),
+                              ],
+                              const SizedBox(height: AppSpacing.lg),
+                              GlassPillButton(
+                                expanded: true,
+                                busy: submitting,
+                                icon: Icons.login,
+                                label: l10n.connect,
+                                onPressed: submitting ? null : _submit,
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                      if (savedServers.isNotEmpty) ...<Widget>[
+                        const SizedBox(height: AppSpacing.lg),
+                        SavedServersCard(
+                          servers: savedServers,
+                          enabled: !submitting,
+                          onSelect: (StoredServer server) => unawaited(
+                            ref.read(sessionProvider.notifier).switchTo(server),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: AppSpacing.md),
+                      Text(
+                        l10n.passwordFootnote,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),

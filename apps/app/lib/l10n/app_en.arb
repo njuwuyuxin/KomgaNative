@@ -642,5 +642,15 @@
   "connProtocolTitle": "Unexpected server response",
   "connProtocolHint": "Make sure this address points to Komga and is not rewritten by a reverse proxy.",
   "connUnexpectedTitle": "Connection failed",
-  "connUnexpectedHint": "Check your settings and try again."
+  "connUnexpectedHint": "Check your settings and try again.",
+  "savedServers": "Saved servers",
+  "backupErrorInvalidJson": "Backup content is not valid JSON.",
+  "backupErrorInvalidFormat": "Backup file structure is invalid or incomplete.",
+  "backupErrorUnsupportedVersion": "Backup version {version} is not compatible with this app.",
+  "@backupErrorUnsupportedVersion": {
+    "placeholders": {
+      "version": {"type": "int"}
+    }
+  },
+  "backupErrorInvalidPrefs": "Could not parse the settings inside this backup."
 }

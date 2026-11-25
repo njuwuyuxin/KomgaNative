@@ -21,6 +21,12 @@ class DriftHttpCache implements HttpCache {
   }
 
   @override
+  Future<Uint8List?> readPinned(String scope, String url) async {
+    final row = await _db.readPinned(scope, url);
+    return row?.body;
+  }
+
+  @override
   Future<void> write(
     String scope,
     String url,

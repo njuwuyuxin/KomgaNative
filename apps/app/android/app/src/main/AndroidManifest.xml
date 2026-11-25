@@ -11,6 +11,7 @@
         android:label="Yomu"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
         android:usesCleartextTraffic="true">
         <!-- 自建 Komga 绝大多数是局域网 http://（NAS 直接开端口）。
              Android 9+ 默认禁止明文，不放行的话用户连 NAS 会直接失败。

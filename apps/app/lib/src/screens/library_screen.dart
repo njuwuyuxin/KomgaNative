@@ -7,6 +7,7 @@ import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/data/shelf_view_options.dart';
+import 'package:komga_native/src/l10n/failure_text.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/providers/pinned_series_provider.dart';
 import 'package:komga_native/src/providers/shelf_selection_provider.dart';

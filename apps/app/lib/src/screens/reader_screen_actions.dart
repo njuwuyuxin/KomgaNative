@@ -66,11 +66,18 @@ mixin _ReaderActions on ConsumerState<ReaderScreen>, _ReaderDerive {
     if (_settledLeave) return;
     _settledLeave = true;
     final seriesId = _seriesId;
+    final exitPage = _exitProgressPage();
+    final isCompleted =
+        !_incognito &&
+        exitPage != null &&
+        (_lastLayout?.isCompletedAt(exitPage) ?? false);
+    final completedBook = isCompleted ? (_lastBook ?? widget.book) : null;
     unawaited(
       _committer.settle(
         flushProgress: _flushProgressForLeave,
         bookId: widget.bookId,
         seriesId: seriesId,
+        completedBook: completedBook,
       ),
     );
   }
@@ -125,7 +132,11 @@ mixin _ReaderActions on ConsumerState<ReaderScreen>, _ReaderDerive {
           _showReaderToast(l10n.savePageImageFailed);
       }
     } on ShelfFailure catch (failure) {
-      _showReaderToast(failure.message);
+      if (mounted) {
+        _showReaderToast(
+          AppLocalizations.of(context).failureTitle(failure.kind),
+        );
+      }
     } on FormatException {
       if (mounted) {
         _showReaderToast(AppLocalizations.of(context).savePageImageFailed);
@@ -150,7 +161,11 @@ mixin _ReaderActions on ConsumerState<ReaderScreen>, _ReaderDerive {
         fileName: 'yomu-${widget.bookId}-page-$page.png',
       );
     } on ShelfFailure catch (failure) {
-      _showReaderToast(failure.message);
+      if (mounted) {
+        _showReaderToast(
+          AppLocalizations.of(context).failureTitle(failure.kind),
+        );
+      }
     } on PlatformException {
       if (mounted) {
         _showReaderToast(AppLocalizations.of(context).sharePageFailed);

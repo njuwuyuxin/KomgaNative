@@ -33,10 +33,9 @@ class SystemNetworkProbe implements NetworkProbe {
   @override
   Future<NetworkKind> current() async {
     try {
-      final interfaces = await NetworkInterface.list(
-        includeLinkLocal: false,
-        type: InternetAddressType.IPv4,
-      );
+      // 同时枚举 IPv4 与 IPv6：现代 4G/5G 运营商常提供纯 IPv6 蜂窝接口，
+      // 仅查 IPv4 会把蜂窝网络误判为 unknown 从而绕过"仅 Wi-Fi 下载"。
+      final interfaces = await NetworkInterface.list(includeLinkLocal: false);
       var cellular = false;
       for (final item in interfaces) {
         final name = item.name.toLowerCase();

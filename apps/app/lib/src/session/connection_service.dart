@@ -57,11 +57,17 @@ class LiveConnectionService implements ConnectionService {
       // 先用一次真实请求验凭据（同时拿到库列表，省一次往返）。
       final libraries = await basic.fetchLibraries();
       final key = await basic.createApiKey(comment: deviceLabel);
-      final account = await KomgaSession.withApiKey(
+      final apiKeySession = KomgaSession.withApiKey(
         address: address,
         apiKey: key,
         trust: trust,
-      ).fetchAccount();
+      );
+      final Account account;
+      try {
+        account = await apiKeySession.fetchAccount();
+      } finally {
+        apiKeySession.close();
+      }
       return ConnectionOutcome(
         server: StoredServer(
           address: address,

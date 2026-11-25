@@ -59,9 +59,14 @@ extension HttpCacheDownloadsDao on HttpCacheDatabase {
     required String bookId,
     required bool pinned,
   }) {
-    final fragment = '/books/$bookId/pages/';
-    return (update(cachedResponses)
-          ..where((t) => t.scope.equals(scope) & t.url.contains(fragment)))
+    final pageFragment = '/books/$bookId/pages/';
+    return (update(cachedResponses)..where(
+          (t) =>
+              t.scope.equals(scope) &
+              (t.url.contains(pageFragment) |
+                  t.url.like('%/books/$bookId/pages') |
+                  t.url.like('%/books/$bookId')),
+        ))
         .write(CachedResponsesCompanion(pinned: Value<bool>(pinned)));
   }
 
@@ -69,6 +74,7 @@ extension HttpCacheDownloadsDao on HttpCacheDatabase {
     String scope = '',
     required String bookId,
     required String seriesId,
+    String bookName = '',
     required int pageCount,
     required int bytes,
   }) async {
@@ -78,6 +84,7 @@ extension HttpCacheDownloadsDao on HttpCacheDatabase {
         scope: Value<String>(scope),
         bookId: bookId,
         seriesId: seriesId,
+        bookName: Value<String>(bookName),
         pageCount: pageCount,
         bytes: bytes,
         savedAt: _now(),
@@ -181,7 +188,9 @@ extension HttpCacheDownloadsDao on HttpCacheDatabase {
   Future<int> deleteCachedPages({
     required String scope,
     required String bookId,
-  }) {
+  }) async {
+    // 解除元数据 JSON（book / pages）的保护标记，让它们回归普通被动缓存策略。
+    await setBookPagesPinned(scope: scope, bookId: bookId, pinned: false);
     final fragment = '/books/$bookId/pages/';
     return (delete(
       cachedResponses,

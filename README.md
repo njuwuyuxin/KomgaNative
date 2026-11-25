@@ -56,11 +56,13 @@
 
 ### 1. 获取安装包
 
-目前可通过本仓库的 [GitHub Actions](https://github.com/njuwuyuxin/Yomu/actions) 获取每次构建产物（Artifact 保留 14 天，下载需登录 GitHub 账号）：
+- **正式发布包（推荐）**：前往 [GitHub Releases](https://github.com/njuwuyuxin/Yomu/releases) 下载正式签名的 Android APK（含 `arm64-v8a`、`armeabi-v7a`、`x86_64` 与 `universal` 及 `SHA256SUMS.txt`）。
+- **日常开发构建**：也可通过 [GitHub Actions](https://github.com/njuwuyuxin/Yomu/actions) 获取每次提交的构建产物（Artifact 保留 14 天，下载需登录 GitHub 账号）：
 
 | 平台 | 流水线 | 产物说明 |
 |---|---|---|
-| **Android** | `Android` (`build-android.yml`) | `komga-native-apk`：可直接在 Android 设备安装的 `app-release.apk`（debug 签名） |
+| **Android** | `Release` (`release.yml`) | GitHub Releases 正式签名 APK（按 ABI 拆分 + 通用包） |
+| **Android（开发）** | `Android` (`build-android.yml`) | `komga-native-apk`：每日开发版 `app-release.apk`（debug 签名） |
 | **iOS** | `iOS` (`build-ios.yml`) | `komga-native-ios-unsigned`：未签名 `Runner.app.zip`（真机安装需通过 Xcode 自行签名） |
 
 ### 2. 连接到你的 Komga 服务器
@@ -149,3 +151,9 @@ Yomu/
 ```
 
 依赖边界：`apps/app → (design_system, platform, api, engines, domain)`，`engines → domain`，`domain → 无`。
+
+---
+
+## 开源协议
+
+本项目基于 [MIT License](LICENSE) 开源。

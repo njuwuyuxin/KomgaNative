@@ -55,6 +55,13 @@ final Provider<DownloadService> downloadServiceProvider =
             throw shelfFailureOf(error);
           }
         },
+        bookMeta: (String bookId) async {
+          try {
+            await komga.fetchBook(bookId);
+          } on KomgaError {
+            // 元信息预热失败不阻断页图下载。
+          }
+        },
         db: ref.watch(httpCacheDatabaseProvider),
         scope: komga.address.baseUrl,
       );

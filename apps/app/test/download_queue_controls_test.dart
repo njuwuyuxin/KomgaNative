@@ -83,7 +83,7 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 30));
     expect(service.finished, isEmpty);
     expect(
-      container.read(downloadsProvider)['b1']?.error,
+      container.read(downloadsProvider)['b1']?.errorKind,
       isNotNull,
       reason: '失败要留在列表里，否则没东西可重试',
     );

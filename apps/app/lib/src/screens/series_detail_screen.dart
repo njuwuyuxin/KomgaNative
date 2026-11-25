@@ -49,6 +49,16 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
   BooksSort? _sort;
   SeriesReadStatus? _readStatus;
 
+  @override
+  void didUpdateWidget(SeriesDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.seriesId != widget.seriesId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) ref.read(bookSelectionProvider.notifier).exit();
+      });
+    }
+  }
+
   SeriesBooksQuery get _booksQuery =>
       (seriesId: seriesId, sort: _sort, readStatus: _readStatus);
 
@@ -192,115 +202,123 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
         MediaQuery.paddingOf(context).top + AppSizes.glassHeaderClearance;
     final offlineBanner = OfflineBanner(onRetry: () => unawaited(_refresh()));
 
-    return EdgeSwipeBack(
-      child: Scaffold(
-        extendBodyBehindAppBar: true,
-        persistentFooterButtons: selection.active
-            ? <Widget>[
-                ShelfBatchBar(
-                  count: selection.ids.length,
-                  busy: _batchBusy,
-                  onMarkRead: () => _markSelectedBooks(read: true),
-                  onMarkUnread: () => _markSelectedBooks(read: false),
-                  extraLabel: l10n.batchAddToReadList,
-                  extraIcon: Icons.playlist_add,
-                  extraKey: const Key('books-batch-readlist'),
-                  onExtraAction: _addSelectedBooksToReadList,
-                ),
-              ]
-            : null,
-        appBar: GlassTopBar(
-          header: GlassHeader(
-            leading: GlassIconButton(
-              icon: Icons.chevron_left,
-              label: MaterialLocalizations.of(context).backButtonTooltip,
-              onPressed: () => context.pop(),
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                GlassIconButton(
-                  key: const Key('series-collection-button'),
-                  icon: inCollection
-                      ? Icons.collections_bookmark
-                      : Icons.collections_bookmark_outlined,
-                  label: l10n.addToCollection,
-                  onPressed: () => unawaited(_openCollectionsPicker()),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                SeriesDownloadMenu(
-                  seriesId: seriesId,
-                  books: page?.items ?? const <Book>[],
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                GlassMenuButton(
-                  key: const Key('series-mark-menu'),
-                  orb: true,
-                  icon: Icons.more_horiz,
-                  label: l10n.moreActions,
-                  menuChildren: <Widget>[
-                    GlassMenuItemButton(
-                      key: const Key('series-add-to-collection'),
-                      label: l10n.addToCollection,
-                      onPressed: () => unawaited(_openCollectionsPicker()),
-                    ),
-                    GlassMenuItemButton(
-                      key: const Key('series-mark-read'),
-                      label: l10n.markAllRead,
-                      onPressed: () => unawaited(_markSeriesRead(read: true)),
-                    ),
-                    GlassMenuItemButton(
-                      key: const Key('series-mark-unread'),
-                      label: l10n.markAllUnread,
-                      onPressed: () => unawaited(_markSeriesRead(read: false)),
-                    ),
-                  ],
-                ),
-              ],
+    return PopScope(
+      onPopInvokedWithResult: (bool didPop, Object? _) {
+        if (didPop && ref.read(bookSelectionProvider).active) {
+          ref.read(bookSelectionProvider.notifier).exit();
+        }
+      },
+      child: EdgeSwipeBack(
+        child: Scaffold(
+          extendBodyBehindAppBar: true,
+          persistentFooterButtons: selection.active
+              ? <Widget>[
+                  ShelfBatchBar(
+                    count: selection.ids.length,
+                    busy: _batchBusy,
+                    onMarkRead: () => _markSelectedBooks(read: true),
+                    onMarkUnread: () => _markSelectedBooks(read: false),
+                    extraLabel: l10n.batchAddToReadList,
+                    extraIcon: Icons.playlist_add,
+                    extraKey: const Key('books-batch-readlist'),
+                    onExtraAction: _addSelectedBooksToReadList,
+                  ),
+                ]
+              : null,
+          appBar: GlassTopBar(
+            header: GlassHeader(
+              leading: GlassIconButton(
+                icon: Icons.chevron_left,
+                label: MaterialLocalizations.of(context).backButtonTooltip,
+                onPressed: () => context.pop(),
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  GlassIconButton(
+                    key: const Key('series-collection-button'),
+                    icon: inCollection
+                        ? Icons.collections_bookmark
+                        : Icons.collections_bookmark_outlined,
+                    label: l10n.addToCollection,
+                    onPressed: () => unawaited(_openCollectionsPicker()),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  SeriesDownloadMenu(
+                    seriesId: seriesId,
+                    books: page?.items ?? const <Book>[],
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  GlassMenuButton(
+                    key: const Key('series-mark-menu'),
+                    orb: true,
+                    icon: Icons.more_horiz,
+                    label: l10n.moreActions,
+                    menuChildren: <Widget>[
+                      GlassMenuItemButton(
+                        key: const Key('series-add-to-collection'),
+                        label: l10n.addToCollection,
+                        onPressed: () => unawaited(_openCollectionsPicker()),
+                      ),
+                      GlassMenuItemButton(
+                        key: const Key('series-mark-read'),
+                        label: l10n.markAllRead,
+                        onPressed: () => unawaited(_markSeriesRead(read: true)),
+                      ),
+                      GlassMenuItemButton(
+                        key: const Key('series-mark-unread'),
+                        label: l10n.markAllUnread,
+                        onPressed: () =>
+                            unawaited(_markSeriesRead(read: false)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
+          body: wide
+              ? SeriesTwoPane(
+                  series: series,
+                  books: page,
+                  failure: failure,
+                  metadataLoading: metadataLoading,
+                  seriesId: seriesId,
+                  heroTag: heroTag,
+                  topPadding: topPadding,
+                  offlineBanner: offlineBanner,
+                  onRefresh: _refresh,
+                  onRetry: () => unawaited(_refresh()),
+                  onLoadMore: _loadMore,
+                  onOpenBook: _openBook,
+                  toolbar: toolbar,
+                  filtered: filtered,
+                  selected: selection.ids,
+                  selecting: selection.active,
+                  onToggleSelect: selecting.toggle,
+                  onMarkManyBooks: _markManyBooks,
+                )
+              : SeriesSinglePane(
+                  series: series,
+                  books: page,
+                  failure: failure,
+                  metadataLoading: metadataLoading,
+                  seriesId: seriesId,
+                  heroTag: heroTag,
+                  topPadding: topPadding,
+                  offlineBanner: offlineBanner,
+                  onRefresh: _refresh,
+                  onRetry: () => unawaited(_refresh()),
+                  onLoadMore: _loadMore,
+                  onOpenBook: _openBook,
+                  toolbar: toolbar,
+                  filtered: filtered,
+                  selected: selection.ids,
+                  selecting: selection.active,
+                  onToggleSelect: selecting.toggle,
+                  onMarkManyBooks: _markManyBooks,
+                ),
         ),
-        body: wide
-            ? SeriesTwoPane(
-                series: series,
-                books: page,
-                failure: failure,
-                metadataLoading: metadataLoading,
-                seriesId: seriesId,
-                heroTag: heroTag,
-                topPadding: topPadding,
-                offlineBanner: offlineBanner,
-                onRefresh: _refresh,
-                onRetry: () => unawaited(_refresh()),
-                onLoadMore: _loadMore,
-                onOpenBook: _openBook,
-                toolbar: toolbar,
-                filtered: filtered,
-                selected: selection.ids,
-                selecting: selection.active,
-                onToggleSelect: selecting.toggle,
-                onMarkManyBooks: _markManyBooks,
-              )
-            : SeriesSinglePane(
-                series: series,
-                books: page,
-                failure: failure,
-                metadataLoading: metadataLoading,
-                seriesId: seriesId,
-                heroTag: heroTag,
-                topPadding: topPadding,
-                offlineBanner: offlineBanner,
-                onRefresh: _refresh,
-                onRetry: () => unawaited(_refresh()),
-                onLoadMore: _loadMore,
-                onOpenBook: _openBook,
-                toolbar: toolbar,
-                filtered: filtered,
-                selected: selection.ids,
-                selecting: selection.active,
-                onToggleSelect: selecting.toggle,
-                onMarkManyBooks: _markManyBooks,
-              ),
       ),
     );
   }

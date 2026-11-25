@@ -218,6 +218,9 @@ class KomgaSession {
   }
 
   Future<Uint8List> _getBytes(String url) async {
+    // 整本下载受保护的页图直接命中本地缓存（Cache-First），在线阅读零重复流量。
+    final pinned = await _pinnedBytes(url);
+    if (pinned != null) return pinned;
     try {
       final response = await _dio.get<Object?>(
         url,
@@ -238,6 +241,16 @@ class KomgaSession {
       final cached = await _cachedBytes(url, error);
       if (cached != null) return cached;
       throw error;
+    }
+  }
+
+  Future<Uint8List?> _pinnedBytes(String url) async {
+    final cache = _cache;
+    if (cache == null) return null;
+    try {
+      return await cache.readPinned(_scope, url);
+    } on Object {
+      return null;
     }
   }
 

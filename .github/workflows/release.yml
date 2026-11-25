@@ -12,8 +12,31 @@ permissions:
   contents: write
 
 jobs:
+  gate:
+    name: Release Gate (format + analyze + layers + tests + goldens)
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.50.0
+          channel: stable
+          cache: true
+
+      - name: Pub get (workspace)
+        working-directory: apps/app
+        run: flutter pub get
+
+      - name: Gate
+        run: dart run tool/ci.dart check
+
   release-android:
     name: Build & Publish Android Release
+    needs: gate
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

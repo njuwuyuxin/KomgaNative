@@ -71,6 +71,33 @@ void main() {
     expect(lower.contains('http'), isFalse);
   });
 
+  test('导出自动剥离所有包含私有服务器 URL 的分区键', () {
+    const serverUrl = 'https://secret.nas.local:25600/komga';
+    final readerWithServer = ReaderPrefs(
+      global: reader.global,
+      spreadFrom: <String, int>{'b1': 3, '$serverUrl|b2': 5},
+      seriesOverrides: <String, ReaderConfig>{
+        '$serverUrl|s1': const ReaderConfig(mode: ReaderModeChoice.vertical),
+      },
+    );
+    final settingsWithServer = settings.withLibraryFilter(serverUrl, 'lib-1');
+
+    final encoded = PrefsBackup.of(
+      reader: readerWithServer,
+      settings: settingsWithServer,
+    ).encode();
+    final lower = encoded.toLowerCase();
+
+    expect(lower.contains('http'), isFalse);
+    expect(lower.contains('secret.nas.local'), isFalse);
+    expect(lower.contains('25600'), isFalse);
+
+    final restored = PrefsBackup.decode(encoded);
+    expect(restored.toReaderPrefs().spreadFrom, <String, int>{'b1': 3});
+    expect(restored.toReaderPrefs().seriesOverrides, isEmpty);
+    expect(restored.toAppSettings().libraryFilters, isEmpty);
+  });
+
   test('坏 JSON：报错而不是静默接受', () {
     expect(
       () => PrefsBackup.decode('{not json'),

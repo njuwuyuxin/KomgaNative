@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:komga_api/komga_api.dart';
 import 'package:komga_domain/komga_domain.dart';
+import 'package:komga_native/src/data/secure_storage.dart';
 
 /// 已保存的服务器会话。
 ///
@@ -113,7 +114,7 @@ abstract interface class ServerStore {
 /// 读到 v1（直接是一个 server 对象）时自动升级，不让老用户掉登录。
 class SecureServerStore implements ServerStore {
   SecureServerStore({FlutterSecureStorage? storage})
-    : _storage = storage ?? const FlutterSecureStorage();
+    : _storage = storage ?? createAppSecureStorage();
 
   static const String _key = 'komganative.server.v1';
 
@@ -156,7 +157,18 @@ class SecureServerStore implements ServerStore {
   }
 
   Future<_ServerState> _read() async {
-    final raw = await _storage.read(key: _key);
+    final String? raw;
+    try {
+      raw = await _storage.read(key: _key);
+    } on Object {
+      // Android 换机/密钥失效时自动清掉坏条目，避免后续重新登录也跟着报错。
+      try {
+        await _storage.delete(key: _key);
+      } on Object {
+        // 清理失败不阻断本次按空状态恢复。
+      }
+      return const _ServerState();
+    }
     if (raw == null || raw.isEmpty) return const _ServerState();
     try {
       final decoded = jsonDecode(raw);

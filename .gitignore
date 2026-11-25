@@ -35,6 +35,7 @@ secrets/
 # 本地 Komga 站点（tool/komga.dart 的默认站点目录）
 .komga/
 tmp-verify/
+.dsh-tmp/
 
 # OS
 Thumbs.db

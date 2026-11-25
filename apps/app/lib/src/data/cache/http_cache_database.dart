@@ -28,7 +28,7 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
   int? _seqSeed;
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -56,8 +56,32 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
           )
         ''');
       }
+      if (from < 8) {
+        await m.addColumn(downloadedBooks, downloadedBooks.bookName);
+        await customStatement('''
+          UPDATE cached_responses
+          SET pinned = 1
+          WHERE EXISTS (
+            SELECT 1 FROM downloaded_books d
+            WHERE d.scope = cached_responses.scope
+              AND (
+                cached_responses.url LIKE '%/books/' || d.book_id || '/pages'
+                OR cached_responses.url LIKE '%/books/' || d.book_id
+              )
+          )
+        ''');
+      }
     },
   );
+
+  Future<CachedResponse?> readPinned(String scope, String url) =>
+      (select(cachedResponses)..where(
+            (t) =>
+                t.scope.equals(scope) &
+                t.url.equals(url) &
+                t.pinned.equals(true),
+          ))
+          .getSingleOrNull();
 
   Future<CachedResponse?> read(String scope, String url) async {
     final row =
@@ -185,13 +209,19 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
       ..addColumns(<Expression<Object>>[count])
       ..where(
         cachedResponses.scope.equals(scope) &
-            cachedResponses.kind.equals('json'),
+            cachedResponses.kind.equals('json') &
+            cachedResponses.pinned.equals(false),
       );
     var over = ((await counting.getSingle()).read(count) ?? 0) - maxJsonRows;
     while (over > 0) {
       final rows =
           await (select(cachedResponses)
-                ..where((t) => t.scope.equals(scope) & t.kind.equals('json'))
+                ..where(
+                  (t) =>
+                      t.scope.equals(scope) &
+                      t.kind.equals('json') &
+                      t.pinned.equals(false),
+                )
                 ..orderBy(<OrderClauseGenerator<CachedResponses>>[
                   (t) => OrderingTerm(expression: t.lastUsedSeq),
                 ])

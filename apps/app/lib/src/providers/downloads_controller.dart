@@ -8,29 +8,35 @@ import 'package:komga_native/src/data/shelf_failure.dart';
 import 'package:komga_native/src/providers/cache_providers.dart';
 import 'package:komga_native/src/providers/download_providers.dart';
 import 'package:komga_native/src/providers/pinned_series_provider.dart';
+import 'package:komga_platform/komga_platform.dart';
 
-/// 单本书的下载状态：进行中（带进度）或失败信息。
+/// 单本书的下载状态：进行中（带进度）、排队中或失败种类（按 Locale 渲染）。
 class DownloadStatus {
-  const DownloadStatus({this.progress, this.error, this.queued = false});
+  const DownloadStatus({this.progress, this.errorKind, this.queued = false});
 
   final DownloadProgress? progress;
-  final String? error;
+  final ShelfFailureKind? errorKind;
   final bool queued;
 
   bool get isRunning => progress != null;
+  bool get hasError => errorKind != null;
 }
 
 /// 下载队列状态机（FIX-07 / DLD-01 / DLD-02 / ARC-07 / ARC-12）。
 class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
   bool _disposed = false;
   final List<Book> _queue = <Book>[];
+  final Map<String, Book> _knownBooks = <String, Book>{};
   final Set<String> _running = <String>{};
   int _concurrency = 1;
   bool _paused = false;
   bool _restored = false;
+  bool _checkingWifi = false;
   String _scope = '';
 
   bool get paused => _paused;
+
+  Book? knownBook(String bookId) => _knownBooks[bookId];
 
   void pauseAll() {
     if (_paused) return;
@@ -45,21 +51,36 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
     state = <String, DownloadStatus>{...state};
   }
 
+  Future<bool> retryOne(String bookId, {Book? fallback}) async {
+    final book = await _resolveBook(bookId, fallback: fallback);
+    if (book == null || _disposed) return false;
+    _clear(bookId);
+    await start(book);
+    return true;
+  }
+
   Future<int> retryFailed() async {
     final failed = <String>[
       for (final entry in state.entries)
-        if (entry.value.error != null) entry.key,
+        if (entry.value.hasError) entry.key,
     ];
     if (failed.isEmpty) return 0;
     var queued = 0;
     for (final id in failed) {
-      final book = await ref.read(bookByIdProvider(id).future);
-      if (book == null) continue;
-      _clear(id);
-      await start(book);
-      queued++;
+      if (await retryOne(id)) queued++;
     }
     return queued;
+  }
+
+  Future<Book?> _resolveBook(String bookId, {Book? fallback}) async {
+    final cached = fallback ?? _knownBooks[bookId];
+    if (cached != null) return cached;
+    try {
+      ref.invalidate(bookByIdProvider(bookId));
+      return await ref.read(bookByIdProvider(bookId).future);
+    } on Object {
+      return null;
+    }
   }
 
   @override
@@ -67,7 +88,9 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
     _disposed = false;
     _restored = false;
     _paused = false;
+    _checkingWifi = false;
     _queue.clear();
+    _knownBooks.clear();
     _running.clear();
     _scope = ref.watch(activeServerKeyProvider);
     ref.onDispose(() => _disposed = true);
@@ -110,15 +133,15 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
         _persist(_db.dequeueDownload(entry.bookId, scope: _scope));
         continue;
       }
-      _queue.add(
-        Book(
-          id: entry.bookId,
-          seriesId: entry.seriesId,
-          name: entry.name,
-          number: entry.number,
-          pagesCount: entry.pagesCount,
-        ),
+      final book = Book(
+        id: entry.bookId,
+        seriesId: entry.seriesId,
+        name: entry.name,
+        number: entry.number,
+        pagesCount: entry.pagesCount,
       );
+      _knownBooks[book.id] = book;
+      _queue.add(book);
       if (state[entry.bookId] == null) {
         _set(entry.bookId, const DownloadStatus(queued: true));
       }
@@ -163,6 +186,7 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
       _queue.any((Book q) => q.id == bookId);
 
   void _enqueueAndPersist(Book book) {
+    _knownBooks[book.id] = book;
     _queue.add(book);
     if (state[book.id] == null) {
       _set(book.id, const DownloadStatus(queued: true));
@@ -186,7 +210,29 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
   }
 
   Future<void> _pump() async {
-    if (_paused) return;
+    if (_paused ||
+        _disposed ||
+        _queue.isEmpty ||
+        _running.length >= _concurrency) {
+      return;
+    }
+    final policy = ref.read(downloadPolicyProvider).value;
+    if (policy?.wifiOnly ?? false) {
+      if (_checkingWifi) return;
+      _checkingWifi = true;
+      try {
+        final kind = await ref.read(networkProbeProvider).current();
+        if (kind == NetworkKind.cellular) {
+          if (!_disposed && !_paused) pauseAll();
+          return;
+        }
+      } on Object {
+        // 探测失败按 unknown 放行。
+      } finally {
+        _checkingWifi = false;
+      }
+      if (_paused || _disposed) return;
+    }
     while (_queue.isNotEmpty && _running.length < _concurrency) {
       final book = _queue.removeAt(0);
       _running.add(book.id);
@@ -194,39 +240,34 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
     }
   }
 
+  void _persistActive(String scope, String bookId, int done, int total) =>
+      _persist(
+        _db.updateQueueEntry(
+          scope: scope,
+          bookId: bookId,
+          state: 'active',
+          done: done,
+          total: total,
+        ),
+      );
+
   Future<void> _runOne(Book book) async {
     final scope = _scope;
     _set(
       book.id,
       const DownloadStatus(progress: DownloadProgress(done: 0, total: 0)),
     );
-    _persist(
-      _db.updateQueueEntry(
-        scope: scope,
-        bookId: book.id,
-        state: 'active',
-        done: 0,
-        total: 0,
-      ),
-    );
+    _persistActive(scope, book.id, 0, 0);
     try {
       await _service.download(
         book,
         onProgress: (DownloadProgress progress) {
           _set(book.id, DownloadStatus(progress: progress));
-          _persist(
-            _db.updateQueueEntry(
-              scope: scope,
-              bookId: book.id,
-              state: 'active',
-              done: progress.done,
-              total: progress.total,
-            ),
-          );
+          _persistActive(scope, book.id, progress.done, progress.total);
         },
       );
     } on ShelfFailure catch (failure) {
-      _set(book.id, DownloadStatus(error: failure.message));
+      _set(book.id, DownloadStatus(errorKind: failure.kind));
     } finally {
       _running.remove(book.id);
       if (!_disposed) {
@@ -235,7 +276,7 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
       }
     }
     if (_disposed) return;
-    if (state[book.id]?.error == null) _clear(book.id);
+    if (!(state[book.id]?.hasError ?? false)) _clear(book.id);
     unawaited(_pump());
   }
 
@@ -244,14 +285,11 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
     _service.cancel(bookId);
     _persist(_db.dequeueDownload(bookId, scope: _scope));
     _clear(bookId);
-    if (!_disposed) {
-      ref.invalidate(downloadedProvider(bookId));
-    }
+    if (!_disposed) ref.invalidate(downloadedProvider(bookId));
   }
 
   void cancelAll() {
-    final pending = <String>{..._queue.map((Book book) => book.id)}
-      ..addAll(_running);
+    final pending = <String>{..._queue.map((Book b) => b.id), ..._running};
     _queue.clear();
     for (final id in pending) {
       _service.cancel(id);

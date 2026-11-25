@@ -6,6 +6,7 @@ import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
+import 'package:komga_native/src/l10n/failure_text.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/screens/reader_args.dart';
 import 'package:komga_native/src/widgets/reader_palette.dart';
@@ -178,7 +179,7 @@ class _ReaderTocSheetState extends ConsumerState<ReaderTocSheet> {
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: Text(
           async.error is ShelfFailure
-              ? (async.error! as ShelfFailure).message
+              ? l10n.failureTitle((async.error! as ShelfFailure).kind)
               : l10n.errorGeneric,
           style: textStyle.body.copyWith(color: palette.muted),
         ),

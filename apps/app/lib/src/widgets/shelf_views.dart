@@ -5,6 +5,7 @@ import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/shelf_view_options.dart';
+import 'package:komga_native/src/l10n/failure_text.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -60,7 +61,7 @@ class ShelfPagingFooter extends StatelessWidget {
           children: <Widget>[
             Flexible(
               child: Text(
-                failure.message,
+                l10n.failureTitle(failure.kind),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),

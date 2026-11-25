@@ -1,11 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/data/cache/http_cache_database.dart';
+import 'package:komga_native/src/l10n/failure_text.dart';
 import 'package:komga_native/src/providers/download_providers.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
+import 'package:komga_native/src/screens/reader_args.dart';
 import 'package:komga_native/src/widgets/cover_image.dart';
 import 'package:komga_native/src/widgets/download_queue_menu.dart';
 import 'package:material_ui/material_ui.dart';
@@ -70,7 +74,7 @@ class DownloadsScreen extends ConsumerWidget {
                             paused: ref.read(downloadsProvider.notifier).paused,
                             hasActive: active.isNotEmpty,
                             hasFailed: active.values.any(
-                              (DownloadStatus s) => s.error != null,
+                              (DownloadStatus s) => s.hasError,
                             ),
                             hasRecords: records.value?.isNotEmpty ?? false,
                           ),
@@ -155,19 +159,50 @@ class _DownloadRow extends ConsumerWidget {
       }
     }
     final status = ref.watch(downloadsProvider)[bookId];
+    final controller = ref.read(downloadsProvider.notifier);
+    final known = controller.knownBook(bookId);
     final cover = ref.watch(bookCoverProvider(bookId)).value;
 
-    final title = book?.name ?? bookId;
-    final subtitle = status?.isRunning ?? false
+    final title =
+        book?.name ??
+        known?.name ??
+        ((record?.bookName.isNotEmpty ?? false) ? record!.bookName : bookId);
+    final isRunning = status?.isRunning ?? false;
+    final isQueued = status?.queued ?? false;
+    final errorKind = status?.errorKind;
+    final subtitle = isRunning
         ? '${status!.progress!.done} / ${status.progress!.total}'
-        : status?.queued ?? false
+        : isQueued
         ? l10n.downloadQueued
+        : errorKind != null
+        ? l10n.failureTitle(errorKind)
         : record == null
         ? l10n.downloadsEmpty
         : l10n.downloadPagesBytes(record.pageCount, _humanBytes(record.bytes));
 
+    final openRecord = (!isRunning && !isQueued && errorKind == null)
+        ? record
+        : null;
+
     return ListTile(
       key: Key('download-$bookId'),
+      onTap: openRecord != null
+          ? () => unawaited(
+              context.push(
+                '/reader/$bookId',
+                extra: ReaderArgs(
+                  book:
+                      book ??
+                      Book(
+                        id: openRecord.bookId,
+                        seriesId: openRecord.seriesId,
+                        name: title,
+                        pagesCount: openRecord.pageCount,
+                      ),
+                ),
+              ),
+            )
+          : null,
       leading: ClipRRect(
         borderRadius: BorderRadius.circular(AppRadii.xs),
         child: SizedBox(
@@ -185,11 +220,15 @@ class _DownloadRow extends ConsumerWidget {
           Text(
             subtitle,
             // 进度数字用等宽字形：否则 "9 / 12" → "10 / 12" 会让整行左右抖。
-            style: (status?.isRunning ?? false)
+            style: isRunning
                 ? AppTypography.of(context).progressNumber
+                : errorKind != null
+                ? theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.error,
+                  )
                 : null,
           ),
-          if (status?.isRunning ?? false) ...<Widget>[
+          if (isRunning) ...<Widget>[
             const SizedBox(height: AppSpacing.xxs),
             LinearProgressIndicator(
               value: status!.progress!.fraction,
@@ -198,22 +237,46 @@ class _DownloadRow extends ConsumerWidget {
           ],
         ],
       ),
-      trailing: (status?.isRunning ?? false) || (status?.queued ?? false)
+      trailing: isRunning || isQueued
           ? IconButton(
               tooltip: l10n.cancelDownload,
-              onPressed: () =>
-                  ref.read(downloadsProvider.notifier).cancel(bookId),
+              onPressed: () => controller.cancel(bookId),
               icon: const Icon(Icons.close),
+            )
+          : errorKind != null
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                IconButton(
+                  key: Key('download-retry-$bookId'),
+                  tooltip: l10n.retry,
+                  onPressed: () => unawaited(
+                    controller.retryOne(bookId, fallback: book ?? known),
+                  ),
+                  icon: const Icon(Icons.refresh),
+                ),
+                IconButton(
+                  key: Key('download-dismiss-$bookId'),
+                  tooltip: l10n.cancelDownload,
+                  onPressed: () => controller.dismiss(bookId),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
             )
           : IconButton(
               tooltip: l10n.downloadedTapToRemove,
-              onPressed: () => _delete(context, ref, book),
+              onPressed: () => _delete(context, ref, book, record),
               icon: const Icon(Icons.delete_outline),
             ),
     );
   }
 
-  Future<void> _delete(BuildContext context, WidgetRef ref, Book? book) async {
+  Future<void> _delete(
+    BuildContext context,
+    WidgetRef ref,
+    Book? book,
+    DownloadedBook? record,
+  ) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
@@ -238,7 +301,13 @@ class _DownloadRow extends ConsumerWidget {
     await ref
         .read(downloadsProvider.notifier)
         .delete(
-          book ?? Book(id: bookId, seriesId: '', name: bookId, pagesCount: 0),
+          book ??
+              Book(
+                id: bookId,
+                seriesId: record?.seriesId ?? '',
+                name: record?.bookName ?? bookId,
+                pagesCount: record?.pageCount ?? 0,
+              ),
         );
   }
 }

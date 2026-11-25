@@ -36,6 +36,14 @@ void main() {
       reason: 'Android 10+ 走分区存储 MediaStore，不应向现代系统申请旧版外部存储权限',
     );
   });
+
+  test('src/main 禁用 Android Auto Backup，避免恢复后 Keystore 密钥不匹配损坏安全存储', () {
+    expect(
+      manifest,
+      contains('android:allowBackup="false"'),
+      reason: '允许云恢复加密存储但无同步 Keystore 密钥会导致 BadPaddingException',
+    );
+  });
 }
 
 /// 从当前目录向上找 main manifest：`flutter test` 可能以 `apps/app` 或仓库根为 cwd。

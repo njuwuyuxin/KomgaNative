@@ -14,6 +14,11 @@ abstract interface class HttpCache {
   /// [url] 是完整请求地址（**含查询串**，否则搜索/分页会互相覆盖）。
   Future<Uint8List?> read(String scope, String url);
 
+  /// 只读整本下载受保护（`pinned`）的离线缓存；未命中或非 pinned 返回 null。
+  ///
+  /// 用于字节资源（页图）的 Cache-First：已整本下载的书在线阅读直接读本地，零网络流量。
+  Future<Uint8List?> readPinned(String scope, String url);
+
   /// 写入成功响应。[kind] 决定淘汰策略，见 [CacheKind]。
   Future<void> write(String scope, String url, CacheKind kind, Uint8List body);
 

@@ -54,13 +54,15 @@ Reading-First Experience · Android / iOS / Android E-Ink
 
 ## Installation & Usage
 
-### 1. Download Prebuilt Artifacts
+### 1. Download Prebuilt Packages
 
-Prebuilt CI artifacts are available from [GitHub Actions](https://github.com/njuwuyuxin/Yomu/actions) (retained for 14 days; requires a GitHub account to download):
+- **Official Releases (Recommended)**: Download signed Android APKs (`arm64-v8a`, `armeabi-v7a`, `x86_64`, `universal`, plus `SHA256SUMS.txt`) from [GitHub Releases](https://github.com/njuwuyuxin/Yomu/releases).
+- **Development Builds**: Per-commit CI artifacts are also available on [GitHub Actions](https://github.com/njuwuyuxin/Yomu/actions) (retained for 14 days; requires a GitHub account):
 
 | Platform | Workflow | Artifact |
 |---|---|---|
-| **Android** | `Android` (`build-android.yml`) | `komga-native-apk` — installable `app-release.apk` (debug-signed) |
+| **Android** | `Release` (`release.yml`) | Signed release APKs on GitHub Releases (split-per-ABI + universal) |
+| **Android (Dev)** | `Android` (`build-android.yml`) | `komga-native-apk` — development `app-release.apk` (debug-signed) |
 | **iOS** | `iOS` (`build-ios.yml`) | `komga-native-ios-unsigned` — unsigned `Runner.app.zip` (requires Xcode signing for physical devices) |
 
 ### 2. Connect to Your Komga Server
@@ -149,3 +151,9 @@ Yomu/
 ```
 
 Dependency direction: `apps/app → (design_system, platform, api, engines, domain)`, `engines → domain`, `domain → none`.
+
+---
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).

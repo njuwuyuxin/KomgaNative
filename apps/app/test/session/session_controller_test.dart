@@ -70,6 +70,28 @@ void main() {
     expect((await store.load())!.apiKey, 'KEY-1');
   });
 
+  test('新增服务器登录后自动刷新 serverListProvider', () async {
+    final store = InMemoryServerStore();
+    final service = FakeConnectionService();
+    final container = containerWith(store: store, service: service);
+    await settle();
+
+    // 先读一次建立缓存（空列表）。
+    expect(await container.read(serverListProvider.future), isEmpty);
+
+    await container
+        .read(sessionProvider.notifier)
+        .connectWithApiKey(
+          rawUrl: 'https://new.example.com',
+          apiKey: 'KEY-NEW',
+        );
+
+    final list = await container.read(serverListProvider.future);
+    expect(list.map((StoredServer s) => s.address.baseUrl), <String>[
+      'https://new.example.com',
+    ]);
+  });
+
   test('API Key 连接成功 → 不调用密码接口', () async {
     final service = FakeConnectionService();
     final container = containerWith(service: service);

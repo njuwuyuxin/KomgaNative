@@ -489,5 +489,17 @@
   "connProtocolTitle": "意外的服务端响应",
   "connProtocolHint": "确认这个地址是 Komga，并且反向代理没有把它改写成网页。",
   "connUnexpectedTitle": "连接失败",
-  "connUnexpectedHint": "请检查设置后重试。"
+  "connUnexpectedHint": "请检查设置后重试。",
+  "savedServers": "已保存的服务器",
+  "libraries": "书库",
+  "allSeries": "全部系列",
+  "backupErrorInvalidJson": "备份内容不是合法的 JSON。",
+  "backupErrorInvalidFormat": "备份文件结构不完整或格式不正确。",
+  "backupErrorUnsupportedVersion": "备份版本 {version} 与当前版本不兼容。",
+  "@backupErrorUnsupportedVersion": {
+    "placeholders": {
+      "version": {"type": "int"}
+    }
+  },
+  "backupErrorInvalidPrefs": "无法解析备份中的偏好设置。"
 }

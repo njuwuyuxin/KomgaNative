@@ -98,7 +98,9 @@ class PageError extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.sm),
         Text(
-          message?.message ?? l10n.readerPageFailed,
+          message == null
+              ? l10n.readerPageFailed
+              : l10n.failureTitle(message.kind),
           style: TextStyle(color: palette.onBackgroundMuted),
         ),
         const SizedBox(height: AppSpacing.sm),

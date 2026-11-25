@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:komga_native/src/data/app_settings.dart';
+import 'package:komga_native/src/data/secure_storage.dart';
 
 /// 应用设置的持久化。
 ///
@@ -24,7 +25,7 @@ abstract interface class SettingsStore {
 /// 真机实现：沿用钥匙串（与服务器、阅读偏好同一套基础设施）。
 class SecureSettingsStore implements SettingsStore {
   SecureSettingsStore({FlutterSecureStorage? storage})
-    : _storage = storage ?? const FlutterSecureStorage();
+    : _storage = storage ?? createAppSecureStorage();
 
   static const String _key = 'komganative.settings.v1';
 

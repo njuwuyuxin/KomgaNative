@@ -19,6 +19,15 @@ import UIKit
     )
     channel.setMethodCallHandler { [weak self] (call: FlutterMethodCall, result: @escaping FlutterResult) in
       switch call.method {
+      case "wakelock":
+        let args = call.arguments as? [String: Any]
+        let enabled = (args?["enabled"] as? Bool) ?? false
+        DispatchQueue.main.async {
+          UIApplication.shared.isIdleTimerDisabled = enabled
+          result(nil)
+        }
+      case "eink":
+        result(["isEink": false, "vendor": "apple"])
       case "saveImage":
         self?.handleSaveImage(call: call, result: result)
       default:

@@ -33,6 +33,7 @@ class ProgressSyncService {
   final ScopedProgressUpload _upload;
 
   Future<void>? _inFlight;
+  bool _needsAnotherPass = false;
   final Set<String> _authBlockedScopes = <String>{};
   static const int _maxKnownBooksPerScope = 256;
   final Map<String, Map<String, Book>> _knownBooks =
@@ -80,19 +81,30 @@ class ProgressSyncService {
     }
   }
 
-  /// 提交当前活动服务器分区的待提交项。已在跑就直接复用同一个 Future（严格单飞，防同步重入）。
+  /// 提交当前活动服务器分区的待提交项。已在跑时记一笔续跑标记并复用同一个 Future，
+  /// 避免上一轮收尾瞬间新入队的进度漏刷。
   Future<void> flush() {
     final running = _inFlight;
-    if (running != null) return running;
+    if (running != null) {
+      _needsAnotherPass = true;
+      return running;
+    }
     final completer = Completer<void>();
     _inFlight = completer.future;
     unawaited(
-      _flushLoop().whenComplete(() {
+      _drainFlushLoop().whenComplete(() {
         _inFlight = null;
         completer.complete();
       }),
     );
     return completer.future;
+  }
+
+  Future<void> _drainFlushLoop() async {
+    do {
+      _needsAnotherPass = false;
+      await _flushLoop();
+    } while (_needsAnotherPass);
   }
 
   Future<void> _flushLoop() async {

@@ -34,6 +34,9 @@ class DownloadedBooks extends Table {
 
   TextColumn get seriesId => text()();
 
+  /// 冗余保存书名：离线进入下载管理页时无需再请求 `/api/v1/books/{id}`。
+  TextColumn get bookName => text().withDefault(const Constant(''))();
+
   IntColumn get pageCount => integer()();
 
   /// 这次下载实际抓到的字节数（设置页/详情页展示用）。

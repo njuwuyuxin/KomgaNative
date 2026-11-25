@@ -13,14 +13,24 @@ const int kPrefsBackupVersion = 1;
 /// 导出的是"我怎么看书"，不是"我怎么登录"。
 const List<String> kPrefsBackupKinds = <String>['reader', 'settings'];
 
+/// 备份解析失败的结构化原因（UI 按 Locale 渲染，避免硬编码单语种文案）。
+enum PrefsBackupErrorKind {
+  invalidJson,
+  invalidFormat,
+  unsupportedVersion,
+  invalidPrefs,
+}
+
 /// 坏文件的统一失败类型。
 class PrefsBackupException implements Exception {
-  const PrefsBackupException(this.message);
+  const PrefsBackupException(this.kind, this.message, {this.version});
 
+  final PrefsBackupErrorKind kind;
   final String message;
+  final int? version;
 
   @override
-  String toString() => 'PrefsBackupException: $message';
+  String toString() => 'PrefsBackupException($kind): $message';
 }
 
 /// 本地偏好的导出/导入（SET-02）。
@@ -58,24 +68,38 @@ class PrefsBackup {
     try {
       raw = jsonDecode(source);
     } on FormatException catch (error) {
-      throw PrefsBackupException('不是合法的 JSON：${error.message}');
+      throw PrefsBackupException(
+        PrefsBackupErrorKind.invalidJson,
+        'Invalid JSON: ${error.message}',
+      );
     }
     if (raw is! Map<String, Object?>) {
-      throw const PrefsBackupException('备份文件的顶层必须是一个对象');
+      throw const PrefsBackupException(
+        PrefsBackupErrorKind.invalidFormat,
+        'Backup root must be a JSON object',
+      );
     }
     final version = raw['version'];
     if (version is! int) {
-      throw const PrefsBackupException('缺少 version 字段');
+      throw const PrefsBackupException(
+        PrefsBackupErrorKind.invalidFormat,
+        'Missing version field',
+      );
     }
     if (version != kPrefsBackupVersion) {
       throw PrefsBackupException(
-        '备份版本 $version 与当前版本 $kPrefsBackupVersion 不兼容',
+        PrefsBackupErrorKind.unsupportedVersion,
+        'Unsupported backup version $version',
+        version: version,
       );
     }
     final reader = raw['reader'];
     final settings = raw['settings'];
     if (reader is! Map<String, Object?> || settings is! Map<String, Object?>) {
-      throw const PrefsBackupException('缺少 reader / settings 段');
+      throw const PrefsBackupException(
+        PrefsBackupErrorKind.invalidFormat,
+        'Missing reader or settings section',
+      );
     }
     final rawPinned = raw['pinnedSeries'];
     final List<String>? pinnedSeries = rawPinned is List
@@ -91,35 +115,72 @@ class PrefsBackup {
     );
   }
 
-  /// 用当前状态造一份备份。
+  /// 用当前状态造一份备份，自动剥离所有以服务器地址为键的私有分区项。
   factory PrefsBackup.of({
     required ReaderPrefs reader,
     required AppSettings settings,
     List<String>? pinnedSeries,
   }) => PrefsBackup(
-    reader: reader.toJson(),
-    settings: settings.toJson(),
+    reader: _sanitizeReaderJson(reader.toJson()),
+    settings: _sanitizeSettingsJson(settings.toJson()),
     pinnedSeries: pinnedSeries,
   );
+
+  /// 剥离 `seriesOverrides` / `spreadFrom` 中带 `serverKey|` 或 URL 的键，
+  /// 确保导出的备份绝不泄露私有服务器域名或内网地址。
+  static Map<String, Object?> _sanitizeReaderJson(Map<String, Object?> raw) {
+    final copy = Map<String, Object?>.of(raw);
+    _stripServerScopedMap(copy, 'seriesOverrides');
+    _stripServerScopedMap(copy, 'spreadFrom');
+    return copy;
+  }
+
+  /// 剥离 `libraryFilters` / `filterPresets`（键为服务器 `baseUrl`）。
+  static Map<String, Object?> _sanitizeSettingsJson(Map<String, Object?> raw) {
+    return Map<String, Object?>.of(raw)
+      ..remove('libraryFilters')
+      ..remove('filterPresets');
+  }
+
+  static void _stripServerScopedMap(Map<String, Object?> map, String key) {
+    final value = map[key];
+    if (value is! Map) return;
+    final filtered = <String, Object?>{
+      for (final entry in value.entries)
+        if (entry.key is String && !_containsServerAddress(entry.key as String))
+          entry.key as String: entry.value,
+    };
+    if (filtered.isEmpty) {
+      map.remove(key);
+    } else {
+      map[key] = filtered;
+    }
+  }
+
+  static bool _containsServerAddress(String key) =>
+      key.contains('|') || key.contains('://');
 
   /// 把备份里的阅读偏好解析出来；形状不对就抛。
   ReaderPrefs toReaderPrefs() {
     try {
       return ReaderPrefs.fromJson(reader);
     } on Object catch (error) {
-      throw PrefsBackupException('阅读设置无法解析：$error');
+      throw PrefsBackupException(
+        PrefsBackupErrorKind.invalidPrefs,
+        'Failed to parse reader prefs: $error',
+      );
     }
   }
 
   /// 把备份里的应用设置解析出来；形状不对就抛。
-  ///
-  /// `AppSettings.fromJson` 对每个字段都有默认值，所以"缺字段"不算坏；
-  /// 但整体不是对象时会在上面就被拦下。
   AppSettings toAppSettings() {
     try {
       return AppSettings.fromJson(settings);
     } on Object catch (error) {
-      throw PrefsBackupException('应用设置无法解析：$error');
+      throw PrefsBackupException(
+        PrefsBackupErrorKind.invalidPrefs,
+        'Failed to parse app settings: $error',
+      );
     }
   }
 }

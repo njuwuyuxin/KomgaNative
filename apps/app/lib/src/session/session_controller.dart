@@ -202,6 +202,7 @@ class SessionController extends Notifier<SessionState> {
           ? outcome.server
           : outcome.server.copyWith(certificateFingerprint: trustFingerprint);
       await _store.save(saved);
+      ref.invalidate(serverListProvider);
       _pendingAction = null;
       _pendingCertificate = null;
       state = SessionConnected(saved);

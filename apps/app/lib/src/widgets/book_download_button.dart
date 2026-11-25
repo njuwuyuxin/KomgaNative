@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
+import 'package:komga_native/src/l10n/failure_text.dart';
 import 'package:komga_native/src/providers/download_policy_gate.dart';
 import 'package:komga_native/src/providers/download_providers.dart';
 import 'package:material_ui/material_ui.dart';
@@ -41,11 +42,11 @@ class BookDownloadButton extends ConsumerWidget {
       );
     }
 
-    final error = status?.error;
-    if (error != null) {
+    final errorKind = status?.errorKind;
+    if (errorKind != null) {
       return IconButton(
         key: Key('book-download-${book.id}'),
-        tooltip: l10n.downloadRetryTooltip(error),
+        tooltip: l10n.downloadRetryTooltip(l10n.failureTitle(errorKind)),
         onPressed: () {
           controller.dismiss(book.id);
           unawaited(controller.start(book));

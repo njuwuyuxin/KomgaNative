@@ -37,9 +37,9 @@
 		<true/>
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>需要访问局域网以连接你自建的 Komga 服务器</string>
+	<string>Yomu needs local network access to connect to your self-hosted Komga server. / 需要访问局域网以连接你自建的 Komga 服务器。</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>需要将当前漫画页面保存到你的系统相册</string>
+	<string>Yomu needs permission to save comic pages to your Photos library. / 需要将当前漫画页面保存到你的系统相册。</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

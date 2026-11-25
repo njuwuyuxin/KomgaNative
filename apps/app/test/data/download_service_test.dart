@@ -226,4 +226,81 @@ void main() {
       );
     },
   );
+
+  test(
+    '已下载书籍的 /books/{id} 与 /pages 元信息 JSON 受 pinned 保护，清缓存与 JSON 淘汰不误删',
+    () async {
+      await db.close();
+      db = HttpCacheDatabase(NativeDatabase.memory(), maxJsonRows: 2);
+
+      const pagesUrl = '$scope/api/v1/books/book-meta/pages';
+      const bookUrl = '$scope/api/v1/books/book-meta';
+      final payload = Uint8List.fromList(<int>[1, 2, 3]);
+      final service = KomgaDownloadService(
+        pages: (String bookId) async {
+          await db.write(scope, pagesUrl, 'json', payload);
+          return const <PageInfo>[
+            PageInfo(
+              number: 1,
+              width: 800,
+              height: 1200,
+              mediaType: 'image/png',
+            ),
+          ];
+        },
+        bookMeta: (String bookId) async {
+          await db.write(scope, bookUrl, 'json', payload);
+        },
+        pageImage: (String bookId, int page) async {
+          await db.write(
+            scope,
+            '$scope/api/v1/books/$bookId/pages/$page?zero_based=false',
+            'image',
+            payload,
+          );
+          return payload;
+        },
+        db: db,
+        scope: scope,
+      );
+
+      final done = await service.download(
+        book(id: 'book-meta', pages: 1),
+        onProgress: (_) {},
+      );
+      expect(done, isTrue);
+      final record = await service.downloaded('book-meta');
+      expect(record?.bookName, 'Vol. 1');
+
+      // 写入多条普通 JSON 触发 _pruneJson（上限 2）。
+      for (var i = 0; i < 5; i++) {
+        await db.write(scope, '$scope/api/v1/series?page=$i', 'json', payload);
+      }
+      // 清理被动缓存。
+      await db.clear(scope: scope);
+
+      expect(await db.read(scope, pagesUrl), isNotNull);
+      expect(await db.read(scope, bookUrl), isNotNull);
+    },
+  );
+
+  test('断点续传：本地已缓存的页图不重复走网络请求', () async {
+    final cachedBytes = Uint8List.fromList(<int>[42, 43, 44]);
+    await db.write(
+      scope,
+      '$scope/api/v1/books/b-resume/pages/1?zero_based=false',
+      'image',
+      cachedBytes,
+    );
+    final fetchedPages = <int>[];
+    final service = build(pages: 2, byteSize: 10, onPage: fetchedPages.add);
+
+    final done = await service.download(
+      book(id: 'b-resume', pages: 2),
+      onProgress: (_) {},
+    );
+    expect(done, isTrue);
+    expect(fetchedPages, <int>[2], reason: '第 1 页命中本地缓存，只应拉第 2 页');
+    expect((await service.downloaded('b-resume'))?.bytes, 13);
+  });
 }

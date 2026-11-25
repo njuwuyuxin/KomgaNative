@@ -13,6 +13,7 @@ import 'package:komga_native/src/data/progress/progress_sync_service.dart';
 import 'package:komga_native/src/data/reader_prefs.dart';
 import 'package:komga_native/src/data/reading_session_tracker.dart';
 import 'package:komga_native/src/data/shelf_failure.dart';
+import 'package:komga_native/src/l10n/failure_text.dart';
 import 'package:komga_native/src/screens/reader_args.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/providers/pinned_series_provider.dart';

@@ -67,7 +67,7 @@
 | `ci.yml` | push to main、PR、手动 | `windows-latest` | `dart run tool/ci.dart check`：格式 + 分析 + 分层规则 + 全部测试 + 黄金图比对 |
 | `build-android.yml` | push to main（代码路径变化）、手动 | `ubuntu-latest` | `flutter pub get` → `dart run tool/ci.dart codegen` → `flutter build apk --release` → 上传 debug 签名 APK artifact |
 | `build-ios.yml` | push / PR / `v*` tag / 手动 | `macos-latest` | `flutter pub get` → `dart run tool/ci.dart codegen` → `flutter build ios --release --no-codesign` → 上传 `.app.zip` |
-| `release.yml` | push `v*` tag | `ubuntu-latest` | 校验 tag 与 `pubspec.yaml` 版本一致 → 还原正式 keystore → 构建分架构与通用 release APK → `apksigner` 验签 → 自动发布到 GitHub Releases（附 `SHA256SUMS.txt`） |
+| `release.yml` | push `v*` tag | `windows-latest` + `ubuntu-latest` | 先在 Windows 跑全量 `ci.dart check` 门禁 → 校验 tag 与 `pubspec.yaml` 版本一致 → 还原正式 keystore → 构建分架构与通用 release APK → `apksigner` 验签 → 自动发布到 GitHub Releases（附 `SHA256SUMS.txt`） |
 
 **为什么门禁放在 Windows**：黄金图基线以 Windows 为唯一平台（`AGENTS.md` 的约定）。在 Linux/macOS 上跑会因字体光栅化差异导致 5 张基线全部失配，而且修不好——只能换基线平台。
 

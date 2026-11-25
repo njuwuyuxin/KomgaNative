@@ -37,8 +37,8 @@ mixin _ShelfSlivers on ConsumerState<LibraryScreen> {
           child: StatusView(
             key: const Key('shelf-error'),
             icon: Icons.cloud_off_outlined,
-            title: failure.message,
-            message: failure.hint,
+            title: l10n.failureTitle(failure.kind),
+            message: l10n.failureHint(failure.kind),
             actionLabel: needsSignIn ? l10n.signOut : l10n.retry,
             onAction: needsSignIn
                 ? () => ref.read(sessionProvider.notifier).signOut()
