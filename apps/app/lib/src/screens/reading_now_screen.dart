@@ -7,6 +7,7 @@ import 'package:komga_domain/komga_domain.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
 import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/screens/series_detail_args.dart';
+import 'package:komga_native/src/widgets/offline_banner.dart';
 import 'package:komga_native/src/widgets/reading_now_continue.dart';
 import 'package:komga_native/src/widgets/recent_history_row.dart';
 import 'package:komga_native/src/widgets/series_hero_tag.dart';
@@ -43,69 +44,76 @@ class ReadingNowScreen extends ConsumerWidget {
       await ref.read(ondeckProvider.future);
     }
 
+    Future<void> refreshAll() async {
+      ref.invalidate(ondeckProvider);
+      ref.invalidate(recentSeriesProvider);
+      for (final library in libraries) {
+        ref.invalidate(libraryShelfProvider(library.id));
+      }
+    }
+
     return Scaffold(
       body: GlassPageBackground(
-        child: SafeArea(
-          bottom: false,
-          child: RefreshIndicator(
-            onRefresh: () async {
-              ref.invalidate(ondeckProvider);
-              ref.invalidate(recentSeriesProvider);
-              for (final library in libraries) {
-                ref.invalidate(libraryShelfProvider(library.id));
-              }
-            },
-            child: CustomScrollView(
-              key: const Key('reading-now-scroll'),
-              physics: const AlwaysScrollableScrollPhysics(),
-              slivers: <Widget>[
-                // 这一页没有标题栏：直接从"继续阅读"卡片开始。
-                const SliverToBoxAdapter(
-                  child: SizedBox(height: AppSpacing.sm),
-                ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md,
+        child: Stack(
+          children: <Widget>[
+            SafeArea(
+              bottom: false,
+              child: RefreshIndicator(
+                onRefresh: refreshAll,
+                child: CustomScrollView(
+                  key: const Key('reading-now-scroll'),
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: <Widget>[
+                    // 这一页没有标题栏：直接从"继续阅读"卡片开始。
+                    const SliverToBoxAdapter(
+                      child: SizedBox(height: AppSpacing.sm),
                     ),
-                    child: ReadingNowContinue(
-                      // `?.items` 读的是分页结果；不写类型名是为了守住
-                      // "界面层不 import komga_api" 这条分层约束。
-                      books: ondeck.value?.items,
-                      hasError: ondeck.hasError,
-                      onRetry: retryOndeck,
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md,
+                        ),
+                        child: ReadingNowContinue(
+                          // `?.items` 读的是分页结果；不写类型名是为了守住
+                          // "界面层不 import komga_api" 这条分层约束。
+                          books: ondeck.value?.items,
+                          hasError: ondeck.hasError,
+                          onRetry: retryOndeck,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-                // 最近阅读（HIS-02）：有历史才出现，没历史时这一段不占位置。
-                const SliverToBoxAdapter(child: RecentHistoryRow()),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.md,
-                      AppSpacing.lg,
-                      AppSpacing.md,
-                      AppSpacing.xs,
+                    // 最近阅读（HIS-02）：有历史才出现，没历史时这一段不占位置。
+                    const SliverToBoxAdapter(child: RecentHistoryRow()),
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.md,
+                          AppSpacing.lg,
+                          AppSpacing.md,
+                          AppSpacing.xs,
+                        ),
+                        child: Text(
+                          l10n.recentlyAdded,
+                          style: AppTypography.of(context).title,
+                        ),
+                      ),
                     ),
-                    child: Text(
-                      l10n.recentlyAdded,
-                      style: AppTypography.of(context).title,
+                    _SeriesShelf(
+                      key: const Key('reading-now-recent'),
+                      heroScope: 'reading-now-recent',
+                      series: recent.value,
+                      hasError: recent.hasError,
                     ),
-                  ),
+                    ..._libraryShelves(context, ref, libraries),
+                    const SliverToBoxAdapter(
+                      child: SizedBox(height: AppSizes.navBarClearance),
+                    ),
+                  ],
                 ),
-                _SeriesShelf(
-                  key: const Key('reading-now-recent'),
-                  heroScope: 'reading-now-recent',
-                  series: recent.value,
-                  hasError: recent.hasError,
-                ),
-                ..._libraryShelves(context, ref, libraries),
-                const SliverToBoxAdapter(
-                  child: SizedBox(height: AppSizes.navBarClearance),
-                ),
-              ],
+              ),
             ),
-          ),
+            OfflineOverlay(onRetry: () => unawaited(refreshAll())),
+          ],
         ),
       ),
     );

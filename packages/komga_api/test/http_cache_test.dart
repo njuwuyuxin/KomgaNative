@@ -22,6 +22,8 @@ class FakeCache implements HttpCache {
   CacheKind? lastKind;
   int onlineReports = 0;
   int offlineReports = 0;
+  final List<RequestPriority> onlinePriorities = <RequestPriority>[];
+  final List<RequestPriority> offlinePriorities = <RequestPriority>[];
 
   String _key(String scope, String url) => '$scope|$url';
 
@@ -55,10 +57,22 @@ class FakeCache implements HttpCache {
   }
 
   @override
-  void reportOnline(String scope) => onlineReports++;
+  void reportOnline(
+    String scope, {
+    RequestPriority priority = RequestPriority.primary,
+  }) {
+    onlineReports++;
+    onlinePriorities.add(priority);
+  }
 
   @override
-  void reportOffline(String scope) => offlineReports++;
+  void reportOffline(
+    String scope, {
+    RequestPriority priority = RequestPriority.primary,
+  }) {
+    offlineReports++;
+    offlinePriorities.add(priority);
+  }
 }
 
 /// 断网：适配器直接抛 dio 的连接错误（与真机上 SocketException 折叠后同类）。
@@ -274,6 +288,33 @@ void main() {
       final result = await session.fetchPageImage('book1', 1);
       expect(result, body);
       expect(networkCalls, 0, reason: 'pinned 页图应走 Cache-First 零流量');
+    });
+
+    test('封面/页缩略图上报 decorative 优先级，正文页图与 JSON 上报 primary', () async {
+      final cache = FakeCache();
+      final online = sessionWith(
+        dio(FakeAdapter((_) async => bytesResponse(<int>[1, 2]))),
+        cache: cache,
+      );
+      await online.fetchSeriesThumbnail('s1');
+      await online.fetchBookThumbnail('b1');
+      await online.fetchPageThumbnail('b1', 1);
+      await online.fetchPageImage('b1', 1);
+
+      expect(cache.onlinePriorities, <RequestPriority>[
+        RequestPriority.decorative,
+        RequestPriority.decorative,
+        RequestPriority.decorative,
+        RequestPriority.primary,
+      ]);
+
+      final offline = sessionWith(offlineDio(), cache: cache);
+      await offline.fetchSeriesThumbnail('s1');
+      await offline.fetchPageImage('b1', 1);
+      expect(cache.offlinePriorities, <RequestPriority>[
+        RequestPriority.decorative,
+        RequestPriority.primary,
+      ]);
     });
   });
 

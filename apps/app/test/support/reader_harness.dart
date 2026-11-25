@@ -66,9 +66,17 @@ Future<InMemoryReaderPrefsStore> pumpReader(
     ),
   );
 
-  /// 离线提示由缓存实例广播；先报告，再建树，顶栏图标才会在首帧出现。
-  final cache = DriftHttpCache(HttpCacheDatabase(NativeDatabase.memory()));
-  if (offline) cache.reportOffline('https://komga.example.com');
+  /// 离线提示由缓存实例广播；先经两次核心失败确认离线，再建树，顶栏图标才会在首帧出现。
+  final cache = DriftHttpCache(
+    HttpCacheDatabase(NativeDatabase.memory()),
+    now: () => DateTime.utc(2026, 11, 25, 12),
+  );
+  addTearDown(cache.dispose);
+  if (offline) {
+    cache
+      ..reportOffline('https://komga.example.com')
+      ..reportOffline('https://komga.example.com');
+  }
 
   await tester.pumpWidget(
     ProviderScope(

@@ -105,9 +105,18 @@ void main() {
       }
     }
 
-    // 离线提示由缓存实例广播：必须在首帧之前报告，基线才画得出来。
-    final cache = DriftHttpCache(HttpCacheDatabase(NativeDatabase.memory()));
-    if (offline) cache.reportOffline('https://komga.example.com');
+    // 离线提示由缓存实例广播：必须在首帧之前通过两次核心失败确认离线，
+    // 这样既走真实滤波阈值，也不留挂起定时器且基线第一帧就画得出来。
+    final cache = DriftHttpCache(
+      HttpCacheDatabase(NativeDatabase.memory()),
+      now: () => DateTime.utc(2026, 11, 25, 12),
+    );
+    addTearDown(cache.dispose);
+    if (offline) {
+      cache
+        ..reportOffline('https://komga.example.com')
+        ..reportOffline('https://komga.example.com');
+    }
 
     await pumpGoldenScreen(
       tester,
@@ -266,6 +275,7 @@ void main() {
       size: GoldenSizes.phone,
       theme: AppTheme.light(),
       offline: true,
+      withNavBar: true,
     );
   });
 

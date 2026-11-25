@@ -1,8 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_design_system/komga_design_system.dart';
 import 'package:komga_native/l10n/app_localizations.dart';
+import 'package:komga_native/src/providers/library_providers.dart';
 import 'package:komga_native/src/screens/collections_tab.dart';
 import 'package:komga_native/src/screens/readlists_tab.dart';
+import 'package:komga_native/src/widgets/offline_banner.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 收藏集 / 阅读列表入口（UI-P3-8 / ARC-12 拆分子标签页）。
@@ -102,6 +104,12 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen>
                   ),
                 ),
               ),
+            ),
+            OfflineOverlay(
+              onRetry: () {
+                ref.invalidate(collectionsProvider);
+                ref.invalidate(readListsProvider);
+              },
             ),
           ],
         ),

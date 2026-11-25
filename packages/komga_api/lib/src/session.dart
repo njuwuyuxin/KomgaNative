@@ -217,7 +217,10 @@ class KomgaSession {
     }
   }
 
-  Future<Uint8List> _getBytes(String url) async {
+  Future<Uint8List> _getBytes(
+    String url, {
+    RequestPriority priority = RequestPriority.primary,
+  }) async {
     // 整本下载受保护的页图直接命中本地缓存（Cache-First），在线阅读零重复流量。
     final pinned = await _pinnedBytes(url);
     if (pinned != null) return pinned;
@@ -234,11 +237,11 @@ class KomgaSession {
         throw const KomgaProtocolError('服务器返回的不是图片数据');
       }
       await _rememberBytes(url, bytes);
-      _cache?.reportOnline(_scope);
+      _cache?.reportOnline(_scope, priority: priority);
       return bytes;
     } on DioException catch (e) {
       final error = mapDioException(e);
-      final cached = await _cachedBytes(url, error);
+      final cached = await _cachedBytes(url, error, priority: priority);
       if (cached != null) return cached;
       throw error;
     }
@@ -260,10 +263,14 @@ class KomgaSession {
     return null;
   }
 
-  Future<Uint8List?> _cachedBytes(String url, KomgaError error) async {
+  Future<Uint8List?> _cachedBytes(
+    String url,
+    KomgaError error, {
+    RequestPriority priority = RequestPriority.primary,
+  }) async {
     final cache = _cache;
     if (cache == null || !_canServeStale(error)) return null;
-    cache.reportOffline(_scope);
+    cache.reportOffline(_scope, priority: priority);
     try {
       return await cache.read(_scope, url);
     } on Object {

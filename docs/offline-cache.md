@@ -8,10 +8,10 @@
 | 场景 | 行为 |
 |---|---|
 | 在线逛书架 | 系列列表 / 封面 / 系列详情 / 书列表 / 页图 / 页列表 全部写进本地缓存 |
-| 断网打开 App | 书架显示上次的列表与封面，顶部出现「Offline · showing saved content」提示条 |
-| 断网点进系列 | 系列详情与书列表从缓存出；没缓存过就仍是错误页（会提示可重试） |
+| 断网打开 App | 书架显示上次的列表与封面，底部悬浮出现「Offline · showing saved content」玻璃胶囊（不挤占页面布局） |
+| 断网点进系列 | 系列详情与书列表从缓存出，底部悬浮提示离线；没缓存过就仍是错误页（会提示可重试） |
 | 断网打开读过的书 | 页图从缓存出，翻页正常；**没读过的页会显示页内错误**，可重试 |
-| 网络恢复 | 任意一次成功请求（GET 或进度 PATCH）后离线提示自动消失 |
+| 弱网抗抖动与恢复 | 封面/缩略图等装饰性请求失败不单独拉响离线；核心请求连败 2 次或单次失败 1.8s 内无成功才确认离线；进入离线后至少驻留 2.5s 防闪烁（点击 Retry 成功可立刻撤掉） |
 | 设置 → Storage | 显示缓存占用与条数、已下载书籍数量与体积，可一键清空缓存（不影响阅读进度） |
 | 设置 → Downloaded books | 下载管理页（UI-P3-13）：进行中/排队/已下载，显示进度、书名、页数与体积，可取消、删除 |
 | 系列详情 → 每本书的下载按钮 | 整本下载（显示进度、可取消、可删除），下载完的书断网可整本阅读 |
@@ -45,9 +45,10 @@
 | `packages/komga_api/lib/src/http_cache.dart` | `HttpCache` 接口（纯 Dart，四个方法） |
 | `packages/komga_api/lib/src/session.dart` | GET 成功写缓存；网络错误/5xx 读缓存并上报离线状态 |
 | `apps/app/lib/src/data/cache/http_cache_database.dart` | Drift 表 + 字节预算 LRU + JSON 条数裁剪 + 占用统计 |
-| `apps/app/lib/src/data/cache/drift_http_cache.dart` | 接口实现 + `ValueNotifier<bool> offline` 广播 |
+| `apps/app/lib/src/data/cache/connectivity_filter.dart` | 连接状态滞回滤波器（信号分级、宽限窗口、最小驻留、多服务器 scope 隔离） |
+| `apps/app/lib/src/data/cache/drift_http_cache.dart` | 接口实现 + 经滤波器驱动的 `ValueNotifier<bool> offline` 广播 |
 | `apps/app/lib/src/providers/cache_providers.dart` | 缓存库/实例/占用/离线状态 provider |
-| `apps/app/lib/src/widgets/offline_banner.dart` | 离线提示条（带 Retry） |
+| `apps/app/lib/src/widgets/offline_banner.dart` | 底部悬浮离线胶囊 `OfflineOverlay` / `OfflineBanner`（带 Retry，零布局偏移） |
 | `apps/app/lib/src/screens/settings_screen.dart` | Storage 区：占用展示 + 清空 + 下载管理入口 |
 | `apps/app/lib/src/screens/downloads_screen.dart` | 下载管理页（UI-P3-13） |
 | `apps/app/test/downloads_queue_test.dart` | 下载队列串行单测 |

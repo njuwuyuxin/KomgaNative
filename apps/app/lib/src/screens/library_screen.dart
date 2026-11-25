@@ -76,14 +76,14 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
   ///
   /// 断点判断只在 `WindowSizeClass` 里做一次（AGENTS.md 架构不变量 6），
   /// 页面内部不再自己比宽度。
-  bool _twoPane(BuildContext context) =>
-      WindowSizeClass.of(MediaQuery.sizeOf(context).width) ==
-      WindowSizeClass.expanded;
+  WindowSizeClass _sizeClass(BuildContext context) =>
+      WindowSizeClass.of(MediaQuery.sizeOf(context).width);
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final motion = AppMotion.of(context);
+    final sizeClass = _sizeClass(context);
     final state = ref.watch(shelfProvider);
     final controller = ref.read(shelfProvider.notifier);
     final selection = ref.watch(shelfSelectionProvider);
@@ -95,93 +95,100 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
       body: Row(
         children: <Widget>[
           // 平板（≥1024）才显示左侧库导航（PLT-01）：手机上它会挤掉两列封面。
-          if (_twoPane(context)) const ShelfSideRail(),
+          if (sizeClass == WindowSizeClass.expanded) const ShelfSideRail(),
           Expanded(
             child: GlassPageBackground(
-              child: RefreshIndicator(
-                // 标题栏是钉住的浮层：下拉刷新的转圈要出现在它下面，不能被玻璃压住。
-                edgeOffset:
-                    MediaQuery.paddingOf(context).top +
-                    AppSizes.glassHeaderClearance,
-                onRefresh: _refresh,
-                child: NotificationListener<ScrollNotification>(
-                  onNotification: (ScrollNotification notification) {
-                    if (state.hasMore &&
-                        notification.metrics.extentAfter < _prefetchExtent) {
-                      unawaited(controller.loadMore());
-                    }
-                    return false;
-                  },
-                  child: ShelfPinchDetector(
-                    enabled:
-                        state.view == ShelfView.grid && state.series.isNotEmpty,
-                    onPinch: _pinchCover,
-                    child: CustomScrollView(
-                      key: const Key('shelf-scroll'),
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      slivers: <Widget>[
-                        // 顶部常驻液态玻璃栏：常态为搜索框 + 管理圆球 + 三格工具胶囊；
-                        // 进入管理书籍后原地形变为「管理书籍」+ 退出圆球 + 全标已读/未读/收藏集。
-                        GlassHeaderSliver(
-                          header: GlassHeader(
-                            bar: ShelfHeaderBar(
-                              selecting: selection.active,
-                              selectedCount: selection.ids.length,
-                              batchBusy: _batchBusy,
-                              searchController: _searchController,
-                              onSearchChanged: controller.search,
-                              onEnterSelection: selecting.enter,
-                              onExitSelection: selecting.exit,
-                              onMarkRead: () => _markSelected(read: true),
-                              onMarkUnread: () => _markSelected(read: false),
-                              onAddToCollection: _addSelectedToCollection,
-                            ),
-                          ),
-                        ),
-                        // 多选态紧凑信息行：常态不占高度，直接展示书架内容；
-                        // 进入管理模式后平滑展开已选数量与全选动作（墨水屏直接瞬切）。
-                        SliverToBoxAdapter(
-                          child: _SelectionInfoRow(
-                            active: selection.active,
-                            selectedCount: selection.ids.length,
-                            allSelected: allSelected,
-                            motion: motion,
-                            onSelectAll: () => selecting.selectAll(
-                              state.series.map((Series s) => s.id),
-                            ),
-                          ),
-                        ),
-                        // 断网时提示"看的是缓存"，并给一次重新联网的机会。
-                        SliverToBoxAdapter(
-                          child: OfflineBanner(
-                            onRetry: () => unawaited(_refresh()),
-                          ),
-                        ),
-                        SliverToBoxAdapter(
-                          child: LibraryFilterBar(
-                            selected: state.libraryId,
-                            onSelected: controller.selectLibrary,
-                          ),
-                        ),
-                        // 生效中的筛选条件（排序/状态/库），可单独清除（LIB-01）。
-                        const SliverToBoxAdapter(child: ShelfActiveFilters()),
-                        const SliverToBoxAdapter(
-                          child: SizedBox(height: AppSpacing.sm),
-                        ),
-                        PhaseFade(
-                          phase: _phaseOf(state),
+              child: Stack(
+                children: <Widget>[
+                  RefreshIndicator(
+                    // 标题栏是钉住的浮层：下拉刷新的转圈要出现在它下面，不能被玻璃压住。
+                    edgeOffset:
+                        MediaQuery.paddingOf(context).top +
+                        AppSizes.glassHeaderClearance,
+                    onRefresh: _refresh,
+                    child: NotificationListener<ScrollNotification>(
+                      onNotification: (ScrollNotification notification) {
+                        if (state.hasMore &&
+                            notification.metrics.extentAfter <
+                                _prefetchExtent) {
+                          unawaited(controller.loadMore());
+                        }
+                        return false;
+                      },
+                      child: ShelfPinchDetector(
+                        enabled:
+                            state.view == ShelfView.grid &&
+                            state.series.isNotEmpty,
+                        onPinch: _pinchCover,
+                        child: CustomScrollView(
+                          key: const Key('shelf-scroll'),
+                          physics: const AlwaysScrollableScrollPhysics(),
                           slivers: <Widget>[
-                            ..._shelfSlivers(l10n, state, controller),
-                            // 底部留白：悬浮导航条压在内容之上，最后一行要能让开它。
+                            // 顶部常驻液态玻璃栏：常态为搜索框 + 管理圆球 + 三格工具胶囊；
+                            // 进入管理书籍后原地形变为「管理书籍」+ 退出圆球 + 全标已读/未读/收藏集。
+                            GlassHeaderSliver(
+                              header: GlassHeader(
+                                bar: ShelfHeaderBar(
+                                  selecting: selection.active,
+                                  selectedCount: selection.ids.length,
+                                  batchBusy: _batchBusy,
+                                  searchController: _searchController,
+                                  onSearchChanged: controller.search,
+                                  onEnterSelection: selecting.enter,
+                                  onExitSelection: selecting.exit,
+                                  onMarkRead: () => _markSelected(read: true),
+                                  onMarkUnread: () =>
+                                      _markSelected(read: false),
+                                  onAddToCollection: _addSelectedToCollection,
+                                ),
+                              ),
+                            ),
+                            // 多选态紧凑信息行：常态不占高度，直接展示书架内容；
+                            // 进入管理模式后平滑展开已选数量与全选动作（墨水屏直接瞬切）。
+                            SliverToBoxAdapter(
+                              child: _SelectionInfoRow(
+                                active: selection.active,
+                                selectedCount: selection.ids.length,
+                                allSelected: allSelected,
+                                motion: motion,
+                                onSelectAll: () => selecting.selectAll(
+                                  state.series.map((Series s) => s.id),
+                                ),
+                              ),
+                            ),
+                            SliverToBoxAdapter(
+                              child: LibraryFilterBar(
+                                selected: state.libraryId,
+                                onSelected: controller.selectLibrary,
+                              ),
+                            ),
+                            // 生效中的筛选条件（排序/状态/库），可单独清除（LIB-01）。
                             const SliverToBoxAdapter(
-                              child: SizedBox(height: AppSizes.navBarClearance),
+                              child: ShelfActiveFilters(),
+                            ),
+                            const SliverToBoxAdapter(
+                              child: SizedBox(height: AppSpacing.sm),
+                            ),
+                            PhaseFade(
+                              phase: _phaseOf(state),
+                              slivers: <Widget>[
+                                ..._shelfSlivers(l10n, state, controller),
+                                // 底部留白：悬浮导航条压在内容之上，最后一行要能让开它。
+                                const SliverToBoxAdapter(
+                                  child: SizedBox(
+                                    height: AppSizes.navBarClearance,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
+                  // 断网时底部悬浮胶囊提示"看的是缓存"，完全脱离滚动流，不挤占页面布局。
+                  OfflineOverlay(onRetry: () => unawaited(_refresh())),
+                ],
               ),
             ),
           ),

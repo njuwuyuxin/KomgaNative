@@ -24,7 +24,6 @@ class SeriesSinglePane extends StatelessWidget {
     required this.onRetry,
     required this.onOpenBook,
     this.topPadding = 0,
-    this.offlineBanner,
     this.toolbar,
     this.filtered = false,
     this.selected = const <String>{},
@@ -44,7 +43,6 @@ class SeriesSinglePane extends StatelessWidget {
   /// 封面 Hero tag（由 `SeriesDetailArgs` 带过来，见 `seriesHeroTag`）。
   final String heroTag;
   final double topPadding;
-  final Widget? offlineBanner;
   final Future<void> Function() onRefresh;
   final VoidCallback onRetry;
   final OpenSeriesBook onOpenBook;
@@ -91,7 +89,6 @@ class SeriesSinglePane extends StatelessWidget {
               ),
             ),
           ),
-          if (offlineBanner != null) SliverToBoxAdapter(child: offlineBanner),
           PhaseFade(
             phase: seriesBooksPhase(books: books, failure: failure),
             slivers: seriesBookPhaseSlivers(
@@ -132,7 +129,6 @@ class SeriesTwoPane extends StatelessWidget {
     required this.onRetry,
     required this.onOpenBook,
     this.topPadding = 0,
-    this.offlineBanner,
     this.toolbar,
     this.filtered = false,
     this.selected = const <String>{},
@@ -152,7 +148,6 @@ class SeriesTwoPane extends StatelessWidget {
   /// 封面 Hero tag（由 `SeriesDetailArgs` 带过来，见 `seriesHeroTag`）。
   final String heroTag;
   final double topPadding;
-  final Widget? offlineBanner;
   final Future<void> Function() onRefresh;
   final VoidCallback onRetry;
   final OpenSeriesBook onOpenBook;
@@ -210,8 +205,6 @@ class SeriesTwoPane extends StatelessWidget {
               slivers: <Widget>[
                 if (topPadding > 0)
                   SliverToBoxAdapter(child: SizedBox(height: topPadding)),
-                if (offlineBanner != null)
-                  SliverToBoxAdapter(child: offlineBanner),
                 PhaseFade(
                   phase: seriesBooksPhase(books: books, failure: failure),
                   slivers: seriesBookPhaseSlivers(

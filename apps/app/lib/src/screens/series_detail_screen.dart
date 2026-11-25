@@ -200,7 +200,6 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
         WindowSizeClass.expanded;
     final topPadding =
         MediaQuery.paddingOf(context).top + AppSizes.glassHeaderClearance;
-    final offlineBanner = OfflineBanner(onRetry: () => unawaited(_refresh()));
 
     return PopScope(
       onPopInvokedWithResult: (bool didPop, Object? _) {
@@ -277,47 +276,50 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
               ),
             ),
           ),
-          body: wide
-              ? SeriesTwoPane(
-                  series: series,
-                  books: page,
-                  failure: failure,
-                  metadataLoading: metadataLoading,
-                  seriesId: seriesId,
-                  heroTag: heroTag,
-                  topPadding: topPadding,
-                  offlineBanner: offlineBanner,
-                  onRefresh: _refresh,
-                  onRetry: () => unawaited(_refresh()),
-                  onLoadMore: _loadMore,
-                  onOpenBook: _openBook,
-                  toolbar: toolbar,
-                  filtered: filtered,
-                  selected: selection.ids,
-                  selecting: selection.active,
-                  onToggleSelect: selecting.toggle,
-                  onMarkManyBooks: _markManyBooks,
-                )
-              : SeriesSinglePane(
-                  series: series,
-                  books: page,
-                  failure: failure,
-                  metadataLoading: metadataLoading,
-                  seriesId: seriesId,
-                  heroTag: heroTag,
-                  topPadding: topPadding,
-                  offlineBanner: offlineBanner,
-                  onRefresh: _refresh,
-                  onRetry: () => unawaited(_refresh()),
-                  onLoadMore: _loadMore,
-                  onOpenBook: _openBook,
-                  toolbar: toolbar,
-                  filtered: filtered,
-                  selected: selection.ids,
-                  selecting: selection.active,
-                  onToggleSelect: selecting.toggle,
-                  onMarkManyBooks: _markManyBooks,
-                ),
+          body: Stack(
+            children: <Widget>[
+              wide
+                  ? SeriesTwoPane(
+                      series: series,
+                      books: page,
+                      failure: failure,
+                      metadataLoading: metadataLoading,
+                      seriesId: seriesId,
+                      heroTag: heroTag,
+                      topPadding: topPadding,
+                      onRefresh: _refresh,
+                      onRetry: () => unawaited(_refresh()),
+                      onLoadMore: _loadMore,
+                      onOpenBook: _openBook,
+                      toolbar: toolbar,
+                      filtered: filtered,
+                      selected: selection.ids,
+                      selecting: selection.active,
+                      onToggleSelect: selecting.toggle,
+                      onMarkManyBooks: _markManyBooks,
+                    )
+                  : SeriesSinglePane(
+                      series: series,
+                      books: page,
+                      failure: failure,
+                      metadataLoading: metadataLoading,
+                      seriesId: seriesId,
+                      heroTag: heroTag,
+                      topPadding: topPadding,
+                      onRefresh: _refresh,
+                      onRetry: () => unawaited(_refresh()),
+                      onLoadMore: _loadMore,
+                      onOpenBook: _openBook,
+                      toolbar: toolbar,
+                      filtered: filtered,
+                      selected: selection.ids,
+                      selecting: selection.active,
+                      onToggleSelect: selecting.toggle,
+                      onMarkManyBooks: _markManyBooks,
+                    ),
+              OfflineOverlay(onRetry: () => unawaited(_refresh())),
+            ],
+          ),
         ),
       ),
     );

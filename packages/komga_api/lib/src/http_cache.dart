@@ -23,11 +23,26 @@ abstract interface class HttpCache {
   Future<void> write(String scope, String url, CacheKind kind, Uint8List body);
 
   /// 请求成功：UI 可以撤掉"离线"提示。
-  void reportOnline(String scope);
+  ///
+  /// [priority] 区分核心接口（JSON / 页图 / 写操作）与高并发装饰性资源（封面/页缩略图），
+  /// 供上层连接状态滤波器抗抖动。
+  void reportOnline(
+    String scope, {
+    RequestPriority priority = RequestPriority.primary,
+  });
 
   /// 请求失败（网络不可达 / 5xx）：UI 应提示"正在显示缓存内容"。
-  void reportOffline(String scope);
+  void reportOffline(
+    String scope, {
+    RequestPriority priority = RequestPriority.primary,
+  });
 }
+
+/// 请求对连接状态判定的权重。
+///
+/// 封面/页缩略图并发度高、失败已静默降级为占位图，弱网下容易偶发超时；
+/// 区分后可避免单张缩略图超时导致整个 App 频繁在离线/在线之间抖动。
+enum RequestPriority { primary, decorative }
 
 /// 缓存内容的类型。
 ///
