@@ -149,28 +149,3 @@ Yomu/
 ```
 
 Dependency direction: `apps/app → (design_system, platform, api, engines, domain)`, `engines → domain`, `domain → none`.
-
----
-
-## Known Limitations
-
-- **Keep Screen Awake & Volume Keys**: Currently implemented on Android only; gracefully no-op on iOS.
-- **E-Ink Tuning**: Uses a fixed high-contrast E-Ink theme without runtime contrast/gamma sliders.
-- **In-App Brightness**: Implemented as an overlay dimmer rather than modifying the OS system brightness.
-- **Certificate Pinning**: Pins the leaf certificate's SHA-256 fingerprint (re-confirmation required upon renewal; no custom CA chain or mTLS).
-- **Release Signing**: CI-built Android APKs are debug-signed and iOS artifacts are unsigned; Play Store / TestFlight distribution is not yet configured.
-
----
-
-## Documentation
-
-*(Most internal engineering documentation is maintained in Simplified Chinese.)*
-
-- **Environment Setup**: [docs/environment-setup.md](docs/environment-setup.md)
-- **Reverse Proxy & TLS Guide**: [docs/tls-and-proxy.md](docs/tls-and-proxy.md)
-- **Reader Architecture & Settings**: [docs/reader.md](docs/reader.md)
-- **Offline Caching & Storage**: [docs/offline-cache.md](docs/offline-cache.md)
-- **Accessibility & Adaptive Input**: [docs/a11y-and-input.md](docs/a11y-and-input.md)
-- **CI Workflows**: [docs/ci.md](docs/ci.md)
-- **Development Notes, Verification Archive & Full Doc Index**: [docs/development-notes.md](docs/development-notes.md)
-- **Changelog**: [CHANGELOG.md](CHANGELOG.md)

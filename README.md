@@ -149,26 +149,3 @@ Yomu/
 ```
 
 依赖边界：`apps/app → (design_system, platform, api, engines, domain)`，`engines → domain`，`domain → 无`。
-
----
-
-## 已知限制
-
-- **屏幕常亮与音量键翻页**：目前仅在 Android 端生效，iOS 端静默降级。
-- **墨水屏调节**：提供固定的高对比度墨水屏主题，暂未提供运行时对比度/灰度曲线调节。
-- **阅读器亮度**：采用应用内遮罩调节，不修改操作系统全局亮度。
-- **证书固定粒度**：按服务端叶证书 SHA-256 指纹固定，证书续期后需重新确认一次；暂不支持自定义 CA 链或双向 TLS（mTLS）。
-- **应用分发签名**：CI 自动构建的 Android APK 为 debug 签名、iOS 产物为未签名包，暂未上架应用商店或 TestFlight。
-
----
-
-## 相关文档
-
-- **环境搭建与双机同步**：[docs/environment-setup.md](docs/environment-setup.md)
-- **反代与 TLS 证书指南**：[docs/tls-and-proxy.md](docs/tls-and-proxy.md)
-- **阅读器功能与设计**：[docs/reader.md](docs/reader.md)
-- **离线缓存与存储机制**：[docs/offline-cache.md](docs/offline-cache.md)
-- **无障碍与多形态适配**：[docs/a11y-and-input.md](docs/a11y-and-input.md)
-- **CI 流水线说明**：[docs/ci.md](docs/ci.md)
-- **开发过程记录、实测档案与完整文档索引**：[docs/development-notes.md](docs/development-notes.md)
-- **更新日志**：[CHANGELOG.md](CHANGELOG.md)

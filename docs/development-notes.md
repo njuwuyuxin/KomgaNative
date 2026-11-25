@@ -98,7 +98,7 @@ dart run tool/ci.dart install  # 构建 release 装到模拟器并启动（保�
 | Android 音量键全 Activity 消费 | **已解决** | 已改为仅在阅读器激活期间消费（见 [a11y-and-input.md](a11y-and-input.md)） |
 | iOS 常亮与音量键翻页 | **仍为平台边界** | 仅 Android 生效，iOS 侧静默降级 |
 | 墨水屏对比度/灰度选项 | **仍为已知边界** | 固定高对比度 e-ink 主题，无运行时曲线调节 |
-| 应用内亮度遮罩 / 叶证书指纹固定 | **有意设计边界** | 见主 README「已知限制」与 [ADR 0001](adr/0001-certificate-trust.md) |
+| 应用内亮度遮罩 / 叶证书指纹固定 | **有意设计边界** | 详见 [reader.md](reader.md) 与 [ADR 0001](adr/0001-certificate-trust.md) |
 
 ---
 
