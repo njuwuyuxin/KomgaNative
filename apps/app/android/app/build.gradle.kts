@@ -52,6 +52,11 @@ android {
                     ?: error("key.properties missing required property: keyAlias")
                 keyPassword = keystoreProperties.getProperty("keyPassword")
                     ?: error("key.properties missing required property: keyPassword")
+                // 显式启用 v1 + v2 + v3 全套签名：AGP 8/9 在 minSdk >= 24 下默认关闭 v1 (JAR)，
+                // 部分国产 ROM 与 Android 墨水屏安装器会读取 META-INF 证书，缺失 v1 会报"缺乏开发者证书"。
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
             }
         }
     }

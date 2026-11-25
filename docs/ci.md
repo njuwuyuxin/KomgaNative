@@ -201,7 +201,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tool\bootstrap.ps1 -CheckOnl
 | `ANDROID_KEY_ALIAS` | Key 别名（`keyAlias`） |
 | `ANDROID_KEY_PASSWORD` | Key 密码（`keyPassword`） |
 
-> `apps/app/android/app/build.gradle.kts` 仅在存在 `apps/app/android/key.properties` 时启用正式签名，本地开发与日常 CI 未配置时自动回退 debug 签名；`release.yml` 会在构建前校验 Secrets 并在打包后用 `apksigner` 验签，防止误发 debug 签名包。
+> `apps/app/android/app/build.gradle.kts` 仅在存在 `apps/app/android/key.properties` 时启用正式签名（显式同时开启 v1 + v2 + v3 签名方案以兼容所有国产 ROM 与墨水屏设备），本地开发与日常 CI 未配置时自动回退 debug 签名；`release.yml` 会在构建前校验 Secrets 并在打包后用 `apksigner` 验签，防止误发 debug 签名包或缺失签名方案。
 
 ### 6.2 发布步骤
 

@@ -165,11 +165,12 @@ jobs:
           cp "${APK_DIR}/app-x86_64-release.apk"      "${OUT_DIR}/Yomu-${TAG}-android-x86_64.apk"
           cp "${APK_DIR}/app-release.apk"             "${OUT_DIR}/Yomu-${TAG}-android-universal.apk"
 
-          # 确认产物签名有效且使用正式证书，绝不误发 Android Debug 签名包
+          # 确认产物签名有效、包含 v1/v2/v3 完整签名块且使用正式证书，绝不误发 Android Debug 签名包
           APKSIGNER="$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools" -maxdepth 2 -name apksigner 2>/dev/null | sort -V | tail -n 1 || true)"
           for apk in "${OUT_DIR}"/*.apk; do
             if [ -n "${APKSIGNER}" ]; then
-              cert_info="$("${APKSIGNER}" verify --print-certs "${apk}")"
+              # minSdk=24 时 apksigner 默认跳过 v1 校验；传 --min-sdk-version 21 以显式验全 v1+v2+v3
+              cert_info="$("${APKSIGNER}" verify -v --min-sdk-version 21 --print-certs "${apk}")"
             else
               cert_info="$(keytool -printcert -jarfile "${apk}")"
             fi
@@ -178,6 +179,14 @@ jobs:
             if echo "${cert_info}" | grep -q "CN=Android Debug"; then
               echo "::error::${apk} 仍使用了 Android Debug 签名，终止发布！"
               exit 1
+            fi
+            if [ -n "${APKSIGNER}" ]; then
+              for scheme in "v1 scheme (JAR signing): true" "v2 scheme (APK Signature Scheme v2): true" "v3 scheme (APK Signature Scheme v3): true"; do
+                if ! echo "${cert_info}" | grep -qF "${scheme}"; then
+                  echo "::error::${apk} 缺少预期签名方案（${scheme}），终止发布！"
+                  exit 1
+                fi
+              done
             fi
           done
 
