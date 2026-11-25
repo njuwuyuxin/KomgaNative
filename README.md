@@ -1,6 +1,6 @@
 <div align="center">
 
-# KomgaNative
+# Yomu
 
 **专为 [Komga](https://komga.org) 打造的跨平台原生漫画阅读客户端**
 
@@ -8,9 +8,9 @@
 
 **简体中文** | [English](README.en.md)
 
-[![CI](https://github.com/njuwuyuxin/KomgaNative/actions/workflows/ci.yml/badge.svg)](https://github.com/njuwuyuxin/KomgaNative/actions/workflows/ci.yml)
-[![Android Build](https://github.com/njuwuyuxin/KomgaNative/actions/workflows/build-android.yml/badge.svg)](https://github.com/njuwuyuxin/KomgaNative/actions/workflows/build-android.yml)
-[![iOS Build](https://github.com/njuwuyuxin/KomgaNative/actions/workflows/build-ios.yml/badge.svg)](https://github.com/njuwuyuxin/KomgaNative/actions/workflows/build-ios.yml)
+[![CI](https://github.com/njuwuyuxin/Yomu/actions/workflows/ci.yml/badge.svg)](https://github.com/njuwuyuxin/Yomu/actions/workflows/ci.yml)
+[![Android Build](https://github.com/njuwuyuxin/Yomu/actions/workflows/build-android.yml/badge.svg)](https://github.com/njuwuyuxin/Yomu/actions/workflows/build-android.yml)
+[![iOS Build](https://github.com/njuwuyuxin/Yomu/actions/workflows/build-ios.yml/badge.svg)](https://github.com/njuwuyuxin/Yomu/actions/workflows/build-ios.yml)
 ![Flutter](https://img.shields.io/badge/Flutter-3.50.0-02569B?logo=flutter&logoColor=white)
 ![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20%7C%20E--Ink-2E7D32)
 
@@ -20,7 +20,7 @@
 
 ## 简介
 
-**KomgaNative** 是面向自建 [Komga](https://komga.org) 漫画服务器的跨平台原生客户端（基于 Flutter），专注于流畅的漫画阅读体验、可靠的离线与多设备进度同步，以及针对手机、平板与电子墨水屏的形态适配。
+**Yomu** 是面向自建 [Komga](https://komga.org) 漫画服务器的跨平台原生客户端（基于 Flutter），专注于流畅的漫画阅读体验、可靠的离线与多设备进度同步，以及针对手机、平板与电子墨水屏的形态适配。
 
 ## 核心特性
 
@@ -56,7 +56,7 @@
 
 ### 1. 获取安装包
 
-目前可通过本仓库的 [GitHub Actions](https://github.com/njuwuyuxin/KomgaNative/actions) 获取每次构建产物（Artifact 保留 14 天，下载需登录 GitHub 账号）：
+目前可通过本仓库的 [GitHub Actions](https://github.com/njuwuyuxin/Yomu/actions) 获取每次构建产物（Artifact 保留 14 天，下载需登录 GitHub 账号）：
 
 | 平台 | 流水线 | 产物说明 |
 |---|---|---|
@@ -67,7 +67,7 @@
 
 1. 启动应用，输入 Komga 服务器地址（例如 `http://192.168.1.10:25600` 或带反代子路径的 `https://comics.example.com/komga`）。
 2. 选择登录方式：
-   - **账号模式**：输入邮箱与密码，客户端会自动调用 Komga API 创建一把独立的 `KomgaNative` API Key 并仅保存该 Key（可在 Komga 后台随时吊销）。
+   - **账号模式**：输入邮箱与密码，客户端会自动调用 Komga API 创建一把独立的客户端 API Key 并仅保存该 Key（可在 Komga 后台随时吊销）。
    - **API Key 模式**：在 Komga 网页端 `账号设置 → API Keys` 生成后直接粘贴（适合开启双步验证的场景）。
 3. **局域网与反代处理**：
    - 局域网明文 `http://` 可直接使用；若端口实际仅监听 HTTPS，客户端会自动升级为 `https://` 重试。
@@ -99,8 +99,8 @@
 
 ```bash
 # 1. 克隆仓库
-git clone https://github.com/njuwuyuxin/KomgaNative.git
-cd KomgaNative
+git clone https://github.com/njuwuyuxin/Yomu.git
+cd Yomu
 
 # 2. 安装 Workspace 依赖
 cd apps/app && flutter pub get && cd ../..
@@ -135,7 +135,7 @@ dart run tool/ci.dart check
 项目采用 Dart Pub Workspace 单仓多包结构，依赖方向严格受 `tool/ci.dart layers` 约束：
 
 ```text
-KomgaNative/
+Yomu/
 ├── apps/app                      # Flutter 应用主体（Android / iOS）
 ├── packages/
 │   ├── komga_domain              # 纯 Dart 领域模型（零外部依赖）
