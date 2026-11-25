@@ -1,297 +1,174 @@
+<div align="center">
+
 # KomgaNative
 
-Komga 的跨平台客户端（iOS / Android / Android 墨水屏），阅读体验优先。
+**专为 [Komga](https://komga.org) 打造的跨平台原生漫画阅读客户端**
 
-> 状态：**M1 收尾 / v1 功能补完中**（阶段计划见 [docs/roadmap.md](docs/roadmap.md)）。
-> 已完成：M0 骨架（三套主题 + 黄金图闭环）、**服务器连接流程**（密码换 API Key / 直接粘贴 Key / 钥匙串保存 / 路由守卫 / 错误映射）、
-> **API 契约验证**（对真实 Komga 1.30.1 实例端到端实测，见 [docs/komga-api-verification.md](docs/komga-api-verification.md)）、
-> **反代与 TLS 处理**（`http` 端口自动升级 `https`、证书不受信任时固定指纹 + 用户确认，见 [docs/tls-and-proxy.md](docs/tls-and-proxy.md)）、
-> **真实书架**（`/api/v1/series` 分页 + 搜索 + 按库筛选 + 封面 + 下拉刷新 + 空/错态）、
-> **系列详情**（`/api/v1/series/{id}` + 书列表 + 点书进阅读器）、
-> **阅读器 v2**（单页 / 双页跨页 / 纵向连续三种模式，按系列方向自动选默认值；
-> 真实页图、点击翻页、双指缩放、从上次位置继续、进度回写 Komga；墨水屏白底黑字；
-> 阅读设置面板：模式/亮度/常亮/跳页，偏好持久化）、
-> **进度 outbox**（Drift 落盘、断网不丢、联网/回前台自动补交、多设备按服务端 `lastModified` 对账）、
-> **离线缓存**（书架/封面/页图 GET 响应落盘，断网看到上次的内容并显示离线提示条，见 [docs/offline-cache.md](docs/offline-cache.md)）、
-> **多服务器与存储管理**（设置页切换/删除服务器、缓存与下载占用、清空离线内容）、
-> **国际化**（English / 中文 / 跟随系统；ARB + `flutter gen-l10n`，见 [docs/i18n.md](docs/i18n.md)）、
-> **形态适配与无障碍（阶段 H 首轮）**（Android 音量键翻页、读屏语义与 48 点击区、
-> 系列详情平板两栏；见 [docs/a11y-and-input.md](docs/a11y-and-input.md)）。
-> 已在 **Android 模拟器 + 本机 Komga 实例**上跑通"连接 → 书架 → 系列 → 阅读 → 进度"全链路，
-> 并在**一台公网 NAS（openresty 反代 + 证书已过期）**上验证了真实登录路径。
-> 待完成：中文字体子集（黄金图里验证中文排版）、墨水屏对比度/灰度选项（见 roadmap 阶段 H 的边界）。
+阅读体验优先 · 适配 Android / iOS / Android 墨水屏
 
-## 文档
+**简体中文** | [English](README.en.md)
 
-| 文档 | 内容 |
-|---|---|
-| [docs/tech-selection.md](docs/tech-selection.md) | 技术选型：候选评分、技术栈、三大子系统设计、AI Agent 工程化、里程碑与风险 |
-| [docs/environment-setup.md](docs/environment-setup.md) | 环境搭建与双机切换：免管理员安装、验收标准、踩坑表 |
-| [docs/ci.md](docs/ci.md) | GitHub Actions：概念、免费额度与计费倍率、三条流水线、排障 |
-| [docs/komga-api-verification.md](docs/komga-api-verification.md) | Komga API 实测记录：复现步骤、证据表、发现的缺陷、仍未验证项 |
-| [docs/series-queries.md](docs/series-queries.md) | 书架排序与阅读状态筛选的参数验证（真实响应顺序） |
-| [docs/tls-and-proxy.md](docs/tls-and-proxy.md) | 反代与证书：真实现象（明文 400 / 证书过期）、客户端行为矩阵、复现方式 |
-| [docs/reader.md](docs/reader.md) | 阅读器：三层分工、模式规则、设置与持久化的取舍、常亮通道的实现边界 |
-| [docs/adr/0001-certificate-trust.md](docs/adr/0001-certificate-trust.md) | ADR：为什么用 TOFU + 固定指纹，而不是"忽略证书" |
-| [docs/adr/0002-progress-outbox-and-drift.md](docs/adr/0002-progress-outbox-and-drift.md) | ADR：进度 outbox 与 Drift 落盘（表结构、seq 回执、对账基准） |
-| [docs/offline-cache.md](docs/offline-cache.md) | 离线与缓存：能看什么、容量与淘汰、分区、验证 |
-| [docs/i18n.md](docs/i18n.md) | 国际化：ARB 组织、生成流程、语言设置与"数据层文案未本地化"的边界 |
-| [docs/a11y-and-input.md](docs/a11y-and-input.md) | 无障碍与输入：音量键翻页、读屏语义、48 点击区、平板两栏、墨水屏边界 |
-| [docs/adr/0003-http-response-cache.md](docs/adr/0003-http-response-cache.md) | ADR：为什么把缓存钩在传输层、为什么与进度库分文件 |
-| [docs/adr/0005-per-series-reader-settings.md](docs/adr/0005-per-series-reader-settings.md) | ADR：按系列阅读设置存哪里（secure storage JSON，不新增 Drift 表） |
-| [docs/adr/0006-share-page-with-share-plus.md](docs/adr/0006-share-page-with-share-plus.md) | ADR：分享单页为什么用 share_plus，而不是自写原生通道 |
-| [docs/roadmap.md](docs/roadmap.md) | 剩余功能分阶段计划（C–I）与验收口径 |
-| [docs/ui-polish-plan.md](docs/ui-polish-plan.md) | UI 精致化计划（对标 Panels）的 P0–P3 清单与落地记录 |
-| [docs/panels-comparison.md](docs/panels-comparison.md) | 2026-11 的功能/UI 细节对比、剩余差距与建议批次 |
-| [AGENTS.md](AGENTS.md) | Agent 工作契约：命令、架构不变量、DoD、反模式 |
+[![CI](https://github.com/njuwuyuxin/KomgaNative/actions/workflows/ci.yml/badge.svg)](https://github.com/njuwuyuxin/KomgaNative/actions/workflows/ci.yml)
+[![Android Build](https://github.com/njuwuyuxin/KomgaNative/actions/workflows/build-android.yml/badge.svg)](https://github.com/njuwuyuxin/KomgaNative/actions/workflows/build-android.yml)
+[![iOS Build](https://github.com/njuwuyuxin/KomgaNative/actions/workflows/build-ios.yml/badge.svg)](https://github.com/njuwuyuxin/KomgaNative/actions/workflows/build-ios.yml)
+![Flutter](https://img.shields.io/badge/Flutter-3.50.0-02569B?logo=flutter&logoColor=white)
+![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20%7C%20E--Ink-2E7D32)
 
-## CI
+</div>
 
-| 流水线 | 触发 | 机器 | 内容 |
-|---|---|---|---|
-| `ci.yml` | push / PR / 手动 | windows | 全量门禁（含黄金图） |
-| `build-android.yml` | main / 手动 | ubuntu | release APK 产物 |
-| `build-ios.yml` | push / PR / tag / 手动 | macos | `--no-codesign` 编译验证（public 仓库 macOS 免费） |
+---
 
-## 快速开始
+## 简介
+
+**KomgaNative** 是面向自建 [Komga](https://komga.org) 漫画服务器的跨平台原生客户端（基于 Flutter），专注于流畅的漫画阅读体验、可靠的离线与多设备进度同步，以及针对手机、平板与电子墨水屏的形态适配。
+
+## 核心特性
+
+### 沉浸式漫画阅读器
+- **三种阅读模式**：支持**单页**、**双页跨页**（自动处理封面单页与宽页跨图，支持按书手动微调双页分组）与**纵向连续（条漫）**，默认自动跟随系列阅读方向与设备横竖屏。
+- **翻页与画面控制**：内置着色器真实卷页、平移、淡入与无动画瞬切；支持适应屏幕/填满屏幕/适应宽度/适应高度、自动去白边、双指/双击缩放与锁定缩放、动态/沉浸式页边取色背景、应用内亮度调节、屏幕常亮及条漫自动滚动。
+- **多样化操控与工具**：支持五种点击区预设与方向反转、Android 音量键翻页、键盘/蓝牙翻页器、顶栏 `AA` 快捷设置、按系列独立记住设置、可复用的阅读预设、系列目录跳转、缩略图滑条、无痕阅读、单页分享以及一键保存原图（双页自动左右拼接保存）。
+
+### 墨水屏与多形态适配
+- **电子墨水屏专项优化**：提供零动画、零阴影、纯黑白高对比度主题与白底黑字阅读画布；Android 端支持自动识别常见墨水屏设备（Boox / Meebook / Boyue / Hisense 等），亦可随时手动切换。
+- **手机与平板自适应**：平板宽屏自动启用书架双栏（书库侧栏 + 书架网格）与系列详情双栏，支持独立的平板默认单/双页排版设置；Android 端主动申请屏幕最高刷新率。
+- **无障碍与双语**：内置完整读屏语义与动态字体缩放适配，支持**简体中文**与 **English**（可跟随系统或手动切换）。
+
+### 书架、收藏与全局搜索
+- **正在读首页**：聚合继续阅读、最近阅读记录、最近添加与按书库货架，打开应用即可续读。
+- **书架与系列管理**：支持网格/列表切换、封面尺寸调节、排序与阅读状态/书库筛选、保存常用筛选组合、系列置顶、未读角标，以及书架/系列内多选批量标记已读/未读与批量加入收藏集。
+- **收藏集与阅读列表**：支持封面拼贴浏览、搜索与排序，支持直接新建、重命名、删除收藏集及管理其中系列。
+- **全局搜索**：跨系列与书籍检索，提供搜索历史以及阅读状态/标签筛选。
+
+### 离线缓存、整本下载与进度同步
+- **本地优先进度同步**：翻页进度优先写入本地数据库并自动在联网、回前台或冷启动时补交，基于服务端时间戳完成多设备对账，断网阅读不丢进度。
+- **智能离线缓存**：自动缓存浏览过的书架、详情、封面与页图（图片 256 MB LRU 淘汰，与用户数据分库存储），断网时无缝回退并展示离线状态提示。
+- **整本与批量下载**：支持单本、整系列或前 N 本未读批量下载，具备持久化下载队列、暂停/继续/重试、仅 Wi-Fi 下载、并发数配置与标记已读后自动清理。
+
+### 安全连接、多服务器与阅读统计
+- **更安全的登录方式**：支持「账号密码换取专属可吊销 API Key（本地绝不保存密码）」与「直接粘贴 API Key」两种模式，凭据加密存储于系统 Keychain / Keystore。
+- **反向代理与内网友好**：完整支持局域网 HTTP、反代子路径（如 `https://host/komga`）、HTTP 误连 HTTPS 端口自动升级，以及自签名/过期证书的 **TOFU（首次信任）指纹固定**。
+- **多服务器隔离与本地统计**：支持保存并一键切换多台 Komga 服务器，所有进度、下载、置顶、历史与阅读覆盖按服务器完全隔离；内置本地阅读历史、连续阅读天数与 12 周热力图，并支持通过剪贴板导出/导入偏好设置（不含凭据）。
+
+---
+
+## 获取与使用
+
+### 1. 获取安装包
+
+目前可通过本仓库的 [GitHub Actions](https://github.com/njuwuyuxin/KomgaNative/actions) 获取每次构建产物（Artifact 保留 14 天，下载需登录 GitHub 账号）：
+
+| 平台 | 流水线 | 产物说明 |
+|---|---|---|
+| **Android** | `Android` (`build-android.yml`) | `komga-native-apk`：可直接在 Android 设备安装的 `app-release.apk`（debug 签名） |
+| **iOS** | `iOS` (`build-ios.yml`) | `komga-native-ios-unsigned`：未签名 `Runner.app.zip`（真机安装需通过 Xcode 自行签名） |
+
+### 2. 连接到你的 Komga 服务器
+
+1. 启动应用，输入 Komga 服务器地址（例如 `http://192.168.1.10:25600` 或带反代子路径的 `https://comics.example.com/komga`）。
+2. 选择登录方式：
+   - **账号模式**：输入邮箱与密码，客户端会自动调用 Komga API 创建一把独立的 `KomgaNative` API Key 并仅保存该 Key（可在 Komga 后台随时吊销）。
+   - **API Key 模式**：在 Komga 网页端 `账号设置 → API Keys` 生成后直接粘贴（适合开启双步验证的场景）。
+3. **局域网与反代处理**：
+   - 局域网明文 `http://` 可直接使用；若端口实际仅监听 HTTPS，客户端会自动升级为 `https://` 重试。
+   - 若服务器使用自签名或已过期证书，客户端会展示证书 CN、颁发者、有效期与 SHA-256 指纹；核对无误点击信任后仅固定当前证书，证书更换时会再次提示确认。
+
+更多反代与证书细节可参考 [docs/tls-and-proxy.md](docs/tls-and-proxy.md)。
+
+---
+
+## 本地构建与部署
+
+### 环境要求
+
+- **Flutter**：`3.50.0`（见 `.fvmrc`）
+- **Dart SDK**：`^3.14.0`
+- **Android 构建**：JDK 17 + Android SDK
+- **iOS 构建**：macOS + Xcode
+
+> Windows 用户可使用仓库内置的无管理员权限引导脚本一键体检或安装依赖：
+> ```powershell
+> powershell -NoProfile -ExecutionPolicy Bypass -File tool\bootstrap.ps1 -CheckOnly
+> powershell -NoProfile -ExecutionPolicy Bypass -File tool\bootstrap.ps1
+> ```
+> 详细步骤与排障见 [docs/environment-setup.md](docs/environment-setup.md)。
+
+### 从源码运行与构建
+
+> 注意：Drift 数据库代码与多语言文件（`*.g.dart` / `app_localizations*.dart`）不提交至仓库，**首次克隆后需先执行代码生成**。
 
 ```bash
-# 1. 环境（Windows，用户级，无需管理员）
-powershell -NoProfile -ExecutionPolicy Bypass -File tool\bootstrap.ps1 -CheckOnly   # 体检
-powershell -NoProfile -ExecutionPolicy Bypass -File tool\bootstrap.ps1             # 安装
+# 1. 克隆仓库
+git clone https://github.com/njuwuyuxin/KomgaNative.git
+cd KomgaNative
 
-# 2. 依赖与校验
+# 2. 安装 Workspace 依赖
 cd apps/app && flutter pub get && cd ../..
-dart run tool/ci.dart check
 
-# 3. 跑起来
+# 3. 生成 Drift 与多语言代码
+dart run tool/ci.dart codegen
+
+# 4. 运行到已连接的设备或模拟器
 cd apps/app && flutter run
 ```
 
-## 结构
-
-```
-apps/app                       Flutter 应用（android / ios）
-packages/komga_domain          领域模型（纯 Dart，零依赖）
-packages/komga_reader_engine   阅读器几何：适配缩放、平移夹紧、双页/RTL 分组
-packages/komga_sync_engine     进度 outbox + 多设备对账决策
-packages/komga_api             Komga REST 传输层、错误模型、URL 构造
-packages/komga_design_system   token、light/dark/eink 三主题、基础组件
-packages/komga_platform        设备形态与墨水屏探测的抽象层
-tool/ci.dart                   统一校验入口（check / fix / test / golden）
-```
-
-依赖方向由 `dart run tool/ci.dart check` 的 `layers` 步骤强制：
-`app → (design_system, platform, api, engines, domain)`；`engines → domain`；`domain → 无`。
-
-## 质量门禁
+构建 Release 产物：
 
 ```bash
-dart run tool/ci.dart check    # format + analyze + layers + 全部测试
-dart run tool/ci.dart golden   # 重新生成黄金图（仅 Windows，与 CI 一致）
+# Android APK
+cd apps/app && flutter build apk --release
+
+# iOS（无签名验证；真机分发请配置签名后使用 flutter build ipa）
+cd apps/app && flutter build ios --release --no-codesign
 ```
 
-当前基线：**399 个测试**（纯 Dart 160 / Flutter 239），**28 张黄金图**覆盖
-书架（手机 light / 平板 dark / 1.3 倍字号 / 墨水屏 / 空态 / 错误态 / **离线态**）、系列详情（手机 / 平板两栏 dark / 平板两栏 light / 墨水屏）、
-阅读器（单页 dark+eink、双页 dark+eink、纵向 dark、设置面板 dark+eink）、墨水屏设置（含存储占用）、连接页（light / eink）、
-证书面板（手机 / 平板 / 墨水屏）、启动页。
+本地质量门禁（代码生成 + 格式检查 + 静态分析 + 架构分层检查 + 全量单测与黄金图）：
 
-其中 `packages/komga_api` 的 99 个测试里包含**两层真值校验**：
-`contract_test.dart` 拿官方 OpenAPI 校验客户端会构造的每个 URL；`fixtures_test.dart` 用真实服务器响应驱动解析层。
-反代与证书的异常形态同样用**真实抓包**（`test/fixtures/proxy-400-plain-http.html`）和真实异常类型驱动（`errors_test.dart`）；
-离线缓存的回退决策由 11 个用例覆盖（命中/未命中/404/401/5xx/缓存自身故障）。
-阅读器的几何（单页适配、双页分组、纵向偏移/页码映射）在 `packages/komga_reader_engine` 里是纯函数，32 个用例表驱动覆盖。
+```bash
+dart run tool/ci.dart check
+```
 
-## 连接流程（已可用）
+---
 
-1. 输入服务器地址（支持反代子路径，如 `https://host/komga`）；
-2. **Account 模式**：邮箱 + 密码 → 客户端自动调 `POST /api/v2/users/me/api-keys` 创建一把名为
-   `KomgaNative` 的 Key → 只把 Key 存进 Keychain/Keystore，**不保存密码**；
-3. **API Key 模式**：在 Komga 后台建好 Key 直接粘贴（适合开了双步验证）；
-4. 连接失败按类型给不同建议（401 → 检查凭据；网络错误 → 检查地址/同网段；非 Komga 响应 → 检查反代）。
+## 项目结构
 
-## 书架（已可用）
+项目采用 Dart Pub Workspace 单仓多包结构，依赖方向严格受 `tool/ci.dart layers` 约束：
 
-数据流：`LibraryScreen`（只画状态）← `ShelfController`（分页/搜索/筛选/竞态）← `LibraryRepository`（唯一碰网络的地方）← `KomgaSession`。
+```text
+KomgaNative/
+├── apps/app                      # Flutter 应用主体（Android / iOS）
+├── packages/
+│   ├── komga_domain              # 纯 Dart 领域模型（零外部依赖）
+│   ├── komga_reader_engine       # 纯 Dart 阅读器几何引擎（单双页分组、缩放、点击区、自动滚动、提色）
+│   ├── komga_sync_engine         # 纯 Dart 进度 Outbox 与多设备对账引擎
+│   ├── komga_api                 # Komga REST 传输层、错误模型、URL 契约与离线缓存接口
+│   ├── komga_design_system       # 设计 Token、Light / Dark / E-Ink 三主题与玻璃控件库
+│   └── komga_platform            # 平台能力抽象（断点形态、墨水屏探测、硬件键、网络与存图）
+├── tool/                         # CI 门禁（ci.dart）、环境引导与本地联调脚本
+└── docs/                         # 架构设计、使用指南、ADR 与开发记录
+```
 
-- **继续阅读**：书架顶部一行 ondeck（读过没读完的书），读完会自动消失；点击带着系列阅读方向直接进阅读器；
-- **排序与筛选**：标题 A-Z/Z-A、最近添加、最近阅读；阅读状态（未读/在读/已读）。
-  取值只列已对真实 Komga 1.30.1 验证过的（见 [docs/series-queries.md](docs/series-queries.md)）；
-- 分页 + 滚到底自动预取（距底 600px，太晚会有"卡一下"的体感）；
-- 搜索 350ms 防抖；按库筛选；下拉刷新（空态/错误态也能拉）；
-- 封面走 `/series/{id}/thumbnail`，字节进 48 张的 LRU 缓存，失败只显示占位图**不影响整页**；
-- 错误按语义分四类（凭据失效 → Sign out / 网络 / 服务端 / 协议），失败不清空已有内容；
-- 请求带 generation 号，快速切库/边搜边刷新时旧响应不会覆盖新结果；
-- 网格按"最大列宽 190"自适应：手机 2 列、平板 5 列、墨水屏 4 列，不用断点写死。
+依赖边界：`apps/app → (design_system, platform, api, engines, domain)`，`engines → domain`，`domain → 无`。
 
-## 系列详情（已可用）
+---
 
-- 头部：封面 + 标题 + "N of M read" + 进度条 + 阅读方向（来自 `metadata.readingDirection`）；
-- 书列表：封图、`#卷号 · 书名`、页数、已读完打勾；点一本书进阅读器（把已抓到的 `Book` 一起带过去，省一次请求）；
-- **平板两栏**：宽 ≥1024 时左头部 / 右书列表（`WindowSizeClass.expanded`），手机、横屏手机、
-  758×1024 墨水屏保持单栏；两栏实现见 `widgets/series_two_pane.dart`；
-- **标记整系列已读/未读**：右上角菜单，一条 `POST`/`DELETE /series/{id}/read-progress` 完成
-  （接口经真实实例验证，见 [docs/series-queries.md](docs/series-queries.md)），本地 outbox 同步覆盖；
-- 一次要 100 本（多数系列够用）；真超过 100 本时底部明说 "Showing 100 of N"，**不装作全都在**；
-- 空系列、加载失败（可重试）、下拉刷新与书架同一套语义。
+## 已知限制
 
-## 阅读器 v2（已可用）
+- **屏幕常亮与音量键翻页**：目前仅在 Android 端生效，iOS 端静默降级。
+- **墨水屏调节**：提供固定的高对比度墨水屏主题，暂未提供运行时对比度/灰度曲线调节。
+- **阅读器亮度**：采用应用内遮罩调节，不修改操作系统全局亮度。
+- **证书固定粒度**：按服务端叶证书 SHA-256 指纹固定，证书续期后需重新确认一次；暂不支持自定义 CA 链或双向 TLS（mTLS）。
+- **应用分发签名**：CI 自动构建的 Android APK 为 debug 签名、iOS 产物为未签名包，暂未上架应用商店或 TestFlight。
 
-三种模式，顶栏右侧的菜单随时切换，**切完页码不丢**：
+---
 
-| 模式 | 行为 |
-|---|---|
-| 单页 | 一屏一页；点击左右三分之一翻页，中间收起/显示顶栏底栏 |
-| 双页 | 封面单独一屏；普通页两两成屏；宽页（跨页大图）单独成屏；左右顺序按阅读方向（RTL 时后一页在左） |
-| 纵向连续 | 条漫/竖向作品；页图按宽度铺满、连续排列，滚动位置实时换算成页码 |
+## 相关文档
 
-- **默认模式跟随系列元数据**：`readingDirection` 是 `WEBTOON` / `VERTICAL` 就直接进纵向连续，其余先单页；
-  双页是用户主动选的（Komga 的元数据表达不了"双页"）。
-- **真实页图**：`/books/{id}/pages` 拿尺寸 → 引擎算布局 → `/books/{id}/pages/{n}?zero_based=false` 取图；
-- **缩放**：单页/双页支持双指缩放 1×–4× 与放大后拖动，缩回自动归位；纵向模式交给滚动，不叠加缩放；
-- **接着读**：用服务端 `readProgress.page` 恢复位置；纵向模式滚动到对应偏移；
-- **进度回写**：翻页后 600ms 防抖 PATCH；到最后一页置 `completed`，切后台立刻 flush；
-  双页的"最后一屏含末页"也算读完（否则系列进度永远差一页）；
-- **墨水屏**：阅读区改白底黑字（黑底会触发整屏全刷），顶栏/底栏/错误页同一套配色；
-- 页列表失败 → 整页错误 + 重试；单页失败 → 页内提示 + 重试，**页码与翻页仍可用**。
-
-### 阅读设置
-
-顶栏右侧按钮打开面板，四项设置都即时生效：
-
-| 设置 | 说明 |
-|---|---|
-| 阅读模式 | 跟随书 / 单页 / 双页 / 纵向；**持久化**，下次打开新书沿用 |
-| 亮度 | 阅读区盖一层黑遮罩（下限 20%，不会全黑），不吃点击，翻页照常 |
-| 常亮 | 进阅读器置真、退出置假（Android `FLAG_KEEP_SCREEN_ON`，见 [docs/reader.md](docs/reader.md)） |
-| 音量键 | 仅 Android：音量上 = 上一页，音量下 = 下一页；单页/双页生效，纵向连续忽略 |
-| 跳页 | 拖到目标页松手才跳；纵向模式滚到对应偏移 |
-
-偏好存在 secure storage（`komganative.reader.v1`），不是 Drift：几个字段不需要查询能力，
-Drift 留给书架/页图缓存与进度 outbox。坏存档一律回默认值。
-
-## 无障碍、输入与形态适配（阶段 H 首轮）
-
-- **音量键翻页**：Android 原生 `dispatchKeyEvent` 捕获音量键并消费，经 `komganative/device`
-  通道发给 `ChannelHardwareKeys`；阅读器单页/双页映射为上一页/下一页，纵向模式忽略。
-  iOS 与桌面没有实现，`MissingPluginException` 静默降级为空流；
-- **读屏语义**：书架卡片、继续阅读卡片、系列书行各是一句完整标签；阅读器顶/底栏与下载按钮
-  沿用 `IconButton` 的 tooltip 语义；文案全部来自 `context.l10n`，`SeriesTile` 不再硬编码「已读」；
-- **点击区**：图标按钮默认 48×48，自定义卡片（96×196）与书行整行可点；
-- **平板两栏**：系列详情在 ≥1024 时左头部 / 右书列表；窄屏路径不变；
-- 细节、验收与**未验证项**（Kotlin 未本机编译、iOS 常亮未做、墨水屏灰度选项未做）见
-  [docs/a11y-and-input.md](docs/a11y-and-input.md)。
-
-## 进度：先落盘，再补交
-
-翻页不再直连 PATCH：先写本地 Drift（`local_progress`），再尽力上传。
-断网、切后台、服务端 5xx 都不会丢这一页。
-
-- **合并**：同一本书只保留最新一条（翻页很密，堆队列没有意义）；
-- **回执**：提交成功要 `seq` 匹配才清空——提交期间又翻页时，新进度必须留下；
-- **补交时机**：启动、**会话恢复/重新登录后**、回到前台、下次翻页（真机踩到过"启动时会话还没恢复"的时序坑）；
-- **对账**：只信服务端 `lastModified`，不用设备墙钟；`decideSync` 决定"推送/采纳/忽略"，
-  采纳时写回本地；服务端把进度删了（标记未读）本地也清空；
-- **本地优先展示**：书架与阅读器 resume 都会叠加本地未提交进度，
-  所以"断网读完 → 重新打开"看到的是自己读到的那一页，不是服务端的旧值；
-- **401/403**：保留队列但本轮停手，重新登录后再补交。
-
-表结构、为什么合一张表、为什么 PATCH 成功后要把服务端基准置空，见
-[ADR 0002](docs/adr/0002-progress-outbox-and-drift.md)。
-
-## 离线：看过的东西还能看
-
-缓存钩在 `KomgaSession` 的 GET 上（不是每个 Repository 各写一遍）：成功写盘，
-**网络类失败 / 5xx** 才回退；404/401/403 不回退——资源被删或登录失效时要如实报错。
-细节与取舍见 [docs/offline-cache.md](docs/offline-cache.md)、[ADR 0003](docs/adr/0003-http-response-cache.md)。
-
-- 缓存什么：系列列表、系列详情、书列表、页列表、页图、封面；
-- 容量：图片 256 MB 按 LRU 淘汰；JSON 每服务器 400 条按最久未用裁剪，**不参与字节淘汰**
-  （它很小，却是"书能不能打开"的前提）；
-- 分区：按服务器 `baseUrl`，多服务器不串数据；查询串进缓存键，搜索/分页互不覆盖；
-- 提示：传输层观测到失败就显示「Offline · showing saved content」，任意请求成功（含进度 PATCH）后自动消失；
-- **整本下载**：系列详情每本书右侧 ⬇ 按钮，显示进度、可取消、可删除；下载完断网可整本读，
-  设置页能看到已下载数量与体积；
-- 管理：设置 → Storage 看占用、一键清空（只清缓存，不动进度）。
-
-## 设置（已可用）
-
-`设置` 页分四块：
-
-- **外观**：主题（跟随系统 / 亮 / 暗）、墨水屏模式（关动画/阴影/彩色，最大化对比度）、
-  **语言**（跟随系统 / English / 中文，选择即生效并持久化到 secure storage）；
-- **服务器**：保存多台 Komga（地址 + 账号 + Key），点一下切换，可逐台删除；
-  `Add server` 退出当前会话去连新服务器——**Disconnect 只清"当前"，不会忘掉整个列表**；
-- **存储**：离线内容占用与条数、已下载书籍数量与体积；`Clear` 同时清掉缓存与下载记录
-  （否则"已下载"徽标会指向已经删掉的页），但**不动阅读进度**；
-- **关于**：版本、开源许可（`showLicensePage`）。
-
-## 连接到你的 Komga（NAS）
-
-1. 地址填 `http://<NAS 局域网 IP>:<端口>`，例如 `http://192.168.1.10:25600`（也支持 `https://` 与反代子路径 `https://host/komga`）；
-2. **内网 http 是支持的**：Android 已放行明文（`usesCleartextTraffic`），iOS 已配 ATS 例外；
-   只有"公网地址 + 明文 http"才会弹红色警告——局域网不会；
-3. **端口其实只开 HTTPS 也没关系**：反代会回 `400 The plain HTTP request was sent to HTTPS port`，
-   客户端识别到这条就把协议自动换成 `https://` 重试，成功后保存的是能用的那个地址；
-4. **证书过期/自签名**：会弹一个面板列出证书的 CN、颁发者、到期日和 SHA-256 指纹，
-   点 `Connect anyway` 才继续。确认后只固定这一张证书——以后换证书会再问一次，不会静默放行；
-5. 用邮箱 + 密码登录：客户端会调 `POST /api/v2/users/me/api-keys` 建一把 comment 形如
-   `KomgaNative <UTC 时间戳>` 的 Key（同账号重名会被服务端拒绝，撞上会自动换一个重试）；
-6. 之后**只保存 Key**（Keychain / Keystore），不再保存密码；可以在 Komga 后台随时吊销这把 Key；
-7. 也可以直接用 API Key 模式：Komga → 账号设置 → API keys 里建一把粘进来。
-
-排障：连不上先确认手机与 NAS 同一网段、端口没被防火墙挡、`http://` 与端口写全；
-若地址被反代改写成网页，会提示"响应无法识别"；若提示"证书不受信任"，先核对面板里的指纹
-（`sha256sum` 或浏览器里能看到同一张证书），确认是自己服务器再点继续。
-**装的是 release APK 时**，还要确认它带 `INTERNET` 权限（`aapt2 dump permissions app-release.apk`）：
-漏了这条权限，系统会拒绝所有 socket，界面只有"无法连接到 xxx"，而同一台手机的浏览器却能打开——
-debug 包（模拟器 / `flutter run`）自带这条权限，所以这个坑只在真机 release 包上暴露。
-权限声明在 `apps/app/android/app/src/main/AndroidManifest.xml`，由 `test/platform/android_manifest_test.dart` 钉住。
-
-## 模拟器实测记录（2026-11-17）
-
-在 `kn_api36`（Android 16 / API 36）上，对着本机 `komga-1.30.1` 真实实例走了一遍：
-
-| 验证项 | 结果 |
-|---|---|
-| 密码换 API Key（含撞 `ERR_1034` 后自动重试） | ✅ 服务端出现 `KomgaNative 2026-11-17T11:13:07Z` |
-| 会话持久化（杀进程重启） | ✅ 直接进书架，不再要求登录 |
-| 书架：真实系列 + 真实封面 + 分页 | ✅ 5 个系列，`0/1`、`2/2` 徽标正确 |
-| 系列详情：书列表 + 阅读方向 | ✅ 显示 `Reads right to left` |
-| 阅读器：真实页图 + RTL 翻页 | ✅ 点左侧前进，页码 `1/8 → 2/8` |
-| 进度回写 + 最后一页 `completed` | ✅ 服务端 `page=8 completed=true`，系列 `1/2` |
-| 返回后刷新进度 | ⚠️ 初次实测**不刷新**（仍显示 `0 of 2`），已修复并复测通过（返回后 `2 of 2`、徽标 `2/2`） |
-| 返回书架不跳回顶部 | ⚠️ 第一版修复把列表重置导致跳顶，改为 `refreshInPlace` 后复测通过 |
-| 真实 NAS（openresty 反代，证书 2026-07-19 过期） | ✅ 首次 `http://…:4433` 被反代回 400 → 自动升级 `https` → 弹出证书面板 → `Connect anyway` 后登录成功（见 [docs/tls-and-proxy.md](docs/tls-and-proxy.md)） |
-| 同一台 NAS 续期证书后 | ✅ 无 `-k` 的严格校验通过（`ssl_verify=0`、返回 401 而非握手失败），不再弹面板——指纹固定只在"证书变了"时才拦 |
-| 双页跨页（RTL 系列，3 页真实书） | ✅ 顶栏 `2–3 / 3`；P3 在左、P2 在右（日漫右起） |
-| 双页读完写回 | ✅ 服务端 `"page":3,"completed":true`（最后一屏含末页也标完成） |
-| 纵向连续 + 滚动跟随页码 | ✅ 滚动后 `2 / 3 → 3 / 3`，并按页写回进度 |
-| 墨水屏阅读器 | ✅ 白底黑字（顶栏/底栏/页码同套配色），不再黑底全刷 |
-| 阅读设置：亮度 | ✅ 拖到 20% 后整页变暗；**杀进程重启后仍是 20%**（存档生效） |
-| 阅读设置：常亮 | ✅ 打开后 `dumpsys window` 出现 `fl=KEEP_SCREEN_ON`，关掉即消失 |
-| 进度 outbox：离线翻页 | ✅ 停掉服务端翻到第 4 页 → 杀进程 → 服务端仍是第 3 页 |
-| 进度 outbox：冷启动补交 | ✅ 重启 App 后服务端变成 `page:4, completed:true`（`lastModified` 是新时间） |
-| 进度 outbox：积压补交 | ✅ 修 bug 前积压的第 2 页，冷启动后被自动补交 |
-
-## 已知边界
-
-- **离线只覆盖"看过的东西"**：没访问过的页断网仍打不开（整本下载属于阶段 D）；
-  离线时也不做凭据校验——登录态失效要联网才会发现；
-- **常亮只在 Android 生效**：iOS 侧通道没实现（`MissingPluginException` 静默降级为"不常亮"），
-  没有 macOS 环境验证，宁可留空也不写没跑过的 `AppDelegate`；
-- **音量键翻页只在 Android 生效**：原生侧会消费音量键（整个 Activity 都不再调系统音量，
-  不只是阅读器）；Kotlin 已通过本地 `flutter build apk --debug`，但未在真机验证按键行为，
-  见 [docs/a11y-and-input.md](docs/a11y-and-input.md)；
-- **墨水屏没有对比度/灰度选项**：只有固定的 e-ink 主题（零动画/零阴影/纯黑白 + 阅读器白底），
-  没有运行时调节，也没有真实墨水屏设备上的残影验收；
-- **亮度是应用内遮罩**，不改系统亮度（那需要新插件），夜里够用但不是系统级调光；
-- **阅读偏好是全局的**，不按书记忆（系列的条漫/竖向已由元数据兜住，双页是个人习惯）；
-- **数据层文案尚未本地化**：`ShelfFailure.message/hint`（书架/系列/阅读器的错误态）与
-  `SessionController` 生成的连接失败 `error/hint` 仍是数据层写死的文本（英文为主，部分历史文案为中文），
-  不随语言设置切换；详见 [docs/i18n.md](docs/i18n.md#边界数据层文案尚未本地化)；
-- **中文字体子集未做**：黄金图测试只加载 Roboto，没有 CJK 字形，所以还没有中文黄金图；
-  `settings@eink` 里语言选项的「中文」二字在测试字体下显示为占位方块（真机使用系统字体，显示正常）。
-  这属于 roadmap 阶段 G 的剩余项，不是文案缺失；
-- 证书信任是**按叶证书指纹固定**：服务器续期后需要再确认一次（有意为之，不是 bug）；
-  不做自签名 CA 链校验与双向 TLS。
+- **环境搭建与双机同步**：[docs/environment-setup.md](docs/environment-setup.md)
+- **反代与 TLS 证书指南**：[docs/tls-and-proxy.md](docs/tls-and-proxy.md)
+- **阅读器功能与设计**：[docs/reader.md](docs/reader.md)
+- **离线缓存与存储机制**：[docs/offline-cache.md](docs/offline-cache.md)
+- **无障碍与多形态适配**：[docs/a11y-and-input.md](docs/a11y-and-input.md)
+- **CI 流水线说明**：[docs/ci.md](docs/ci.md)
+- **开发过程记录、实测档案与完整文档索引**：[docs/development-notes.md](docs/development-notes.md)
+- **更新日志**：[CHANGELOG.md](CHANGELOG.md)
