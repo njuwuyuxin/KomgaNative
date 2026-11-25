@@ -10,15 +10,15 @@
 
 | 概念 | 含义 | 本仓库对应 |
 |---|---|---|
-| workflow | 一个 YAML 文件 = 一条流水线 | `ci.yml` / `build-android.yml` / `build-ios.yml` |
+| workflow | 一个 YAML 文件 = 一条流水线 | `ci.yml` / `build-android.yml` / `build-ios.yml` / `release.yml` |
 | trigger (`on:`) | 什么时候跑 | push / pull_request / 打 tag / 手动 |
-| job | 一台机器上的一组步骤 | `gate` / `apk` / `build` |
+| job | 一台机器上的一组步骤 | `gate` / `apk` / `build` / `release-android` |
 | runner | 实际执行的虚拟机 | `windows-latest` / `ubuntu-latest` / `macos-latest` |
 | step | job 里的一步（跑命令或调用 action） | `flutter pub get`、`dart run tool/ci.dart check` |
 | action (`uses:`) | 别人写好的可复用步骤 | `actions/checkout@v7`、`subosito/flutter-action@v2` |
 | artifact | 跑完产出的文件，可下载 | APK、未签名 `.app.zip`、黄金图失败截图 |
 | cache | 跨运行复用的目录，省下载时间 | Flutter SDK、Gradle 依赖 |
-| secret | 加密变量，日志里自动打码 | 将来 TestFlight/Play 的签名密钥 |
+| secret | 加密变量，日志里自动打码 | Android 发布 keystore / 将来 iOS 签名密钥 |
 
 **它不是**：不是服务器（不能常驻）、不是免费算力池（有额度和时长上限）、不适合做长时间任务（单 job 上限 6 小时）。
 
@@ -60,13 +60,14 @@
 
 ---
 
-## 3. 本仓库的三条流水线
+## 3. 本仓库的四条流水线
 
 | 文件 | 触发 | 机器 | 做什么 |
 |---|---|---|---|
 | `ci.yml` | push to main、PR、手动 | `windows-latest` | `dart run tool/ci.dart check`：格式 + 分析 + 分层规则 + 全部测试 + 黄金图比对 |
-| `build-android.yml` | push to main（代码路径变化）、手动 | `ubuntu-latest` | `flutter pub get` → `dart run tool/ci.dart codegen` → `flutter build apk --release` → 上传 APK artifact |
+| `build-android.yml` | push to main（代码路径变化）、手动 | `ubuntu-latest` | `flutter pub get` → `dart run tool/ci.dart codegen` → `flutter build apk --release` → 上传 debug 签名 APK artifact |
 | `build-ios.yml` | push / PR / `v*` tag / 手动 | `macos-latest` | `flutter pub get` → `dart run tool/ci.dart codegen` → `flutter build ios --release --no-codesign` → 上传 `.app.zip` |
+| `release.yml` | push `v*` tag | `ubuntu-latest` | 校验 tag 与 `pubspec.yaml` 版本一致 → 还原正式 keystore → 构建分架构与通用 release APK → `apksigner` 验签 → 自动发布到 GitHub Releases（附 `SHA256SUMS.txt`） |
 
 **为什么门禁放在 Windows**：黄金图基线以 Windows 为唯一平台（`AGENTS.md` 的约定）。在 Linux/macOS 上跑会因字体光栅化差异导致 5 张基线全部失配，而且修不好——只能换基线平台。
 
@@ -145,7 +146,7 @@ git push -u origin main
 git remote set-url origin git@github.com:<你>/KomgaNative.git
 ```
 
-3. 推送成功后打开仓库页面的 **Actions** 标签，能看到三条 workflow 自动出现。
+3. 推送成功后打开仓库页面的 **Actions** 标签，能看到四条 workflow 自动出现。
 
 ### 4.2 双机开发时
 
@@ -185,9 +186,44 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tool\bootstrap.ps1 -CheckOnl
 
 ---
 
-## 6. 后续要补的（按优先级）
+## 6. 发版（GitHub Releases）
 
-1. **签名**：Android keystore + `key.properties` 走 secrets；iOS 用 App Store Connect API Key + `flutter build ipa`。
+推 `v*` 标签会触发 `.github/workflows/release.yml`，自动构建**正式签名**的 Android APK（`arm64-v8a` / `armeabi-v7a` / `x86_64` / `universal` + `SHA256SUMS.txt`）并发布到仓库 Releases 页面。
+
+### 6.1 一次性配置：GitHub Actions Secrets
+
+在仓库 **Settings → Secrets and variables → Actions → New repository secret** 中添加以下 4 项：
+
+| Secret 名称 | 说明 |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | 正式 `.jks` 文件的 Base64 编码（Windows PowerShell：`[Convert]::ToBase64String([IO.File]::ReadAllBytes("yomu-release.jks"))`） |
+| `ANDROID_KEYSTORE_PASSWORD` | Keystore 密码（`storePassword`） |
+| `ANDROID_KEY_ALIAS` | Key 别名（`keyAlias`） |
+| `ANDROID_KEY_PASSWORD` | Key 密码（`keyPassword`） |
+
+> `apps/app/android/app/build.gradle.kts` 仅在存在 `apps/app/android/key.properties` 时启用正式签名，本地开发与日常 CI 未配置时自动回退 debug 签名；`release.yml` 会在构建前校验 Secrets 并在打包后用 `apksigner` 验签，防止误发 debug 签名包。
+
+### 6.2 发布步骤
+
+1. 更新 `apps/app/pubspec.yaml` 的 `version: <semver>+<build>`（`semver` 须与 tag 去掉 `v` 后一致，`build` 须严格递增）。
+2. 本地跑完门禁与模拟器验证后提交推送到 `main`：
+   ```bash
+   dart run tool/ci.dart check
+   dart run tool/ci.dart install
+   ```
+3. 打标签并推送：
+   ```bash
+   git tag -a v0.1.0 -m "Release v0.1.0"
+   git push origin v0.1.0
+   ```
+   - 稳定版（如 `v0.1.0`、`v1.0.0`）会自动标记为 **Latest**；
+   - 预发布版（含 `-`，如 `v0.2.0-rc.1`、`v0.2.0-beta.1`）会自动标记为 **Pre-release**。
+
+---
+
+## 7. 后续要补的（按优先级）
+
+1. **iOS 正式签名**：用 App Store Connect API Key + `flutter build ipa` 接 TestFlight / App Store。
 2. **契约测试**：job 里 `docker run gotson/komga`，跑真实服务器用例（M1）。
 3. **分支保护**：Settings → Branches → 要求 `Gate` 通过才能合并（这也是"CI 当裁判"真正生效的地方）。
 4. **成本优化**（私有仓库才有意义）：把纯 Dart 测试拆到 ubuntu job，Windows 只跑黄金图，可把单次门禁从 ~12 分钟压到 ~6 分钟。

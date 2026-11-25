@@ -1,7 +1,17 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+val hasReleaseSigning = keystorePropertiesFile.exists()
+if (hasReleaseSigning) {
+    FileInputStream(keystorePropertiesFile).use { keystoreProperties.load(it) }
 }
 
 android {
@@ -29,11 +39,35 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                val storeFilePath = keystoreProperties.getProperty("storeFile")?.trim()
+                    ?: error("key.properties missing required property: storeFile")
+                val resolvedStoreFile = rootProject.file(storeFilePath)
+                check(resolvedStoreFile.exists()) {
+                    "Release keystore not found: ${resolvedStoreFile.absolutePath}"
+                }
+                storeFile = resolvedStoreFile
+                storePassword = keystoreProperties.getProperty("storePassword")
+                    ?: error("key.properties missing required property: storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                    ?: error("key.properties missing required property: keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+                    ?: error("key.properties missing required property: keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // 存在 apps/app/android/key.properties 时使用正式签名；
+            // 本地开发与日常验证构建未配置时回退 debug 签名，保证 `dart run tool/ci.dart install` 正常可用。
+            signingConfig = if (hasReleaseSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }
