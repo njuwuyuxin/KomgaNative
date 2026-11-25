@@ -121,43 +121,116 @@ float relShade(vec2 n) {
     return (kAmbient + (1.0 - kAmbient) * max(dot(n, kLight), 0.0)) / base;
 }
 
-// 某一条垂直于轴线的线上，卷起的纸在屏幕上伸到多远（d 的最大值）。
-//
-// 从轴线上的点 a0 沿 u 发一条射线与纸面矩形求交，得到这条线上纸的弧长区间
-// [s0, s1]；卷在圆柱上的那段（s < πR）屏幕投影是 R·sin(s/R)，取最大值。
-// 角附近纸卷不到 π/2，剪影就比 R 小——影子必须跟着真实剪影走，
-// 不能只看 θ = π/2 处有没有纸（那样角附近会出现一条亮斜带）。
-// 没有卷起的纸时返回 -1。
-float silhouetteAt(vec2 a0, vec2 u, float r) {
-    vec2 us = vec2(abs(u.x) < 1e-5 ? 1e-5 : u.x, abs(u.y) < 1e-5 ? 1e-5 : u.y);
-    vec2 invU = 1.0 / us;
-    vec2 t1 = (uRect.xy - a0) * invU;
-    vec2 t2 = (uRect.xy + uRect.zw - a0) * invU;
-    vec2 tMin = min(t1, t2);
-    vec2 tMax = max(t1, t2);
-    float s0 = max(max(tMin.x, tMin.y), 0.0);
-    float s1 = min(tMax.x, tMax.y);
-    float sEnd = min(s1, kPi * r);
+// 直线 origin + w * dir 与纸面矩形 uRect 的交区间 [wMin, wMax]；无交时 wMin > wMax。
+vec2 rectLineInterval(vec2 origin, vec2 dir) {
+    vec2 lo = uRect.xy - origin;
+    vec2 hi = uRect.xy + uRect.zw - origin;
+    float tMin = -1e9;
+    float tMax = 1e9;
+    if (abs(dir.x) > 1e-5) {
+        float a = lo.x / dir.x;
+        float b = hi.x / dir.x;
+        tMin = max(tMin, min(a, b));
+        tMax = min(tMax, max(a, b));
+    } else if (lo.x > 0.0 || hi.x < 0.0) {
+        tMin = 1.0;
+        tMax = -1.0;
+    }
+    if (abs(dir.y) > 1e-5) {
+        float a = lo.y / dir.y;
+        float b = hi.y / dir.y;
+        tMin = max(tMin, min(a, b));
+        tMax = min(tMax, max(a, b));
+    } else if (lo.y > 0.0 || hi.y < 0.0) {
+        tMin = 1.0;
+        tMax = -1.0;
+    }
+    return vec2(tMin, tMax);
+}
+
+// 平滑阶跃：把轴向区间 [wMin, wMax] 解析软化成连续阴影。
+float softStep(float x) {
+    return 1.0 / (1.0 + exp(-clamp(x, -16.0, 16.0)));
+}
+
+// 若矩形角 c 落在卷筒带 0 <= s <= sMax 内，把它在轴向 t 上的投影并进区间 ext。
+vec2 extendByCorner(vec2 ext, vec2 c, vec2 u, vec2 t, float sMax) {
+    vec2 rel = c - uAxis;
+    float s = dot(rel, u);
+    float w = dot(rel, t);
+    bool inBand = s >= 0.0 && s <= sMax;
+    return inBand ? vec2(min(ext.x, w), max(ext.y, w)) : ext;
+}
+
+// 卷在圆柱上的那段纸（0 <= s <= πR）沿轴向 t 的覆盖区间 [wMin, wMax]。
+// 它是纸面矩形与带 0 <= s <= πR 的交（凸多边形）在 t 上的投影，顶点只可能是两条带边
+// 与矩形的交点或落在带内的矩形角，所以端点随卷页参数与像素都连续，没有离散采样台阶。
+vec2 rollExtent(vec2 u, vec2 t, float r) {
+    float sMax = kPi * r;
+    vec2 ext = vec2(1e9, -1e9);
+    vec2 e0 = rectLineInterval(uAxis, t);
+    ext = e0.y >= e0.x ? vec2(min(ext.x, e0.x), max(ext.y, e0.y)) : ext;
+    vec2 e1 = rectLineInterval(uAxis + u * sMax, t);
+    ext = e1.y >= e1.x ? vec2(min(ext.x, e1.x), max(ext.y, e1.y)) : ext;
+    vec2 lo = uRect.xy;
+    vec2 hi = uRect.xy + uRect.zw;
+    ext = extendByCorner(ext, lo, u, t, sMax);
+    ext = extendByCorner(ext, vec2(hi.x, lo.y), u, t, sMax);
+    ext = extendByCorner(ext, vec2(lo.x, hi.y), u, t, sMax);
+    ext = extendByCorner(ext, hi, u, t, sMax);
+    return ext;
+}
+
+// 轴向位置 a0 那条垂直于轴线的线上，卷起的纸在屏幕上覆盖的 d 区间 [lo, hi]。
+// 这条线上纸的弧长区间与 [0, πR] 求交得 [s0, sEnd]，屏幕投影是 R·sin(s/R)：
+// hi 是剪影（角附近纸卷不到 π/2，剪影比 R 小），lo 是离轴线最近的那端。
+vec2 rollFootprint(vec2 a0, vec2 u, float r) {
+    vec2 iv = rectLineInterval(a0, u);
+    float s0 = max(iv.x, 0.0);
+    float sEnd = min(iv.y, kPi * r);
+    float invR = 1.0 / max(r, 1e-3);
+    float a = r * sin(clamp(s0 * invR, 0.0, kPi));
+    float b = r * sin(clamp(sEnd * invR, 0.0, kPi));
     float top = 0.5 * kPi * r;
-    float reach = (s0 <= top && sEnd >= top)
-        ? r
-        : max(r * sin(clamp(s0 / max(r, 1e-3), 0.0, kPi)),
-              r * sin(clamp(sEnd / max(r, 1e-3), 0.0, kPi)));
-    return (s1 > s0 && sEnd > s0 && r > 0.01) ? reach : -1.0;
+    float reach = (s0 <= top && sEnd >= top) ? r : max(a, b);
+    return sEnd > s0 ? vec2(min(a, b), reach) : vec2(0.0);
+}
+
+// 卷筒投在下层的软阴影：卷筒在 (轴向 w, 法向 d) 平面上的投影近似为
+// "w ∈ [wMin, wMax] 且 d ∈ [lo(w), hi(w)]"，影子是它的可分离模糊——
+// 轴向用 softStep 解析软化区间端点，法向按到 [lo, hi] 的距离指数衰减；
+// 区间外的像素取最近端点处的剪影，所以 lo/hi 全程连续。
+// 早先按 θ 切片或沿轴向离散采样，每片在纸页边缘各留一级台阶，卷起尖端下方会叠出分层色块。
+float rollShadowAt(vec2 p, vec2 u, vec2 t, float d, float r, float rollLift) {
+    vec2 ext = rollExtent(u, t, r);
+    float valid = ext.y > ext.x + 1.0 ? 1.0 : 0.0;
+    float soft = 2.0 + 0.9 * r;
+    float sigma = 0.5 * soft;
+    float v = dot(p - uAxis, t);
+    float wc = valid > 0.5
+        ? clamp(v, ext.x + 0.5, ext.y - 0.5)
+        : 0.5 * (ext.x + ext.y);
+    vec2 fp = rollFootprint(uAxis + t * wc, u, r);
+    // 剪影越低（角附近）影子越淡。
+    float strength = smoothstep(0.0, 0.6 * r, fp.y);
+    float axial = softStep((v - ext.x) / sigma) - softStep((v - ext.y) / sigma);
+    float gap = max(fp.x - d, 0.0) + max(d - fp.y, 0.0);
+    return kRollShadow * rollLift * valid * axial * strength * exp(-gap / soft);
 }
 
 // 翻过去的那片纸（平压在高度 ~2R 处）投在屏幕点 p 上的影子。
 //
-// 对 d > 0（圆柱正面）按 d = 0 求值：正面贴近纸面、同样被那片纸挡着，
-// 影子必须连续地越过轴线；只算到 d <= 0 的话，卷筒两端会出现一条
-// "灰 | 白"的硬斜边。
-float flapShadowAt(vec2 p, vec2 u, float d, float r) {
+// clampToAxis = true 用于平铺正面与圆柱正面（d > 0 按 d = 0 求值，使影子连续越过轴线，
+// 避免卷筒两端出现"灰 | 白"硬斜边）；clampToAxis = false 用于露出的下层，
+// d > 0 时额外计入到轴线的距离，确保页面外跨 d = 0 连续过渡。
+float flapShadowAt(vec2 p, vec2 u, float d, float r, bool clampToAxis) {
     float dc = min(d, 0.0);
     vec2 qFlip = p - u * d + u * (dc + kPi * r - 2.0 * dc);
     float outside = max(-edgeDistance(qFlip), 0.0);
+    float dist = (!clampToAxis && d > 0.0) ? length(vec2(d, outside)) : outside;
     float soft = 2.0 + 0.8 * r;
     float lift = clamp(r / 8.0, 0.0, 1.0);
-    return kFlapShadow * lift * exp(-outside / soft);
+    return kFlapShadow * lift * exp(-dist / soft);
 }
 
 // 预乘 alpha 的 "over" 合成。
@@ -177,30 +250,6 @@ void main() {
     // 卷筒抬起系数：半径收拢到 0 时阴影与外沿高光平滑淡出，避免临近书脊落地瞬间突灭。
     float rollLift = smoothstep(0.0, 8.0, r);
 
-    // ---- 接收面上的阴影 ----
-    float shadow = 0.0;
-    if (flatSide) {
-        // 翻过去的那片纸平压在高度 ~2R 处，影子沿它的轮廓向外柔和衰减。
-        // 被它盖住的地方影子不可见（上层会盖住），不用额外裁剪。
-        shadow = flapShadowAt(p, u, d, r);
-    } else if (rollLift > 0.001) {
-        // 卷筒投在露出来的下层上：沿轴向多采几条线，侧边才是软的。
-        float soft = 2.0 + 0.9 * r;
-        float acc = 0.0;
-        for (int i = -2; i <= 2; i++) {
-            float off = float(i) * 0.5 * soft;
-            vec2 a0 = p - u * d + t * off;
-            float reach = silhouetteAt(a0, u, r);
-            if (reach >= 0.0) {
-                float beyond = max(d - reach, 0.0);
-                // 剪影越低（角附近）影子越淡。
-                float strength = smoothstep(0.0, 0.6 * r, reach);
-                acc += strength * exp(-beyond / soft);
-            }
-        }
-        shadow = kRollShadow * rollLift * acc / 5.0;
-    }
-
     // ---- 1. 平铺在原位的正面（d <= 0），其余位置是露出来的下层 ----
     vec4 color;
     float flatCov = 0.0;
@@ -212,10 +261,18 @@ void main() {
             flatCov = coverage(p);
         }
     }
-    vec3 flatRgb = sheetAt(p) * (1.0 - shadow);
+    float flatShadow = flatSide ? flapShadowAt(p, u, d, r, true) : 0.0;
+    vec3 flatRgb = sheetAt(p) * (1.0 - flatShadow);
     color = vec4(flatRgb * flatCov, flatCov);
-    // 下层（下一页 / 页面外的背景）只叠一层半透明黑。
-    color += vec4(0.0, 0.0, 0.0, shadow * (1.0 - flatCov));
+    // 下层（下一页 / 页面外的背景）只叠一层半透明黑；同时合成翻页背面与卷筒的连续软阴影，
+    // 确保纸页外露区域跨 d = 0 无接缝、无阶梯带纹。
+    if (flatCov < 0.999) {
+        float underShadow = flapShadowAt(p, u, d, r, false);
+        if (rollLift > 0.001) {
+            underShadow = max(underShadow, rollShadowAt(p, u, t, d, r, rollLift));
+        }
+        color += vec4(0.0, 0.0, 0.0, underShadow * (1.0 - flatCov));
+    }
 
     // ---- 2./3. 圆柱：同一个 d 对应正面（θ < π/2）和背面（θ > π/2）两层 ----
     if (r > 0.01 && !flatSide && d <= r + 0.5) {
@@ -228,7 +285,7 @@ void main() {
         vec2 nF = vec2(-sin(thetaF), cos(thetaF));
         // 正面越往上卷离那片纸越近、受光越少：影子从轴线处连续延续过来。
         vec3 rgbF = sheetAt(qF) * relShade(nF) *
-                    (1.0 - flapShadowAt(p, u, d, r) * cos(thetaF));
+                    (1.0 - flapShadowAt(p, u, d, r, true) * cos(thetaF));
         float covF = isHinged ? hingedCoverage(qF, spineOnRight) : coverage(qF);
         color = over(color, rgbF, covF * rim);
 

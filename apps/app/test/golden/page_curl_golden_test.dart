@@ -61,6 +61,8 @@ void main() {
     required bool forward,
     required double turn,
     bool mirrored = false,
+    Rect underRect = const Rect.fromLTWH(15, 130, 360, 540),
+    Color underColor = const Color(0xFFB9C7B4),
   }) async {
     const size = GoldenSizes.phone;
     tester.view.physicalSize = size * kGoldenDevicePixelRatio;
@@ -91,8 +93,8 @@ void main() {
               // 下层：相邻页（纯色，方便看影子）。
               Positioned.fill(child: Container(color: const Color(0xFF1C1B1A))),
               Positioned.fromRect(
-                rect: rect,
-                child: Container(color: const Color(0xFFB9C7B4)),
+                rect: underRect,
+                child: Container(color: underColor),
               ),
               Positioned.fill(
                 child: CustomPaint(
@@ -238,6 +240,18 @@ void main() {
       forward: true,
       turn: 0.4,
       mirrored: true,
+    );
+  });
+
+  // 底页高于被卷纸面且为亮底：验证纸页上缘外侧卷筒阴影无阶梯条纹、跨轴线无硬截断。
+  testWidgets('page_curl@edge_shadow', (WidgetTester tester) async {
+    await pumpCurl(
+      tester,
+      name: 'page_curl@edge_shadow',
+      forward: true,
+      turn: 0.55,
+      underRect: const Rect.fromLTWH(15, 40, 360, 720),
+      underColor: const Color(0xFFF5F5F5),
     );
   });
 }
