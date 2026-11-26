@@ -406,3 +406,26 @@ final class NativePdfBridgePlugin: NSObject {
     }
   }
 }
+
+/// iOS 原生归档通道占位注册（LMB-12，ADR 0010）：明确返回 UNSUPPORTED 供上层友好降级，零额外 Pod 依赖。
+final class NativeArchiveBridgePlugin: NSObject {
+  func register(with messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(
+      name: "yomu/native_archive",
+      binaryMessenger: messenger
+    )
+    channel.setMethodCallHandler { call, result in
+      if call.method == "closeArchive" {
+        result(nil)
+      } else {
+        result(
+          FlutterError(
+            code: "UNSUPPORTED",
+            message: "Compressed RAR/7z native decoder is not bundled on iOS",
+            details: nil
+          )
+        )
+      }
+    }
+  }
+}

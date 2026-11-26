@@ -146,6 +146,14 @@ class MainActivity : FlutterActivity() {
         ).setMethodCallHandler { call, result ->
             pdfHandler.handle(call, result)
         }
+
+        val archiveHandler = NativeArchiveHandler(this, ioExecutor)
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            NativeArchiveHandler.CHANNEL,
+        ).setMethodCallHandler { call, result ->
+            archiveHandler.handle(call, result)
+        }
     }
 
     @Suppress("DEPRECATION")

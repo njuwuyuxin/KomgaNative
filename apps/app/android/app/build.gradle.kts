@@ -83,3 +83,10 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // ADR 0010: Android 原生 CB7 (7z/LZMA2) 与 CBR (RAR4) 解码依赖（零 NDK ABI 体积膨胀）。
+    implementation("org.apache.commons:commons-compress:1.27.1")
+    implementation("org.tukaani:xz:1.10")
+    implementation("com.github.junrar:junrar:7.5.5")
+}

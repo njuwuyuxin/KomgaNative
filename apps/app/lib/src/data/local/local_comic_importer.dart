@@ -18,15 +18,18 @@ final class LocalComicImporter {
     required LocalComicsStorage storage,
     CoverThumbnailEncoder coverEncoder = encodeDefaultCoverThumbnail,
     NativePdfBridge? pdfBridge,
+    NativeArchiveBridge? archiveBridge,
   }) : _db = db,
        _storage = storage,
        _coverEncoder = coverEncoder,
-       _pdfBridge = pdfBridge;
+       _pdfBridge = pdfBridge,
+       _archiveBridge = archiveBridge;
 
   final ProgressDatabase _db;
   final LocalComicsStorage _storage;
   final CoverThumbnailEncoder _coverEncoder;
   final NativePdfBridge? _pdfBridge;
+  final NativeArchiveBridge? _archiveBridge;
   int _idSeq = 0;
 
   String _nextId(String prefix) {
@@ -58,6 +61,7 @@ final class LocalComicImporter {
           parentFolderName: parentFolderName,
           nextId: _nextId,
           pdfBridge: _pdfBridge,
+          archiveBridge: _archiveBridge,
         );
         seriesIds.addAll(imported.importedSeriesIds);
         bookIds.addAll(imported.importedBookIds);
@@ -192,8 +196,13 @@ final class LocalComicImporter {
     await for (final entity in sourceDir.list(followLinks: false)) {
       if (entity is! File) continue;
       final name = importBaseName(entity.path);
+      final lower = name.toLowerCase();
       if (isNestedComicArchivePath(name) ||
-          name.toLowerCase().endsWith('.pdf')) {
+          lower.endsWith('.pdf') ||
+          lower.endsWith('.cbr') ||
+          lower.endsWith('.rar') ||
+          lower.endsWith('.cb7') ||
+          lower.endsWith('.7z')) {
         childArchives.add(PickedComicFile.fromFile(entity, name: name));
       }
     }

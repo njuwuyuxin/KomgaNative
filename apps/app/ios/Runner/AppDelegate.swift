@@ -6,6 +6,7 @@ import UIKit
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private let externalRootsPlugin = ExternalRootsBridgePlugin()
   private let nativePdfPlugin = NativePdfBridgePlugin()
+  private let nativeArchivePlugin = NativeArchiveBridgePlugin()
 
   override func application(
     _ application: UIApplication,
@@ -18,6 +19,7 @@ import UIKit
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     externalRootsPlugin.register(with: engineBridge.applicationRegistrar.messenger())
     nativePdfPlugin.register(with: engineBridge.applicationRegistrar.messenger())
+    nativeArchivePlugin.register(with: engineBridge.applicationRegistrar.messenger())
     let channel = FlutterMethodChannel(
       name: "komganative/device",
       binaryMessenger: engineBridge.applicationRegistrar.messenger()

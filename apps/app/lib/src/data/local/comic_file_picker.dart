@@ -59,6 +59,10 @@ final class PlatformComicFilePicker implements ComicFilePicker {
               'cbt',
               'tar',
               'pdf',
+              'cbr',
+              'rar',
+              'cb7',
+              '7z',
             ],
           );
     return _mapPlatformFiles(files);

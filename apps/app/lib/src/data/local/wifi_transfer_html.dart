@@ -55,7 +55,7 @@ String buildWifiTransferHtml({required bool pinRequired}) {
         <button type="button" id="pickFilesBtn">选择压缩包 / Files</button>
         <button type="button" class="secondary" id="pickFolderBtn">选择文件夹 / Folder</button>
       </div>
-      <input id="fileInput" type="file" multiple accept=".cbz,.zip,.epub,.cbt,.tar,.pdf" hidden>
+      <input id="fileInput" type="file" multiple accept=".cbz,.zip,.epub,.cbt,.tar,.pdf,.cbr,.rar,.cb7,.7z" hidden>
       <input id="folderInput" type="file" webkitdirectory multiple hidden>
     </div>
   </div>
@@ -64,7 +64,7 @@ String buildWifiTransferHtml({required bool pinRequired}) {
   </div>
 </div>
 <script>
-const ARCHIVE_RE = /\\.(cbz|zip|epub|cbt|tar|pdf)\$/i;
+const ARCHIVE_RE = /\\.(cbz|zip|epub|cbt|tar|pdf|cbr|rar|cb7|7z)\$/i;
 const IMAGE_RE = /\\.(jpe?g|png|webp|gif|bmp|avif|heic|jxl)\$/i;
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
