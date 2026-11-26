@@ -37,6 +37,22 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- 系统文件管理器 / 网盘 / 聊天应用「用 Yomu 打开」或分享 .cbz / .zip 漫画（LMA-12）。 -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:mimeType="application/vnd.comicbook+zip"/>
+                <data android:mimeType="application/x-cbz"/>
+                <data android:mimeType="application/zip"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="application/vnd.comicbook+zip"/>
+                <data android:mimeType="application/x-cbz"/>
+                <data android:mimeType="application/zip"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

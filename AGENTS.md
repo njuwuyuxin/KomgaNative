@@ -34,9 +34,10 @@ apps/app                     Flutter 应用 `yomu`（唯一可执行目标：and
 packages/yomu_domain         纯 Dart：通用漫画领域模型（零依赖）
 packages/yomu_reader         纯 Dart：分页/双页/缩放/卷页几何计算
 packages/yomu_sync           纯 Dart：进度 outbox + 多设备对账
+packages/yomu_local_archive  纯 Dart：本地 CBZ/ZIP 随机访问、文件夹扫描、宽高嗅探与 ComicInfo.xml 解析
 packages/komga_api           Komga 服务器专属 REST 传输层、错误模型、URL 构造
 packages/yomu_design_system  Yomu 设计 token、三套主题、基础组件
-packages/yomu_platform       平台能力抽象（设备形态、墨水屏探测、按键与存储）
+packages/yomu_platform       平台能力抽象（设备形态、墨水屏探测、按键、相册存储与外部文件打开）
 tool/ci.dart                 统一校验入口
 tool/emulator.dart           本地模拟器启动器（可选，见 docs/environment-setup.md §11）
 tool/komga.dart              本地 Komga 启停（可选，联调用，见 §12）
@@ -45,7 +46,7 @@ docs/                        选型、环境、spec、ADR
 
 ## 架构不变量（违反即失败，`ci.dart layers` 会拦）
 
-1. `yomu_domain` / `yomu_reader` / `yomu_sync` **不得** import flutter / dio / drift / go_router。
+1. `yomu_domain` / `yomu_reader` / `yomu_sync` / `yomu_local_archive` **不得** import flutter / dio / drift / go_router。
 2. `apps/app/lib/src/screens/**` 与 `widgets/**` **不得** import `package:komga_api`，只能经 Repository。
 3. Widget 里不做网络 I/O，不 `await` 请求；只读 provider 状态 + 派发 intent。
 4. 错误统一用 `KomgaError`（`packages/komga_api/lib/src/errors.dart`）或领域内的密封类型，UI 只 `switch`，不允许裸 `catch`。
@@ -130,8 +131,9 @@ Komga 的真实行为记录在 `docs/komga-api-verification.md`，已知与 Open
 
 ## 当前阶段
 
-核心功能与架构治理（`ARC-01` ~ `ARC-12`）已完成：
-- **连接与多服务器隔离**：连接流程、TOFU 自签名证书固定（`lib/src/session/`）、统一共享 `komgaSessionProvider` 连接池；本地进度、已下载书籍、下载队列、置顶系列、阅读历史与阅读器按系列覆盖全面按 `serverKey`（规范化 `baseUrl`）复合主键分区隔离。
+核心功能、架构治理（`ARC-01` ~ `ARC-12`）与本地/多源双栖演进（`LMA-01` ~ `LMA-12`）已完成：
+- **本地优先免登录与多源双栖架构（ADR 0008 / 0009）**：取消开屏强制登录墙，冷启动免登录直达主界面；通过 `SourceRegistry`（`sourceKey` 插件注册表）实现「编目按源清晰分组（单源时隐藏分组栏）+ 首页正在读/阅读器/历史热力图跨源无感汇聚（云端项配低调小云标）」，支持 `CBZ/ZIP` 与图片文件夹流式入库、本地收藏集/阅读列表、本地系列合并/拆分/元数据编辑/自定义封面以及系统外部文件「用 Yomu 打开」。
+- **连接与多服务器隔离**：连接流程、TOFU 自签名证书固定（`lib/src/session/`）、统一共享 `komgaSessionProvider` 连接池；本地进度、已下载书籍、下载队列、置顶系列、阅读历史与阅读器按系列覆盖全面按 `sourceKey / serverKey` 复合主键分区物理隔离。
 - **数据层与离线能力**：按限界上下文拆分为 `LibraryRepository`、`CollectionsRepository`、`ReadStatusRepository`、`ReaderRepository`；用户资产库 `komga_native.sqlite`（本地进度 Outbox、系列置顶、阅读会话统计）与可再生缓存库 `komga_cache.sqlite`（HTTP 响应缓存、整本下载 `pinned` 页图保护与 256 MB 被动浏览 LRU 淘汰）物理分离。
 - **阅读器与 UI**：单页 / 双页 / 条漫纵向滚动与自动滚动、卷页着色器、纯配置值对象 `ReaderConfig`（预设快照与按系列覆盖零漂移）、平板双栏自适应（`WindowSizeClass` 唯一出口）、中英双语 i18n 与 CJK 字体测试回退、阅读统计热力图。
 - **自动化门禁（`tool/ci.dart`）**：代码生成 + 格式检查 + 静态分析 + 分层与代码规模红线（非生成生产文件 ≤ 350 行、单类 ≤ 300 行、零裸 `catch (_)`）+ 黄金图确定性检查 + 全量单测与黄金图基线。

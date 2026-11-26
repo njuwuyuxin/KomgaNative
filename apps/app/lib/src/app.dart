@@ -5,6 +5,7 @@ import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/l10n/l10n.dart';
 import 'package:yomu/src/providers/settings_provider.dart';
 import 'package:yomu/src/providers/router_provider.dart';
+import 'package:yomu/src/widgets/incoming_file_scope.dart';
 import 'package:yomu/src/widgets/progress_sync_scope.dart';
 
 /// 应用根。
@@ -31,17 +32,19 @@ class KomgaApp extends ConsumerWidget {
     );
 
     return ProgressSyncScope(
-      child: MaterialApp.router(
-        title: 'Yomu',
-        debugShowCheckedModeBanner: false,
-        scrollBehavior: const _NoOverscrollBehavior(),
-        locale: settings.language.locale,
-        localizationsDelegates: appLocalizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        theme: useEink ? einkTheme : AppTheme.light(),
-        darkTheme: useEink ? einkTheme : AppTheme.dark(),
-        themeMode: useEink ? ThemeMode.light : settings.themeMode,
-        routerConfig: router,
+      child: IncomingFileScope(
+        child: MaterialApp.router(
+          title: 'Yomu',
+          debugShowCheckedModeBanner: false,
+          scrollBehavior: const _NoOverscrollBehavior(),
+          locale: settings.language.locale,
+          localizationsDelegates: appLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          theme: useEink ? einkTheme : AppTheme.light(),
+          darkTheme: useEink ? einkTheme : AppTheme.dark(),
+          themeMode: useEink ? ThemeMode.light : settings.themeMode,
+          routerConfig: router,
+        ),
       ),
     );
   }

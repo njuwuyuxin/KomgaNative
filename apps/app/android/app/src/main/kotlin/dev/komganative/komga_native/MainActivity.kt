@@ -1,15 +1,21 @@
 package dev.komganative.komga_native
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.OpenableColumns
 import android.view.KeyEvent
 import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import java.io.File
+import java.io.FileOutputStream
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Executors
 
 /**
@@ -20,6 +26,9 @@ import java.util.concurrent.Executors
  */
 class MainActivity : FlutterActivity() {
     private var deviceChannel: MethodChannel? = null
+    private var incomingFilesChannel: MethodChannel? = null
+    private var dartConsumedInitial = false
+    private val pendingIncomingFiles = CopyOnWriteArrayList<Map<String, String>>()
     private val ioExecutor = Executors.newSingleThreadExecutor()
     private var pendingStoragePermissionCallback: ((Boolean) -> Unit)? = null
 
@@ -29,6 +38,13 @@ class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requestHighestRefreshRate()
+        captureIncomingIntent(intent, notifyImmediately = false)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        captureIncomingIntent(intent, notifyImmediately = true)
     }
 
     override fun onDestroy() {
@@ -91,6 +107,85 @@ class MainActivity : FlutterActivity() {
                 "saveImage" -> handleSaveImage(call, result)
                 else -> result.notImplemented()
             }
+        }
+
+        val filesChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            INCOMING_FILES_CHANNEL,
+        )
+        incomingFilesChannel = filesChannel
+        filesChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "consumeInitialFiles" -> {
+                    dartConsumedInitial = true
+                    val snapshot = ArrayList(pendingIncomingFiles)
+                    pendingIncomingFiles.clear()
+                    result.success(snapshot)
+                }
+                else -> result.notImplemented()
+            }
+        }
+    }
+
+    private fun captureIncomingIntent(intent: Intent?, notifyImmediately: Boolean) {
+        if (intent == null) return
+        val uri: Uri? = when (intent.action) {
+            Intent.ACTION_VIEW -> intent.data
+            Intent.ACTION_SEND -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    intent.getParcelableExtra(Intent.EXTRA_STREAM)
+                }
+            }
+            else -> null
+        }
+        if (uri == null) return
+        val appContext = applicationContext
+        ioExecutor.execute {
+            try {
+                val displayName = resolveDisplayName(uri) ?: "imported.cbz"
+                val safeName = displayName.replace(Regex("[\\\\/:*?\"<>|]"), "_")
+                val outDir = File(appContext.cacheDir, "incoming").apply { mkdirs() }
+                val destFile = File(outDir, "${System.currentTimeMillis()}_$safeName")
+                appContext.contentResolver.openInputStream(uri)?.use { input ->
+                    FileOutputStream(destFile).use { output ->
+                        input.copyTo(output)
+                    }
+                } ?: return@execute
+                val payload = mapOf("path" to destFile.absolutePath, "name" to displayName)
+                runOnUiThread {
+                    val ch = incomingFilesChannel
+                    if (notifyImmediately && dartConsumedInitial && ch != null) {
+                        ch.invokeMethod("incomingFile", payload)
+                    } else {
+                        pendingIncomingFiles.add(payload)
+                    }
+                }
+            } catch (_: Exception) {
+                // 外部无效 URI 静默忽略，不导致主 Activity 崩溃。
+            }
+        }
+    }
+
+    private fun resolveDisplayName(uri: Uri): String? {
+        if (uri.scheme == "file") {
+            return uri.lastPathSegment
+        }
+        return try {
+            contentResolver.query(
+                uri,
+                arrayOf(OpenableColumns.DISPLAY_NAME),
+                null,
+                null,
+                null,
+            )?.use { cursor ->
+                val idx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (idx >= 0 && cursor.moveToFirst()) cursor.getString(idx) else null
+            } ?: uri.lastPathSegment
+        } catch (_: Exception) {
+            uri.lastPathSegment
         }
     }
 
@@ -209,6 +304,7 @@ class MainActivity : FlutterActivity() {
 
     companion object {
         private const val CHANNEL = "komganative/device"
+        private const val INCOMING_FILES_CHANNEL = "yomu/incoming_files"
         private const val REQUEST_WRITE_STORAGE = 1042
     }
 }

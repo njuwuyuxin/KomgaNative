@@ -32,18 +32,18 @@
 
 | 任务 ID | 所属批次 | 任务名称 | 优先级 | 估时 | 前置依赖 | 状态 |
 |---|---|---|---|---|---|---|
-| `LMA-01` | Batch L0 | 新建纯 Dart 包 `yomu_local_archive`（`RandomAccessByteSource`、魔数嗅探、ZIP/CBZ 按页读取、宽高嗅探、`ComicInfo.xml`、自然排序） | P0 | M | — | [ ] |
-| `LMA-02` | Batch L0 | 领域层新增 `ContentSource` / `SourceCapabilities` 与实体 `sourceKey` 标识（面向未来 Kavita/OPDS 预留） | P0 | S | — | [ ] |
-| `LMA-03` | Batch L0 | 扩展用户库 `komga_native.sqlite` 新增本地书目表与本地收藏集/阅读列表表，打通本地进度直写 | P0 | M | `LMA-02` | [ ] |
-| `LMA-04` | Batch L0 | 完整实现本地四大仓库：`LocalLibrary` / `LocalReader` / `LocalCollections` / `LocalReadStatusRepository` | P0 | M | `LMA-01`, `LMA-03` | [ ] |
-| `LMA-05` | Batch L1 | 实现 `SourceRegistry` 多源插件表、活动源状态机（含老用户升级兼容）与跨源「正在读 / 历史」汇聚器 | P0 | M | `LMA-04` | [ ] |
-| `LMA-06` | Batch L1 | 接入 `file_picker` 与受管沙盒导入管线 `LocalComicImporter`（CBZ/ZIP + 图片文件夹 + 首图封面提取） | P0 | M | `LMA-01`, `LMA-03` | [ ] |
-| `LMA-07` | Batch L1 | 解除 `router.dart` 登录墙、单源隐形/多源分组胶囊、跨源卡片低调小云标与「云端同步（Komga）」设置升级 | P0 | M | `LMA-05`, `LMA-06` | [ ] |
-| `LMA-08` | Batch L1 | MVP 中英双语文案、多形态黄金图基线补齐与模拟器端到端验收 | P0 | S–M | `LMA-07` | [ ] |
-| `LMA-09` | Batch L2 | 本地书籍/系列单选与多选批量删除（SQLite + 沙盒物理文件 + 存储统计联动） | P1 | M | `LMA-08` | [ ] |
-| `LMA-10` | Batch L2 | 本地编目管理：编辑标题/卷号/方向/简介、散装单卷合并与拆分系列 | P1 | M | `LMA-09` | [ ] |
-| `LMA-11` | Batch L2 | 本地自定义封面（阅读器「将当前页设为封面」与相册选图） | P2 | S–M | `LMA-10` | [ ] |
-| `LMA-12` | Batch L2 | 系统文件关联（Android Intent / iOS Document Types & Files.app 共享）：外部点击 `.cbz` 直接导入阅读 | P1 | S–M | `LMA-06`, `LMA-08` | [ ] |
+| `LMA-01` | Batch L0 | 新建纯 Dart 包 `yomu_local_archive`（`RandomAccessByteSource`、魔数嗅探、ZIP/CBZ 按页读取、宽高嗅探、`ComicInfo.xml`、自然排序） | P0 | M | — | [x] |
+| `LMA-02` | Batch L0 | 领域层新增 `ContentSource` / `SourceCapabilities` 与实体 `sourceKey` 标识（面向未来 Kavita/OPDS 预留） | P0 | S | — | [x] |
+| `LMA-03` | Batch L0 | 扩展用户库 `komga_native.sqlite` 新增本地书目表与本地收藏集/阅读列表表，打通本地进度直写 | P0 | M | `LMA-02` | [x] |
+| `LMA-04` | Batch L0 | 完整实现本地四大仓库：`LocalLibrary` / `LocalReader` / `LocalCollections` / `LocalReadStatusRepository` | P0 | M | `LMA-01`, `LMA-03` | [x] |
+| `LMA-05` | Batch L1 | 实现 `SourceRegistry` 多源插件表、活动源状态机（含老用户升级兼容）与跨源「正在读 / 历史」汇聚器 | P0 | M | `LMA-04` | [x] |
+| `LMA-06` | Batch L1 | 接入 `file_picker` 与受管沙盒导入管线 `LocalComicImporter`（CBZ/ZIP + 图片文件夹 + 首图封面提取） | P0 | M | `LMA-01`, `LMA-03` | [x] |
+| `LMA-07` | Batch L1 | 解除 `router.dart` 登录墙、单源隐形/多源分组胶囊、跨源卡片低调小云标与「云端同步（Komga）」设置升级 | P0 | M | `LMA-05`, `LMA-06` | [x] |
+| `LMA-08` | Batch L1 | MVP 中英双语文案、多形态黄金图基线补齐与模拟器端到端验收 | P0 | S–M | `LMA-07` | [x] |
+| `LMA-09` | Batch L2 | 本地书籍/系列单选与多选批量删除（SQLite + 沙盒物理文件 + 存储统计联动） | P1 | M | `LMA-08` | [x] |
+| `LMA-10` | Batch L2 | 本地编目管理：编辑标题/卷号/方向/简介、散装单卷合并与拆分系列 | P1 | M | `LMA-09` | [x] |
+| `LMA-11` | Batch L2 | 本地自定义封面（阅读器「将当前页设为封面」与相册选图） | P2 | S–M | `LMA-10` | [x] |
+| `LMA-12` | Batch L2 | 系统文件关联（Android Intent / iOS Document Types & Files.app 共享）：外部点击 `.cbz` 直接导入阅读 | P1 | S–M | `LMA-06`, `LMA-08` | [x] |
 
 ---
 
