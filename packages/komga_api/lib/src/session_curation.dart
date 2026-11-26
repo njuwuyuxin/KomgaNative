@@ -16,7 +16,7 @@ extension KomgaSessionCuration on KomgaSession {
       }),
       '新建收藏集',
     );
-    return collectionFromJson(data);
+    return collectionFromJson(data).withSource(_scope);
   }
 
   /// 收藏集详情（`GET /api/v1/collections/{id}`）。
@@ -25,7 +25,7 @@ extension KomgaSessionCuration on KomgaSession {
       await _getJson(_urls.collection(collectionId)),
       '收藏集',
     );
-    return collectionFromJson(data);
+    return collectionFromJson(data).withSource(_scope);
   }
 
   /// 系列所属的收藏集（`GET /api/v1/series/{seriesId}/collections`，实测返回裸数组）。
@@ -37,7 +37,9 @@ extension KomgaSessionCuration on KomgaSession {
     return data
         .map(asMap)
         .whereType<Map<Object?, Object?>>()
-        .map(collectionFromJson)
+        .map(
+          (Map<Object?, Object?> m) => collectionFromJson(m).withSource(_scope),
+        )
         .toList(growable: false);
   }
 
@@ -88,7 +90,10 @@ extension KomgaSessionCuration on KomgaSession {
       await _getJson(_urls.collections(page: page, size: size)),
       '收藏集列表',
     );
-    return pageResultFromJson(data, collectionFromJson);
+    return pageResultFromJson(
+      data,
+      (Map<Object?, Object?> m) => collectionFromJson(m).withSource(_scope),
+    );
   }
 
   /// 收藏集里的系列（有顺序）。
@@ -103,7 +108,10 @@ extension KomgaSessionCuration on KomgaSession {
       ),
       '收藏集系列',
     );
-    return pageResultFromJson(data, seriesFromJson);
+    return pageResultFromJson(
+      data,
+      (Map<Object?, Object?> m) => seriesFromJson(m).withSource(_scope),
+    );
   }
 
   /// 阅读列表（UI-P3-8）。
@@ -115,7 +123,10 @@ extension KomgaSessionCuration on KomgaSession {
       await _getJson(_urls.readLists(page: page, size: size)),
       '阅读列表',
     );
-    return pageResultFromJson(data, readListFromJson);
+    return pageResultFromJson(
+      data,
+      (Map<Object?, Object?> m) => readListFromJson(m).withSource(_scope),
+    );
   }
 
   /// 阅读列表详情（`GET /api/v1/readlists/{id}`）。
@@ -124,7 +135,7 @@ extension KomgaSessionCuration on KomgaSession {
       await _getJson(_urls.readList(readListId)),
       '阅读列表',
     );
-    return readListFromJson(data);
+    return readListFromJson(data).withSource(_scope);
   }
 
   /// 单本书所属的阅读列表（`GET /api/v1/books/{bookId}/readlists`，实测返回裸数组）。
@@ -136,7 +147,9 @@ extension KomgaSessionCuration on KomgaSession {
     return data
         .map(asMap)
         .whereType<Map<Object?, Object?>>()
-        .map(readListFromJson)
+        .map(
+          (Map<Object?, Object?> m) => readListFromJson(m).withSource(_scope),
+        )
         .toList(growable: false);
   }
 
@@ -158,7 +171,7 @@ extension KomgaSessionCuration on KomgaSession {
       }),
       '新建阅读列表',
     );
-    return readListFromJson(data);
+    return readListFromJson(data).withSource(_scope);
   }
 
   /// 更新阅读列表（`PATCH /api/v1/readlists/{id}`）：支持改名、改简介、改排序、更新 `bookIds`。
@@ -207,7 +220,10 @@ extension KomgaSessionCuration on KomgaSession {
       await _getJson(_urls.readListBooks(readListId, page: page, size: size)),
       '阅读列表书籍',
     );
-    return pageResultFromJson(data, bookFromJson);
+    return pageResultFromJson(
+      data,
+      (Map<Object?, Object?> m) => bookFromJson(m).withSource(_scope),
+    );
   }
 
   /// 更新阅读进度（`PATCH /api/v1/books/{id}/read-progress`，页码 1 基）。

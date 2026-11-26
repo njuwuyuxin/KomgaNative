@@ -5,6 +5,7 @@ library;
 
 export 'src/account.dart';
 export 'src/collections.dart';
+export 'src/content_source.dart';
 export 'src/entities.dart';
 export 'src/queries.dart';
 export 'src/server_address.dart';

@@ -44,7 +44,10 @@ extension KomgaSessionCatalog on KomgaSession {
       ),
       '系列列表',
     );
-    return pageResultFromJson(data, seriesFromJson);
+    return pageResultFromJson(
+      data,
+      (Map<Object?, Object?> m) => seriesFromJson(m).withSource(_scope),
+    );
   }
 
   Future<PageResult<Book>> fetchSeriesBooks(
@@ -66,7 +69,10 @@ extension KomgaSessionCatalog on KomgaSession {
       ),
       '书籍列表',
     );
-    return pageResultFromJson(data, bookFromJson);
+    return pageResultFromJson(
+      data,
+      (Map<Object?, Object?> m) => bookFromJson(m).withSource(_scope),
+    );
   }
 
   /// 单个系列。系列已被删除时返回 `null`。
@@ -76,7 +82,7 @@ extension KomgaSessionCatalog on KomgaSession {
         await _getJson(_urls.seriesById(seriesId)),
         '系列信息',
       );
-      return seriesFromJson(data);
+      return seriesFromJson(data).withSource(_scope);
     } on KomgaNotFoundError {
       return null;
     }
@@ -84,7 +90,7 @@ extension KomgaSessionCatalog on KomgaSession {
 
   Future<Book> fetchBook(String bookId) async {
     final data = _requireMap(await _getJson(_urls.book(bookId)), '书籍信息');
-    return bookFromJson(data);
+    return bookFromJson(data).withSource(_scope);
   }
 
   /// 全局书搜索。
@@ -97,7 +103,10 @@ extension KomgaSessionCatalog on KomgaSession {
       await _getJson(_urls.books(page: page, size: size, search: query)),
       '书籍搜索',
     );
-    return pageResultFromJson(data, bookFromJson);
+    return pageResultFromJson(
+      data,
+      (Map<Object?, Object?> m) => bookFromJson(m).withSource(_scope),
+    );
   }
 
   /// 在读中的书（Komga 的 Keep Reading：按最近阅读时间倒序）。
@@ -109,7 +118,10 @@ extension KomgaSessionCatalog on KomgaSession {
       await _getJson(_urls.inProgressBooks(page: page, size: size)),
       '在读书籍列表',
     );
-    return pageResultFromJson(data, bookFromJson);
+    return pageResultFromJson(
+      data,
+      (Map<Object?, Object?> m) => bookFromJson(m).withSource(_scope),
+    );
   }
 
   /// 待读下一本列表（Komga 的 ondeck：已读过至少一本且当前无在读书的系列的首本未读）。
@@ -118,7 +130,10 @@ extension KomgaSessionCatalog on KomgaSession {
       await _getJson(_urls.ondeck(size: size)),
       '继续阅读列表',
     );
-    return pageResultFromJson(data, bookFromJson);
+    return pageResultFromJson(
+      data,
+      (Map<Object?, Object?> m) => bookFromJson(m).withSource(_scope),
+    );
   }
 
   Future<List<PageInfo>> fetchBookPages(String bookId) async {

@@ -3,6 +3,8 @@
 /// 命名约定：`Komga*` 前缀只用在 API DTO 上；领域模型不带前缀。
 library;
 
+import 'package:yomu_domain/src/content_source.dart';
+
 /// 服务器认证方式。
 enum AuthKind {
   /// 长期有效的 API Key（`X-API-Key`），推荐。
@@ -170,6 +172,7 @@ class Series {
     this.publisher,
     this.releaseDate,
     this.tags = const <String>[],
+    this.sourceKey = kLocalSourceKey,
   });
 
   final String id;
@@ -178,26 +181,36 @@ class Series {
   final int booksCount;
   final int booksReadCount;
   final ReadingDirection readingDirection;
-
-  /// 简介（系列元数据；系列没写时退回书籍聚合的简介）。
   final String? summary;
-
-  /// 作者名（来自书籍元数据的聚合，UI-P2-4）。可能是空的——很多库不填。
   final List<String> authors;
-
-  /// 出版社（系列元数据优先，其次书籍聚合）。
   final String? publisher;
-
-  /// 出版日期（书籍聚合里的 `releaseDate`，只有日期没有时间）。
   final DateTime? releaseDate;
-
-  /// 标签（书籍聚合；不含流派 genres，那是另一个字段）。
   final List<String> tags;
+
+  /// 所属内容源标识（默认 [kLocalSourceKey]，远程服务器返回规范化 `sourceKey`）。
+  final String sourceKey;
+
+  bool get isCloud => !isLocalSourceKey(sourceKey);
 
   double get progress {
     if (booksCount <= 0) return 0;
     return (booksReadCount / booksCount).clamp(0, 1).toDouble();
   }
+
+  Series withSource(String nextSourceKey) => Series(
+    id: id,
+    libraryId: libraryId,
+    title: title,
+    booksCount: booksCount,
+    booksReadCount: booksReadCount,
+    readingDirection: readingDirection,
+    summary: summary,
+    authors: authors,
+    publisher: publisher,
+    releaseDate: releaseDate,
+    tags: tags,
+    sourceKey: nextSourceKey,
+  );
 }
 
 class Book {
@@ -211,34 +224,24 @@ class Book {
     this.mediaProfile = MediaProfile.divina,
     this.sizeBytes = 0,
     this.readProgress,
+    this.sourceKey = kLocalSourceKey,
   });
 
   final String id;
   final String seriesId;
   final String name;
-
-  /// 所属系列的标题（Komga `BookDto.seriesTitle`）。
-  ///
-  /// 书自己的 `name` 往往只是 "Vol. 1"，离开系列页就没有上下文；
-  /// 搜索、阅读列表、继续阅读卡都要靠它把书名补全（FIX-06）。
-  /// 老存档/部分端点的 JSON 没有这个字段，所以是可空的。
   final String? seriesTitle;
-
-  /// 卷号/章节号，字符串（Komga 里可能是 "1", "1.5", ""）。
   final String number;
-
   final int pagesCount;
   final MediaProfile mediaProfile;
   final int sizeBytes;
   final ReadProgress? readProgress;
+  final String sourceKey;
 
+  bool get isCloud => !isLocalSourceKey(sourceKey);
   bool get isUnread => readProgress == null;
   bool get isCompleted => readProgress?.completed ?? false;
 
-  /// 换一个阅读进度（本地进度叠加用）。
-  ///
-  /// 用独立方法而不是 `copyWith(readProgress: null)`：那种写法分不清
-  /// "不改" 和 "清空"，而"服务端把进度删了"恰恰需要清空。
   Book withProgress(ReadProgress? progress) => Book(
     id: id,
     seriesId: seriesId,
@@ -249,6 +252,20 @@ class Book {
     mediaProfile: mediaProfile,
     sizeBytes: sizeBytes,
     readProgress: progress,
+    sourceKey: sourceKey,
+  );
+
+  Book withSource(String nextSourceKey) => Book(
+    id: id,
+    seriesId: seriesId,
+    name: name,
+    seriesTitle: seriesTitle,
+    number: number,
+    pagesCount: pagesCount,
+    mediaProfile: mediaProfile,
+    sizeBytes: sizeBytes,
+    readProgress: readProgress,
+    sourceKey: nextSourceKey,
   );
 }
 
