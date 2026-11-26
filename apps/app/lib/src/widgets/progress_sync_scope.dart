@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:yomu/src/data/progress/progress_sync_service.dart';
 import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/progress_providers.dart';
 import 'package:yomu/src/session/session_controller.dart';
@@ -23,13 +22,13 @@ class ProgressSyncScope extends ConsumerStatefulWidget {
 
 class _ProgressSyncScopeState extends ConsumerState<ProgressSyncScope>
     with WidgetsBindingObserver {
-  late final ProgressSyncService _sync = ref.read(progressSyncProvider);
+  Future<void> _flush() => ref.read(progressSyncProvider).flush();
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    unawaited(_sync.flush());
+    unawaited(_flush());
   }
 
   @override
@@ -45,7 +44,7 @@ class _ProgressSyncScopeState extends ConsumerState<ProgressSyncScope>
   }
 
   Future<void> _flushAndRefreshReadingNow() async {
-    await _sync.flush();
+    await _flush();
     if (!mounted) return;
     // 回到前台时顺带刷新"继续阅读"（多端进度对账 + 本地补交后的最新结果）；
     // 未挂载监听者时 invalidate 是零开销空操作。
@@ -60,7 +59,7 @@ class _ProgressSyncScopeState extends ConsumerState<ProgressSyncScope>
     ) {
       // 冷启动恢复会话、或用户重新登录：这两条路径都会走到这里。
       if (next is SessionConnected && previous is! SessionConnected) {
-        unawaited(_sync.flush());
+        unawaited(_flush());
       }
     });
     return widget.child;

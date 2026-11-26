@@ -49,12 +49,20 @@ Future<int> layerCheck() async {
       ], reason: 'UI 不得直接访问 API 层'),
     );
     violations.addAll(
-      _scanImports(dir, <String>[
-        'package:drift/',
-        'package:yomu/src/data/cache/',
-        'package:yomu/src/data/progress/progress_database.dart',
-        'package:yomu/src/data/progress/progress_tables.dart',
-      ], reason: 'UI 不得直接依赖 Drift 数据库或表行类型，请经由 Provider 暴露纯领域/视图模型'),
+      _scanImports(
+        dir,
+        <String>[
+          'package:drift/',
+          'package:yomu/src/data/cache/',
+          'package:yomu/src/data/progress/',
+          'package:yomu/src/data/local/',
+        ],
+        allowed: const <String>[
+          // 仅放行不含数据库/DAO/IO 副作用的纯视图模型文件；严禁放行 *_tables.dart / *_dao.dart / *_database.dart / *_repository.dart。
+          'package:yomu/src/data/local/mounted_root_summary.dart',
+        ],
+        reason: 'UI 不得直接依赖 Drift、缓存/进度/本地编目数据库或 DAO，请经由 Provider 暴露纯领域/视图模型',
+      ),
     );
     violations.addAll(
       _scanCode(dir, <String>[
@@ -172,6 +180,7 @@ List<String> _scanSizeAndBareCatch(String dir) {
 List<String> _scanImports(
   String dir,
   List<String> forbidden, {
+  List<String> allowed = const <String>[],
   required String reason,
 }) {
   final directory = Directory(dir);
@@ -183,6 +192,7 @@ List<String> _scanImports(
     for (var i = 0; i < lines.length; i++) {
       final line = lines[i];
       if (!line.contains('import ')) continue;
+      if (allowed.any(line.contains)) continue;
       for (final f in forbidden) {
         if (line.contains(f)) {
           violations.add('${entity.path}:${i + 1} 禁止 import $f（$reason）');
