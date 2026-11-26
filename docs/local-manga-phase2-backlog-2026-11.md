@@ -17,7 +17,7 @@
 | **Phase A** | `LMB-04` | 漫画型 `EPUB`（固定版式 / 纯图）支持：`OPF` 元数据、`RTL` 方向、内嵌目录与纯文字拦截 | P1 | M | [x] |
 | **Phase A** | `LMB-05` | 单本书内部多章节目录（EPUB TOC / 子目录 / `ComicInfo` 书签）+ 通用页级书签 | P1 | M | [x] |
 | **Phase A** | `LMB-06` | 老压缩包文件名 `Shift-JIS / GBK` 真转码 + `CBT/TAR` + 嵌套合集包自动拆包 | P1 | M | [x] |
-| **Phase B** | `LMB-07` | 内置局域网 HTTP Wi-Fi 传书服务（浏览器拖拽文件/文件夹 + 进度 + 可选 PIN） | P1 | M-L | [ ] |
+| **Phase B** | `LMB-07` | 内置局域网 HTTP Wi-Fi 传书服务（浏览器拖拽文件/文件夹 + 进度 + 可选 PIN） | P1 | M-L | [x] |
 | **Phase B** | `LMB-08` | 外部目录原位挂载：Android SAF 持久化树 & iOS Security-Scoped Bookmark（含 `.nomedia` & iCloud 感知） | P1 | L | [ ] |
 | **Phase B** | `LMB-09` | 后台增量目录扫描器、iOS `Files.app` 目录自发现与「本地书库管理中心」 | P1 | M-L | [ ] |
 | **Phase B** | `LMB-10` | 本地书架「按文件夹树浏览」双模视图 | P1 | M | [ ] |

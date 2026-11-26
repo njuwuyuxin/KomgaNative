@@ -254,7 +254,7 @@ int _parseTarSize(Uint8List header) {
 }
 
 int? _parseOctalField(Uint8List block, int start, int length) {
-  var end = start + length;
+  final end = start + length;
   var i = start;
   while (i < end && (block[i] == 0x20 || block[i] == 0x00)) {
     i++;

@@ -532,6 +532,36 @@
   "importComics": "导入漫画",
   "importArchiveFiles": "导入 CBZ / ZIP / 漫画 EPUB",
   "importComicFolder": "导入漫画文件夹",
+  "wifiTransferMenu": "Wi-Fi 传书",
+  "wifiTransferTitle": "局域网 Wi-Fi 传书",
+  "wifiTransferHint": "在同一 Wi-Fi 下的电脑或平板浏览器中打开下方地址，即可拖拽上传 CBZ / ZIP / EPUB / CBT 压缩包或整本漫画文件夹。",
+  "wifiTransferUrlLabel": "浏览器访问地址",
+  "wifiTransferCopyUrl": "复制地址",
+  "wifiTransferCopied": "已复制传书地址",
+  "wifiTransferPinToggle": "启用传书 PIN 校验",
+  "wifiTransferPinHint": "开启后浏览器上传需输入 4 位校验码",
+  "wifiTransferPinValue": "当前 PIN：{pin}",
+  "@wifiTransferPinValue": {
+    "placeholders": {
+      "pin": {"type": "String"}
+    }
+  },
+  "wifiTransferPinRefresh": "刷新 PIN",
+  "wifiTransferStart": "启动传书服务",
+  "wifiTransferStop": "停止传书服务",
+  "wifiTransferStopped": "传书服务已停止",
+  "wifiTransferReceiving": "正在接收 {name}…",
+  "@wifiTransferReceiving": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "wifiTransferReceivedCount": "本次会话已导入 {count} 册",
+  "@wifiTransferReceivedCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
   "importingProgress": "正在导入（{done}/{total}）",
   "@importingProgress": {
     "placeholders": {

@@ -115,7 +115,7 @@ void main() {
           PRAGMA user_version = 4;
         ''');
         } finally {
-          raw.dispose();
+          raw.close();
         }
 
         final db = ProgressDatabase(NativeDatabase(dbFile));

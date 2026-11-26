@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/src/providers/active_source_provider.dart';
 import 'package:yomu/src/providers/local_import_provider.dart';
+import 'package:yomu/src/widgets/wifi_transfer_sheet.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 
@@ -123,6 +124,12 @@ class LocalImportMenuOrb extends ConsumerWidget {
           onPressed: () {
             if (!busy) unawaited(runLocalFolderImport(context, ref));
           },
+        ),
+        GlassMenuItemButton(
+          key: const Key('import-menu-wifi'),
+          icon: Icons.wifi_tethering,
+          label: l10n.wifiTransferMenu,
+          onPressed: () => unawaited(showWifiTransferSheet(context)),
         ),
       ],
     );

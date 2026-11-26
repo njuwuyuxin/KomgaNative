@@ -30,7 +30,7 @@ final bookBookmarksProvider = StreamProvider.autoDispose
 
 /// 页级书签变更控制器（Widget 不直接碰 DB，统一经本控制器派发）。
 final Provider<PageBookmarkController> bookmarkControllerProvider =
-    Provider<PageBookmarkController>((Ref ref) => PageBookmarkController(ref));
+    Provider<PageBookmarkController>(PageBookmarkController.new);
 
 final class PageBookmarkController {
   const PageBookmarkController(this._ref);

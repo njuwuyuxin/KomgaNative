@@ -683,6 +683,36 @@
   "importComics": "Import comics",
   "importArchiveFiles": "Import CBZ / ZIP / EPUB",
   "importComicFolder": "Import comic folder",
+  "wifiTransferMenu": "Wi-Fi Transfer",
+  "wifiTransferTitle": "Wi-Fi Transfer",
+  "wifiTransferHint": "Open the address below in a browser on the same Wi-Fi network, then drag and drop CBZ/ZIP/EPUB/CBT files or comic folders.",
+  "wifiTransferUrlLabel": "Browser address",
+  "wifiTransferCopyUrl": "Copy address",
+  "wifiTransferCopied": "Address copied to clipboard",
+  "wifiTransferPinToggle": "Require transfer PIN",
+  "wifiTransferPinHint": "Protect LAN uploads with a 4-digit PIN",
+  "wifiTransferPinValue": "Current PIN: {pin}",
+  "@wifiTransferPinValue": {
+    "placeholders": {
+      "pin": {"type": "String"}
+    }
+  },
+  "wifiTransferPinRefresh": "Generate new PIN",
+  "wifiTransferStart": "Start server",
+  "wifiTransferStop": "Stop server",
+  "wifiTransferStopped": "Server stopped",
+  "wifiTransferReceiving": "Receiving {name}…",
+  "@wifiTransferReceiving": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "wifiTransferReceivedCount": "Imported {count} book(s) this session",
+  "@wifiTransferReceivedCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
   "importingProgress": "Importing ({done}/{total})",
   "@importingProgress": {
     "placeholders": {
