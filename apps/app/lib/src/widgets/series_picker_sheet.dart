@@ -2,13 +2,13 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/l10n/failure_text.dart';
-import 'package:komga_native/src/providers/library_providers.dart';
-import 'package:komga_native/src/widgets/cover_image.dart';
-import 'package:komga_native/src/widgets/load_more_footer.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/l10n/failure_text.dart';
+import 'package:yomu/src/providers/library_providers.dart';
+import 'package:yomu/src/widgets/cover_image.dart';
+import 'package:yomu/src/widgets/load_more_footer.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 在收藏集详情页内选择系列加入该收藏集的底部抽屉。

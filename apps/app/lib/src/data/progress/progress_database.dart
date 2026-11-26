@@ -2,11 +2,11 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:drift/drift.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/data/progress/user_tables.dart';
-import 'package:komga_sync_engine/komga_sync_engine.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/data/progress/user_tables.dart';
+import 'package:yomu_sync/yomu_sync.dart';
 
-export 'package:komga_native/src/data/progress/user_tables.dart';
+export 'package:yomu/src/data/progress/user_tables.dart';
 
 part 'progress_database.g.dart';
 part 'progress_user_dao.dart';

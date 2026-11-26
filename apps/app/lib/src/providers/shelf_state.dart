@@ -1,7 +1,7 @@
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/data/shelf_failure.dart';
-import 'package:komga_native/src/data/shelf_filter_preset.dart';
-import 'package:komga_native/src/data/shelf_view_options.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/data/shelf_failure.dart';
+import 'package:yomu/src/data/shelf_filter_preset.dart';
+import 'package:yomu/src/data/shelf_view_options.dart';
 
 /// 书架一屏的状态。
 class ShelfState {

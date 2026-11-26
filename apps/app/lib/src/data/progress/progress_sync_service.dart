@@ -1,9 +1,9 @@
 import 'dart:async';
 
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/data/progress/progress_store.dart';
-import 'package:komga_native/src/data/shelf_failure.dart';
-import 'package:komga_sync_engine/komga_sync_engine.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/data/progress/progress_store.dart';
+import 'package:yomu/src/data/shelf_failure.dart';
+import 'package:yomu_sync/yomu_sync.dart';
 
 /// 单服进度上传接口（单测便捷入口）。
 typedef ProgressUpload = Future<void> Function(ProgressTarget target);

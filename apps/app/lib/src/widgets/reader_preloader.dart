@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/scheduler.dart';
-import 'package:komga_native/src/data/shelf_failure.dart';
-import 'package:komga_reader_engine/komga_reader_engine.dart';
+import 'package:yomu/src/data/shelf_failure.dart';
+import 'package:yomu_reader/yomu_reader.dart';
 
 /// 阅读器的页图预取调度（单页 / 双页）。
 ///

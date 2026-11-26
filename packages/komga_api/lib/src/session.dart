@@ -7,7 +7,7 @@ import 'package:komga_api/src/http_cache.dart';
 import 'package:komga_api/src/parsers.dart';
 import 'package:komga_api/src/tls.dart';
 import 'package:komga_api/src/urls.dart';
-import 'package:komga_domain/komga_domain.dart';
+import 'package:yomu_domain/yomu_domain.dart';
 
 part 'session_catalog.dart';
 part 'session_curation.dart';

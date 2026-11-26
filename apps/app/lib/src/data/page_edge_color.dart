@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:komga_reader_engine/komga_reader_engine.dart';
+import 'package:yomu_reader/yomu_reader.dart';
 
 /// 从页图字节里取"页边主色"（UI-P1-5 动态背景）。
 ///

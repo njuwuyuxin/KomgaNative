@@ -1,4 +1,4 @@
-import 'package:komga_domain/komga_domain.dart';
+import 'package:yomu_domain/yomu_domain.dart';
 
 /// Komga URL 构造。
 ///

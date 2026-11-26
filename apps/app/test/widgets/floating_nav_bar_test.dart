@@ -1,8 +1,8 @@
 import 'dart:ui' show Tristate;
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_native/src/widgets/floating_nav_bar.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu/src/widgets/floating_nav_bar.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 悬浮玻璃导航条：点击派发、点按区、语义、墨水屏退化。

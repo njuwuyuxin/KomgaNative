@@ -2,19 +2,19 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/data/shelf_view_options.dart';
-import 'package:komga_native/src/providers/library_providers.dart';
-import 'package:komga_native/src/providers/pinned_series_provider.dart';
-import 'package:komga_native/src/widgets/cover_image.dart';
-import 'package:komga_native/src/widgets/series_context_menu.dart';
-import 'package:komga_native/src/widgets/series_hero_tag.dart';
-import 'package:komga_native/src/widgets/unread_badge.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/data/shelf_view_options.dart';
+import 'package:yomu/src/providers/library_providers.dart';
+import 'package:yomu/src/providers/pinned_series_provider.dart';
+import 'package:yomu/src/widgets/cover_image.dart';
+import 'package:yomu/src/widgets/series_context_menu.dart';
+import 'package:yomu/src/widgets/series_hero_tag.dart';
+import 'package:yomu/src/widgets/unread_badge.dart';
 import 'package:material_ui/material_ui.dart';
 
-export 'package:komga_native/src/widgets/series_context_menu.dart';
+export 'package:yomu/src/widgets/series_context_menu.dart';
 
 /// 书架上的一个系列卡片。
 class SeriesShelfTile extends ConsumerWidget {

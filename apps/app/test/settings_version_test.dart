@@ -2,16 +2,16 @@ import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/l10n/l10n.dart';
-import 'package:komga_native/src/data/cache/http_cache_database.dart';
-import 'package:komga_native/src/data/settings_store.dart';
-import 'package:komga_native/src/providers/app_info_provider.dart';
-import 'package:komga_native/src/providers/cache_providers.dart';
-import 'package:komga_native/src/providers/settings_provider.dart';
-import 'package:komga_native/src/screens/settings_screen.dart';
-import 'package:komga_native/src/session/server_store.dart';
-import 'package:komga_native/src/session/session_controller.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/l10n/l10n.dart';
+import 'package:yomu/src/data/cache/http_cache_database.dart';
+import 'package:yomu/src/data/settings_store.dart';
+import 'package:yomu/src/providers/app_info_provider.dart';
+import 'package:yomu/src/providers/cache_providers.dart';
+import 'package:yomu/src/providers/settings_provider.dart';
+import 'package:yomu/src/screens/settings_screen.dart';
+import 'package:yomu/src/session/server_store.dart';
+import 'package:yomu/src/session/session_controller.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// FIX-09：版本号必须来自构建产物，不再是硬编码的 `0.1.0 (v1)`。

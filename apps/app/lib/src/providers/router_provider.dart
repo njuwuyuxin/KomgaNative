@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:komga_native/src/router.dart';
-import 'package:komga_native/src/session/session_controller.dart';
+import 'package:yomu/src/router.dart';
+import 'package:yomu/src/session/session_controller.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 把 Riverpod 的会话状态桥接成 go_router 能监听的对象。

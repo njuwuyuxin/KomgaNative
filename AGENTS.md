@@ -22,30 +22,30 @@ dart run tool/komga.dart start   # 启停本地 Komga 服务器（可选，联�
 单包测试（更快，改纯逻辑时优先）：
 
 ```bash
-dart test packages/komga_reader_engine
-dart test packages/komga_sync_engine
+dart test packages/yomu_reader
+dart test packages/yomu_sync
 flutter test apps/app
 ```
 
 ## 仓库结构
 
 ```
-apps/app                      Flutter 应用（唯一可执行目标：android, ios）
-packages/komga_domain         纯 Dart：领域模型（零依赖）
-packages/komga_reader_engine  纯 Dart：分页/双页/缩放几何计算
-packages/komga_sync_engine    纯 Dart：进度 outbox + 多设备对账
-packages/komga_api            Komga REST 传输层、错误模型、URL 构造
-packages/komga_design_system  设计 token、三套主题、基础组件
-packages/komga_platform       平台能力抽象（设备形态、墨水屏探测）
-tool/ci.dart                  统一校验入口
-tool/emulator.dart            本地模拟器启动器（可选，见 docs/environment-setup.md §11）
-tool/komga.dart               本地 Komga 启停（可选，联调用，见 §12）
-docs/                         选型、环境、spec、ADR
+apps/app                     Flutter 应用 `yomu`（唯一可执行目标：android, ios）
+packages/yomu_domain         纯 Dart：通用漫画领域模型（零依赖）
+packages/yomu_reader         纯 Dart：分页/双页/缩放/卷页几何计算
+packages/yomu_sync           纯 Dart：进度 outbox + 多设备对账
+packages/komga_api           Komga 服务器专属 REST 传输层、错误模型、URL 构造
+packages/yomu_design_system  Yomu 设计 token、三套主题、基础组件
+packages/yomu_platform       平台能力抽象（设备形态、墨水屏探测、按键与存储）
+tool/ci.dart                 统一校验入口
+tool/emulator.dart           本地模拟器启动器（可选，见 docs/environment-setup.md §11）
+tool/komga.dart              本地 Komga 启停（可选，联调用，见 §12）
+docs/                        选型、环境、spec、ADR
 ```
 
 ## 架构不变量（违反即失败，`ci.dart layers` 会拦）
 
-1. `komga_domain` / `komga_reader_engine` / `komga_sync_engine` **不得** import flutter / dio / drift / go_router。
+1. `yomu_domain` / `yomu_reader` / `yomu_sync` **不得** import flutter / dio / drift / go_router。
 2. `apps/app/lib/src/screens/**` 与 `widgets/**` **不得** import `package:komga_api`，只能经 Repository。
 3. Widget 里不做网络 I/O，不 `await` 请求；只读 provider 状态 + 派发 intent。
 4. 错误统一用 `KomgaError`（`packages/komga_api/lib/src/errors.dart`）或领域内的密封类型，UI 只 `switch`，不允许裸 `catch`。

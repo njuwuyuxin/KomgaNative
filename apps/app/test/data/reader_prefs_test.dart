@@ -1,12 +1,12 @@
 import 'dart:ui' show Locale;
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/data/reader_prefs.dart';
-import 'package:komga_native/src/widgets/reader_mode_text.dart';
-import 'package:komga_native/src/widgets/reader_settings_rows.dart';
-import 'package:komga_reader_engine/komga_reader_engine.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/data/reader_prefs.dart';
+import 'package:yomu/src/widgets/reader_mode_text.dart';
+import 'package:yomu/src/widgets/reader_settings_rows.dart';
+import 'package:yomu_reader/yomu_reader.dart';
 
 void main() {
   group('ReaderPrefs & ReaderConfig', () {

@@ -1,8 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:komga_native/src/data/app_settings.dart';
-import 'package:komga_native/src/data/secure_storage.dart';
+import 'package:yomu/src/data/app_settings.dart';
+import 'package:yomu/src/data/secure_storage.dart';
 
 /// 应用设置的持久化。
 ///

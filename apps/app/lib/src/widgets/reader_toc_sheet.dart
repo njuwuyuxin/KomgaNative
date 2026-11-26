@@ -2,14 +2,14 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/data/shelf_failure.dart';
-import 'package:komga_native/src/l10n/failure_text.dart';
-import 'package:komga_native/src/providers/library_providers.dart';
-import 'package:komga_native/src/screens/reader_args.dart';
-import 'package:komga_native/src/widgets/reader_palette.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/data/shelf_failure.dart';
+import 'package:yomu/src/l10n/failure_text.dart';
+import 'package:yomu/src/providers/library_providers.dart';
+import 'package:yomu/src/screens/reader_args.dart';
+import 'package:yomu/src/widgets/reader_palette.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 阅读器里的"目录"（RDR-02）：本系列的书列表，点一本直接换书。

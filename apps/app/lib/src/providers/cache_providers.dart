@@ -4,12 +4,12 @@ import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_native/src/data/cache/drift_http_cache.dart';
-import 'package:komga_native/src/data/cache/http_cache_database.dart';
-import 'package:komga_native/src/session/session_controller.dart';
+import 'package:yomu/src/data/cache/drift_http_cache.dart';
+import 'package:yomu/src/data/cache/http_cache_database.dart';
+import 'package:yomu/src/session/session_controller.dart';
 import 'package:path_provider/path_provider.dart';
 
-export 'package:komga_native/src/data/cache/http_cache_database.dart'
+export 'package:yomu/src/data/cache/http_cache_database.dart'
     show HttpCacheDownloadsDao;
 
 /// 内容缓存库（Drift，独立于进度库）。

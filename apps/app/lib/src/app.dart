@@ -1,11 +1,11 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/l10n/l10n.dart';
-import 'package:komga_native/src/providers/settings_provider.dart';
-import 'package:komga_native/src/providers/router_provider.dart';
-import 'package:komga_native/src/widgets/progress_sync_scope.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/l10n/l10n.dart';
+import 'package:yomu/src/providers/settings_provider.dart';
+import 'package:yomu/src/providers/router_provider.dart';
+import 'package:yomu/src/widgets/progress_sync_scope.dart';
 
 /// 应用根。
 ///

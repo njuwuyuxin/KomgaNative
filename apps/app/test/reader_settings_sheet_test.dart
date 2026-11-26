@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_native/src/data/reader_prefs.dart';
-import 'package:komga_native/src/widgets/reader_fit_preview.dart';
+import 'package:yomu/src/data/reader_prefs.dart';
+import 'package:yomu/src/widgets/reader_fit_preview.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_reader.dart';

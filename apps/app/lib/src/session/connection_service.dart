@@ -1,6 +1,6 @@
 import 'package:komga_api/komga_api.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/session/server_store.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/session/server_store.dart';
 
 class ConnectionOutcome {
   const ConnectionOutcome({required this.server, required this.libraries});

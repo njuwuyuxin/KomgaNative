@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/data/curation_ops.dart';
-import 'package:komga_native/src/providers/library_providers.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/data/curation_ops.dart';
+import 'package:yomu/src/providers/library_providers.dart';
 
 /// 收藏集与阅读列表写操作控制器（ARC-05 / ARC-09）。
 class CollectionsController extends Notifier<void> {

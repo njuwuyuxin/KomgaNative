@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:komga_api/komga_api.dart';
-import 'package:komga_native/src/data/cache/connectivity_filter.dart';
+import 'package:yomu/src/data/cache/connectivity_filter.dart';
 
 class _FakeClock {
   DateTime current = DateTime.utc(2026, 11, 25, 12);

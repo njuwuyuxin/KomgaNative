@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/providers/library_providers.dart';
-import 'package:komga_native/src/providers/progress_providers.dart';
-import 'package:komga_native/src/session/session_controller.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/providers/library_providers.dart';
+import 'package:yomu/src/providers/progress_providers.dart';
+import 'package:yomu/src/session/session_controller.dart';
 
 /// 当前服务器的稳定标识（LIB-02）。
 final Provider<String> activeServerKeyProvider = Provider<String>((Ref ref) {

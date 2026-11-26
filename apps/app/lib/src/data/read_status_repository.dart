@@ -1,7 +1,7 @@
 import 'package:komga_api/komga_api.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/data/progress/progress_sync_service.dart';
-import 'package:komga_native/src/data/shelf_failure.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/data/progress/progress_sync_service.dart';
+import 'package:yomu/src/data/shelf_failure.dart';
 
 /// 阅读状态变更限界上下文仓库（整系列/单本书标记已读与未读，UI-P2-5 / ARC-09）。
 abstract interface class ReadStatusRepository {

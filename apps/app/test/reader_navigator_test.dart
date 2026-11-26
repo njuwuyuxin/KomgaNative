@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_native/src/widgets/page_navigator_sheet.dart';
+import 'package:yomu/src/widgets/page_navigator_sheet.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_reader.dart';

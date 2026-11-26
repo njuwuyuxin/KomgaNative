@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/widgets/reader_layout.dart';
-import 'package:komga_native/src/widgets/reader_progress_writer.dart';
-import 'package:komga_reader_engine/komga_reader_engine.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/widgets/reader_layout.dart';
+import 'package:yomu/src/widgets/reader_progress_writer.dart';
+import 'package:yomu_reader/yomu_reader.dart';
 
 /// 竖版页（宽 < 高），双页模式会两两配对。
 List<PageInfo> portrait(int count) => <PageInfo>[

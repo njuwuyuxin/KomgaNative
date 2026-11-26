@@ -5,16 +5,16 @@ import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_api/komga_api.dart';
-import 'package:komga_native/src/data/progress/progress_database.dart';
-import 'package:komga_native/src/data/progress/progress_store.dart';
-import 'package:komga_native/src/data/progress/progress_sync_service.dart';
-import 'package:komga_native/src/data/shelf_failure.dart';
-import 'package:komga_native/src/providers/komga_session_provider.dart';
-import 'package:komga_native/src/session/session_controller.dart';
-import 'package:komga_sync_engine/komga_sync_engine.dart';
+import 'package:yomu/src/data/progress/progress_database.dart';
+import 'package:yomu/src/data/progress/progress_store.dart';
+import 'package:yomu/src/data/progress/progress_sync_service.dart';
+import 'package:yomu/src/data/shelf_failure.dart';
+import 'package:yomu/src/providers/komga_session_provider.dart';
+import 'package:yomu/src/session/session_controller.dart';
+import 'package:yomu_sync/yomu_sync.dart';
 import 'package:path_provider/path_provider.dart';
 
-export 'package:komga_native/src/data/progress/progress_database.dart'
+export 'package:yomu/src/data/progress/progress_database.dart'
     show ProgressUserDao;
 
 /// 本地用户资产数据库（Drift）。

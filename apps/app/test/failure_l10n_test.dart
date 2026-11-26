@@ -1,11 +1,11 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:komga_api/komga_api.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/data/shelf_failure.dart';
-import 'package:komga_native/src/l10n/connection_failure_text.dart';
-import 'package:komga_native/src/l10n/failure_text.dart';
-import 'package:komga_native/src/session/session_controller.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/data/shelf_failure.dart';
+import 'package:yomu/src/l10n/connection_failure_text.dart';
+import 'package:yomu/src/l10n/failure_text.dart';
+import 'package:yomu/src/session/session_controller.dart';
 
 /// I18N-01：失败类型 → 本地化文案。
 void main() {

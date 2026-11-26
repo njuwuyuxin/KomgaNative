@@ -1,4 +1,4 @@
-import 'package:komga_design_system/komga_design_system.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 长按上下文菜单里的一项。

@@ -3,11 +3,11 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/data/collections_repository.dart';
-import 'package:komga_native/src/data/library_repository.dart';
-import 'package:komga_native/src/data/read_status_repository.dart';
-import 'package:komga_native/src/data/shelf_failure.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/data/collections_repository.dart';
+import 'package:yomu/src/data/library_repository.dart';
+import 'package:yomu/src/data/read_status_repository.dart';
+import 'package:yomu/src/data/shelf_failure.dart';
 
 /// 书架假仓库：可指定数据、可随时切换失败、可把请求"卡住"以观察加载态。
 ///

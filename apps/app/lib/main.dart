@@ -1,7 +1,7 @@
-import 'package:komga_design_system/komga_design_system.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_native/src/app.dart';
+import 'package:yomu/src/app.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

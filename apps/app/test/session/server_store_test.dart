@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/session/server_store.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/session/server_store.dart';
 
 import '../support/fakes.dart';
 

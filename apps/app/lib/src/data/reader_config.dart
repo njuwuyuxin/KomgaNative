@@ -1,7 +1,7 @@
-import 'package:komga_native/src/data/reader_choices.dart';
-import 'package:komga_reader_engine/komga_reader_engine.dart';
+import 'package:yomu/src/data/reader_choices.dart';
+import 'package:yomu_reader/yomu_reader.dart';
 
-export 'package:komga_native/src/data/reader_choices.dart';
+export 'package:yomu/src/data/reader_choices.dart';
 
 /// 不可变纯阅读配置值对象（ARC-04）。
 ///

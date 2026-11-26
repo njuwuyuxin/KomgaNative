@@ -2,10 +2,10 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_native/src/providers/reader_providers.dart';
-import 'package:komga_native/src/widgets/reader_chrome.dart';
-import 'package:komga_native/src/widgets/reader_palette.dart';
-import 'package:komga_reader_engine/komga_reader_engine.dart';
+import 'package:yomu/src/providers/reader_providers.dart';
+import 'package:yomu/src/widgets/reader_chrome.dart';
+import 'package:yomu/src/widgets/reader_palette.dart';
+import 'package:yomu_reader/yomu_reader.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 服务端没返回尺寸时的兜底页面尺寸（比例接近实体漫画单页）。

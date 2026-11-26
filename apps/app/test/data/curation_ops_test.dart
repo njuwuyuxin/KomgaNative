@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_native/src/data/curation_ops.dart';
+import 'package:yomu/src/data/curation_ops.dart';
 
 void main() {
   group('membershipOf', () {

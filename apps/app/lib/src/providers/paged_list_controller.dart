@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/data/shelf_failure.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/data/shelf_failure.dart';
 
 /// 通用增量分页器（ARC-12）：
 /// - 首屏请求 `page = 0`；

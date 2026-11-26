@@ -1,4 +1,4 @@
-import 'package:komga_domain/komga_domain.dart';
+import 'package:yomu_domain/yomu_domain.dart';
 
 /// 把 Komga 的 JSON 映射成领域模型。
 ///

@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_native/src/providers/reader_prefs_provider.dart';
-import 'package:komga_platform/komga_platform.dart';
+import 'package:yomu/src/providers/reader_prefs_provider.dart';
+import 'package:yomu_platform/yomu_platform.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 把"屏幕常亮"和阅读器的生命周期绑在一起：进来置真、退出置假。

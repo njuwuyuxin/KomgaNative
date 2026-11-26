@@ -1,6 +1,6 @@
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_reader_engine/komga_reader_engine.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu_reader/yomu_reader.dart';
 
 /// 阅读器"这一屏"的派生状态：分屏、相邻屏、能否翻页、是否读完、页码文案。
 ///

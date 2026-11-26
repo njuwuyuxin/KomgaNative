@@ -2,7 +2,7 @@ import 'dart:typed_data';
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_native/src/data/cache/http_cache_database.dart';
+import 'package:yomu/src/data/cache/http_cache_database.dart';
 
 /// 内容缓存表的单测。
 ///

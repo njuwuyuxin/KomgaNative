@@ -2,7 +2,7 @@
 
 - 状态：已采纳（2026-11-26 终审定稿）
 - 日期：2026-11-26
-- 相关：`apps/app/lib/src/router.dart`、`apps/app/lib/src/data/`、`apps/app/lib/src/providers/`、`packages/komga_domain`、`packages/komga_design_system`、`docs/local-manga-plan-2026-11.md`
+- 相关：`apps/app/lib/src/router.dart`、`apps/app/lib/src/data/`、`apps/app/lib/src/providers/`、`packages/yomu_domain`、`packages/yomu_design_system`、`docs/local-manga-plan-2026-11.md`
 
 ## 背景
 

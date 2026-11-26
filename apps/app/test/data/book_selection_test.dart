@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/data/book_selection.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/data/book_selection.dart';
 
 /// UI-P2-4 详情页主按钮"读哪一本"的纯逻辑。
 void main() {

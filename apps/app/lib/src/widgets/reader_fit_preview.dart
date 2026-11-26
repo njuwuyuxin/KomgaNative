@@ -1,6 +1,6 @@
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_native/src/data/reader_prefs.dart';
-import 'package:komga_native/src/widgets/reader_palette.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu/src/data/reader_prefs.dart';
+import 'package:yomu/src/widgets/reader_palette.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 适配方式的 4 个小示意图（RDR-04）。

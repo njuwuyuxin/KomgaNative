@@ -5,8 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/l10n/l10n.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/l10n/l10n.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 黄金图工具。

@@ -2,10 +2,10 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_api/komga_api.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/session/certificate_prompt.dart';
-import 'package:komga_native/src/session/connection_service.dart';
-import 'package:komga_native/src/session/server_store.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/session/certificate_prompt.dart';
+import 'package:yomu/src/session/connection_service.dart';
+import 'package:yomu/src/session/server_store.dart';
 
 /// 连接失败的结构化种类（ARC-11：UI 按当前 Locale 渲染，消除中英硬编码混排）。
 enum ConnectionFailureKind {

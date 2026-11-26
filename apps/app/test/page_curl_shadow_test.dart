@@ -3,8 +3,8 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_native/src/widgets/page_curl.dart';
-import 'package:komga_reader_engine/komga_reader_engine.dart';
+import 'package:yomu/src/widgets/page_curl.dart';
+import 'package:yomu_reader/yomu_reader.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 回归测试：单页卷页时纸页边缘外的卷筒阴影不得出现离散采样导致的条状阶梯带纹，

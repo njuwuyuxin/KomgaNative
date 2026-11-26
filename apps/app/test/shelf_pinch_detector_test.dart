@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_native/src/widgets/shelf_pinch_detector.dart';
+import 'package:yomu/src/widgets/shelf_pinch_detector.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// UI-P2-7：双指捏合调封面档位。

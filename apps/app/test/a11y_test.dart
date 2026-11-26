@@ -1,17 +1,17 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/l10n/l10n.dart';
-import 'package:komga_native/src/data/cache/http_cache_database.dart';
-import 'package:komga_native/src/data/download/download_service.dart';
-import 'package:komga_native/src/providers/download_providers.dart';
-import 'package:komga_native/src/providers/library_providers.dart';
-import 'package:komga_native/src/screens/library_screen.dart';
-import 'package:komga_native/src/screens/reading_now_screen.dart';
-import 'package:komga_native/src/screens/series_detail_screen.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/l10n/l10n.dart';
+import 'package:yomu/src/data/cache/http_cache_database.dart';
+import 'package:yomu/src/data/download/download_service.dart';
+import 'package:yomu/src/providers/download_providers.dart';
+import 'package:yomu/src/providers/library_providers.dart';
+import 'package:yomu/src/screens/library_screen.dart';
+import 'package:yomu/src/screens/reading_now_screen.dart';
+import 'package:yomu/src/screens/series_detail_screen.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_library.dart';

@@ -1,14 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/data/app_settings.dart';
-import 'package:komga_native/src/data/reader_prefs.dart';
-import 'package:komga_reader_engine/komga_reader_engine.dart'
-    show TapZonePreset;
-import 'package:komga_native/src/data/shelf_view_options.dart';
-import 'package:komga_native/src/providers/library_providers.dart';
-import 'package:komga_native/src/session/session_controller.dart';
-import 'package:komga_native/src/providers/reader_prefs_provider.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/data/app_settings.dart';
+import 'package:yomu/src/data/reader_prefs.dart';
+import 'package:yomu_reader/yomu_reader.dart' show TapZonePreset;
+import 'package:yomu/src/data/shelf_view_options.dart';
+import 'package:yomu/src/providers/library_providers.dart';
+import 'package:yomu/src/session/session_controller.dart';
+import 'package:yomu/src/providers/reader_prefs_provider.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 设置页的"阅读"分组（SET-01）：把阅读器面板里的默认值提升到设置里。

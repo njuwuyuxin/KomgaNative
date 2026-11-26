@@ -2,11 +2,11 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:komga_api/komga_api.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/providers/settings_provider.dart';
-import 'package:komga_native/src/session/connection_service.dart';
-import 'package:komga_native/src/session/server_store.dart';
-import 'package:komga_platform/komga_platform.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/providers/settings_provider.dart';
+import 'package:yomu/src/session/connection_service.dart';
+import 'package:yomu/src/session/server_store.dart';
+import 'package:yomu_platform/yomu_platform.dart';
 
 /// 记录常亮开关的调用序列，用来断言"进阅读器置真、退出置假"。
 class FakeWakeLock implements WakeLock {

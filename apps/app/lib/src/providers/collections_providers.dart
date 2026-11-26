@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/data/collections_repository.dart';
-import 'package:komga_native/src/providers/komga_session_provider.dart';
-import 'package:komga_native/src/providers/library_providers.dart';
-import 'package:komga_native/src/providers/progress_providers.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/data/collections_repository.dart';
+import 'package:yomu/src/providers/komga_session_provider.dart';
+import 'package:yomu/src/providers/library_providers.dart';
+import 'package:yomu/src/providers/progress_providers.dart';
 
 /// 一次增量分页拉取的条数（收藏集 / 阅读列表 / 搜索）。
 const int kListPageSize = 30;

@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_native/src/providers/reader_prefs_provider.dart';
-import 'package:komga_platform/komga_platform.dart';
+import 'package:yomu/src/providers/reader_prefs_provider.dart';
+import 'package:yomu_platform/yomu_platform.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 阅读器在前台期间接管音量键：进来 `setActive(true)` 并订阅，退出交还系统。

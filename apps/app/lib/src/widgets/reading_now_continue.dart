@@ -3,17 +3,17 @@ import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/providers/library_providers.dart';
-import 'package:komga_native/src/screens/reader_screen.dart';
-import 'package:komga_native/src/widgets/book_hero_tag.dart';
-import 'package:komga_native/src/widgets/cover_image.dart';
-import 'package:komga_native/src/widgets/reading_now_states.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/providers/library_providers.dart';
+import 'package:yomu/src/screens/reader_screen.dart';
+import 'package:yomu/src/widgets/book_hero_tag.dart';
+import 'package:yomu/src/widgets/cover_image.dart';
+import 'package:yomu/src/widgets/reading_now_states.dart';
 import 'package:material_ui/material_ui.dart';
 
-export 'package:komga_native/src/widgets/reading_now_states.dart';
+export 'package:yomu/src/widgets/reading_now_states.dart';
 
 /// "正在读"页顶部的继续阅读卡片，以及它的加载/空/失败三态（FIX-05 / ARC-12）。
 class ReadingNowContinue extends StatefulWidget {

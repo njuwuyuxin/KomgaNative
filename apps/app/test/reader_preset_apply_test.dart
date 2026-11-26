@@ -1,11 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_native/src/data/reader_prefs.dart';
-import 'package:komga_native/src/data/reader_prefs_store.dart';
-import 'package:komga_native/src/providers/reader_prefs_provider.dart';
-import 'package:komga_reader_engine/komga_reader_engine.dart'
-    show TapZonePreset;
+import 'package:yomu/src/data/reader_prefs.dart';
+import 'package:yomu/src/data/reader_prefs_store.dart';
+import 'package:yomu/src/providers/reader_prefs_provider.dart';
+import 'package:yomu_reader/yomu_reader.dart' show TapZonePreset;
 
 /// FIX-04 & ARC-04：`ReaderConfig` 值对象全字段往返、预设应用与系列覆盖不漂移。
 void main() {

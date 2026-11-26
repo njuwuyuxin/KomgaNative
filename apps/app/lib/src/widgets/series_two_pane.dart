@@ -1,10 +1,10 @@
 import 'dart:async';
 
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/widgets/phase_fade.dart';
-import 'package:komga_native/src/widgets/series_book_list.dart';
-import 'package:komga_native/src/widgets/series_header.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/widgets/phase_fade.dart';
+import 'package:yomu/src/widgets/series_book_list.dart';
+import 'package:yomu/src/widgets/series_header.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 窄屏系列详情：头部与书列表放在同一条滚动流里。

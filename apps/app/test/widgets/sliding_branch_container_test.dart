@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_native/src/widgets/sliding_branch_container.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu/src/widgets/sliding_branch_container.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 主页面切换的滑动容器：旧页滑出 / 新页滑入、RTL、墨水屏退化、分支状态保留。

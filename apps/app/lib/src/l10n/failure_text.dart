@@ -1,5 +1,5 @@
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/data/shelf_failure.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/data/shelf_failure.dart';
 
 /// 把数据层的失败类型翻译成本地化文案（I18N-01）。
 ///

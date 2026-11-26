@@ -1,6 +1,6 @@
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/data/progress/progress_database.dart';
-import 'package:komga_sync_engine/komga_sync_engine.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/data/progress/progress_database.dart';
+import 'package:yomu_sync/yomu_sync.dart';
 
 /// 本地已知的阅读进度。
 class ProgressRecord {

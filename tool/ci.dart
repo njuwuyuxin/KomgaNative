@@ -6,15 +6,15 @@ import 'dart:io';
 import 'ci_checks.dart';
 
 const List<String> _purePackages = <String>[
-  'packages/komga_domain',
-  'packages/komga_reader_engine',
-  'packages/komga_sync_engine',
+  'packages/yomu_domain',
+  'packages/yomu_reader',
+  'packages/yomu_sync',
   'packages/komga_api',
 ];
 
 const List<String> _flutterPackages = <String>[
-  'packages/komga_platform',
-  'packages/komga_design_system',
+  'packages/yomu_platform',
+  'packages/yomu_design_system',
   'apps/app',
 ];
 

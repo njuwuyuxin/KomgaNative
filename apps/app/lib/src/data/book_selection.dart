@@ -1,4 +1,4 @@
-import 'package:komga_domain/komga_domain.dart';
+import 'package:yomu_domain/yomu_domain.dart';
 
 /// "接着读哪一本"（UI-P2-4 详情页主按钮）。
 ///

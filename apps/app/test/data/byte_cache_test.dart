@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_native/src/data/byte_cache.dart';
+import 'package:yomu/src/data/byte_cache.dart';
 
 Uint8List bytes(int value) => Uint8List.fromList(<int>[value]);
 

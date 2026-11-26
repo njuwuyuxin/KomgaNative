@@ -1,8 +1,8 @@
 import 'package:komga_api/komga_api.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/data/library_repository.dart';
-import 'package:komga_native/src/data/progress/progress_sync_service.dart';
-import 'package:komga_native/src/data/shelf_failure.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/data/library_repository.dart';
+import 'package:yomu/src/data/progress/progress_sync_service.dart';
+import 'package:yomu/src/data/shelf_failure.dart';
 
 /// 收藏集与阅读列表限界上下文仓库（UI-P3-8 / SER-04 / ARC-09）。
 abstract interface class CollectionsRepository {

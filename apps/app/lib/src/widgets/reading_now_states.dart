@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu/l10n/app_localizations.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// "正在读"页的空态、骨架与错误提示组件（ARC-12 拆分独立文件）。

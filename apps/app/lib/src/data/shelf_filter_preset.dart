@@ -1,4 +1,4 @@
-import 'package:komga_domain/komga_domain.dart';
+import 'package:yomu_domain/yomu_domain.dart';
 
 /// 一组命名的书架筛选条件（LIB-04）：排序 + 阅读状态 + 库。
 ///

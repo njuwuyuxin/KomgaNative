@@ -2,16 +2,16 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/data/shelf_failure.dart';
-import 'package:komga_native/src/l10n/failure_text.dart';
-import 'package:komga_native/src/providers/pinned_series_provider.dart';
-import 'package:komga_native/src/providers/series_read_provider.dart';
-import 'package:komga_native/src/screens/series_detail_args.dart';
-import 'package:komga_native/src/widgets/collection_picker_sheet.dart';
-import 'package:komga_native/src/widgets/context_menu.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/data/shelf_failure.dart';
+import 'package:yomu/src/l10n/failure_text.dart';
+import 'package:yomu/src/providers/pinned_series_provider.dart';
+import 'package:yomu/src/providers/series_read_provider.dart';
+import 'package:yomu/src/screens/series_detail_args.dart';
+import 'package:yomu/src/widgets/collection_picker_sheet.dart';
+import 'package:yomu/src/widgets/context_menu.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 长按系列卡片能做的事（UI-P2-5）。

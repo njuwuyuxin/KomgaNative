@@ -3,8 +3,8 @@ import 'dart:typed_data';
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_native/src/data/cache/http_cache_database.dart';
-import 'package:komga_native/src/data/progress/progress_database.dart';
+import 'package:yomu/src/data/cache/http_cache_database.dart';
+import 'package:yomu/src/data/progress/progress_database.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 /// ARC-06：置顶系列与阅读会话统计从 v5 `komga_cache.sqlite` 平滑迁入用户库 `komga_native.sqlite`。

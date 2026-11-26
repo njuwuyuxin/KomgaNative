@@ -1,14 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/l10n/connection_failure_text.dart';
-import 'package:komga_native/src/session/server_store.dart';
-import 'package:komga_native/src/session/session_controller.dart';
-import 'package:komga_native/src/widgets/certificate_panel.dart';
-import 'package:komga_native/src/widgets/saved_servers_card.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/l10n/connection_failure_text.dart';
+import 'package:yomu/src/session/server_store.dart';
+import 'package:yomu/src/session/session_controller.dart';
+import 'package:yomu/src/widgets/certificate_panel.dart';
+import 'package:yomu/src/widgets/saved_servers_card.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 首次连接 / 重新连接页。

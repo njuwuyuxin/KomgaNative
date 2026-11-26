@@ -1,7 +1,7 @@
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_native/src/data/progress/progress_database.dart';
-import 'package:komga_native/src/data/reading_session_tracker.dart';
+import 'package:yomu/src/data/progress/progress_database.dart';
+import 'package:yomu/src/data/reading_session_tracker.dart';
 
 /// HIS-01：阅读会话的记账规则与落库。
 void main() {

@@ -1,9 +1,9 @@
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_native/src/providers/library_providers.dart';
-import 'package:komga_native/src/widgets/cover_image.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu/src/providers/library_providers.dart';
+import 'package:yomu/src/widgets/cover_image.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 收藏集的封面拼贴（UI-02）：最多 4 张系列封面。

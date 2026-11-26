@@ -2,9 +2,9 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/data/reader_repository.dart';
-import 'package:komga_native/src/data/shelf_failure.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/data/reader_repository.dart';
+import 'package:yomu/src/data/shelf_failure.dart';
 
 /// 阅读器假仓库：页图用 `test/fixtures/pages/*.png` 里的真实 PNG，
 /// 这样黄金图能看到"真的把一页画出来"的样子。

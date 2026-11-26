@@ -1,7 +1,7 @@
 import 'dart:convert';
 
-import 'package:komga_native/src/data/app_settings.dart';
-import 'package:komga_native/src/data/reader_prefs.dart';
+import 'package:yomu/src/data/app_settings.dart';
+import 'package:yomu/src/data/reader_prefs.dart';
 
 /// 备份格式版本。导入时**只接受相同主版本**：
 /// 老版本读得懂新文件是巧合，不是承诺。

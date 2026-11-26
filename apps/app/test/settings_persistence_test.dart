@@ -2,9 +2,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_native/src/data/app_settings.dart';
-import 'package:komga_native/src/data/settings_store.dart';
-import 'package:komga_native/src/providers/settings_provider.dart';
+import 'package:yomu/src/data/app_settings.dart';
+import 'package:yomu/src/data/settings_store.dart';
+import 'package:yomu/src/providers/settings_provider.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 设置持久化（FIX-02）：主题、墨水屏、语言、触感都从同一个 blob 恢复/落盘，

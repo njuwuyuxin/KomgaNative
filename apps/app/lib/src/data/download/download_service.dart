@@ -1,8 +1,8 @@
 import 'dart:typed_data';
 
 import 'package:komga_api/komga_api.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/data/cache/http_cache_database.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/data/cache/http_cache_database.dart';
 
 /// 整本下载的进度（0 基已完成页数）。
 class DownloadProgress {

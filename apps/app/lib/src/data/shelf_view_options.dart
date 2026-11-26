@@ -1,4 +1,4 @@
-import 'package:komga_design_system/komga_design_system.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 书架的呈现方式（UI-P2-7）。

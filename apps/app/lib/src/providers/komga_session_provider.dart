@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_api/komga_api.dart';
-import 'package:komga_native/src/providers/cache_providers.dart';
-import 'package:komga_native/src/session/session_controller.dart';
+import 'package:yomu/src/providers/cache_providers.dart';
+import 'package:yomu/src/session/session_controller.dart';
 
 /// 当前已连接会话共享的唯一 [KomgaSession]（含统一 `Dio` 连接池、`TlsTrust` 与 `HttpCache`）。
 ///

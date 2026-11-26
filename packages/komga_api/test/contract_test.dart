@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:komga_api/komga_api.dart';
-import 'package:komga_domain/komga_domain.dart';
+import 'package:yomu_domain/yomu_domain.dart';
 import 'package:test/test.dart';
 
 import 'support/fixtures.dart';

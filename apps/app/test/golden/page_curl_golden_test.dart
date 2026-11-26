@@ -1,8 +1,8 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_native/src/widgets/page_curl.dart';
-import 'package:komga_reader_engine/komga_reader_engine.dart';
+import 'package:yomu/src/widgets/page_curl.dart';
+import 'package:yomu_reader/yomu_reader.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'golden_harness.dart';

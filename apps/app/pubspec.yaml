@@ -1,5 +1,5 @@
-name: komga_native
-description: KomgaNative — Komga 跨平台客户端（iOS / Android / 墨水屏）。
+name: yomu
+description: Yomu — 跨平台漫画阅读器（支持本地导入与 Komga，iOS / Android / 墨水屏）。
 publish_to: none
 version: 0.1.0+1
 
@@ -20,16 +20,16 @@ dependencies:
   go_router: ^18.1.4
   komga_api:
     path: ../../packages/komga_api
-  komga_design_system:
-    path: ../../packages/komga_design_system
-  komga_domain:
-    path: ../../packages/komga_domain
-  komga_platform:
-    path: ../../packages/komga_platform
-  komga_reader_engine:
-    path: ../../packages/komga_reader_engine
-  komga_sync_engine:
-    path: ../../packages/komga_sync_engine
+  yomu_design_system:
+    path: ../../packages/yomu_design_system
+  yomu_domain:
+    path: ../../packages/yomu_domain
+  yomu_platform:
+    path: ../../packages/yomu_platform
+  yomu_reader:
+    path: ../../packages/yomu_reader
+  yomu_sync:
+    path: ../../packages/yomu_sync
   drift: ^2.35.4
   path_provider: ^2.1.6
   share_plus: ^13.3.1

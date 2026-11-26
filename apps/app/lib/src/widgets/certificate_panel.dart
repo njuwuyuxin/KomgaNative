@@ -1,7 +1,7 @@
 import 'package:material_ui/material_ui.dart';
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/session/certificate_prompt.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/session/certificate_prompt.dart';
 
 /// 证书不受信任时给用户看的面板。
 ///

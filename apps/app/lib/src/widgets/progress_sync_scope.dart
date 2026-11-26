@@ -1,10 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_native/src/data/progress/progress_sync_service.dart';
-import 'package:komga_native/src/providers/library_providers.dart';
-import 'package:komga_native/src/providers/progress_providers.dart';
-import 'package:komga_native/src/session/session_controller.dart';
+import 'package:yomu/src/data/progress/progress_sync_service.dart';
+import 'package:yomu/src/providers/library_providers.dart';
+import 'package:yomu/src/providers/progress_providers.dart';
+import 'package:yomu/src/session/session_controller.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 把"补交进度"挂到 App 生命周期上：启动时、**会话连上时**、每次回到前台。

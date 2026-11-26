@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/data/reader_prefs.dart';
-import 'package:komga_reader_engine/komga_reader_engine.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/data/reader_prefs.dart';
+import 'package:yomu_reader/yomu_reader.dart';
 
 /// PLT-02：平板默认排版（自动/单页/双页），手机不受影响，显式模式优先。
 void main() {

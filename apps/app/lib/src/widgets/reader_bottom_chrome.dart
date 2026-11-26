@@ -1,11 +1,11 @@
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/widgets/reader_chrome.dart';
-import 'package:komga_native/src/widgets/reader_finished_card.dart';
-import 'package:komga_native/src/widgets/reader_layout.dart';
-import 'package:komga_native/src/widgets/reader_page_slider.dart';
-import 'package:komga_native/src/widgets/reader_palette.dart';
-import 'package:komga_native/src/widgets/reader_thumbnail_strip.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/widgets/reader_chrome.dart';
+import 'package:yomu/src/widgets/reader_finished_card.dart';
+import 'package:yomu/src/widgets/reader_layout.dart';
+import 'package:yomu/src/widgets/reader_page_slider.dart';
+import 'package:yomu/src/widgets/reader_palette.dart';
+import 'package:yomu/src/widgets/reader_thumbnail_strip.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 底部 chrome 的三段：缩略图滑条（UI-P1-2）、书末卡片（UI-P1-7）、翻页控件。

@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:komga_reader_engine/komga_reader_engine.dart';
+import 'package:yomu_reader/yomu_reader.dart';
 
 /// 从页图字节检测四周纯色边框（UI-P3-10）。
 ///

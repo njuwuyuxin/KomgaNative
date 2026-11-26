@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_native/src/data/progress/progress_database.dart';
-import 'package:komga_native/src/data/reading_stats.dart';
+import 'package:yomu/src/data/progress/progress_database.dart';
+import 'package:yomu/src/data/reading_stats.dart';
 
 /// HIS-03：Insights 的统计口径（连续天数/最长连续/周月汇总/热力图）。
 void main() {

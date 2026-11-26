@@ -1,15 +1,15 @@
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/data/page_border_crop.dart';
-import 'package:komga_native/src/data/page_edge_color.dart';
-import 'package:komga_native/src/data/reader_repository.dart';
-import 'package:komga_native/src/providers/komga_session_provider.dart';
-import 'package:komga_native/src/providers/library_providers.dart';
-import 'package:komga_native/src/providers/progress_providers.dart';
-import 'package:komga_platform/komga_platform.dart';
-import 'package:komga_reader_engine/komga_reader_engine.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/data/page_border_crop.dart';
+import 'package:yomu/src/data/page_edge_color.dart';
+import 'package:yomu/src/data/reader_repository.dart';
+import 'package:yomu/src/providers/komga_session_provider.dart';
+import 'package:yomu/src/providers/library_providers.dart';
+import 'package:yomu/src/providers/progress_providers.dart';
+import 'package:yomu_platform/yomu_platform.dart';
+import 'package:yomu_reader/yomu_reader.dart';
 
 /// 系统相册 / 默认图片目录保存器：生产走原生通道，测试可替换为假实现。
 final Provider<ImageSaver> imageSaverProvider = Provider<ImageSaver>(

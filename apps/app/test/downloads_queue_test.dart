@@ -4,11 +4,11 @@ import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/data/cache/http_cache_database.dart';
-import 'package:komga_native/src/data/download/download_service.dart';
-import 'package:komga_native/src/providers/cache_providers.dart';
-import 'package:komga_native/src/providers/download_providers.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/data/cache/http_cache_database.dart';
+import 'package:yomu/src/data/download/download_service.dart';
+import 'package:yomu/src/providers/cache_providers.dart';
+import 'package:yomu/src/providers/download_providers.dart';
 
 /// UI-P3-13：下载队列一次只跑一本，后面的显示"排队中"。
 void main() {

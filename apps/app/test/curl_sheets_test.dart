@@ -3,7 +3,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_native/src/widgets/page_curl.dart';
+import 'package:yomu/src/widgets/page_curl.dart';
 import 'package:material_ui/material_ui.dart';
 
 void main() {

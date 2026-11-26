@@ -1,15 +1,15 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/data/curation_ops.dart';
-import 'package:komga_native/src/data/shelf_failure.dart';
-import 'package:komga_native/src/l10n/failure_text.dart';
-import 'package:komga_native/src/providers/collections_controller.dart';
-import 'package:komga_native/src/providers/library_providers.dart';
-import 'package:komga_native/src/widgets/curation_dialogs.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/data/curation_ops.dart';
+import 'package:yomu/src/data/shelf_failure.dart';
+import 'package:yomu/src/l10n/failure_text.dart';
+import 'package:yomu/src/providers/collections_controller.dart';
+import 'package:yomu/src/providers/library_providers.dart';
+import 'package:yomu/src/widgets/curation_dialogs.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 弹出「添加到阅读列表」勾选面板，支持单本书或批量多选书。

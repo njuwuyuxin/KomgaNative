@@ -1,6 +1,6 @@
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/data/shelf_filter_preset.dart';
-import 'package:komga_native/src/data/shelf_view_options.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/data/shelf_filter_preset.dart';
+import 'package:yomu/src/data/shelf_view_options.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 搜索历史最多留几条：10 条足够覆盖最近找过的，再多会把空态撑成一整屏。

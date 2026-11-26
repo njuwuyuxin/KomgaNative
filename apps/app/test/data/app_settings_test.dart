@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/data/app_settings.dart';
-import 'package:komga_native/src/data/shelf_view_options.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/data/app_settings.dart';
+import 'package:yomu/src/data/shelf_view_options.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 偏好快照的编解码：必须能扛住旧版本、手工改过、写坏的存档。

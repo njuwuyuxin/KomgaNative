@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/providers/download_providers.dart';
-import 'package:komga_platform/komga_platform.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/providers/download_providers.dart';
+import 'package:yomu_platform/yomu_platform.dart';
 
 /// 下载前的网络检查（DLD-01）。
 ///

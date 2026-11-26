@@ -2,7 +2,7 @@
 
 - 状态：已采纳
 - 日期：2026-11-26
-- 相关：`packages/komga_local_archive`、`packages/komga_platform`、`apps/app/lib/src/data/local/`、ADR 0006、ADR 0008
+- 相关：`packages/yomu_local_archive`、`packages/yomu_platform`、`apps/app/lib/src/data/local/`、ADR 0006、ADR 0008
 
 ## 背景
 
@@ -25,9 +25,9 @@
 - **引入理由**：与 ADR 0006（`share_plus`）一致，本仓库在 Windows 环境开发、iOS 构建依赖云端 CI，不应手写未经本地编译和真机调测的 iOS Swift/ObjC 原生文件选择通道；`file_picker` 是 Flutter 生态最成熟的文件与目录选择方案，无需申请宽泛的 `MANAGE_EXTERNAL_STORAGE` 敏感权限即可合规通过 Play Store 与 App Store 审核。
 - **测试隔离**：通过抽象接口 `ComicFilePicker` 封装文件/目录选择结果，业务层与 Widget 测试注入内存假实现，不直接耦合插件静态调用。
 
-### 2. 新建零外部依赖的纯 Dart 包 `packages/komga_local_archive`（面向 `RandomAccessByteSource` 抽象）
+### 2. 新建零外部依赖的纯 Dart 包 `packages/yomu_local_archive`（面向 `RandomAccessByteSource` 抽象）
 
-对于 `.cbz` / `.zip` 解析、`ComicInfo.xml` 解析与图片尺寸提取，**不引入任何第三方 pub 依赖**，全部在新建纯 Dart 包 `packages/komga_local_archive` 中基于抽象随机字节源接口 `RandomAccessByteSource`（`length()` + `readRange(offset, count)`）与 Dart SDK 标准库（`dart:typed_data`、`dart:convert`、原生 `ZLibCodec`）实现：
+对于 `.cbz` / `.zip` 解析、`ComicInfo.xml` 解析与图片尺寸提取，**不引入任何第三方 pub 依赖**，全部在新建纯 Dart 包 `packages/yomu_local_archive` 中基于抽象随机字节源接口 `RandomAccessByteSource`（`length()` + `readRange(offset, count)`）与 Dart SDK 标准库（`dart:typed_data`、`dart:convert`、原生 `ZLibCodec`）实现：
 
 1. **面向 `RandomAccessByteSource` 的 \(O(1)\) 随机访问 ZIP 中央目录读取器与文件头魔数嗅探**：
    - **文件头魔数嗅探（Magic Bytes Sniffing）**：先读取前 16 字节校验真实容器（`50 4B 03 04` ZIP、`52 61 72 21` RAR4/RAR5、`37 7A BC AF` 7z、`%PDF`），即使民间资源将 `.zip` 误改后缀为 `.cbr` 也能按真实格式打开，若是 RAR/7z/PDF 则返回明确的结构化格式提示而非报文件损坏；
@@ -61,5 +61,5 @@
 
 ## 后果
 
-- 全仓仅新增 **1 个** 第三方插件依赖（`file_picker`），核心归档引擎 `packages/komga_local_archive` 保持 100% 纯 Dart，毫秒级跑完 `dart test`，并纳入 `tool/ci_checks.dart` 的纯逻辑包门禁（禁止依赖 `flutter` / `dio` / `drift` / `go_router`，单文件 ≤ 350 行、单类 ≤ 300 行）。
+- 全仓仅新增 **1 个** 第三方插件依赖（`file_picker`），核心归档引擎 `packages/yomu_local_archive` 保持 100% 纯 Dart，毫秒级跑完 `dart test`，并纳入 `tool/ci_checks.dart` 的纯逻辑包门禁（禁止依赖 `flutter` / `dio` / `drift` / `go_router`，单文件 ≤ 350 行、单类 ≤ 300 行）。
 - 代价是应用沙盒会持有一份漫画文件副本（与主流 iOS/Android 本地阅读器 Panels、Aidoku 一致），因此必须在设置页「存储」分组清晰展示「本地漫画占用」并提供单本/批量删除以释放空间。

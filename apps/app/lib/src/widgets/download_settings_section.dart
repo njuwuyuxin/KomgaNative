@@ -1,11 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/data/app_settings.dart';
-import 'package:komga_native/src/providers/download_providers.dart';
-import 'package:komga_native/src/providers/settings_provider.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/data/app_settings.dart';
+import 'package:yomu/src/providers/download_providers.dart';
+import 'package:yomu/src/providers/settings_provider.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 设置页的"下载"分组（DLD-01）：仅 Wi-Fi / 读完自动删除 / 并发数。

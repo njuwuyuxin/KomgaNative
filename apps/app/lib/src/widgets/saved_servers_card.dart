@@ -1,6 +1,6 @@
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/session/server_store.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/session/server_store.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 连接页上的"已保存服务器"快捷切换卡片（从设置页点"添加服务器"进入时可随时一键切回）。

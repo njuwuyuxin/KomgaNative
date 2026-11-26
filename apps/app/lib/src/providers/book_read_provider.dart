@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_native/src/providers/library_providers.dart';
-import 'package:komga_native/src/providers/series_read_provider.dart';
+import 'package:yomu/src/providers/library_providers.dart';
+import 'package:yomu/src/providers/series_read_provider.dart';
 
 /// 单本书的阅读状态写入（标记已读 / 未读，UI-P2-5 / ARC-10）。
 class BookReadController extends Notifier<Set<String>> {

@@ -4,15 +4,15 @@ import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/data/app_settings.dart';
-import 'package:komga_native/src/data/cache/http_cache_database.dart';
-import 'package:komga_native/src/data/download/download_service.dart';
-import 'package:komga_native/src/data/settings_store.dart';
-import 'package:komga_native/src/providers/cache_providers.dart';
-import 'package:komga_native/src/providers/download_providers.dart';
-import 'package:komga_native/src/providers/settings_provider.dart';
-import 'package:komga_platform/komga_platform.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/data/app_settings.dart';
+import 'package:yomu/src/data/cache/http_cache_database.dart';
+import 'package:yomu/src/data/download/download_service.dart';
+import 'package:yomu/src/data/settings_store.dart';
+import 'package:yomu/src/providers/cache_providers.dart';
+import 'package:yomu/src/providers/download_providers.dart';
+import 'package:yomu/src/providers/settings_provider.dart';
+import 'package:yomu_platform/yomu_platform.dart';
 
 /// DLD-01：下载设置（仅 Wi-Fi / 读完自动删除 / 并发数）。
 void main() {

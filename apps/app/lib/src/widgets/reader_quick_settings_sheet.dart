@@ -1,13 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/data/reader_prefs.dart';
-import 'package:komga_native/src/providers/pinned_series_provider.dart';
-import 'package:komga_native/src/providers/reader_prefs_provider.dart';
-import 'package:komga_native/src/widgets/reader_palette.dart';
-import 'package:komga_native/src/widgets/reader_settings_rows.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/data/reader_prefs.dart';
+import 'package:yomu/src/providers/pinned_series_provider.dart';
+import 'package:yomu/src/providers/reader_prefs_provider.dart';
+import 'package:yomu/src/widgets/reader_palette.dart';
+import 'package:yomu/src/widgets/reader_settings_rows.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 顶栏 `AA` 打开的快捷设置（RDR-03）。

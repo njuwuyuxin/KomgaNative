@@ -1,17 +1,17 @@
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/data/library_repository.dart';
-import 'package:komga_native/src/data/read_status_repository.dart';
-import 'package:komga_native/src/providers/komga_session_provider.dart';
-import 'package:komga_native/src/providers/paged_list_controller.dart';
-import 'package:komga_native/src/providers/progress_providers.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/data/library_repository.dart';
+import 'package:yomu/src/data/read_status_repository.dart';
+import 'package:yomu/src/providers/komga_session_provider.dart';
+import 'package:yomu/src/providers/paged_list_controller.dart';
+import 'package:yomu/src/providers/progress_providers.dart';
 
-export 'package:komga_native/src/providers/collections_providers.dart';
-export 'package:komga_native/src/providers/paged_list_controller.dart';
-export 'package:komga_native/src/providers/search_providers.dart';
-export 'package:komga_native/src/providers/shelf_controller.dart';
+export 'package:yomu/src/providers/collections_providers.dart';
+export 'package:yomu/src/providers/paged_list_controller.dart';
+export 'package:yomu/src/providers/search_providers.dart';
+export 'package:yomu/src/providers/shelf_controller.dart';
 
 /// 书架目录仓库：复用共享 [komgaSessionProvider] 连接池（ARC-09）。
 final Provider<LibraryRepository> libraryRepositoryProvider =

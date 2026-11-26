@@ -1,9 +1,9 @@
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/data/progress/progress_database.dart';
-import 'package:komga_native/src/data/progress/progress_store.dart';
-import 'package:komga_sync_engine/komga_sync_engine.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/data/progress/progress_database.dart';
+import 'package:yomu/src/data/progress/progress_store.dart';
+import 'package:yomu_sync/yomu_sync.dart';
 
 /// Drift 实现的行为契约（与 `InMemoryProgressStore` 必须一致）。
 ///

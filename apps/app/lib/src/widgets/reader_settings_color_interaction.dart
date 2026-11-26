@@ -1,10 +1,10 @@
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/data/reader_prefs.dart';
-import 'package:komga_native/src/providers/reader_prefs_provider.dart';
-import 'package:komga_native/src/widgets/reader_palette.dart';
-import 'package:komga_native/src/widgets/reader_settings_group.dart';
-import 'package:komga_native/src/widgets/reader_settings_rows.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/data/reader_prefs.dart';
+import 'package:yomu/src/providers/reader_prefs_provider.dart';
+import 'package:yomu/src/widgets/reader_palette.dart';
+import 'package:yomu/src/widgets/reader_settings_group.dart';
+import 'package:yomu/src/widgets/reader_settings_rows.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 阅读设置面板的「颜色」与「交互」两组（ARC-12 拆分独立组件）。

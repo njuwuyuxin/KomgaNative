@@ -3,13 +3,13 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:komga_api/komga_api.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/data/collections_repository.dart';
-import 'package:komga_native/src/data/library_repository.dart';
-import 'package:komga_native/src/data/progress/progress_store.dart';
-import 'package:komga_native/src/data/progress/progress_sync_service.dart';
-import 'package:komga_native/src/data/shelf_failure.dart';
-import 'package:komga_sync_engine/komga_sync_engine.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/data/collections_repository.dart';
+import 'package:yomu/src/data/library_repository.dart';
+import 'package:yomu/src/data/progress/progress_store.dart';
+import 'package:yomu/src/data/progress/progress_sync_service.dart';
+import 'package:yomu/src/data/shelf_failure.dart';
+import 'package:yomu_sync/yomu_sync.dart';
 
 /// 假的 dio 适配器：按路径回放响应并记录请求。
 class _Adapter implements HttpClientAdapter {

@@ -1,16 +1,16 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/data/reader_prefs.dart';
-import 'package:komga_native/src/providers/pinned_series_provider.dart';
-import 'package:komga_native/src/providers/reader_prefs_provider.dart';
-import 'package:komga_native/src/widgets/reader_fit_preview.dart';
-import 'package:komga_native/src/widgets/reader_mode_text.dart';
-import 'package:komga_native/src/widgets/reader_palette.dart';
-import 'package:komga_native/src/widgets/reader_preset_section.dart';
-import 'package:komga_native/src/widgets/reader_settings_color_interaction.dart';
-import 'package:komga_native/src/widgets/reader_settings_group.dart';
-import 'package:komga_native/src/widgets/reader_settings_rows.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/data/reader_prefs.dart';
+import 'package:yomu/src/providers/pinned_series_provider.dart';
+import 'package:yomu/src/providers/reader_prefs_provider.dart';
+import 'package:yomu/src/widgets/reader_fit_preview.dart';
+import 'package:yomu/src/widgets/reader_mode_text.dart';
+import 'package:yomu/src/widgets/reader_palette.dart';
+import 'package:yomu/src/widgets/reader_preset_section.dart';
+import 'package:yomu/src/widgets/reader_settings_color_interaction.dart';
+import 'package:yomu/src/widgets/reader_settings_group.dart';
+import 'package:yomu/src/widgets/reader_settings_rows.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 阅读设置面板：按"页面 / 布局 / 颜色 / 交互"四组排（RDR-04）。

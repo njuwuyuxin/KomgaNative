@@ -1,14 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/data/app_settings.dart';
-import 'package:komga_native/src/data/settings_store.dart';
-import 'package:komga_native/src/data/shelf_view_options.dart';
-import 'package:komga_native/src/providers/library_providers.dart';
-import 'package:komga_native/src/providers/settings_provider.dart';
-import 'package:komga_native/src/session/server_store.dart';
-import 'package:komga_native/src/session/session_controller.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/data/app_settings.dart';
+import 'package:yomu/src/data/settings_store.dart';
+import 'package:yomu/src/data/shelf_view_options.dart';
+import 'package:yomu/src/providers/library_providers.dart';
+import 'package:yomu/src/providers/settings_provider.dart';
+import 'package:yomu/src/session/server_store.dart';
+import 'package:yomu/src/session/session_controller.dart';
 
 import '../support/fake_library.dart';
 import '../support/fakes.dart';

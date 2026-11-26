@@ -2,9 +2,9 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' show lerpDouble;
 
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/widgets/shelf_query_buttons.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/widgets/shelf_query_buttons.dart';
 import 'package:material_ui/material_ui.dart';
 
 part 'shelf_header_actions.dart';

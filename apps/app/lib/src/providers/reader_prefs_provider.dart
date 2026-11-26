@@ -1,12 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_native/src/data/reader_prefs.dart';
-import 'package:komga_native/src/data/reader_prefs_store.dart';
-import 'package:komga_native/src/providers/pinned_series_provider.dart';
-import 'package:komga_platform/komga_platform.dart';
-import 'package:komga_reader_engine/komga_reader_engine.dart'
-    show TapZonePreset;
+import 'package:yomu/src/data/reader_prefs.dart';
+import 'package:yomu/src/data/reader_prefs_store.dart';
+import 'package:yomu/src/providers/pinned_series_provider.dart';
+import 'package:yomu_platform/yomu_platform.dart';
+import 'package:yomu_reader/yomu_reader.dart' show TapZonePreset;
 
 /// 阅读偏好：模式 / 亮度 / 常亮 / 预设 / 系列覆盖。
 ///

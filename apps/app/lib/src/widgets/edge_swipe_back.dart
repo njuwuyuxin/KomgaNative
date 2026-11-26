@@ -1,4 +1,4 @@
-import 'package:komga_design_system/komga_design_system.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 从屏幕边缘往中间拖，返回上一页（UI-P2-3）。

@@ -1,10 +1,10 @@
 import 'dart:typed_data';
 
 import 'package:komga_api/komga_api.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/data/byte_cache.dart';
-import 'package:komga_native/src/data/progress/progress_sync_service.dart';
-import 'package:komga_native/src/data/shelf_failure.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/data/byte_cache.dart';
+import 'package:yomu/src/data/progress/progress_sync_service.dart';
+import 'package:yomu/src/data/shelf_failure.dart';
 
 /// 阅读器的数据来源（书元信息、页列表、页图与内存页图缓存，ARC-09）。
 abstract interface class ReaderRepository {

@@ -1,16 +1,16 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/providers/app_info_provider.dart';
-import 'package:komga_native/src/providers/cache_providers.dart';
-import 'package:komga_native/src/providers/download_providers.dart';
-import 'package:komga_native/src/providers/settings_provider.dart';
-import 'package:komga_native/src/widgets/download_settings_section.dart';
-import 'package:komga_native/src/widgets/settings_backup_section.dart';
-import 'package:komga_native/src/widgets/settings_library_reading_sections.dart';
-import 'package:komga_native/src/session/server_store.dart';
-import 'package:komga_native/src/session/session_controller.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/providers/app_info_provider.dart';
+import 'package:yomu/src/providers/cache_providers.dart';
+import 'package:yomu/src/providers/download_providers.dart';
+import 'package:yomu/src/providers/settings_provider.dart';
+import 'package:yomu/src/widgets/download_settings_section.dart';
+import 'package:yomu/src/widgets/settings_backup_section.dart';
+import 'package:yomu/src/widgets/settings_library_reading_sections.dart';
+import 'package:yomu/src/session/server_store.dart';
+import 'package:yomu/src/session/session_controller.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 设置页：外观 + 多服务器 + 存储 + 关于。

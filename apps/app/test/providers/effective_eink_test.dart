@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_native/src/data/settings_store.dart';
-import 'package:komga_native/src/providers/settings_provider.dart';
+import 'package:yomu/src/data/settings_store.dart';
+import 'package:yomu/src/providers/settings_provider.dart';
 
 /// 固定初始状态的设置控制器：不读存储、不落盘，只供 provider 单测使用。
 class _FixedSettings extends SettingsController {

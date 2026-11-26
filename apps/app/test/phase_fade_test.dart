@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_native/src/widgets/phase_fade.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu/src/widgets/phase_fade.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// UI-P2-8 的入场淡入。

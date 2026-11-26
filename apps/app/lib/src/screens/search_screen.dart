@@ -2,13 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/providers/search_providers.dart';
-import 'package:komga_native/src/providers/settings_provider.dart';
-import 'package:komga_native/src/screens/search_results_sliver.dart';
-import 'package:komga_native/src/widgets/search_empty_state.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/providers/search_providers.dart';
+import 'package:yomu/src/providers/settings_provider.dart';
+import 'package:yomu/src/screens/search_results_sliver.dart';
+import 'package:yomu/src/widgets/search_empty_state.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 全局搜索（UI-P3-9 / ARC-12 拆出 [SearchResultsSliver]）。

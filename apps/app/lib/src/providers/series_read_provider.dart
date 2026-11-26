@@ -1,10 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/providers/download_providers.dart';
-import 'package:komga_native/src/providers/library_providers.dart';
-import 'package:komga_native/src/providers/pinned_series_provider.dart';
-import 'package:komga_native/src/providers/progress_providers.dart';
-import 'package:komga_native/src/providers/reader_providers.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/providers/download_providers.dart';
+import 'package:yomu/src/providers/library_providers.dart';
+import 'package:yomu/src/providers/pinned_series_provider.dart';
+import 'package:yomu/src/providers/progress_providers.dart';
+import 'package:yomu/src/providers/reader_providers.dart';
 
 /// 阅读状态变更后的统一跨模块联动刷新钩子（ARC-10）。
 void invalidateAfterReadStatusChange(Ref ref, {String? seriesId}) {

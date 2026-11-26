@@ -1,4 +1,4 @@
-import 'package:komga_domain/komga_domain.dart';
+import 'package:yomu_domain/yomu_domain.dart';
 
 /// 打开阅读器时从列表页带过来的上下文。
 ///

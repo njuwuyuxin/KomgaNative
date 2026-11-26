@@ -1,5 +1,5 @@
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/session/session_controller.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/session/session_controller.dart';
 
 /// [ConnectionFailure] → 当前语言本地化文案（ARC-11）。
 extension ConnectionFailureText on AppLocalizations {

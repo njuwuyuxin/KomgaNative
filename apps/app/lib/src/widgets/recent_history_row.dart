@@ -1,11 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/providers/library_providers.dart';
-import 'package:komga_native/src/providers/pinned_series_provider.dart';
-import 'package:komga_native/src/providers/reading_history_provider.dart';
-import 'package:komga_native/src/widgets/cover_image.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/providers/library_providers.dart';
+import 'package:yomu/src/providers/pinned_series_provider.dart';
+import 'package:yomu/src/providers/reading_history_provider.dart';
+import 'package:yomu/src/widgets/cover_image.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// "最近阅读"横滑条（HIS-02）：按会话时间取最近读过的书，点一下直接回到那本书。

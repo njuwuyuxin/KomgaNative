@@ -2,8 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:komga_api/komga_api.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/data/secure_storage.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/data/secure_storage.dart';
 
 /// 已保存的服务器会话。
 ///

@@ -1,8 +1,8 @@
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_native/src/widgets/cover_image.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu/src/widgets/cover_image.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 系列详情头部的封面槽位：带形状/阴影的封面 + Hero（书架卡片 → 详情头部）。

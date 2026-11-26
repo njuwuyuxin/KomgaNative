@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_native/src/data/reader_prefs.dart';
-import 'package:komga_native/src/data/reader_prefs_store.dart';
-import 'package:komga_native/src/providers/reader_prefs_provider.dart';
+import 'package:yomu/src/data/reader_prefs.dart';
+import 'package:yomu/src/data/reader_prefs_store.dart';
+import 'package:yomu/src/providers/reader_prefs_provider.dart';
 
 /// RDR-04：四组设置各自可重置，且只影响自己那一组。
 void main() {

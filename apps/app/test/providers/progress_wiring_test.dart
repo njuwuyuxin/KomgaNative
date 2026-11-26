@@ -1,21 +1,21 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/data/collections_repository.dart';
-import 'package:komga_native/src/data/library_repository.dart';
-import 'package:komga_native/src/data/progress/progress_store.dart';
-import 'package:komga_native/src/data/read_status_repository.dart';
-import 'package:komga_native/src/data/reader_repository.dart';
-import 'package:komga_native/src/providers/komga_session_provider.dart';
-import 'package:komga_native/src/providers/library_providers.dart';
-import 'package:komga_native/src/providers/progress_providers.dart';
-import 'package:komga_native/src/providers/reader_providers.dart';
-import 'package:komga_native/src/session/server_store.dart';
-import 'package:komga_native/src/session/session_controller.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/data/collections_repository.dart';
+import 'package:yomu/src/data/library_repository.dart';
+import 'package:yomu/src/data/progress/progress_store.dart';
+import 'package:yomu/src/data/read_status_repository.dart';
+import 'package:yomu/src/data/reader_repository.dart';
+import 'package:yomu/src/providers/komga_session_provider.dart';
+import 'package:yomu/src/providers/library_providers.dart';
+import 'package:yomu/src/providers/progress_providers.dart';
+import 'package:yomu/src/providers/reader_providers.dart';
+import 'package:yomu/src/session/server_store.dart';
+import 'package:yomu/src/session/session_controller.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
-import 'package:komga_sync_engine/komga_sync_engine.dart';
+import 'package:yomu_sync/yomu_sync.dart';
 
 /// 回归：进度上传不能经由仓库，否则 `仓库 → 同步服务 → 仓库` 形成循环依赖。
 ///

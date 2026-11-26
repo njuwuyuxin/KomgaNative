@@ -1,0 +1,19 @@
+name: yomu_platform
+description: 平台能力的最小抽象（设备形态、墨水屏探测、硬件按键与相册存储）。
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.14.0
+  flutter: ">=3.50.0"
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  yomu_domain:
+    path: ../yomu_domain
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter

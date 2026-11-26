@@ -1,10 +1,10 @@
 import 'dart:typed_data';
 
 import 'package:komga_api/komga_api.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/data/byte_cache.dart';
-import 'package:komga_native/src/data/progress/progress_sync_service.dart';
-import 'package:komga_native/src/data/shelf_failure.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/data/byte_cache.dart';
+import 'package:yomu/src/data/progress/progress_sync_service.dart';
+import 'package:yomu/src/data/shelf_failure.dart';
 
 /// 书架与目录查询限界上下文（库、系列、书籍目录、搜索、继续阅读、封面，ARC-09）。
 ///

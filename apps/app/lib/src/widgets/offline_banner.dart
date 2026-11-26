@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/providers/cache_providers.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/providers/cache_providers.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 底部悬浮离线提示浮层：通过 `Stack` 覆盖在内容上方，出现/消失不改变文档流布局。

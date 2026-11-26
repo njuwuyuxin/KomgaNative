@@ -1,10 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_native/src/data/progress/progress_database.dart';
-import 'package:komga_native/src/data/reading_session_tracker.dart';
-import 'package:komga_native/src/providers/pinned_series_provider.dart';
-import 'package:komga_native/src/providers/progress_providers.dart';
+import 'package:yomu/src/data/progress/progress_database.dart';
+import 'package:yomu/src/data/reading_session_tracker.dart';
+import 'package:yomu/src/providers/pinned_series_provider.dart';
+import 'package:yomu/src/providers/progress_providers.dart';
 
-export 'package:komga_native/src/data/progress/progress_database.dart'
+export 'package:yomu/src/data/progress/progress_database.dart'
     show ReadingSession;
 
 /// 当前服务器的最近阅读会话（HIS-02 / ARC-07 / ARC-10 Drift 表更新流自动刷新）。

@@ -4,13 +4,13 @@ import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/data/cache/http_cache_database.dart';
-import 'package:komga_native/src/data/download/download_service.dart';
-import 'package:komga_native/src/data/shelf_failure.dart';
-import 'package:komga_native/src/providers/cache_providers.dart';
-import 'package:komga_native/src/providers/download_providers.dart';
-import 'package:komga_native/src/providers/library_providers.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/data/cache/http_cache_database.dart';
+import 'package:yomu/src/data/download/download_service.dart';
+import 'package:yomu/src/data/shelf_failure.dart';
+import 'package:yomu/src/providers/cache_providers.dart';
+import 'package:yomu/src/providers/download_providers.dart';
+import 'package:yomu/src/providers/library_providers.dart';
 
 import 'support/fake_library.dart';
 

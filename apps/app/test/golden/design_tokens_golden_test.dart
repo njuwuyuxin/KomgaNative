@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_design_system/komga_design_system.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'golden_harness.dart';

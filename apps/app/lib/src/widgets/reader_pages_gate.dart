@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/data/shelf_failure.dart';
-import 'package:komga_native/src/widgets/reader_chrome.dart';
-import 'package:komga_native/src/widgets/reader_palette.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/data/shelf_failure.dart';
+import 'package:yomu/src/widgets/reader_chrome.dart';
+import 'package:yomu/src/widgets/reader_palette.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 页列表的三种"还不能读"：加载中 / 失败 / 空书。都过了才调用 [builder]。

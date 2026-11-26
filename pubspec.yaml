@@ -1,4 +1,4 @@
-name: komga_native_workspace
+name: yomu_workspace
 publish_to: none
 
 environment:
@@ -7,9 +7,9 @@ environment:
 # Dart pub workspace：所有成员共享一份 lockfile，包边界 = Agent 任务边界。
 workspace:
   - apps/app
-  - packages/komga_domain
-  - packages/komga_reader_engine
-  - packages/komga_sync_engine
+  - packages/yomu_domain
+  - packages/yomu_reader
+  - packages/yomu_sync
   - packages/komga_api
-  - packages/komga_design_system
-  - packages/komga_platform
+  - packages/yomu_design_system
+  - packages/yomu_platform

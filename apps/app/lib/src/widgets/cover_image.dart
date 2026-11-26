@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import 'package:komga_design_system/komga_design_system.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 封面图：解码出第一帧时淡入（UI-P2-1）。

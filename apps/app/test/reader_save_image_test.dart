@@ -2,11 +2,11 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/data/page_save.dart';
-import 'package:komga_native/src/data/reader_prefs.dart';
-import 'package:komga_native/src/data/shelf_failure.dart';
-import 'package:komga_platform/komga_platform.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/data/page_save.dart';
+import 'package:yomu/src/data/reader_prefs.dart';
+import 'package:yomu/src/data/shelf_failure.dart';
+import 'package:yomu_platform/yomu_platform.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_reader.dart';

@@ -1,11 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/providers/download_policy_gate.dart';
-import 'package:komga_native/src/providers/download_providers.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/providers/download_policy_gate.dart';
+import 'package:yomu/src/providers/download_providers.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 系列页的"下载"菜单（SER-03）：全部 / 未读前 N 本。

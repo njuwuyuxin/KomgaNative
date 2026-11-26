@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/providers/library_providers.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/providers/library_providers.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_library.dart';

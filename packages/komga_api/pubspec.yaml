@@ -14,8 +14,8 @@ dependencies:
   # 理由见 docs/adr/0002-certificate-trust.md。
   crypto: ^3.0.8
   dio: ^5.11.1
-  komga_domain:
-    path: ../komga_domain
+  yomu_domain:
+    path: ../yomu_domain
 
 dev_dependencies:
   test: ^1.25.0

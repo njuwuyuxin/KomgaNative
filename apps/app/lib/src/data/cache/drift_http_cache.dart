@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:komga_api/komga_api.dart';
-import 'package:komga_native/src/data/cache/connectivity_filter.dart';
-import 'package:komga_native/src/data/cache/http_cache_database.dart';
+import 'package:yomu/src/data/cache/connectivity_filter.dart';
+import 'package:yomu/src/data/cache/http_cache_database.dart';
 
 /// [HttpCache] 的 Drift 实现。
 ///

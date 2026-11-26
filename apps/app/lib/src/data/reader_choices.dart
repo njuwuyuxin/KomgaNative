@@ -1,5 +1,5 @@
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_reader_engine/komga_reader_engine.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu_reader/yomu_reader.dart';
 
 /// 用户在阅读设置里选的模式。
 ///

@@ -1,18 +1,18 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_api/komga_api.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/data/cache/http_cache_database.dart';
-import 'package:komga_native/src/data/download/download_service.dart';
-import 'package:komga_native/src/data/shelf_failure.dart';
-import 'package:komga_native/src/providers/cache_providers.dart';
-import 'package:komga_native/src/providers/downloads_controller.dart';
-import 'package:komga_native/src/providers/komga_session_provider.dart';
-import 'package:komga_native/src/providers/library_providers.dart';
-import 'package:komga_native/src/providers/pinned_series_provider.dart';
-import 'package:komga_native/src/providers/settings_provider.dart';
-import 'package:komga_platform/komga_platform.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/data/cache/http_cache_database.dart';
+import 'package:yomu/src/data/download/download_service.dart';
+import 'package:yomu/src/data/shelf_failure.dart';
+import 'package:yomu/src/providers/cache_providers.dart';
+import 'package:yomu/src/providers/downloads_controller.dart';
+import 'package:yomu/src/providers/komga_session_provider.dart';
+import 'package:yomu/src/providers/library_providers.dart';
+import 'package:yomu/src/providers/pinned_series_provider.dart';
+import 'package:yomu/src/providers/settings_provider.dart';
+import 'package:yomu_platform/yomu_platform.dart';
 
-export 'package:komga_native/src/providers/downloads_controller.dart';
+export 'package:yomu/src/providers/downloads_controller.dart';
 
 /// 当前生效的下载策略（DLD-01）：仅 Wi-Fi、读完自动删除、并发数。
 typedef DownloadPolicy = ({

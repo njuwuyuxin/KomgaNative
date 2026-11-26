@@ -3,13 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:komga_api/komga_api.dart';
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/l10n/l10n.dart';
-import 'package:komga_native/src/data/cache/drift_http_cache.dart';
-import 'package:komga_native/src/data/cache/http_cache_database.dart';
-import 'package:komga_native/src/providers/cache_providers.dart';
-import 'package:komga_native/src/widgets/offline_banner.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/l10n/l10n.dart';
+import 'package:yomu/src/data/cache/drift_http_cache.dart';
+import 'package:yomu/src/data/cache/http_cache_database.dart';
+import 'package:yomu/src/providers/cache_providers.dart';
+import 'package:yomu/src/widgets/offline_banner.dart';
 import 'package:material_ui/material_ui.dart';
 
 void main() {

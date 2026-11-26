@@ -1,5 +1,5 @@
 import 'package:flutter/physics.dart';
-import 'package:komga_design_system/komga_design_system.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 主页面分支容器：切换 dock tab 时让旧页和新页水平滑动。

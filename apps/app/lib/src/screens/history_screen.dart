@@ -2,12 +2,12 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/providers/library_providers.dart';
-import 'package:komga_native/src/providers/pinned_series_provider.dart';
-import 'package:komga_native/src/providers/reading_history_provider.dart';
-import 'package:komga_native/src/widgets/cover_image.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/providers/library_providers.dart';
+import 'package:yomu/src/providers/pinned_series_provider.dart';
+import 'package:yomu/src/providers/reading_history_provider.dart';
+import 'package:yomu/src/widgets/cover_image.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 阅读历史页（HIS-02）：按天分组、可搜索、可删单条、可清空。

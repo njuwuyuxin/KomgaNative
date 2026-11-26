@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/providers/library_providers.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/providers/library_providers.dart';
 
 /// 搜索查询条件（SCH-02 / ARC-12：不含 `size`，由增量分页器按 `page = 0, 1...` 拉取）。
 typedef SearchQuery = ({

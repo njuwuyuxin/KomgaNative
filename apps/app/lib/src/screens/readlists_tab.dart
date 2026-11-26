@@ -2,16 +2,16 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/data/shelf_failure.dart';
-import 'package:komga_native/src/l10n/failure_text.dart';
-import 'package:komga_native/src/providers/collections_controller.dart';
-import 'package:komga_native/src/providers/library_providers.dart';
-import 'package:komga_native/src/screens/collections_screen.dart';
-import 'package:komga_native/src/widgets/curation_dialogs.dart';
-import 'package:komga_native/src/widgets/load_more_footer.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/data/shelf_failure.dart';
+import 'package:yomu/src/l10n/failure_text.dart';
+import 'package:yomu/src/providers/collections_controller.dart';
+import 'package:yomu/src/providers/library_providers.dart';
+import 'package:yomu/src/screens/collections_screen.dart';
+import 'package:yomu/src/widgets/curation_dialogs.dart';
+import 'package:yomu/src/widgets/load_more_footer.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 阅读列表的本地排序方式（与收藏集对齐）。

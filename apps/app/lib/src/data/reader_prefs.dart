@@ -1,6 +1,6 @@
-import 'package:komga_native/src/data/reader_config.dart';
+import 'package:yomu/src/data/reader_config.dart';
 
-export 'package:komga_native/src/data/reader_config.dart';
+export 'package:yomu/src/data/reader_config.dart';
 
 /// 一组命名的阅读设置（UI-P3-1）。
 ///

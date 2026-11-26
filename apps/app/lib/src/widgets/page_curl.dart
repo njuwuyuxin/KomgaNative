@@ -1,11 +1,11 @@
 import 'dart:ui' as ui;
 
-import 'package:komga_native/src/data/reader_prefs.dart';
-import 'package:komga_native/src/widgets/curl_sheets.dart';
-import 'package:komga_reader_engine/komga_reader_engine.dart';
+import 'package:yomu/src/data/reader_prefs.dart';
+import 'package:yomu/src/widgets/curl_sheets.dart';
+import 'package:yomu_reader/yomu_reader.dart';
 import 'package:material_ui/material_ui.dart';
 
-export 'package:komga_native/src/widgets/curl_sheets.dart';
+export 'package:yomu/src/widgets/curl_sheets.dart';
 
 /// 翻页动画的绘制层。
 ///

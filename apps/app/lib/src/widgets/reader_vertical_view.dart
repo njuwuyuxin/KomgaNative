@@ -1,9 +1,9 @@
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/widgets/reader_page.dart';
-import 'package:komga_native/src/widgets/reader_palette.dart';
-import 'package:komga_reader_engine/komga_reader_engine.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/widgets/reader_page.dart';
+import 'package:yomu/src/widgets/reader_palette.dart';
+import 'package:yomu_reader/yomu_reader.dart';
 import 'package:flutter/scheduler.dart' show Ticker;
 import 'package:material_ui/material_ui.dart';
 

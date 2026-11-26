@@ -1,10 +1,10 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_native/src/data/app_settings.dart';
-import 'package:komga_native/src/data/prefs_backup.dart';
-import 'package:komga_native/src/data/reader_prefs.dart';
-import 'package:komga_native/src/data/shelf_view_options.dart';
+import 'package:yomu/src/data/app_settings.dart';
+import 'package:yomu/src/data/prefs_backup.dart';
+import 'package:yomu/src/data/reader_prefs.dart';
+import 'package:yomu/src/data/shelf_view_options.dart';
 
 /// SET-02：偏好导出/导入。
 void main() {

@@ -2,15 +2,15 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/src/providers/cache_providers.dart';
-import 'package:komga_native/src/widgets/page_navigator_sheet.dart';
-import 'package:komga_native/src/widgets/reader_bar.dart';
-import 'package:komga_native/src/widgets/reader_quick_settings_sheet.dart';
-import 'package:komga_native/src/widgets/reader_palette.dart';
-import 'package:komga_native/src/widgets/reader_settings_sheet.dart';
-import 'package:komga_native/src/widgets/reader_toc_sheet.dart';
-import 'package:komga_reader_engine/komga_reader_engine.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/providers/cache_providers.dart';
+import 'package:yomu/src/widgets/page_navigator_sheet.dart';
+import 'package:yomu/src/widgets/reader_bar.dart';
+import 'package:yomu/src/widgets/reader_quick_settings_sheet.dart';
+import 'package:yomu/src/widgets/reader_palette.dart';
+import 'package:yomu/src/widgets/reader_settings_sheet.dart';
+import 'package:yomu/src/widgets/reader_toc_sheet.dart';
+import 'package:yomu_reader/yomu_reader.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 阅读器顶栏的接线：离线状态、缩略图面板、设置面板、返回。

@@ -1,9 +1,9 @@
 import 'dart:async';
 
 import 'package:drift/drift.dart';
-import 'package:komga_native/src/data/cache/http_cache_tables.dart';
+import 'package:yomu/src/data/cache/http_cache_tables.dart';
 
-export 'package:komga_native/src/data/cache/http_cache_tables.dart';
+export 'package:yomu/src/data/cache/http_cache_tables.dart';
 
 part 'http_cache_database.g.dart';
 part 'http_cache_downloads_dao.dart';

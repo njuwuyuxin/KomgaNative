@@ -22,7 +22,7 @@
 
 | 批次 | 阶段目标 | 包含任务 | 预估周期 | 阶段交付出口（Gate） |
 |---|---|---|---|---|
-| **Batch L0：纯逻辑与本地全功能仓库** | 纯 Dart 归档引擎、`sourceKey` 多源注册模型、本地书目+本地收藏集 SQLite 表与四大 `Local*Repository` | `LMA-01` ~ `LMA-04` | 约 5–6 天 | `komga_local_archive` 全边界单测全绿；`Local*Repository`（含本地收藏集/阅读列表）离线契约单测全绿 |
+| **Batch L0：纯逻辑与本地全功能仓库** | 纯 Dart 归档引擎、`sourceKey` 多源注册模型、本地书目+本地收藏集 SQLite 表与四大 `Local*Repository` | `LMA-01` ~ `LMA-04` | 约 5–6 天 | `yomu_local_archive` 全边界单测全绿；`Local*Repository`（含本地收藏集/阅读列表）离线契约单测全绿 |
 | **Batch L1：多源注册路由与 MVP 闭环** | `SourceRegistry` 多源路由、解除开屏登录墙、跨源「正在读」汇聚、书架单源隐形/多源分组、`file_picker` 导入 | `LMA-05` ~ `LMA-08` | 约 5–6 天 | **可对外发版获客**：未登录享完整本地书架与收藏集；登录 Komga 后分组清晰、首页续读无感带微云标、零同步冲突 |
 | **Batch L2：本地编目精修与外部打开** | 本地书籍/系列物理删除、散装单卷合并/拆分与元数据编辑、自定义封面、系统外部点击 `.cbz` 直接用 Yomu 打开 | `LMA-09` ~ `LMA-12` | 约 4–5 天 | 本地散装漫画整理体验对齐 Panels；支持从系统文件/聊天/网盘一键打开入库 |
 
@@ -32,7 +32,7 @@
 
 | 任务 ID | 所属批次 | 任务名称 | 优先级 | 估时 | 前置依赖 | 状态 |
 |---|---|---|---|---|---|---|
-| `LMA-01` | Batch L0 | 新建纯 Dart 包 `komga_local_archive`（`RandomAccessByteSource`、魔数嗅探、ZIP/CBZ 按页读取、宽高嗅探、`ComicInfo.xml`、自然排序） | P0 | M | — | [ ] |
+| `LMA-01` | Batch L0 | 新建纯 Dart 包 `yomu_local_archive`（`RandomAccessByteSource`、魔数嗅探、ZIP/CBZ 按页读取、宽高嗅探、`ComicInfo.xml`、自然排序） | P0 | M | — | [ ] |
 | `LMA-02` | Batch L0 | 领域层新增 `ContentSource` / `SourceCapabilities` 与实体 `sourceKey` 标识（面向未来 Kavita/OPDS 预留） | P0 | S | — | [ ] |
 | `LMA-03` | Batch L0 | 扩展用户库 `komga_native.sqlite` 新增本地书目表与本地收藏集/阅读列表表，打通本地进度直写 | P0 | M | `LMA-02` | [ ] |
 | `LMA-04` | Batch L0 | 完整实现本地四大仓库：`LocalLibrary` / `LocalReader` / `LocalCollections` / `LocalReadStatusRepository` | P0 | M | `LMA-01`, `LMA-03` | [ ] |
@@ -76,13 +76,13 @@ UI / Controllers ──┼─── CrossSourceReadingNowProvider (首页「正�
 1. **书架与收藏集零交叉污染**：`libraryRepositoryProvider` 与 `collectionsRepositoryProvider` 直接返回 `registry.bundleFor(activeSource).library / .collections`。本机分组只管本地 SQLite，Komga 分组只管该台 Komga，未来 Kavita 分组只管该台 Kavita——**不需要写任何跨源分页归并器，也不可能把本地书误发给远程收藏集 API**。
 2. **阅读器与首页续读无感直通**：`Series` 与 `Book` 均携带 `sourceKey`。当用户在首页「正在读」或「阅读历史」点击一本非当前书架分组的书时，`ReaderArgs`（或路由查询参数 `?source=...`）将 `sourceKey` 传入 `ReaderScreen`，直接从 `SourceRegistry` 取出对应源的 `ReaderRepository` 打开阅读并向该源专属进度队列回写，无需切分组、零同步冲突。
 
-### 2.2 `packages/komga_local_archive` 模块拆分（每文件 ≤ 250 行）
+### 2.2 `packages/yomu_local_archive` 模块拆分（每文件 ≤ 250 行）
 
 ```
-packages/komga_local_archive/
-├─ pubspec.yaml                      # 纯 Dart 包，零第三方依赖，仅依赖 komga_domain
+packages/yomu_local_archive/
+├─ pubspec.yaml                      # 纯 Dart 包，零第三方依赖，仅依赖 yomu_domain
 ├─ lib/
-│  ├─ komga_local_archive.dart       # 统一公开导出
+│  ├─ yomu_local_archive.dart       # 统一公开导出
 │  └─ src/
 │     ├─ byte_source.dart            # RandomAccessByteSource 接口 + MemoryByteSource + FileByteSource
 │     ├─ archive_errors.dart         # ArchiveException + ArchiveErrorKind 密封枚举 + 文件头魔数嗅探
@@ -101,23 +101,23 @@ packages/komga_local_archive/
 
 ### 3.1 Batch L0：纯逻辑与本地全功能仓库底座
 
-#### `LMA-01` 新建纯 Dart 包 `packages/komga_local_archive`
+#### `LMA-01` 新建纯 Dart 包 `packages/yomu_local_archive`
 - **目标**：把 `.cbz/.zip` 随机访问按页解压、魔数识别、图片文件夹扫描、图片头极速宽高嗅探、`ComicInfo.xml` 解析与自然排序做成零外部依赖的 100% 纯 Dart 引擎。
 - **改造内容**：
-  1. 在根 `pubspec.yaml` 的 `workspace:` 注册 `packages/komga_local_archive`，并加入 `tool/ci.dart`（`_purePackages`）与 `tool/ci_checks.dart`（`_productionRoots` + `pureForbidden`）；
+  1. 在根 `pubspec.yaml` 的 `workspace:` 注册 `packages/yomu_local_archive`，并加入 `tool/ci.dart`（`_purePackages`）与 `tool/ci_checks.dart`（`_productionRoots` + `pureForbidden`）；
   2. 实现 `RandomAccessByteSource`、`sniffContainerMagic`、`ZipDirectory`、`ZipPageReader`、`FolderPageReader`、`ImageDimensions`、`ComicInfoParser` 与 `naturalCompare`。
 - **单测边界覆盖**：0 页空包、纯非图片包、伪后缀（`.cbr` 实为 ZIP 魔数）、`__MACOSX/` 与 `.DS_Store` 垃圾过滤、Stored/Deflate 随机跳页一致性、加密与损坏包枚举错误、自然排序（`2.jpg < 10.jpg`）、PNG/JPEG(含 EXIF)/WebP 宽高嗅探、`ComicInfo.xml`（BOM、转义、`Manga="YesAndRightToLeft"`）。
-- **验收标准**：`dart test packages/komga_local_archive` 1 秒内全绿，`dart run tool/ci.dart check` 全绿。
+- **验收标准**：`dart test packages/yomu_local_archive` 1 秒内全绿，`dart run tool/ci.dart check` 全绿。
 
 ---
 
 #### `LMA-02` 领域层新增 `ContentSource` / `SourceCapabilities` 与实体 `sourceKey`
 - **目标**：建立面向多服务器协议（Local / Komga / 未来 Kavita & OPDS）的可扩展源标识与能力模型。
 - **改造内容**：
-  1. `packages/komga_domain` 新增 `src/content_source.dart`：定义 `kLocalSourceKey = 'local://device'`、`SourceKind { local, komga, kavita, opds }`、`ContentSource` 与 `SourceCapabilities`（`canImportLocalFiles`、`canMutateCatalog`、`canDownloadOffline`、`showsNetworkOfflineBanner`、`supportsCollections`）；
+  1. `packages/yomu_domain` 新增 `src/content_source.dart`：定义 `kLocalSourceKey = 'local://device'`、`SourceKind { local, komga, kavita, opds }`、`ContentSource` 与 `SourceCapabilities`（`canImportLocalFiles`、`canMutateCatalog`、`canDownloadOffline`、`showsNetworkOfflineBanner`、`supportsCollections`）；
   2. 在 `Series`、`Book`、`KomgaCollection`、`ReadList` 增加可选属性 `this.sourceKey = kLocalSourceKey` 及计算属性 `bool get isCloud => sourceKey != kLocalSourceKey`（默认本地值保证全部既有单测与 99 张黄金图零意外变化）；
   3. 在 `KomgaLibraryRepository`、`KomgaReaderRepository`、`KomgaCollectionsRepository` 中将产出的领域实体注入当前服务器的 `sourceKey`（`session.address.baseUrl`）。
-- **验收标准**：`dart test packages/komga_domain` 与 `apps/app` 存量测试 100% 通过。
+- **验收标准**：`dart test packages/yomu_domain` 与 `apps/app` 存量测试 100% 通过。
 
 ---
 

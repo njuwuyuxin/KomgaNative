@@ -2,19 +2,19 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/data/shelf_view_options.dart';
-import 'package:komga_native/src/l10n/failure_text.dart';
-import 'package:komga_native/src/providers/library_providers.dart';
-import 'package:komga_native/src/screens/reader_args.dart';
-import 'package:komga_native/src/screens/series_detail_args.dart';
-import 'package:komga_native/src/widgets/load_more_footer.dart';
-import 'package:komga_native/src/widgets/search_facets.dart';
-import 'package:komga_native/src/widgets/series_book_row.dart';
-import 'package:komga_native/src/widgets/series_hero_tag.dart';
-import 'package:komga_native/src/widgets/series_shelf_tile.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/data/shelf_view_options.dart';
+import 'package:yomu/src/l10n/failure_text.dart';
+import 'package:yomu/src/providers/library_providers.dart';
+import 'package:yomu/src/screens/reader_args.dart';
+import 'package:yomu/src/screens/series_detail_args.dart';
+import 'package:yomu/src/widgets/load_more_footer.dart';
+import 'package:yomu/src/widgets/search_facets.dart';
+import 'package:yomu/src/widgets/series_book_row.dart';
+import 'package:yomu/src/widgets/series_hero_tag.dart';
+import 'package:yomu/src/widgets/series_shelf_tile.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 搜索结果 Sliver（SCH-03 / ARC-12 增量分页 + 失败保留旧结果）。

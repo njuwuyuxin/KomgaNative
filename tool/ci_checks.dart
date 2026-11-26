@@ -4,17 +4,17 @@ const int kMaxFileLines = 350;
 const int kMaxClassLines = 300;
 
 const List<String> _productionRoots = <String>[
-  'packages/komga_domain/lib',
-  'packages/komga_reader_engine/lib',
-  'packages/komga_sync_engine/lib',
+  'packages/yomu_domain/lib',
+  'packages/yomu_reader/lib',
+  'packages/yomu_sync/lib',
   'packages/komga_api/lib',
-  'packages/komga_platform/lib',
-  'packages/komga_design_system/lib',
+  'packages/yomu_platform/lib',
+  'packages/yomu_design_system/lib',
   'apps/app/lib',
 ];
 
 /// 分层与代码规范规则（ADR-0001 + ARC-12 门禁加固）：
-/// - `komga_domain` / `*_engine` 不得依赖 Flutter、HTTP、数据库；
+/// - `yomu_domain` / `yomu_reader` / `yomu_sync` 不得依赖 Flutter、HTTP、数据库；
 /// - UI 层（screens/widgets）不得直接依赖 `komga_api`，只能经 Repository；
 /// - 非生成生产 `.dart` 文件严格 ≤ 350 行，单类 ≤ 300 行；
 /// - 非注释生产代码中禁止裸 `catch (_)`。
@@ -28,9 +28,9 @@ Future<int> layerCheck() async {
     'package:go_router/',
   ];
   for (final pkg in <String>[
-    'packages/komga_domain',
-    'packages/komga_reader_engine',
-    'packages/komga_sync_engine',
+    'packages/yomu_domain',
+    'packages/yomu_reader',
+    'packages/yomu_sync',
   ]) {
     violations.addAll(
       _scanImports(pkg, pureForbidden, reason: '纯逻辑包不得依赖 UI / 网络 / 数据库'),

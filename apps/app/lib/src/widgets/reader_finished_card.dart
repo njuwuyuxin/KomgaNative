@@ -1,10 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_design_system/komga_design_system.dart';
-import 'package:komga_domain/komga_domain.dart';
-import 'package:komga_native/l10n/app_localizations.dart';
-import 'package:komga_native/src/providers/library_providers.dart';
-import 'package:komga_native/src/widgets/cover_image.dart';
-import 'package:komga_native/src/widgets/reader_palette.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/providers/library_providers.dart';
+import 'package:yomu/src/widgets/cover_image.dart';
+import 'package:yomu/src/widgets/reader_palette.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 书末卡片（UI-P1-7）：告诉用户"读完了"，并把下一步做成一个明确的动作。

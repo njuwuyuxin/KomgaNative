@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_native/src/data/reader_prefs.dart';
-import 'package:komga_native/src/providers/reader_providers.dart';
-import 'package:komga_native/src/widgets/reader_layout.dart';
-import 'package:komga_native/src/widgets/reader_palette.dart';
-import 'package:komga_reader_engine/komga_reader_engine.dart';
+import 'package:yomu/src/data/reader_prefs.dart';
+import 'package:yomu/src/providers/reader_providers.dart';
+import 'package:yomu/src/widgets/reader_layout.dart';
+import 'package:yomu/src/widgets/reader_palette.dart';
+import 'package:yomu_reader/yomu_reader.dart';
 
 /// 解析"这一屏"的阅读器配色（UI-P1-5 动态背景）。
 ///

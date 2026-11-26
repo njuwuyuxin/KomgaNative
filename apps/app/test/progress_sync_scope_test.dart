@@ -1,14 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:komga_native/src/data/progress/progress_store.dart';
-import 'package:komga_native/src/data/progress/progress_sync_service.dart';
-import 'package:komga_native/src/data/shelf_failure.dart';
-import 'package:komga_native/src/providers/progress_providers.dart';
-import 'package:komga_native/src/session/server_store.dart';
-import 'package:komga_native/src/session/session_controller.dart';
-import 'package:komga_native/src/widgets/progress_sync_scope.dart';
-import 'package:komga_sync_engine/komga_sync_engine.dart';
+import 'package:yomu/src/data/progress/progress_store.dart';
+import 'package:yomu/src/data/progress/progress_sync_service.dart';
+import 'package:yomu/src/data/shelf_failure.dart';
+import 'package:yomu/src/providers/progress_providers.dart';
+import 'package:yomu/src/session/server_store.dart';
+import 'package:yomu/src/session/session_controller.dart';
+import 'package:yomu/src/widgets/progress_sync_scope.dart';
+import 'package:yomu_sync/yomu_sync.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fakes.dart';
