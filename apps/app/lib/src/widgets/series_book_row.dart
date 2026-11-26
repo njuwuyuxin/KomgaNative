@@ -10,6 +10,7 @@ import 'package:yomu/src/l10n/failure_text.dart';
 import 'package:yomu/src/providers/book_read_provider.dart';
 import 'package:yomu/src/providers/download_policy_gate.dart';
 import 'package:yomu/src/providers/library_providers.dart';
+import 'package:yomu/src/providers/local_catalog_mutator_provider.dart';
 import 'package:yomu/src/widgets/book_download_button.dart';
 import 'package:yomu/src/widgets/context_menu.dart';
 import 'package:yomu/src/widgets/cover_image.dart';
@@ -178,6 +179,12 @@ class SeriesBookRow extends ConsumerWidget {
             icon: Icons.remove_done,
           ),
         ],
+        if (book.id.startsWith('local:'))
+          ContextMenuEntry(
+            value: BookMenuAction.deleteFromDevice,
+            label: l10n.deleteFromDevice,
+            icon: Icons.delete_outline,
+          ),
       ],
     );
     if (action == null || !context.mounted) return;
@@ -191,6 +198,15 @@ class SeriesBookRow extends ConsumerWidget {
         await onMarkPrevious?.call(read: true);
       case BookMenuAction.markPreviousUnread:
         await onMarkPrevious?.call(read: false);
+      case BookMenuAction.deleteFromDevice:
+        final confirmed = await confirmDeleteLocalItems(context, count: 1);
+        if (!confirmed) return;
+        final seriesRemoved = await ref
+            .read(localCatalogMutatorProvider)
+            .deleteBook(book.id, seriesId: book.seriesId);
+        if (seriesRemoved && context.mounted) {
+          Navigator.of(context).maybePop();
+        }
       case BookMenuAction.markRead:
       case BookMenuAction.markUnread:
         try {
@@ -224,4 +240,5 @@ enum BookMenuAction {
   markUnread,
   markPreviousRead,
   markPreviousUnread,
+  deleteFromDevice,
 }

@@ -10,6 +10,7 @@ import 'package:yomu/src/data/shelf_view_options.dart';
 import 'package:yomu/src/l10n/failure_text.dart';
 import 'package:yomu/src/providers/active_source_provider.dart';
 import 'package:yomu/src/providers/library_providers.dart';
+import 'package:yomu/src/providers/local_catalog_mutator_provider.dart';
 import 'package:yomu/src/providers/pinned_series_provider.dart';
 import 'package:yomu/src/providers/shelf_selection_provider.dart';
 import 'package:yomu/src/session/session_controller.dart';
@@ -173,6 +174,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                                 onSelectAll: () => selecting.selectAll(
                                   state.series.map((Series s) => s.id),
                                 ),
+                                onDeleteSelected:
+                                    isRealLocalShelf && selection.ids.isNotEmpty
+                                    ? _deleteSelectedLocal
+                                    : null,
                               ),
                             ),
                             SliverToBoxAdapter(
@@ -230,6 +235,7 @@ class _SelectionInfoRow extends StatelessWidget {
     required this.allSelected,
     required this.motion,
     required this.onSelectAll,
+    this.onDeleteSelected,
   });
 
   final bool active;
@@ -237,10 +243,12 @@ class _SelectionInfoRow extends StatelessWidget {
   final bool allSelected;
   final AppMotion motion;
   final VoidCallback onSelectAll;
+  final VoidCallback? onDeleteSelected;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
     final content = active
         ? Padding(
             padding: const EdgeInsets.fromLTRB(
@@ -255,13 +263,32 @@ class _SelectionInfoRow extends StatelessWidget {
                   child: Text(
                     l10n.selectedCount(selectedCount),
                     key: const Key('shelf-selection-count'),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.primary,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.primary,
                       fontWeight: FontWeight.w600,
                       fontFeatures: AppTypography.tabularFigures,
                     ),
                   ),
                 ),
+                if (onDeleteSelected != null)
+                  TextButton.icon(
+                    key: const Key('shelf-selection-delete'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: theme.colorScheme.error,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      minimumSize: Size.zero,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm,
+                        vertical: AppSpacing.xs,
+                      ),
+                    ),
+                    onPressed: onDeleteSelected,
+                    icon: const Icon(
+                      Icons.delete_outline,
+                      size: AppSizes.iconXs,
+                    ),
+                    label: Text(l10n.deleteFromDevice),
+                  ),
                 TextButton(
                   key: const Key('shelf-selection-all'),
                   style: TextButton.styleFrom(

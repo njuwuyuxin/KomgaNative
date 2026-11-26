@@ -53,4 +53,20 @@ mixin _ShelfBatch on ConsumerState<LibraryScreen> {
       ref.read(shelfSelectionProvider.notifier).exit();
     }
   }
+
+  Future<void> _deleteSelectedLocal() async {
+    final ids = ref.read(shelfSelectionProvider).ids.toList();
+    if (ids.isEmpty || _batchBusy) return;
+    final confirmed = await confirmDeleteLocalItems(context, count: ids.length);
+    if (!confirmed || !mounted) return;
+    setState(() => _batchBusy = true);
+    try {
+      await ref.read(localCatalogMutatorProvider).deleteSeries(ids);
+      if (mounted) {
+        ref.read(shelfSelectionProvider.notifier).exit();
+      }
+    } finally {
+      if (mounted) setState(() => _batchBusy = false);
+    }
+  }
 }

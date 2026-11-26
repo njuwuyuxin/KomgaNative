@@ -7,6 +7,7 @@ import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/src/data/shelf_failure.dart';
 import 'package:yomu/src/l10n/failure_text.dart';
+import 'package:yomu/src/providers/local_catalog_mutator_provider.dart';
 import 'package:yomu/src/providers/pinned_series_provider.dart';
 import 'package:yomu/src/providers/series_read_provider.dart';
 import 'package:yomu/src/screens/series_detail_args.dart';
@@ -23,6 +24,7 @@ enum SeriesMenuAction {
   viewDetails,
   pin,
   unpin,
+  deleteFromDevice,
 }
 
 /// 长按系列的上下文菜单（UI-P2-5 / ARC-05 / ARC-12 独立文件），网格卡片与列表行共用。
@@ -78,6 +80,12 @@ Future<void> showSeriesMenu(
         label: l10n.viewDetails,
         icon: Icons.info_outline,
       ),
+      if (series.id.startsWith('local:'))
+        ContextMenuEntry(
+          value: SeriesMenuAction.deleteFromDevice,
+          label: l10n.deleteFromDevice,
+          icon: Icons.delete_outline,
+        ),
     ],
   );
   if (action == null || !context.mounted) return;
@@ -111,5 +119,11 @@ Future<void> showSeriesMenu(
       await ref
           .read(pinnedSeriesControllerProvider)
           .toggle(series.id, pinned: false);
+    case SeriesMenuAction.deleteFromDevice:
+      final confirmed = await confirmDeleteLocalItems(context, count: 1);
+      if (!confirmed) return;
+      await ref.read(localCatalogMutatorProvider).deleteSeries(<String>[
+        series.id,
+      ]);
   }
 }
