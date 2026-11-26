@@ -378,6 +378,31 @@
   "readerSliderLabel": "Page {page} of {total}",
   "readerToc": "Contents",
   "readerTocCurrent": "Current · {progress}",
+  "readerTocTabBook": "Book",
+  "readerTocTabVolumes": "Volumes",
+  "readerTocChaptersHeading": "Chapters",
+  "readerTocBookmarksHeading": "Bookmarks",
+  "readerTocPageNumber": "Page {page}",
+  "@readerTocPageNumber": {
+    "placeholders": {
+      "page": {"type": "int"}
+    }
+  },
+  "readerBookmarkAdd": "Bookmark this page",
+  "readerBookmarkRemove": "Remove bookmark",
+  "readerBookmarkDelete": "Delete bookmark",
+  "readerBookmarkAdded": "Bookmarked page {page}",
+  "@readerBookmarkAdded": {
+    "placeholders": {
+      "page": {"type": "int"}
+    }
+  },
+  "readerBookmarkRemoved": "Removed bookmark on page {page}",
+  "@readerBookmarkRemoved": {
+    "placeholders": {
+      "page": {"type": "int"}
+    }
+  },
   "readerQuickSettings": "Quick settings",
   "readerMore": "More",
   "readerGroupPages": "Pages",

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:yomu_local_archive/src/archive_errors.dart';
 import 'package:yomu_local_archive/src/byte_source.dart';
+import 'package:yomu_local_archive/src/chapter_extractor.dart';
 import 'package:yomu_local_archive/src/comic_info_parser.dart';
 import 'package:yomu_local_archive/src/epub_opf_parser.dart';
 import 'package:yomu_local_archive/src/epub_toc_parser.dart';

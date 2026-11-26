@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/src/providers/cache_providers.dart';
 import 'package:yomu/src/providers/local_catalog_mutator_provider.dart';
+import 'package:yomu/src/providers/reader_toc_providers.dart';
 import 'package:yomu/src/widgets/page_navigator_sheet.dart';
 import 'package:yomu/src/widgets/reader_bar.dart';
 import 'package:yomu/src/widgets/reader_palette.dart';
@@ -73,6 +74,15 @@ class ReaderTopBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isLocalBook = bookId.startsWith('local:') && seriesId != null;
+    final bookmarks =
+        ref.watch(bookBookmarksProvider(bookId)).value ??
+        const <PageBookmark>[];
+    final chapters =
+        ref.watch(bookChaptersProvider(bookId)).value ?? const <BookChapter>[];
+    final isBookmarked = bookmarks.any((PageBookmark b) => b.page == page);
+    final canOpenToc =
+        seriesId != null || chapters.isNotEmpty || bookmarks.isNotEmpty;
+
     return ValueListenableBuilder<bool>(
       valueListenable: ref.watch(offlineProvider),
       builder: (BuildContext context, bool offline, Widget? _) => ReaderBar(
@@ -83,6 +93,10 @@ class ReaderTopBar extends ConsumerWidget {
         offline: !isLocalBook && offline,
         incognito: incognito,
         onToggleIncognito: onToggleIncognito,
+        isBookmarked: isBookmarked,
+        onToggleBookmark: total > 0
+            ? () => unawaited(_toggleBookmark(context, ref))
+            : null,
         onSavePage: onSavePage,
         onSharePage: onSharePage,
         onSetAsCover: isLocalBook
@@ -105,15 +119,17 @@ class ReaderTopBar extends ConsumerWidget {
             onGroupFrom: onGroupFrom,
           ),
         ),
-        // 目录（RDR-02）：本系列的书列表，点一本替换当前页。
-        onOpenToc: seriesId == null
+        // 目录（RDR-02 + LMB-05）：本卷内部章节/书签 + 本系列各卷。
+        onOpenToc: !canOpenToc
             ? null
             : () => showReaderTocSheet(
                 context,
-                seriesId: seriesId!,
+                seriesId: seriesId,
                 currentBookId: bookId,
                 palette: palette,
                 direction: direction,
+                currentPage: page,
+                onJump: onJump,
               ),
         onOpenSettings: () => showReaderSettingsSheet(
           context,
@@ -126,6 +142,31 @@ class ReaderTopBar extends ConsumerWidget {
         onClose: () => context.pop(),
       ),
     );
+  }
+
+  Future<void> _toggleBookmark(BuildContext context, WidgetRef ref) async {
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    try {
+      final added = await ref
+          .read(bookmarkControllerProvider)
+          .toggle(bookId: bookId, page: page);
+      if (messenger != null) {
+        messenger
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(
+                added
+                    ? l10n.readerBookmarkAdded(page)
+                    : l10n.readerBookmarkRemoved(page),
+              ),
+            ),
+          );
+      }
+    } on Object {
+      // 书签写入失败不阻断阅读。
+    }
   }
 
   Future<void> _setAsCover(BuildContext context, WidgetRef ref) async {

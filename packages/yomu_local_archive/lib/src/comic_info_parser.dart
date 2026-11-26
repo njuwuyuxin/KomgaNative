@@ -18,6 +18,7 @@ final class ComicInfoMetadata {
     this.tags = const <String>[],
     this.readingDirection = ReadingDirection.unknown,
     this.frontCoverPageIndex,
+    this.pageBookmarks = const <({String title, int pageIndex})>[],
   });
 
   final String? series;
@@ -34,6 +35,9 @@ final class ComicInfoMetadata {
 
   /// `ComicInfo.xml` `<Pages>` 中标记为 `Type="FrontCover"` 的 0 基图片序号。
   final int? frontCoverPageIndex;
+
+  /// `ComicInfo.xml` `<Pages>` 中带 `Bookmark="..."` 属性的 0 基页章节书签。
+  final List<({String title, int pageIndex})> pageBookmarks;
 }
 
 /// 零外部依赖解析 `ComicInfo.xml` 字节。畸形或空白字段自动优雅忽略，永不抛异常。
@@ -113,6 +117,7 @@ ComicInfoMetadata parseComicInfoXml(Uint8List rawBytes) {
     _ => ReadingDirection.unknown,
   };
 
+  final pageDetails = _parseComicInfoPages(xml);
   return ComicInfoMetadata(
     series: tagValue('Series'),
     title: tagValue('Title'),
@@ -125,11 +130,13 @@ ComicInfoMetadata parseComicInfoXml(Uint8List rawBytes) {
     releaseDate: releaseDate,
     tags: List<String>.unmodifiable(tags),
     readingDirection: direction,
-    frontCoverPageIndex: _findFrontCoverPageIndex(xml),
+    frontCoverPageIndex: pageDetails.frontCoverIndex,
+    pageBookmarks: pageDetails.bookmarks,
   );
 }
 
-int? _findFrontCoverPageIndex(String xml) {
+({int? frontCoverIndex, List<({String title, int pageIndex})> bookmarks})
+_parseComicInfoPages(String xml) {
   final pageTagPattern = RegExp(r'<Page\b([^>]*)/?>', caseSensitive: false);
   final typePattern = RegExp(
     r'''\bType\s*=\s*["']([^"']*)["']''',
@@ -139,17 +146,37 @@ int? _findFrontCoverPageIndex(String xml) {
     r'''\bImage\s*=\s*["'](\d+)["']''',
     caseSensitive: false,
   );
+  final bookmarkPattern = RegExp(
+    r'''\bBookmark\s*=\s*(?:"([^"]*)"|'([^']*)')''',
+    caseSensitive: false,
+  );
 
+  int? frontCover;
+  final bookmarks = <({String title, int pageIndex})>[];
   for (final match in pageTagPattern.allMatches(xml)) {
     final attrs = match.group(1) ?? '';
+    final indexStr = imagePattern.firstMatch(attrs)?.group(1);
+    final idx = indexStr == null ? null : int.tryParse(indexStr);
+    if (idx == null || idx < 0) continue;
+
     final type = typePattern.firstMatch(attrs)?.group(1)?.toLowerCase();
-    if (type == 'frontcover') {
-      final indexStr = imagePattern.firstMatch(attrs)?.group(1);
-      final idx = indexStr == null ? null : int.tryParse(indexStr);
-      if (idx != null && idx >= 0) return idx;
+    if (type == 'frontcover' && frontCover == null) {
+      frontCover = idx;
+    }
+
+    final bmMatch = bookmarkPattern.firstMatch(attrs);
+    final rawBm = bmMatch?.group(1) ?? bmMatch?.group(2);
+    if (rawBm != null) {
+      final clean = _unescapeXml(rawBm).trim();
+      if (clean.isNotEmpty) {
+        bookmarks.add((title: clean, pageIndex: idx));
+      }
     }
   }
-  return null;
+  return (
+    frontCoverIndex: frontCover,
+    bookmarks: List<({String title, int pageIndex})>.unmodifiable(bookmarks),
+  );
 }
 
 String _unescapeXml(String input) {

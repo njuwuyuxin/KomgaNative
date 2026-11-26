@@ -25,6 +25,7 @@ final class LocalBookImportDraft {
     this.readingDirection = ReadingDirection.unknown,
     this.releaseDate,
     this.coverThumbPath,
+    this.chapters = const <ArchiveChapter>[],
   });
 
   final String bookId;
@@ -44,6 +45,7 @@ final class LocalBookImportDraft {
   final int sizeBytes;
   final String? coverThumbPath;
   final List<ArchivePageEntry> pages;
+  final List<ArchiveChapter> chapters;
 }
 
 /// 生成规范化排序标题（去除英文冠词前缀并转小写）。
@@ -204,6 +206,9 @@ extension LocalCatalogWriteDao on ProgressDatabase {
       await (delete(
         localPagesRows,
       )..where((t) => t.bookId.equals(draft.bookId))).go();
+      await (delete(
+        localBookChaptersRows,
+      )..where((t) => t.bookId.equals(draft.bookId))).go();
       await batch((Batch b) {
         b.insertAll(localPagesRows, <LocalPagesRowsCompanion>[
           for (final p in draft.pages)
@@ -220,6 +225,17 @@ extension LocalCatalogWriteDao on ProgressDatabase {
               mediaType: Value<String?>(p.mediaType),
             ),
         ]);
+        if (draft.chapters.isNotEmpty) {
+          b.insertAll(localBookChaptersRows, <LocalBookChaptersRowsCompanion>[
+            for (var i = 0; i < draft.chapters.length; i++)
+              LocalBookChaptersRowsCompanion.insert(
+                bookId: draft.bookId,
+                chapterIndex: i,
+                title: draft.chapters[i].title,
+                startPage: draft.chapters[i].startPage,
+              ),
+          ]);
+        }
       });
 
       return (seriesId: seriesId, bookId: draft.bookId);

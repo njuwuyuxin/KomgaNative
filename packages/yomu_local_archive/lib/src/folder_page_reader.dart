@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:yomu_local_archive/src/archive_errors.dart';
+import 'package:yomu_local_archive/src/chapter_extractor.dart';
 import 'package:yomu_local_archive/src/comic_info_parser.dart';
 import 'package:yomu_local_archive/src/image_dimensions.dart';
 import 'package:yomu_local_archive/src/natural_sort.dart';
@@ -15,9 +16,11 @@ final class FolderComicReader implements ComicArchiveReader {
     required Directory root,
     required List<ArchivePageEntry> pages,
     Uint8List? comicInfoBytes,
+    List<ArchiveChapter> chapters = const <ArchiveChapter>[],
   }) : _root = root,
        pages = List<ArchivePageEntry>.unmodifiable(pages),
-       comicInfoBytes = comicInfoBytes;
+       comicInfoBytes = comicInfoBytes,
+       chapters = List<ArchiveChapter>.unmodifiable(chapters);
 
   /// 扫描 [directory] 下的图片序列与可选 `ComicInfo.xml`。
   static Future<FolderComicReader> open(
@@ -113,6 +116,10 @@ final class FolderComicReader implements ComicArchiveReader {
       root: directory,
       pages: pages,
       comicInfoBytes: comicInfoBytes,
+      chapters: resolveArchiveChapters(
+        pages: pages,
+        comicInfoBytes: comicInfoBytes,
+      ),
     );
   }
 
@@ -136,7 +143,7 @@ final class FolderComicReader implements ComicArchiveReader {
   ComicInfoMetadata? get embeddedMetadata => null;
 
   @override
-  List<ArchiveChapter> get chapters => const <ArchiveChapter>[];
+  final List<ArchiveChapter> chapters;
 
   @override
   Future<Uint8List> readPage(int pageNumber) async {

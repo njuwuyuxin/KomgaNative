@@ -140,3 +140,19 @@ class LocalReadListsRows extends Table {
   @override
   Set<Column<Object>> get primaryKey => <Column<Object>>{id};
 }
+
+/// 本地书籍内部章节目录表（EPUB TOC / 多子目录 / `ComicInfo.xml` 书签，LMB-05）。
+class LocalBookChaptersRows extends Table {
+  TextColumn get bookId => text()();
+
+  /// 章节顺序序号（0 基，保证同一本书内严格保序）。
+  IntColumn get chapterIndex => integer()();
+
+  TextColumn get title => text()();
+
+  /// 1 基起始页码。
+  IntColumn get startPage => integer()();
+
+  @override
+  Set<Column<Object>> get primaryKey => <Column<Object>>{bookId, chapterIndex};
+}

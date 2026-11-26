@@ -9,7 +9,15 @@ import 'package:material_ui/material_ui.dart';
 ///
 /// 顶栏常驻槽位为：返回 / 标题+页码 / 保存图片 / AA / ⋯。目录、隐身、页面缩略图、
 /// 阅读设置、分享收进这个菜单，保证每颗顶栏按钮都有完整的 48pt 点击区。
-enum ReaderBarAction { toc, incognito, pages, settings, share, setAsCover }
+enum ReaderBarAction {
+  toc,
+  bookmark,
+  incognito,
+  pages,
+  settings,
+  share,
+  setAsCover,
+}
 
 /// 阅读器顶栏。
 ///
@@ -28,6 +36,8 @@ class ReaderBar extends StatelessWidget {
     required this.incognito,
     required this.onToggleIncognito,
     this.onOpenToc,
+    this.isBookmarked = false,
+    this.onToggleBookmark,
     this.onSavePage,
     this.onSharePage,
     this.onSetAsCover,
@@ -50,8 +60,14 @@ class ReaderBar extends StatelessWidget {
   final VoidCallback onOpenSettings;
   final VoidCallback onOpenPages;
 
-  /// 目录（RDR-02）；系列未知时不出现。
+  /// 目录（RDR-02）；系列未知且无书内目录/书签时不出现。
   final VoidCallback? onOpenToc;
+
+  /// 当前页是否已添加书签（LMB-05）。
+  final bool isBookmarked;
+
+  /// 切换当前页的书签状态（LMB-05）。
+  final VoidCallback? onToggleBookmark;
 
   /// 直接保存当前屏图片（单页存单张，双页自动横向拼接后保存）。
   final VoidCallback? onSavePage;
@@ -74,6 +90,7 @@ class ReaderBar extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final actions = <ReaderBarAction>[
       if (onOpenToc != null) ReaderBarAction.toc,
+      if (onToggleBookmark != null) ReaderBarAction.bookmark,
       ReaderBarAction.incognito,
       ReaderBarAction.pages,
       ReaderBarAction.settings,
@@ -177,6 +194,8 @@ class ReaderBar extends StatelessWidget {
     switch (action) {
       case ReaderBarAction.toc:
         onOpenToc?.call();
+      case ReaderBarAction.bookmark:
+        onToggleBookmark?.call();
       case ReaderBarAction.incognito:
         onToggleIncognito();
       case ReaderBarAction.pages:
@@ -194,6 +213,7 @@ class ReaderBar extends StatelessWidget {
   /// 测试和外部脚本只要"先开菜单"就能照旧点到。
   static String _keyFor(ReaderBarAction action) => switch (action) {
     ReaderBarAction.toc => 'reader-toc-button',
+    ReaderBarAction.bookmark => 'reader-bookmark-button',
     ReaderBarAction.incognito => 'reader-incognito-button',
     ReaderBarAction.pages => 'reader-pages-button',
     ReaderBarAction.settings => 'reader-settings-button',
@@ -203,6 +223,8 @@ class ReaderBar extends StatelessWidget {
 
   IconData _iconFor(ReaderBarAction action) => switch (action) {
     ReaderBarAction.toc => Icons.toc_outlined,
+    ReaderBarAction.bookmark =>
+      isBookmarked ? Icons.bookmark : Icons.bookmark_border,
     ReaderBarAction.incognito =>
       incognito ? Icons.visibility_off_outlined : Icons.visibility_outlined,
     ReaderBarAction.pages => Icons.grid_view_outlined,
@@ -214,6 +236,8 @@ class ReaderBar extends StatelessWidget {
   String _labelFor(AppLocalizations l10n, ReaderBarAction action) =>
       switch (action) {
         ReaderBarAction.toc => l10n.readerToc,
+        ReaderBarAction.bookmark =>
+          isBookmarked ? l10n.readerBookmarkRemove : l10n.readerBookmarkAdd,
         ReaderBarAction.incognito =>
           incognito ? l10n.incognitoOn : l10n.incognitoOff,
         ReaderBarAction.pages => l10n.pageThumbnailsTooltip,

@@ -4,31 +4,11 @@ import 'dart:typed_data';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu_local_archive/src/archive_errors.dart';
 import 'package:yomu_local_archive/src/byte_source.dart';
+import 'package:yomu_local_archive/src/chapter_extractor.dart';
 import 'package:yomu_local_archive/src/comic_info_parser.dart';
 import 'package:yomu_local_archive/src/image_dimensions.dart';
 import 'package:yomu_local_archive/src/natural_sort.dart';
 import 'package:yomu_local_archive/src/zip_directory.dart';
-
-/// 归档/漫画书内部的单条章节锚点（1 基起始页码）。
-final class ArchiveChapter {
-  const ArchiveChapter({required this.title, required this.startPage});
-
-  final String title;
-  final int startPage;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is ArchiveChapter &&
-          other.title == title &&
-          other.startPage == startPage);
-
-  @override
-  int get hashCode => Object.hash(title, startPage);
-
-  @override
-  String toString() => 'ArchiveChapter($title -> p.$startPage)';
-}
 
 /// 本地归档或文件夹中的单页索引信息（1 基页码，可直接持久化至本地页索引表）。
 final class ArchivePageEntry {
@@ -94,9 +74,11 @@ final class ZipComicReader implements ComicArchiveReader {
     required RandomAccessByteSource source,
     required List<ArchivePageEntry> pages,
     Uint8List? comicInfoBytes,
+    List<ArchiveChapter> chapters = const <ArchiveChapter>[],
   }) : _source = source,
        pages = List<ArchivePageEntry>.unmodifiable(pages),
-       comicInfoBytes = comicInfoBytes;
+       comicInfoBytes = comicInfoBytes,
+       chapters = List<ArchiveChapter>.unmodifiable(chapters);
 
   /// 扫描中央目录建立页表、提取 `ComicInfo.xml`，并可选嗅探每页宽高（导入阶段调用）。
   static Future<ZipComicReader> open(
@@ -191,6 +173,10 @@ final class ZipComicReader implements ComicArchiveReader {
       source: source,
       pages: pages,
       comicInfoBytes: comicInfoBytes,
+      chapters: resolveArchiveChapters(
+        pages: pages,
+        comicInfoBytes: comicInfoBytes,
+      ),
     );
   }
 
@@ -214,7 +200,7 @@ final class ZipComicReader implements ComicArchiveReader {
   ComicInfoMetadata? get embeddedMetadata => null;
 
   @override
-  List<ArchiveChapter> get chapters => const <ArchiveChapter>[];
+  final List<ArchiveChapter> chapters;
 
   @override
   Future<Uint8List> readPage(int pageNumber) {

@@ -64,3 +64,20 @@ class ReadingSessions extends Table {
   /// 这本书在本次会话结束时是否已读完（用于"读完的书"统计）。
   BoolColumn get completed => boolean().withDefault(const Constant(false))();
 }
+
+/// 通用页级书签表（本地书与远程 Komga 书均可打书签，按 `{scope, bookId, page}` 隔离，LMB-05）。
+class PageBookmarksRows extends Table {
+  TextColumn get scope => text().withDefault(const Constant(''))();
+
+  TextColumn get bookId => text()();
+
+  /// 1 基页码。
+  IntColumn get page => integer()();
+
+  TextColumn get note => text().withDefault(const Constant(''))();
+
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => <Column<Object>>{scope, bookId, page};
+}

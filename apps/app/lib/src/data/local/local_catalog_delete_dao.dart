@@ -31,8 +31,15 @@ extension LocalCatalogDeleteDao on ProgressDatabase {
       await (delete(
         localPagesRows,
       )..where((t) => t.bookId.equals(bookId))).go();
+      await (delete(
+        localBookChaptersRows,
+      )..where((t) => t.bookId.equals(bookId))).go();
       await (delete(localBooksRows)..where((t) => t.id.equals(bookId))).go();
       await (delete(localProgress)..where(
+            (t) => t.scope.equals(kLocalSourceKey) & t.bookId.equals(bookId),
+          ))
+          .go();
+      await (delete(pageBookmarksRows)..where(
             (t) => t.scope.equals(kLocalSourceKey) & t.bookId.equals(bookId),
           ))
           .go();
@@ -119,7 +126,14 @@ extension LocalCatalogDeleteDao on ProgressDatabase {
         await (delete(
           localPagesRows,
         )..where((t) => t.bookId.equals(b.id))).go();
+        await (delete(
+          localBookChaptersRows,
+        )..where((t) => t.bookId.equals(b.id))).go();
         await (delete(localProgress)..where(
+              (t) => t.scope.equals(kLocalSourceKey) & t.bookId.equals(b.id),
+            ))
+            .go();
+        await (delete(pageBookmarksRows)..where(
               (t) => t.scope.equals(kLocalSourceKey) & t.bookId.equals(b.id),
             ))
             .go();

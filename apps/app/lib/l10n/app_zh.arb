@@ -278,6 +278,31 @@
   "readerSliderLabel": "第 {page} 页，共 {total} 页",
   "readerToc": "目录",
   "readerTocCurrent": "当前 · {progress}",
+  "readerTocTabBook": "本卷章节与书签",
+  "readerTocTabVolumes": "系列各卷",
+  "readerTocChaptersHeading": "内部章节",
+  "readerTocBookmarksHeading": "页级书签",
+  "readerTocPageNumber": "第 {page} 页",
+  "@readerTocPageNumber": {
+    "placeholders": {
+      "page": {"type": "int"}
+    }
+  },
+  "readerBookmarkAdd": "添加本页书签",
+  "readerBookmarkRemove": "移除本页书签",
+  "readerBookmarkDelete": "删除书签",
+  "readerBookmarkAdded": "已为第 {page} 页添加书签",
+  "@readerBookmarkAdded": {
+    "placeholders": {
+      "page": {"type": "int"}
+    }
+  },
+  "readerBookmarkRemoved": "已移除第 {page} 页书签",
+  "@readerBookmarkRemoved": {
+    "placeholders": {
+      "page": {"type": "int"}
+    }
+  },
   "readerQuickSettings": "快捷设置",
   "readerMore": "更多",
   "readerGroupPages": "页面",

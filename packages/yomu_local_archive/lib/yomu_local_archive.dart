@@ -5,6 +5,7 @@ library;
 
 export 'src/archive_errors.dart';
 export 'src/byte_source.dart';
+export 'src/chapter_extractor.dart';
 export 'src/comic_info_parser.dart';
 export 'src/epub_opf_parser.dart';
 export 'src/epub_page_reader.dart';

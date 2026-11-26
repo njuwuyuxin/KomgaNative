@@ -2,31 +2,32 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:yomu_design_system/yomu_design_system.dart';
-import 'package:yomu_domain/yomu_domain.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/src/data/shelf_failure.dart';
 import 'package:yomu/src/l10n/failure_text.dart';
 import 'package:yomu/src/providers/library_providers.dart';
+import 'package:yomu/src/providers/reader_toc_providers.dart';
 import 'package:yomu/src/screens/reader_args.dart';
 import 'package:yomu/src/widgets/reader_palette.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:yomu/src/widgets/reader_toc_book_tab.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu_domain/yomu_domain.dart';
 
-/// 阅读器里的"目录"（RDR-02）：本系列的书列表，点一本直接换书。
-///
-/// 为什么不是"章节树"：Komga 的书就是文件（`Vol. 1` / `卷01`），没有比书更细的
-/// 结构化章节；Panels/Aidoku 的目录在这个数据模型下也是"这一系列的书"。
-///
-/// 三个细节：
-/// - 打开时**滚到当前这本**：20+ 本的系列不定位的话，用户每次都要自己找；
-/// - 换书用 `pushReplacement`：连读十本不该压十层返回栈，返回仍然是系列页；
-/// - 高亮当前这本并显示读过的页数，避免"点到刚才那本"。
+enum _TocSegment { book, volumes }
+
+/// 阅读器里的"目录"（RDR-02 + LMB-05）：
+/// - 当本卷有内部章节（EPUB TOC / 多子目录 / ComicInfo 书签）或页级书签时，
+///   展示「本卷章节与书签」+「系列各卷」分段视图；
+/// - 否则自动隐藏分段栏，直接展示系列各卷（保持简洁）。
 Future<void> showReaderTocSheet(
   BuildContext context, {
-  required String seriesId,
+  String? seriesId,
   required String currentBookId,
   required ReaderPalette palette,
   required ReadingDirection direction,
+  int currentPage = 1,
+  void Function(int page)? onJump,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -48,6 +49,8 @@ Future<void> showReaderTocSheet(
           currentBookId: currentBookId,
           palette: palette,
           direction: direction,
+          currentPage: currentPage,
+          onJump: onJump,
         ),
       ),
     ),
@@ -56,31 +59,39 @@ Future<void> showReaderTocSheet(
 
 class ReaderTocSheet extends ConsumerStatefulWidget {
   const ReaderTocSheet({
-    required this.seriesId,
+    this.seriesId,
     required this.currentBookId,
     required this.palette,
     required this.direction,
+    this.currentPage = 1,
+    this.onJump,
     super.key,
   });
 
-  final String seriesId;
+  final String? seriesId;
   final String currentBookId;
   final ReaderPalette palette;
 
   /// 换书时沿用同一个方向（否则 RTL 系列换一本就反着翻）。
   final ReadingDirection direction;
 
+  /// 当前 1 基页码（用于高亮所处章节与书签）。
+  final int currentPage;
+
+  /// 选中书内章节或书签后的跳页回调。
+  final void Function(int page)? onJump;
+
   @override
   ConsumerState<ReaderTocSheet> createState() => _ReaderTocSheetState();
 }
 
 class _ReaderTocSheetState extends ConsumerState<ReaderTocSheet> {
-  /// 一行的高度：只用来给"打开时定位到当前书"一个初始偏移。
   static const double _rowHeight = 72;
 
   final ScrollController _scroll = ScrollController();
   final GlobalKey _currentKey = GlobalKey();
   bool _scrolledToCurrent = false;
+  _TocSegment? _userSegment;
 
   @override
   void dispose() {
@@ -88,10 +99,6 @@ class _ReaderTocSheetState extends ConsumerState<ReaderTocSheet> {
     super.dispose();
   }
 
-  /// 首帧之后把当前书精确滚进视野。
-  ///
-  /// 初始偏移只是"大概位置"（按固定行高估），定位到真正的行还要
-  /// `ensureVisible`：书名可能占两行、缩略图可能更高。
   void _ensureCurrentVisible() {
     if (_scrolledToCurrent) return;
     final context = _currentKey.currentContext;
@@ -104,13 +111,25 @@ class _ReaderTocSheetState extends ConsumerState<ReaderTocSheet> {
     );
   }
 
-  void _open(Book book) {
+  void _openBook(Book book) {
     final route = '/reader/${book.id}';
     Navigator.of(context).pop();
-    // 替换当前阅读器页：连读十本不会压十层返回栈。
     this.context.pushReplacement(
       route,
       extra: ReaderArgs(book: book, direction: widget.direction),
+    );
+  }
+
+  void _jumpToPage(int page) {
+    Navigator.of(context).pop();
+    widget.onJump?.call(page);
+  }
+
+  void _removeBookmark(int page) {
+    unawaited(
+      ref
+          .read(bookmarkControllerProvider)
+          .remove(bookId: widget.currentBookId, page: page),
     );
   }
 
@@ -119,15 +138,49 @@ class _ReaderTocSheetState extends ConsumerState<ReaderTocSheet> {
     final l10n = AppLocalizations.of(context);
     final palette = widget.palette;
     final textStyle = AppTypography.of(context);
-    // 目录只要"按卷号的书单"，不需要排序/筛选。
-    final query = (seriesId: widget.seriesId, sort: null, readStatus: null);
-    final async = ref.watch(seriesBooksProvider(query));
 
-    final body = _buildBody(context, l10n, palette, textStyle, async);
+    final chapters =
+        ref.watch(bookChaptersProvider(widget.currentBookId)).value ??
+        const <BookChapter>[];
+    final bookmarks =
+        ref.watch(bookBookmarksProvider(widget.currentBookId)).value ??
+        const <PageBookmark>[];
+    final hasBookEntries = chapters.isNotEmpty || bookmarks.isNotEmpty;
+    final hasSeries = widget.seriesId != null;
+
+    final effectiveSegment = !hasBookEntries
+        ? _TocSegment.volumes
+        : !hasSeries
+        ? _TocSegment.book
+        : (_userSegment ?? _TocSegment.book);
+
+    final Widget body;
+    if (effectiveSegment == _TocSegment.book && hasBookEntries) {
+      body = ReaderTocBookTab(
+        chapters: chapters,
+        bookmarks: bookmarks,
+        currentPage: widget.currentPage,
+        palette: palette,
+        onJumpPage: _jumpToPage,
+        onRemoveBookmark: _removeBookmark,
+      );
+    } else if (hasSeries) {
+      final query = (seriesId: widget.seriesId!, sort: null, readStatus: null);
+      final async = ref.watch(seriesBooksProvider(query));
+      body = _buildVolumesBody(context, l10n, palette, textStyle, async);
+    } else {
+      body = Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Text(
+          l10n.noBooksYet,
+          style: textStyle.body.copyWith(color: palette.muted),
+        ),
+      );
+    }
+
     return SafeArea(
       top: false,
       child: ConstrainedBox(
-        // 面板最多占 3/4 屏：再高就没有"弹出来"的感觉了。
         constraints: BoxConstraints(
           maxHeight: MediaQuery.sizeOf(context).height * 0.75,
         ),
@@ -160,6 +213,33 @@ class _ReaderTocSheetState extends ConsumerState<ReaderTocSheet> {
                 ],
               ),
             ),
+            if (hasBookEntries && hasSeries)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  0,
+                  AppSpacing.md,
+                  AppSpacing.sm,
+                ),
+                child: GlassSegmentedControl<_TocSegment>(
+                  key: const Key('reader-toc-segment'),
+                  selected: effectiveSegment,
+                  onSelected: (_TocSegment next) =>
+                      setState(() => _userSegment = next),
+                  segments: <GlassSegment<_TocSegment>>[
+                    GlassSegment<_TocSegment>(
+                      key: const Key('reader-toc-tab-book'),
+                      value: _TocSegment.book,
+                      label: l10n.readerTocTabBook,
+                    ),
+                    GlassSegment<_TocSegment>(
+                      key: const Key('reader-toc-tab-volumes'),
+                      value: _TocSegment.volumes,
+                      label: l10n.readerTocTabVolumes,
+                    ),
+                  ],
+                ),
+              ),
             Flexible(child: body),
           ],
         ),
@@ -167,7 +247,7 @@ class _ReaderTocSheetState extends ConsumerState<ReaderTocSheet> {
     );
   }
 
-  Widget _buildBody(
+  Widget _buildVolumesBody(
     BuildContext context,
     AppLocalizations l10n,
     ReaderPalette palette,
@@ -205,8 +285,7 @@ class _ReaderTocSheetState extends ConsumerState<ReaderTocSheet> {
     final currentIndex = page.items.indexWhere(
       (Book book) => book.id == widget.currentBookId,
     );
-    if (_scroll.hasClients == false && currentIndex > 0) {
-      // 还没挂上 controller 时给一个初始偏移，避免"打开就停在第一本"。
+    if (!_scroll.hasClients && currentIndex > 0) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!_scroll.hasClients) return;
         final offset = (currentIndex * _rowHeight).clamp(
@@ -225,80 +304,21 @@ class _ReaderTocSheetState extends ConsumerState<ReaderTocSheet> {
       itemBuilder: (BuildContext context, int index) {
         final book = page.items[index];
         final isCurrent = book.id == widget.currentBookId;
-        // 当前行挂 key：首帧后 ensureVisible 用它精确定位。
         final key = isCurrent ? _currentKey : null;
         if (isCurrent) {
           WidgetsBinding.instance.addPostFrameCallback(
             (_) => _ensureCurrentVisible(),
           );
         }
-        return _TocRow(
+        return ReaderTocVolumeRow(
           key: key,
           book: book,
           palette: palette,
           textStyle: textStyle,
           isCurrent: isCurrent,
-          onTap: isCurrent ? null : () => _open(book),
+          onTap: isCurrent ? null : () => _openBook(book),
         );
       },
-    );
-  }
-}
-
-class _TocRow extends StatelessWidget {
-  const _TocRow({
-    required this.book,
-    required this.palette,
-    required this.textStyle,
-    required this.isCurrent,
-    this.onTap,
-    super.key,
-  });
-
-  final Book book;
-  final ReaderPalette palette;
-  final AppTypography textStyle;
-  final bool isCurrent;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final progress = book.readProgress;
-    // 进度里已经含总页数（`第 114/227 页`），不要再拼一遍 `227 页`。
-    final subtitle = progress == null
-        ? l10n.bookPages(book.pagesCount)
-        : book.isCompleted
-        ? l10n.bookReadPages(book.pagesCount)
-        : l10n.bookPageProgress(progress.page, book.pagesCount);
-
-    return ListTile(
-      key: Key('reader-toc-book-${book.id}'),
-      onTap: onTap,
-      enabled: !isCurrent,
-      leading: Icon(
-        isCurrent ? Icons.play_arrow : Icons.menu_book_outlined,
-        color: isCurrent ? palette.foreground : palette.muted,
-      ),
-      title: Text(
-        book.number.isEmpty ? book.name : '#${book.number} · ${book.name}',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: textStyle.body.copyWith(
-          color: isCurrent ? palette.foreground : palette.foreground,
-          fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w400,
-        ),
-      ),
-      subtitle: Text(
-        isCurrent ? l10n.readerTocCurrent(subtitle) : subtitle,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: Theme.of(context).textTheme.bodySmall
-            ?.copyWith(color: palette.muted),
-      ),
-      trailing: isCurrent
-          ? Icon(Icons.check, color: palette.foreground, size: AppSizes.iconMd)
-          : null,
     );
   }
 }

@@ -128,6 +128,7 @@ Future<({String seriesId, String bookId})> commitComicReaderToDatabase({
       sizeBytes: sizeBytes,
       coverThumbPath: coverRelPath,
       pages: reader.pages,
+      chapters: reader.chapters,
     ),
     generateSeriesId: generateSeriesId,
   );

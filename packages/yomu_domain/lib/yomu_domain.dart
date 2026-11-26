@@ -4,6 +4,7 @@
 library;
 
 export 'src/account.dart';
+export 'src/bookmarks.dart';
 export 'src/collections.dart';
 export 'src/content_source.dart';
 export 'src/entities.dart';
