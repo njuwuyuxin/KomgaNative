@@ -137,7 +137,13 @@ String? _nonEmpty(String? s) =>
 Future<void> writeStreamToFile(Stream<List<int>> stream, File dest) async {
   final sink = dest.openWrite();
   try {
-    await stream.pipe(sink);
+    // 不用 stream.pipe(sink)：PlatformFile.readAsByteStream() 的运行时类型是
+    // Stream<Uint8List>，而 IOSink 实现的是 StreamConsumer<List<int>>，
+    // Dart 泛型协变检查会在 Stream<Uint8List>.pipe 上抛 TypeError。
+    await for (final chunk in stream) {
+      sink.add(chunk);
+    }
+    await sink.flush();
   } finally {
     await sink.close();
   }

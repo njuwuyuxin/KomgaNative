@@ -176,5 +176,22 @@ void main() {
       expect(pages, hasLength(2));
       expect(pages.first.entryName, '001.png');
     });
+
+    test('回归防护：Stream<Uint8List>（file_picker Android/iOS 真实返回流类型）入库不触发 IOSink 协变异常', () async {
+      final cbzBytes = _buildCbz(
+        entries: <String, List<int>>{'01.png': _fakePng(800, 1200)},
+      );
+      final picked = PickedComicFile(
+        name: 'TypedStream Vol.1.cbz',
+        openRead: () => Stream<Uint8List>.value(cbzBytes),
+        sizeBytes: cbzBytes.length,
+      );
+
+      final result = await importer.importArchiveFiles(<PickedComicFile>[
+        picked,
+      ]);
+      expect(result.importedCount, 1);
+      expect(result.failures, isEmpty);
+    });
   });
 }

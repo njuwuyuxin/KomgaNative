@@ -1,4 +1,5 @@
 import 'package:yomu/src/data/reader_config.dart';
+import 'package:yomu_domain/yomu_domain.dart' show isLocalSourceKey;
 
 export 'package:yomu/src/data/reader_config.dart';
 
@@ -81,9 +82,11 @@ class ReaderPrefs {
   /// 按系列覆盖的阅读配置（UI-P3-2）：seriesId → [ReaderConfig]。
   final Map<String, ReaderConfig> seriesOverrides;
 
-  /// 组合带服务器分区的键（`$serverKey|$id`）；未提供服务器标识时退化为裸 `id`。
+  /// 组合带服务器分区的键（远程源为 `$serverKey|$id`；本机源或未提供标识时使用裸 `id`）。
   static String scopedKey(String? serverKey, String id) =>
-      (serverKey == null || serverKey.isEmpty) ? id : '$serverKey|$id';
+      (serverKey == null || isLocalSourceKey(serverKey))
+      ? id
+      : '$serverKey|$id';
 
   /// 当前服务器下该系列是否已启用系列覆盖（兼容无前缀旧存档键）。
   bool hasSeriesOverride(String? seriesId, {String? serverKey}) {
