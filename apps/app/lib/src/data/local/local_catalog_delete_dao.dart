@@ -93,7 +93,10 @@ extension LocalCatalogDeleteDao on ProgressDatabase {
       }
 
       return DeletedLocalPaths(
-        bookRelativePaths: <String>[bookRow.relativePath],
+        // 外部原位挂载书绝不返回源路径供物理删除，只删受管沙盒内的文件与缩略图（LMB-08）。
+        bookRelativePaths: bookRow.mountRootId == null
+            ? <String>[bookRow.relativePath]
+            : const <String>[],
         coverRelativePaths: covers,
         seriesDeleted: seriesDeleted,
       );
@@ -119,7 +122,9 @@ extension LocalCatalogDeleteDao on ProgressDatabase {
       ];
 
       for (final b in books) {
-        bookPaths.add(b.relativePath);
+        if (b.mountRootId == null) {
+          bookPaths.add(b.relativePath);
+        }
         if (b.coverThumbPath != null && b.coverThumbPath!.isNotEmpty) {
           coverPaths.add(b.coverThumbPath!);
         }

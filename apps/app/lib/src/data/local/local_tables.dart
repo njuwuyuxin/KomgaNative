@@ -59,14 +59,28 @@ class LocalBooksRows extends Table {
 
   IntColumn get sizeBytes => integer()();
 
-  /// `'zip'`（CBZ/ZIP 单文件）或 `'folder'`（受管图片目录）。
+  /// `'zip'`（CBZ/ZIP 单文件）、`'epub'`、`'tar'`、`'folder'`（受管沙盒），
+  /// 或 `'ext_zip'` / `'ext_epub'` / `'ext_tar'` / `'ext_folder'` / `'saf_zip'` / `'saf_epub'` / `'saf_tar'`（外部原位挂载，LMB-08）。
   TextColumn get storageKind => text()();
 
-  /// 相对于 `<ApplicationSupport>/local_comics/` 的受管路径（严禁存绝对路径）。
+  /// 沙盒受管书为相对于 `<ApplicationSupport>/local_comics/` 的路径；外部原位挂载书为 SAF URI 或原始路径。
   TextColumn get relativePath => text()();
 
   /// 导入或设封面时生成的缩略图相对路径（相对于 `<ApplicationSupport>/local_comics/`）。
   TextColumn get coverThumbPath => text().nullable()();
+
+  /// 所属外部挂载根目录 ID（`null` 表示受管沙盒导入书，非空表示原位挂载外部书，LMB-08）。
+  TextColumn get mountRootId => text().nullable()();
+
+  /// 在挂载根目录下的规范化相对路径（如 `Frieren/Vol.01.cbz`），供增量扫描（LMB-09）与文件夹树视图（LMB-10）使用。
+  TextColumn get sourceRelativePath => text().nullable()();
+
+  /// 源文件最后修改时间戳（毫秒），用于增量扫描跳过未变更文件。
+  IntColumn get sourceModifiedMs => integer().nullable()();
+
+  /// 是否为尚未下载到本地的云盘占位文件（如 iOS iCloud `.icloud` 占位）。
+  BoolColumn get isCloudPlaceholder =>
+      boolean().withDefault(const Constant(false))();
 
   DateTimeColumn get releaseDate => dateTime().nullable()();
 
@@ -155,4 +169,30 @@ class LocalBookChaptersRows extends Table {
 
   @override
   Set<Column<Object>> get primaryKey => <Column<Object>>{bookId, chapterIndex};
+}
+
+/// 外部挂载的本地漫画根目录表（Android SAF 树 / iOS Security-Scoped Bookmark / 普通目录，LMB-08）。
+class LocalMountedRootsRows extends Table {
+  TextColumn get id => text()();
+
+  TextColumn get displayName => text()();
+
+  /// Android SAF `content://` 树 URI、iOS Base64 Bookmark 或绝对目录路径。
+  TextColumn get uriOrBookmark => text()();
+
+  /// `'androidSaf'` / `'iosBookmark'` / `'localDirectory'`。
+  TextColumn get kind => text()();
+
+  BoolColumn get enabled => boolean().withDefault(const Constant(true))();
+
+  BoolColumn get hasNomedia => boolean().withDefault(const Constant(false))();
+
+  DateTimeColumn get lastScannedAt => dateTime().nullable()();
+
+  IntColumn get booksCount => integer().withDefault(const Constant(0))();
+
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => <Column<Object>>{id};
 }

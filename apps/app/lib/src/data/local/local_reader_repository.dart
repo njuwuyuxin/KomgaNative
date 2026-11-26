@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:yomu/src/data/byte_cache.dart';
+import 'package:yomu/src/data/local/external_byte_source.dart';
+import 'package:yomu/src/data/local/external_roots_dao.dart';
 import 'package:yomu/src/data/local/local_catalog_query_dao.dart';
 import 'package:yomu/src/data/local/local_comics_storage.dart';
 import 'package:yomu/src/data/progress/progress_database.dart';
@@ -10,6 +13,7 @@ import 'package:yomu/src/data/reader_repository.dart';
 import 'package:yomu/src/data/shelf_failure.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu_local_archive/yomu_local_archive.dart';
+import 'package:yomu_platform/yomu_platform.dart';
 
 /// 本机漫画阅读器仓库：复用已打开的归档文件句柄与 64 页内存 [ByteLruCache]，单页随机提取。
 final class LocalReaderRepository implements ReaderRepository {
@@ -20,10 +24,13 @@ final class LocalReaderRepository implements ReaderRepository {
     this._db,
     this._storage, {
     int pageCacheCapacity = defaultPageCacheCapacity,
-  }) : _pages = ByteLruCache(capacity: pageCacheCapacity);
+    ExternalRootsBridge? externalRoots,
+  }) : _pages = ByteLruCache(capacity: pageCacheCapacity),
+       _externalRoots = externalRoots ?? ChannelExternalRootsBridge();
 
   final ProgressDatabase _db;
   final LocalComicsStorage _storage;
+  final ExternalRootsBridge _externalRoots;
   final ByteLruCache _pages;
   final Map<String, Future<Uint8List>> _inFlight =
       <String, Future<Uint8List>>{};
@@ -167,6 +174,10 @@ final class LocalReaderRepository implements ReaderRepository {
         ),
     ];
 
+    if (row.mountRootId != null) {
+      return _openExternalArchiveReader(row, entries);
+    }
+
     if (row.storageKind == 'folder') {
       final dir = await _storage.resolveDirectory(row.relativePath);
       if (!await dir.exists()) {
@@ -183,6 +194,51 @@ final class LocalReaderRepository implements ReaderRepository {
     final file = await _storage.resolveFile(row.relativePath);
     final source = await FileByteSource.open(file);
     if (row.storageKind == 'tar') {
+      return entries.isNotEmpty
+          ? TarComicReader.fromIndexedPages(source, entries)
+          : TarComicReader.open(source);
+    }
+    return entries.isNotEmpty
+        ? ZipComicReader.fromIndexedPages(source, entries)
+        : openComicArchive(source);
+  }
+
+  Future<ComicArchiveReader> _openExternalArchiveReader(
+    LocalBooksRow row,
+    List<ArchivePageEntry> entries,
+  ) async {
+    final rootRow = await _db.mountedRootById(row.mountRootId!);
+    final root = rootRow == null ? null : mountedRootFromRow(rootRow);
+
+    if (row.isCloudPlaceholder) {
+      await _externalRoots.triggerCloudDownload(row.relativePath, root: root);
+      throw const ArchiveException(
+        ArchiveErrorKind.ioError,
+        'Cloud placeholder is downloading; please retry shortly',
+      );
+    }
+
+    if (row.storageKind == 'ext_folder') {
+      final dir = Directory(row.relativePath);
+      return entries.isNotEmpty
+          ? FolderComicReader.fromIndexedPages(dir, entries)
+          : FolderComicReader.open(dir);
+    }
+
+    final useBridge =
+        row.storageKind.startsWith('saf_') ||
+        root?.kind == ExternalRootKind.androidSaf ||
+        root?.kind == ExternalRootKind.iosBookmark;
+    final RandomAccessByteSource source = useBridge
+        ? ExternalRangeByteSource(
+            bridge: _externalRoots,
+            uri: row.relativePath,
+            root: root,
+            knownLength: row.sizeBytes > 0 ? row.sizeBytes : null,
+          )
+        : await FileByteSource.open(File(row.relativePath));
+
+    if (row.storageKind.endsWith('_tar')) {
       return entries.isNotEmpty
           ? TarComicReader.fromIndexedPages(source, entries)
           : TarComicReader.open(source);

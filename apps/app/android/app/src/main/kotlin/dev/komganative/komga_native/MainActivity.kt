@@ -27,6 +27,7 @@ import java.util.concurrent.Executors
 class MainActivity : FlutterActivity() {
     private var deviceChannel: MethodChannel? = null
     private var incomingFilesChannel: MethodChannel? = null
+    private var externalRootsHandler: SafExternalRootsHandler? = null
     private var dartConsumedInitial = false
     private val pendingIncomingFiles = CopyOnWriteArrayList<Map<String, String>>()
     private val ioExecutor = Executors.newSingleThreadExecutor()
@@ -125,6 +126,23 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+
+        val rootsHandler = SafExternalRootsHandler(this, ioExecutor)
+        externalRootsHandler = rootsHandler
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            SafExternalRootsHandler.CHANNEL,
+        ).setMethodCallHandler { call, result ->
+            rootsHandler.handle(call, result)
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (externalRootsHandler?.onActivityResult(requestCode, resultCode, data) == true) {
+            return
+        }
+        super.onActivityResult(requestCode, resultCode, data)
     }
 
     private fun captureIncomingIntent(intent: Intent?, notifyImmediately: Boolean) {

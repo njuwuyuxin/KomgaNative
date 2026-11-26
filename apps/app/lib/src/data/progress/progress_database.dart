@@ -23,6 +23,7 @@ part 'progress_user_dao.dart';
     LocalBooksRows,
     LocalPagesRows,
     LocalBookChaptersRows,
+    LocalMountedRootsRows,
     LocalCollectionsRows,
     LocalReadListsRows,
     PageBookmarksRows,
@@ -39,7 +40,7 @@ class ProgressDatabase extends _$ProgressDatabase {
   final FutureOr<String> Function()? defaultLegacyScope;
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -74,6 +75,15 @@ class ProgressDatabase extends _$ProgressDatabase {
       if (from < 5) {
         await m.createTable(localBookChaptersRows);
         await m.createTable(pageBookmarksRows);
+      }
+      if (from < 6) {
+        await m.createTable(localMountedRootsRows);
+        if (from >= 4) {
+          await m.addColumn(localBooksRows, localBooksRows.mountRootId);
+          await m.addColumn(localBooksRows, localBooksRows.sourceRelativePath);
+          await m.addColumn(localBooksRows, localBooksRows.sourceModifiedMs);
+          await m.addColumn(localBooksRows, localBooksRows.isCloudPlaceholder);
+        }
       }
     },
     beforeOpen: (OpeningDetails details) async {

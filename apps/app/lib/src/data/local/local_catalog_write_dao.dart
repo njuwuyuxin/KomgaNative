@@ -26,6 +26,10 @@ final class LocalBookImportDraft {
     this.releaseDate,
     this.coverThumbPath,
     this.chapters = const <ArchiveChapter>[],
+    this.mountRootId,
+    this.sourceRelativePath,
+    this.sourceModifiedMs,
+    this.isCloudPlaceholder = false,
   });
 
   final String bookId;
@@ -46,6 +50,10 @@ final class LocalBookImportDraft {
   final String? coverThumbPath;
   final List<ArchivePageEntry> pages;
   final List<ArchiveChapter> chapters;
+  final String? mountRootId;
+  final String? sourceRelativePath;
+  final int? sourceModifiedMs;
+  final bool isCloudPlaceholder;
 }
 
 /// 生成规范化排序标题（去除英文冠词前缀并转小写）。
@@ -198,6 +206,10 @@ extension LocalCatalogWriteDao on ProgressDatabase {
           storageKind: draft.storageKind,
           relativePath: draft.relativePath,
           coverThumbPath: Value<String?>(draft.coverThumbPath),
+          mountRootId: Value<String?>(draft.mountRootId),
+          sourceRelativePath: Value<String?>(draft.sourceRelativePath),
+          sourceModifiedMs: Value<int?>(draft.sourceModifiedMs),
+          isCloudPlaceholder: Value<bool>(draft.isCloudPlaceholder),
           releaseDate: Value<DateTime?>(draft.releaseDate),
           createdAt: now,
         ),

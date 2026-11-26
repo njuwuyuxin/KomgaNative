@@ -5,6 +5,7 @@
 library;
 
 export 'src/device_profile.dart';
+export 'src/external_roots.dart';
 export 'src/hardware_keys.dart';
 export 'src/image_saver.dart';
 export 'src/incoming_files.dart';
