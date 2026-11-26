@@ -75,6 +75,18 @@ final class ZipComicReader implements ComicArchiveReader {
     RandomAccessByteSource source, {
     bool sniffDimensions = true,
   }) async {
+    try {
+      return await _openInternal(source, sniffDimensions: sniffDimensions);
+    } on Object {
+      await source.close();
+      rethrow;
+    }
+  }
+
+  static Future<ZipComicReader> _openInternal(
+    RandomAccessByteSource source, {
+    required bool sniffDimensions,
+  }) async {
     final entries = await readZipCentralDirectory(source);
 
     ZipEntryInfo? comicInfoEntry;

@@ -1,0 +1,180 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:drift/native.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:yomu/src/data/local/comic_file_picker.dart';
+import 'package:yomu/src/data/local/local_catalog_query_dao.dart';
+import 'package:yomu/src/data/local/local_comic_importer.dart';
+import 'package:yomu/src/data/local/local_comics_storage.dart';
+import 'package:yomu/src/data/progress/progress_database.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+
+Uint8List _buildCbz({
+  required Map<String, List<int>> entries,
+  bool encrypted = false,
+}) {
+  final out = BytesBuilder();
+  final cd = BytesBuilder();
+  final gpFlag = 0x0800 | (encrypted ? 0x0001 : 0);
+
+  for (final entry in entries.entries) {
+    final offset = out.length;
+    final nameBytes = utf8.encode(entry.key);
+    final data = Uint8List.fromList(entry.value);
+
+    final lfh = ByteData(30)
+      ..setUint32(0, 0x04034b50, Endian.little)
+      ..setUint16(4, 20, Endian.little)
+      ..setUint16(6, gpFlag, Endian.little)
+      ..setUint32(18, data.length, Endian.little)
+      ..setUint32(22, data.length, Endian.little)
+      ..setUint16(26, nameBytes.length, Endian.little);
+    out
+      ..add(lfh.buffer.asUint8List())
+      ..add(nameBytes)
+      ..add(data);
+
+    final cfh = ByteData(46)
+      ..setUint32(0, 0x02014b50, Endian.little)
+      ..setUint16(4, 20, Endian.little)
+      ..setUint16(6, 20, Endian.little)
+      ..setUint16(8, gpFlag, Endian.little)
+      ..setUint32(20, data.length, Endian.little)
+      ..setUint32(24, data.length, Endian.little)
+      ..setUint16(28, nameBytes.length, Endian.little)
+      ..setUint32(42, offset, Endian.little);
+    cd
+      ..add(cfh.buffer.asUint8List())
+      ..add(nameBytes);
+  }
+
+  final cdOffset = out.length;
+  final cdBytes = cd.toBytes();
+  out.add(cdBytes);
+  final eocd = ByteData(22)
+    ..setUint32(0, 0x06054b50, Endian.little)
+    ..setUint16(8, entries.length, Endian.little)
+    ..setUint16(10, entries.length, Endian.little)
+    ..setUint32(12, cdBytes.length, Endian.little)
+    ..setUint32(16, cdOffset, Endian.little);
+  out.add(eocd.buffer.asUint8List());
+  return out.toBytes();
+}
+
+Uint8List _fakePng(int width, int height) {
+  final b = ByteData(33)
+    ..setUint32(8, 13)
+    ..setUint32(16, width)
+    ..setUint32(20, height);
+  final bytes = b.buffer.asUint8List();
+  bytes.setRange(0, 8, const <int>[
+    0x89,
+    0x50,
+    0x4E,
+    0x47,
+    0x0D,
+    0x0A,
+    0x1A,
+    0x0A,
+  ]);
+  bytes.setRange(12, 16, const <int>[0x49, 0x48, 0x44, 0x52]);
+  return bytes;
+}
+
+void main() {
+  group('LocalComicImporter 导入管线测试', () {
+    late Directory srcTemp;
+    late Directory sandboxTemp;
+    late ProgressDatabase db;
+    late LocalComicImporter importer;
+
+    setUp(() {
+      srcTemp = Directory.systemTemp.createTempSync('yomu_import_src_');
+      sandboxTemp = Directory.systemTemp.createTempSync('yomu_import_sandbox_');
+      db = ProgressDatabase(NativeDatabase.memory());
+      importer = LocalComicImporter(
+        db: db,
+        storage: LocalComicsStorage(rootResolver: () async => sandboxTemp),
+        coverEncoder: (
+          Uint8List raw, {
+          required ReadingDirection direction,
+        }) async => raw,
+      );
+    });
+
+    tearDown(() async {
+      await db.close();
+      if (srcTemp.existsSync()) srcTemp.deleteSync(recursive: true);
+      if (sandboxTemp.existsSync()) sandboxTemp.deleteSync(recursive: true);
+    });
+
+    test('批量导入同名多卷自动归并系列、解析 ComicInfo.xml，遇到加密包隔离报错且不留脏文件', () async {
+      final vol1Path = '${srcTemp.path}/Frieren Vol.1.cbz';
+      final vol2Path = '${srcTemp.path}/Frieren Vol.2.cbz';
+      final badPath = '${srcTemp.path}/Locked.zip';
+
+      await File(vol1Path).writeAsBytes(
+        _buildCbz(
+          entries: <String, List<int>>{
+            'ComicInfo.xml': utf8.encode(
+              '<ComicInfo><Series>Frieren</Series><Title>Vol. 1</Title><Number>1</Number><Manga>YesAndRightToLeft</Manga></ComicInfo>',
+            ),
+            '01.png': _fakePng(800, 1200),
+            '02.png': _fakePng(800, 1200),
+          },
+        ),
+      );
+      await File(vol2Path).writeAsBytes(
+        _buildCbz(entries: <String, List<int>>{'01.png': _fakePng(800, 1200)}),
+      );
+      await File(badPath).writeAsBytes(
+        _buildCbz(
+          entries: <String, List<int>>{'01.png': _fakePng(800, 1200)},
+          encrypted: true,
+        ),
+      );
+
+      final result = await importer.importArchiveFiles(<PickedComicFile>[
+        PickedComicFile.fromFile(File(vol1Path), name: 'Frieren Vol.1.cbz'),
+        PickedComicFile.fromFile(File(vol2Path), name: 'Frieren Vol.2.cbz'),
+        PickedComicFile.fromFile(File(badPath), name: 'Locked.zip'),
+      ]);
+
+      expect(result.importedCount, 2);
+      expect(result.importedSeriesIds, hasLength(1), reason: '两卷应归入同一系列');
+      expect(result.failures, hasLength(1));
+      expect(result.failures.single.fileName, 'Locked.zip');
+      expect(result.failures.single.reason, ImportFailureReason.encrypted);
+
+      // 校验沙盒 books/ 下只有 2 个成功的子目录，加密失败包已回滚清理
+      final booksDir = Directory('${sandboxTemp.path}/books');
+      expect(booksDir.listSync(), hasLength(2));
+
+      final series = (await db.queryLocalSeries()).items.single;
+      expect(series.title, 'Frieren');
+      expect(series.booksCount, 2);
+      expect(series.readingDirection, ReadingDirection.rightToLeft);
+    });
+
+    test('importDirectory 支持直接导入图片文件夹', () async {
+      final imgDir = Directory('${srcTemp.path}/孤独摇滚 第1话')..createSync();
+      await File('${imgDir.path}/002.png').writeAsBytes(_fakePng(900, 1300));
+      await File('${imgDir.path}/001.png').writeAsBytes(_fakePng(900, 1300));
+      await File('${imgDir.path}/ComicInfo.xml').writeAsString(
+        '<ComicInfo><Series>孤独摇滚</Series><Number>1</Number></ComicInfo>',
+      );
+
+      final result = await importer.importDirectory(imgDir.path);
+      expect(result.importedCount, 1);
+      expect(result.failures, isEmpty);
+
+      final series = (await db.queryLocalSeries()).items.single;
+      expect(series.title, '孤独摇滚');
+      final pages = await db.localPagesForBook(result.importedBookIds.single);
+      expect(pages, hasLength(2));
+      expect(pages.first.entryName, '001.png');
+    });
+  });
+}
