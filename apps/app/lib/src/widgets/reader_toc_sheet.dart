@@ -25,20 +25,19 @@ Future<void> showReaderTocSheet(
   BuildContext context, {
   String? seriesId,
   required String currentBookId,
+  required String sourceKey,
   required ReaderPalette palette,
   required ReadingDirection direction,
-  String? sourceKey,
   int currentPage = 1,
   void Function(int page)? onJump,
 }) {
-  final resolvedSource = sourceKey ?? ScopedSourceScope.readOf(context);
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     elevation: 0,
     builder: (BuildContext context) => ScopedSourceScope(
-      sourceKey: resolvedSource,
+      sourceKey: sourceKey,
       child: FrostedSurface(
         kind: AppMaterialKind.sheet,
         material: AppMaterial.resolve(
@@ -52,9 +51,9 @@ Future<void> showReaderTocSheet(
           child: ReaderTocSheet(
             seriesId: seriesId,
             currentBookId: currentBookId,
+            sourceKey: sourceKey,
             palette: palette,
             direction: direction,
-            sourceKey: resolvedSource,
             currentPage: currentPage,
             onJump: onJump,
           ),
@@ -68,9 +67,9 @@ class ReaderTocSheet extends ConsumerStatefulWidget {
   const ReaderTocSheet({
     this.seriesId,
     required this.currentBookId,
+    required this.sourceKey,
     required this.palette,
     required this.direction,
-    this.sourceKey,
     this.currentPage = 1,
     this.onJump,
     super.key,
@@ -78,12 +77,11 @@ class ReaderTocSheet extends ConsumerStatefulWidget {
 
   final String? seriesId;
   final String currentBookId;
+  final String sourceKey;
   final ReaderPalette palette;
 
   /// 换书时沿用同一个方向（否则 RTL 系列换一本就反着翻）。
   final ReadingDirection direction;
-
-  final String? sourceKey;
 
   /// 当前 1 基页码（用于高亮所处章节与书签）。
   final int currentPage;
@@ -122,14 +120,13 @@ class _ReaderTocSheetState extends ConsumerState<ReaderTocSheet> {
   }
 
   void _openBook(Book book) {
-    final sourceKey = widget.sourceKey ?? ScopedSourceScope.readOf(context);
     Navigator.of(context).pop();
     context.pushReplacement(
       '/reader/${book.id}',
       extra: ReaderArgs(
         book: book,
         direction: widget.direction,
-        sourceKey: sourceKey ?? book.sourceKey,
+        sourceKey: widget.sourceKey,
       ),
     );
   }
@@ -140,14 +137,13 @@ class _ReaderTocSheetState extends ConsumerState<ReaderTocSheet> {
   }
 
   void _removeBookmark(int page) {
-    final sourceKey = widget.sourceKey ?? ScopedSourceScope.readOf(context);
     unawaited(
       ref
           .read(bookmarkControllerProvider)
           .remove(
             bookId: widget.currentBookId,
             page: page,
-            sourceKey: sourceKey,
+            sourceKey: widget.sourceKey,
           ),
     );
   }
@@ -157,7 +153,7 @@ class _ReaderTocSheetState extends ConsumerState<ReaderTocSheet> {
     final l10n = AppLocalizations.of(context);
     final palette = widget.palette;
     final textStyle = AppTypography.of(context);
-    final sourceKey = widget.sourceKey ?? ScopedSourceScope.maybeOf(context);
+    final sourceKey = widget.sourceKey;
     final tocQuery = (sourceKey: sourceKey, bookId: widget.currentBookId);
 
     final chapters =

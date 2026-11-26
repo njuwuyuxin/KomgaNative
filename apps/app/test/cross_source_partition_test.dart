@@ -11,10 +11,13 @@ import 'package:yomu/src/data/progress/progress_database.dart';
 import 'package:yomu/src/data/progress/progress_store.dart';
 import 'package:yomu/src/data/reader_prefs.dart';
 import 'package:yomu/src/data/reader_prefs_store.dart';
+import 'package:yomu/src/data/reading_session_tracker.dart';
 import 'package:yomu/src/providers/active_source_provider.dart';
 import 'package:yomu/src/providers/progress_providers.dart';
 import 'package:yomu/src/providers/reader_prefs_provider.dart';
 import 'package:yomu/src/providers/reader_toc_providers.dart';
+import 'package:yomu/src/providers/reading_history_provider.dart';
+import 'package:yomu/src/providers/source_registry_provider.dart';
 import 'package:yomu/src/session/server_store.dart';
 import 'package:yomu/src/session/session_controller.dart';
 import 'package:yomu/src/widgets/reader_palette.dart';
@@ -22,6 +25,9 @@ import 'package:yomu/src/widgets/reader_settings_sheet.dart';
 import 'package:yomu/src/widgets/scoped_source_scope.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu_domain/yomu_domain.dart';
+
+import 'support/fake_library.dart';
+import 'support/fake_reader.dart';
 
 class _FixedActiveSource extends ActiveSourceController {
   _FixedActiveSource(this._source);
@@ -187,6 +193,7 @@ void main() {
                   sourceKey: scopeA,
                   child: ReaderSettingsSheet(
                     palette: ReaderPalette.of(isEink: false),
+                    sourceKey: scopeA,
                     page: 1,
                     total: 10,
                     seriesId: 'shared-series-id',
@@ -226,6 +233,122 @@ void main() {
     expect(
       prefs.forSeries('shared-series-id', serverKey: scopeB).mode,
       ReaderModeChoice.auto,
+    );
+  });
+
+  test('readingSessionsProvider 遍历 registry.sources 全局汇聚本机与全部远程源', () async {
+    final db = ProgressDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    const urlA = 'https://alpha.example.com';
+    const urlB = 'https://beta.example.com';
+    final serverA = StoredServer(
+      address: ServerAddress.parse(urlA),
+      apiKey: 'KEY-A',
+      accountEmail: 'a@example.com',
+    );
+    final serverB = StoredServer(
+      address: ServerAddress.parse(urlB),
+      apiKey: 'KEY-B',
+      accountEmail: 'b@example.com',
+    );
+
+    SourceBundle bundleOf(ContentSource source) {
+      final lib = FakeLibraryRepository();
+      return SourceBundle(
+        source: source,
+        library: lib,
+        reader: FakeReaderRepository(),
+        collections: lib,
+        readStatus: lib,
+      );
+    }
+
+    final registry = SourceRegistry(
+      localBundle: bundleOf(const LocalContentSource()),
+      remoteBundles: <String, SourceBundle>{
+        urlA: bundleOf(remoteSourceOfServer(serverA)),
+        urlB: bundleOf(remoteSourceOfServer(serverB)),
+      },
+    );
+
+    final container = ProviderContainer(
+      overrides: <Override>[
+        progressDatabaseProvider.overrideWithValue(db),
+        sourceRegistryProvider.overrideWithValue(registry),
+        activeSourceProvider.overrideWith(
+          () => _FixedActiveSource(const LocalContentSource()),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final recorder = container.read(readingSessionRecorderProvider);
+    final baseTime = DateTime.utc(2026, 11, 20, 10);
+    await recorder.record(
+      ReadingSessionDraft(
+        bookId: 'b-local',
+        seriesId: 's-local',
+        bookName: 'Local Vol. 1',
+        startedAt: baseTime,
+        endedAt: baseTime.add(const Duration(minutes: 5)),
+        startPage: 1,
+        endPage: 5,
+        completed: false,
+      ),
+      scope: kLocalSourceKey,
+    );
+    await recorder.record(
+      ReadingSessionDraft(
+        bookId: 'b-a',
+        seriesId: 's-a',
+        bookName: 'Alpha Vol. 1',
+        startedAt: baseTime.add(const Duration(minutes: 10)),
+        endedAt: baseTime.add(const Duration(minutes: 20)),
+        startPage: 1,
+        endPage: 10,
+        completed: false,
+      ),
+      scope: urlA,
+    );
+    await recorder.record(
+      ReadingSessionDraft(
+        bookId: 'b-b',
+        seriesId: 's-b',
+        bookName: 'Beta Vol. 1',
+        startedAt: baseTime.add(const Duration(minutes: 30)),
+        endedAt: baseTime.add(const Duration(minutes: 45)),
+        startPage: 1,
+        endPage: 15,
+        completed: false,
+      ),
+      scope: urlB,
+    );
+
+    final sessions = await container.read(readingSessionsProvider.future);
+    expect(sessions.map((ReadingSession s) => s.scope).toSet(), <String>{
+      kLocalSourceKey,
+      urlA,
+      urlB,
+    });
+  });
+
+  test('ReaderPrefsController 系列级写入缺失 serverKey 时显式抛 ArgumentError', () {
+    final container = ProviderContainer(
+      overrides: <Override>[
+        readerPrefsStoreProvider.overrideWithValue(InMemoryReaderPrefsStore()),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(readerPrefsProvider.notifier);
+    expect(
+      () => controller.setMode(ReaderModeChoice.double, seriesId: 's1'),
+      throwsArgumentError,
+    );
+    expect(
+      () => controller.setSeriesOverride('s1', true, serverKey: ''),
+      throwsArgumentError,
     );
   });
 }

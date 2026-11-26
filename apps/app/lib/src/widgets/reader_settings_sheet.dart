@@ -2,7 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/src/data/reader_prefs.dart';
-import 'package:yomu/src/providers/pinned_series_provider.dart';
 import 'package:yomu/src/providers/reader_prefs_provider.dart';
 import 'package:yomu/src/widgets/reader_fit_preview.dart';
 import 'package:yomu/src/widgets/reader_mode_text.dart';
@@ -19,13 +18,12 @@ import 'package:material_ui/material_ui.dart';
 Future<void> showReaderSettingsSheet(
   BuildContext context, {
   required ReaderPalette palette,
+  required String sourceKey,
   required int page,
   required int total,
   String? seriesId,
-  String? sourceKey,
   required ValueChanged<int> onJump,
 }) {
-  final resolvedSource = sourceKey ?? ScopedSourceScope.readOf(context);
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -33,7 +31,7 @@ Future<void> showReaderSettingsSheet(
     backgroundColor: Colors.transparent,
     elevation: 0,
     builder: (BuildContext context) => ScopedSourceScope(
-      sourceKey: resolvedSource,
+      sourceKey: sourceKey,
       child: FrostedSurface(
         kind: AppMaterialKind.sheet,
         material: AppMaterial.resolve(
@@ -46,10 +44,10 @@ Future<void> showReaderSettingsSheet(
           type: MaterialType.transparency,
           child: ReaderSettingsSheet(
             palette: palette,
+            sourceKey: sourceKey,
             page: page,
             total: total,
             seriesId: seriesId,
-            sourceKey: resolvedSource,
             onJump: onJump,
           ),
         ),
@@ -61,29 +59,26 @@ Future<void> showReaderSettingsSheet(
 class ReaderSettingsSheet extends ConsumerWidget {
   const ReaderSettingsSheet({
     required this.palette,
+    required this.sourceKey,
     required this.page,
     required this.total,
     required this.onJump,
     this.seriesId,
-    this.sourceKey,
     super.key,
   });
 
   final ReaderPalette palette;
+  final String sourceKey;
   final int page;
   final int total;
   final ValueChanged<int> onJump;
   final String? seriesId;
-  final String? sourceKey;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final global = ref.watch(readerPrefsProvider);
-    final serverKey =
-        sourceKey ??
-        ScopedSourceScope.maybeOf(context) ??
-        ref.watch(activeServerKeyProvider);
+    final serverKey = sourceKey;
     final controller = ref.read(readerPrefsProvider.notifier);
     final textStyle = Theme.of(context).textTheme;
     final seriesId = this.seriesId;

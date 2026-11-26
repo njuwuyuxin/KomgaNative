@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yomu_domain/yomu_domain.dart' show kLocalSourceKey;
 import 'package:yomu/src/data/reader_prefs.dart';
 import 'package:yomu/src/data/reader_prefs_store.dart';
 import 'package:yomu/src/providers/reader_prefs_provider.dart';
@@ -122,10 +123,18 @@ void main() {
   test('系列覆盖的重置只影响那个系列', () async {
     final container = await containerWith(allChanged);
     final controller = container.read(readerPrefsProvider.notifier);
-    controller.setSeriesOverride('s1', true);
-    controller.setFit(ReaderFitChoice.fitWidth, seriesId: 's1');
+    controller.setSeriesOverride('s1', true, serverKey: kLocalSourceKey);
+    controller.setFit(
+      ReaderFitChoice.fitWidth,
+      seriesId: 's1',
+      serverKey: kLocalSourceKey,
+    );
 
-    controller.resetGroup(ReaderSettingsGroup.layout, seriesId: 's1');
+    controller.resetGroup(
+      ReaderSettingsGroup.layout,
+      seriesId: 's1',
+      serverKey: kLocalSourceKey,
+    );
 
     final prefs = container.read(readerPrefsProvider);
     expect(prefs.forSeries('s1').fit, ReaderFitChoice.contain);

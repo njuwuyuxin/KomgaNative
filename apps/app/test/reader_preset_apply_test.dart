@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yomu_domain/yomu_domain.dart' show kLocalSourceKey;
 import 'package:yomu/src/data/reader_prefs.dart';
 import 'package:yomu/src/data/reader_prefs_store.dart';
 import 'package:yomu/src/providers/reader_prefs_provider.dart';
@@ -44,9 +45,13 @@ void main() {
 
   const fullPrefs = ReaderPrefs(global: fullConfig);
 
-  String savePresetAndGetId(ProviderContainer container, {String? seriesId}) {
+  String savePresetAndGetId(
+    ProviderContainer container, {
+    String? seriesId,
+    String? serverKey,
+  }) {
     final controller = container.read(readerPrefsProvider.notifier);
-    controller.savePreset('我的预设', seriesId: seriesId);
+    controller.savePreset('我的预设', seriesId: seriesId, serverKey: serverKey);
     return container.read(readerPrefsProvider).presets.last.id;
   }
 
@@ -86,24 +91,76 @@ void main() {
 
     // 在系列 s1 上构造全非默认配置并存成预设。
     controller
-      ..setSeriesOverride('s1', true)
-      ..setMode(fullConfig.mode, seriesId: 's1')
-      ..setBrightness(fullConfig.brightness, seriesId: 's1')
-      ..setKeepAwake(fullConfig.keepAwake, seriesId: 's1')
-      ..setFit(fullConfig.fit, seriesId: 's1')
-      ..setDirection(fullConfig.direction, seriesId: 's1')
-      ..setBackground(fullConfig.background, seriesId: 's1')
-      ..setLockZoom(fullConfig.lockZoom, seriesId: 's1')
-      ..setTrimBorders(fullConfig.trimBorders, seriesId: 's1')
-      ..setPageTurn(fullConfig.pageTurn, seriesId: 's1')
-      ..setTapZone(fullConfig.tapZone, seriesId: 's1')
-      ..setInvertTapZones(fullConfig.invertTapZones, seriesId: 's1')
-      ..setDoubleTapZoom(fullConfig.doubleTapZoom, seriesId: 's1')
-      ..setAutoScrollSpeed(fullConfig.autoScrollSpeed, seriesId: 's1')
-      ..setShowSessionTime(fullConfig.showSessionTime, seriesId: 's1');
+      ..setSeriesOverride('s1', true, serverKey: kLocalSourceKey)
+      ..setMode(fullConfig.mode, seriesId: 's1', serverKey: kLocalSourceKey)
+      ..setBrightness(
+        fullConfig.brightness,
+        seriesId: 's1',
+        serverKey: kLocalSourceKey,
+      )
+      ..setKeepAwake(
+        fullConfig.keepAwake,
+        seriesId: 's1',
+        serverKey: kLocalSourceKey,
+      )
+      ..setFit(fullConfig.fit, seriesId: 's1', serverKey: kLocalSourceKey)
+      ..setDirection(
+        fullConfig.direction,
+        seriesId: 's1',
+        serverKey: kLocalSourceKey,
+      )
+      ..setBackground(
+        fullConfig.background,
+        seriesId: 's1',
+        serverKey: kLocalSourceKey,
+      )
+      ..setLockZoom(
+        fullConfig.lockZoom,
+        seriesId: 's1',
+        serverKey: kLocalSourceKey,
+      )
+      ..setTrimBorders(
+        fullConfig.trimBorders,
+        seriesId: 's1',
+        serverKey: kLocalSourceKey,
+      )
+      ..setPageTurn(
+        fullConfig.pageTurn,
+        seriesId: 's1',
+        serverKey: kLocalSourceKey,
+      )
+      ..setTapZone(
+        fullConfig.tapZone,
+        seriesId: 's1',
+        serverKey: kLocalSourceKey,
+      )
+      ..setInvertTapZones(
+        fullConfig.invertTapZones,
+        seriesId: 's1',
+        serverKey: kLocalSourceKey,
+      )
+      ..setDoubleTapZoom(
+        fullConfig.doubleTapZoom,
+        seriesId: 's1',
+        serverKey: kLocalSourceKey,
+      )
+      ..setAutoScrollSpeed(
+        fullConfig.autoScrollSpeed,
+        seriesId: 's1',
+        serverKey: kLocalSourceKey,
+      )
+      ..setShowSessionTime(
+        fullConfig.showSessionTime,
+        seriesId: 's1',
+        serverKey: kLocalSourceKey,
+      );
 
-    final id = savePresetAndGetId(container, seriesId: 's1');
-    controller.applyPreset(id, seriesId: 's2');
+    final id = savePresetAndGetId(
+      container,
+      seriesId: 's1',
+      serverKey: kLocalSourceKey,
+    );
+    controller.applyPreset(id, seriesId: 's2', serverKey: kLocalSourceKey);
 
     final state = container.read(readerPrefsProvider);
     expect(state.forSeries('s1'), fullConfig);
@@ -118,22 +175,30 @@ void main() {
     );
     final controller = container.read(readerPrefsProvider.notifier);
     controller
-      ..setMode(ReaderModeChoice.double, seriesId: 's1')
-      ..setLockZoom(true, seriesId: 's1')
-      ..setTrimBorders(true, seriesId: 's1');
-    final id = savePresetAndGetId(container, seriesId: 's1');
+      ..setMode(
+        ReaderModeChoice.double,
+        seriesId: 's1',
+        serverKey: kLocalSourceKey,
+      )
+      ..setLockZoom(true, seriesId: 's1', serverKey: kLocalSourceKey)
+      ..setTrimBorders(true, seriesId: 's1', serverKey: kLocalSourceKey);
+    final id = savePresetAndGetId(
+      container,
+      seriesId: 's1',
+      serverKey: kLocalSourceKey,
+    );
 
     controller
-      ..setLockZoom(false, seriesId: 's1')
-      ..setTrimBorders(false, seriesId: 's1')
-      ..applyPreset(id, seriesId: 's1');
+      ..setLockZoom(false, seriesId: 's1', serverKey: kLocalSourceKey)
+      ..setTrimBorders(false, seriesId: 's1', serverKey: kLocalSourceKey)
+      ..applyPreset(id, seriesId: 's1', serverKey: kLocalSourceKey);
 
     var state = container.read(readerPrefsProvider);
     expect(state.forSeries('s1').lockZoom, isTrue);
     expect(state.forSeries('s1').trimBorders, isTrue);
     expect(state.forSeries('s1').mode, ReaderModeChoice.double);
 
-    controller.setSeriesOverride('s1', false);
+    controller.setSeriesOverride('s1', false, serverKey: kLocalSourceKey);
 
     state = container.read(readerPrefsProvider);
     expect(state.seriesOverrides, isEmpty);

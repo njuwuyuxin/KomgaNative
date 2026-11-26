@@ -16,6 +16,7 @@ import 'package:yomu_domain/yomu_domain.dart';
 class ReaderSessionCoordinator {
   ReaderSessionCoordinator({
     required this.bookId,
+    required String sourceKey,
     required Book? initialBook,
     required ProgressSyncService progressSync,
     required ReadingSessionRecorder recorder,
@@ -24,7 +25,8 @@ class ReaderSessionCoordinator {
     required bool Function() isShowSessionTimeEnabled,
     required VoidCallback onSessionMinutesChanged,
     Duration progressDebounce = ReaderProgressWriter.defaultDelay,
-  }) : _initialBook = initialBook,
+  }) : resolvedSourceKey = sourceKey,
+       _initialBook = initialBook,
        _progressSync = progressSync,
        _recorder = recorder,
        _committer = committer,
@@ -67,8 +69,8 @@ class ReaderSessionCoordinator {
   bool? _initialBookUnread;
   int _lastReadPage = 0;
 
-  /// 当前书所属内容源标识（供进度落盘、会话记录与退出联动复用）。
-  String? resolvedSourceKey;
+  /// 当前书所属内容源标识（非空，供进度落盘、会话记录与退出联动复用）。
+  String resolvedSourceKey;
 
   int get shownSessionMinutes => _shownSessionMinutes;
   bool get incognito => _incognito;
@@ -100,7 +102,7 @@ class ReaderSessionCoordinator {
     if (book != null) {
       _lastBook = book;
       _initialBookUnread ??= book.isUnread;
-      _progressSync.noteBook(book);
+      _progressSync.noteBook(book, scope: resolvedSourceKey);
     }
   }
 

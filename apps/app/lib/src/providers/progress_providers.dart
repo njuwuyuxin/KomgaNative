@@ -11,6 +11,7 @@ import 'package:yomu/src/data/progress/progress_store.dart';
 import 'package:yomu/src/data/progress/progress_sync_service.dart';
 import 'package:yomu/src/data/shelf_failure.dart';
 import 'package:yomu/src/providers/komga_session_provider.dart';
+import 'package:yomu/src/session/server_store.dart';
 import 'package:yomu/src/session/session_controller.dart';
 import 'package:yomu_sync/yomu_sync.dart';
 import 'package:path_provider/path_provider.dart';
@@ -53,22 +54,44 @@ final Provider<ProgressStore> progressStoreProvider = Provider<ProgressStore>(
   (Ref ref) => DriftProgressStore(ref.watch(progressDatabaseProvider)),
 );
 
-/// 进度同步服务：复用共享 [komgaSessionProvider] 连接池按服务器分区上传（ARC-07 / ARC-09）。
+/// 进度同步服务：按显式服务器分区独立上传，不再依赖单会话回退（ARC-07 / ARC-09）。
 final Provider<ProgressSyncService> progressSyncProvider =
     Provider<ProgressSyncService>((Ref ref) {
       final service = ProgressSyncService(
         store: ref.watch(progressStoreProvider),
-        activeScope: () =>
-            ref.read(komgaSessionProvider)?.address.baseUrl ?? '',
+        defaultFlushScopes: () {
+          final servers = ref.read(serverListProvider).value;
+          if (servers != null && servers.isNotEmpty) {
+            return servers.map((StoredServer s) => s.address.baseUrl);
+          }
+          final session = ref.read(sessionProvider);
+          if (session is SessionConnected) {
+            return <String>[session.server.address.baseUrl];
+          }
+          return const <String>[];
+        },
         scopedUpload: (String scope, ProgressTarget target) =>
             _uploadProgress(ref, scope, target),
       );
-      ref.listen<KomgaSession?>(komgaSessionProvider, (_, KomgaSession? next) {
-        if (next != null) {
-          service.resetAuthBlock(next.address.baseUrl);
-          unawaited(service.flush());
+      ref.listen<AsyncValue<List<StoredServer>>>(serverListProvider, (
+        _,
+        AsyncValue<List<StoredServer>> next,
+      ) {
+        final servers = next.value;
+        if (servers == null || servers.isEmpty) return;
+        for (final server in servers) {
+          service.resetAuthBlock(server.address.baseUrl);
+        }
+        unawaited(service.flush());
+      });
+      ref.listen<SessionState>(sessionProvider, (_, SessionState next) {
+        if (next is SessionConnected) {
+          final url = next.server.address.baseUrl;
+          service.resetAuthBlock(url);
+          unawaited(service.flush(scope: url));
         }
       });
+      ref.onDispose(service.dispose);
       return service;
     });
 

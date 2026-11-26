@@ -95,6 +95,7 @@ void main() {
           home: Scaffold(
             body: ReaderTopBar(
               bookId: 'local:b1',
+              sourceKey: kLocalSourceKey,
               seriesId: 's1',
               title: 'Vol 1',
               pageLabel: '2 / 5',
@@ -148,6 +149,7 @@ void main() {
         ctx,
         seriesId: 's1',
         currentBookId: 'local:b1',
+        sourceKey: kLocalSourceKey,
         palette: ReaderPalette.dark,
         direction: ReadingDirection.rightToLeft,
         currentPage: 2,

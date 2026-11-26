@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/src/data/reader_prefs.dart';
-import 'package:yomu/src/providers/pinned_series_provider.dart';
 import 'package:yomu/src/providers/reader_prefs_provider.dart';
 import 'package:yomu/src/widgets/reader_palette.dart';
 import 'package:yomu/src/widgets/reader_settings_rows.dart';
@@ -22,17 +21,16 @@ import 'package:material_ui/material_ui.dart';
 Future<void> showReaderQuickSettingsSheet(
   BuildContext context, {
   required ReaderPalette palette,
+  required String sourceKey,
   String? seriesId,
-  String? sourceKey,
 }) {
-  final resolvedSource = sourceKey ?? ScopedSourceScope.readOf(context);
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     elevation: 0,
     builder: (BuildContext context) => ScopedSourceScope(
-      sourceKey: resolvedSource,
+      sourceKey: sourceKey,
       child: FrostedSurface(
         kind: AppMaterialKind.sheet,
         material: AppMaterial.resolve(
@@ -45,8 +43,8 @@ Future<void> showReaderQuickSettingsSheet(
           type: MaterialType.transparency,
           child: ReaderQuickSettingsSheet(
             palette: palette,
+            sourceKey: sourceKey,
             seriesId: seriesId,
-            sourceKey: resolvedSource,
           ),
         ),
       ),
@@ -57,8 +55,8 @@ Future<void> showReaderQuickSettingsSheet(
 class ReaderQuickSettingsSheet extends ConsumerWidget {
   const ReaderQuickSettingsSheet({
     required this.palette,
+    required this.sourceKey,
     this.seriesId,
-    this.sourceKey,
     super.key,
   });
 
@@ -66,17 +64,14 @@ class ReaderQuickSettingsSheet extends ConsumerWidget {
 
   /// 当前书的系列：有值时这些改动只作用在这个系列（"按系列记住"开着的话）。
   final String? seriesId;
-  final String? sourceKey;
+  final String sourceKey;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final all = ref.watch(readerPrefsProvider);
-    final serverKey =
-        sourceKey ??
-        ScopedSourceScope.maybeOf(context) ??
-        ref.watch(activeServerKeyProvider);
+    final serverKey = sourceKey;
     // 与完整面板同一条规则：只有这个系列**已经**开了"按系列记住"才写覆盖，
     // 否则改动应该是全局的（否则用户会发现"改了只有这一本生效"）。
     final writeSeriesId = all.hasSeriesOverride(seriesId, serverKey: serverKey)

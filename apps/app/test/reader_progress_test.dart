@@ -48,7 +48,7 @@ void main() {
 
     // 服务端没收到，但本地队列里有第 2 页。
     expect(repository.saved, isEmpty, reason: '断网时上传必然失败');
-    final pending = await progressStore.pending();
+    final pending = await progressStore.pending(scope: kTestKomgaSourceKey);
     expect(pending, hasLength(1));
     expect(pending.single.target.page, 2);
 
@@ -57,7 +57,7 @@ void main() {
     await tapRight(tester);
     await tester.pump(const Duration(milliseconds: 700));
 
-    expect(await progressStore.pending(), isEmpty);
+    expect(await progressStore.pending(scope: kTestKomgaSourceKey), isEmpty);
     // 同书只保留最新一条：补交的是第 3 页，而不是先补 2 再补 3。
     expect(
       repository.saved.map((({int page, bool completed}) s) => s.page),
@@ -82,7 +82,7 @@ void main() {
     expect(find.text('2 / 3'), findsOneWidget);
 
     // 本地记录已经是第 2 页，重建阅读器（模拟返回列表再进来）应停在这里。
-    final record = await progressStore.record('b1');
+    final record = await progressStore.record('b1', scope: kTestKomgaSourceKey);
     expect(record!.page, 2);
   });
 
@@ -114,7 +114,10 @@ void main() {
     expect(repository.saved, <({int page, bool completed})>[
       (page: 1, completed: false),
     ]);
-    final record = await progressStore.record('b-new');
+    final record = await progressStore.record(
+      'b-new',
+      scope: kTestKomgaSourceKey,
+    );
     expect(record?.page, 1);
     expect(record?.completed, isFalse);
   });
@@ -190,7 +193,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.saved, isEmpty);
-    expect(await progressStore.record('b-incog'), isNull);
+    expect(
+      await progressStore.record('b-incog', scope: kTestKomgaSourceKey),
+      isNull,
+    );
   });
 
   testWidgets('从阅读器 pop 返回后无需下拉刷新，"正在读"自动出现刚打开的书', (WidgetTester tester) async {

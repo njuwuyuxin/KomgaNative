@@ -3,32 +3,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yomu/src/data/local/local_catalog_query_dao.dart';
 import 'package:yomu/src/data/progress/progress_database.dart';
 import 'package:yomu/src/data/reading_session_tracker.dart';
-import 'package:yomu/src/providers/pinned_series_provider.dart';
 import 'package:yomu/src/providers/progress_providers.dart';
-import 'package:yomu/src/session/session_controller.dart';
+import 'package:yomu/src/providers/source_registry_provider.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 
 export 'package:yomu/src/data/progress/progress_database.dart'
     show ReadingSession;
 
-Set<String> _readingSessionScopes({
-  required String activeScope,
-  required SessionState session,
-}) => <String>{
+Set<String> _readingSessionScopes(SourceRegistry registry) => <String>{
   kLocalSourceKey,
-  if (activeScope.isNotEmpty) activeScope,
-  if (session is SessionConnected) session.server.address.baseUrl,
+  for (final source in registry.sources)
+    if (source.sourceKey.isNotEmpty) source.sourceKey,
 };
 
-/// 最近阅读会话（汇聚本机 `'local://device'` 与当前连接服务器，不同远程服务器之间严格隔离）。
+/// 最近阅读会话（ADR 0008 全局汇总口径：遍历 [SourceRegistry.sources] 汇聚本机与全部已配置远程源）。
 final FutureProvider<List<ReadingSession>> readingSessionsProvider =
     FutureProvider<List<ReadingSession>>((Ref ref) {
-      final activeScope = ref.watch(activeServerKeyProvider);
-      final session = ref.watch(sessionProvider);
-      final scopes = _readingSessionScopes(
-        activeScope: activeScope,
-        session: session,
-      );
+      final registry = ref.watch(sourceRegistryProvider);
+      final scopes = _readingSessionScopes(registry);
       final db = ref.watch(progressDatabaseProvider);
       final sub = db.readingSessionsUpdates().listen(
         (_) => ref.invalidateSelf(),
@@ -93,10 +85,7 @@ class ReadingSessionRecorder {
 
   Future<void> clear() async {
     try {
-      final scopes = _readingSessionScopes(
-        activeScope: _ref.read(activeServerKeyProvider),
-        session: _ref.read(sessionProvider),
-      );
+      final scopes = _readingSessionScopes(_ref.read(sourceRegistryProvider));
       await _ref
           .read(progressDatabaseProvider)
           .clearReadingSessions(scopes: scopes);
@@ -106,13 +95,15 @@ class ReadingSessionRecorder {
     }
   }
 
-  Future<void> record(ReadingSessionDraft draft, {String? scope}) async {
+  Future<void> record(
+    ReadingSessionDraft draft, {
+    required String scope,
+  }) async {
     try {
-      final String targetScope = scope ?? _ref.read(activeServerKeyProvider);
       await _ref
           .read(progressDatabaseProvider)
           .addReadingSession(
-            scope: targetScope,
+            scope: scope,
             bookId: draft.bookId,
             seriesId: draft.seriesId,
             bookName: draft.bookName,

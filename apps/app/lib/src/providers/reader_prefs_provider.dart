@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yomu/src/data/reader_prefs.dart';
 import 'package:yomu/src/data/reader_prefs_store.dart';
-import 'package:yomu/src/providers/pinned_series_provider.dart';
 import 'package:yomu_platform/yomu_platform.dart';
 import 'package:yomu_reader/yomu_reader.dart'
     show ReaderImageFilter, TapZonePreset, WidePageSplitMode;
@@ -24,9 +23,15 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
 
   ReaderPrefsStore get _store => ref.read(readerPrefsStoreProvider);
 
-  String _resolveServerKey(String? serverKey) {
-    if (serverKey != null && serverKey.isNotEmpty) return serverKey;
-    return ref.read(activeServerKeyProvider);
+  String _requireServerKey(String? serverKey) {
+    if (serverKey == null || serverKey.isEmpty) {
+      throw ArgumentError.value(
+        serverKey,
+        'serverKey',
+        '系列或书籍级阅读偏好必须显式传入非空 serverKey',
+      );
+    }
+    return serverKey;
   }
 
   Future<void> _restore() async {
@@ -184,13 +189,14 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
   );
 
   /// 记住/清除某本书的双页分组起点（RDR-06 / ARC-07）；[index] 为 null 表示恢复自动。
-  void setSpreadFrom(String bookId, int? index, {String? serverKey}) => _update(
-    state.withSpreadFrom(
-      bookId,
-      index,
-      serverKey: _resolveServerKey(serverKey),
-    ),
-  );
+  void setSpreadFrom(String bookId, int? index, {required String serverKey}) =>
+      _update(
+        state.withSpreadFrom(
+          bookId,
+          index,
+          serverKey: _requireServerKey(serverKey),
+        ),
+      );
 
   /// 把某一组设置恢复默认（RDR-04）：只动这一组，其它组不受影响。
   void resetGroup(
@@ -204,8 +210,12 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
   );
 
   /// 打开/关闭"按系列记住"（UI-P3-2 / ARC-07 按服务器分区）。
-  void setSeriesOverride(String seriesId, bool enabled, {String? serverKey}) {
-    final resolvedKey = _resolveServerKey(serverKey);
+  void setSeriesOverride(
+    String seriesId,
+    bool enabled, {
+    required String serverKey,
+  }) {
+    final resolvedKey = _requireServerKey(serverKey);
     if (!enabled) {
       if (!state.hasSeriesOverride(seriesId, serverKey: resolvedKey)) return;
       _update(state.withSeriesOverride(seriesId, null, serverKey: resolvedKey));
@@ -224,20 +234,19 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
   void savePreset(String name, {String? seriesId, String? serverKey}) {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return;
+    final config = seriesId == null
+        ? state.global
+        : state.forSeries(seriesId, serverKey: _requireServerKey(serverKey));
     final preset = ReaderPreset(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       name: trimmed,
-      config: state.forSeries(
-        seriesId,
-        serverKey: _resolveServerKey(serverKey),
-      ),
+      config: config,
     );
     _update(state.copyWith(presets: <ReaderPreset>[...state.presets, preset]));
   }
 
   /// 应用一个预设：直接替换全局 [ReaderConfig] 或指定系列的覆盖。
   void applyPreset(String id, {String? seriesId, String? serverKey}) {
-    final resolvedKey = _resolveServerKey(serverKey);
     for (final preset in state.presets) {
       if (preset.id != id) continue;
       if (seriesId != null) {
@@ -245,7 +254,7 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
           state.withSeriesOverride(
             seriesId,
             preset.config,
-            serverKey: resolvedKey,
+            serverKey: _requireServerKey(serverKey),
           ),
         );
       } else {
@@ -274,7 +283,7 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
       _update(state.copyWith(global: change(state.global)));
       return;
     }
-    final resolvedKey = _resolveServerKey(serverKey);
+    final resolvedKey = _requireServerKey(serverKey);
     _update(
       state.withSeriesOverride(
         seriesId,

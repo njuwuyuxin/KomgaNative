@@ -44,7 +44,7 @@ void main() {
   group('提交', () {
     test('save 先落盘再提交，成功后队列清空', () async {
       final sync = build();
-      await sync.save('b1', page: 3, completed: false);
+      await sync.save('b1', page: 3, completed: false, scope: '');
       await sync.flush();
 
       expect(uploaded.single.page, 3);
@@ -55,7 +55,7 @@ void main() {
     test('断网：进度留在本地，联网后再 flush 补交', () async {
       networkDown = true;
       final sync = build();
-      await sync.save('b1', page: 5, completed: false);
+      await sync.save('b1', page: 5, completed: false, scope: '');
       await sync.flush();
 
       expect(await store.pending(), hasLength(1), reason: '失败不能丢');
@@ -70,8 +70,8 @@ void main() {
     test('401 之后本轮停手（不刷服务端日志），重新 save 才恢复', () async {
       authBroken = true;
       final sync = build();
-      await sync.save('b1', page: 2, completed: false);
-      await sync.save('b2', page: 4, completed: false);
+      await sync.save('b1', page: 2, completed: false, scope: '');
+      await sync.save('b2', page: 4, completed: false, scope: '');
       await sync.flush();
 
       expect(await store.pending(), hasLength(2), reason: '凭据问题不代表进度错了');
@@ -79,14 +79,14 @@ void main() {
 
       // 重新登录后再翻一页 → 恢复提交，并且把之前积压的一起推上去。
       authBroken = false;
-      await sync.save('b3', page: 1, completed: false);
+      await sync.save('b3', page: 1, completed: false, scope: '');
       await sync.flush();
       expect((await store.pending()), isEmpty);
     });
 
     test('单飞：并发 flush 不会把同一条进度提交两次', () async {
       final sync = build();
-      await sync.save('b1', page: 2, completed: false);
+      await sync.save('b1', page: 2, completed: false, scope: '');
 
       await Future.wait(<Future<void>>[
         sync.flush(),
@@ -108,10 +108,10 @@ void main() {
         },
       );
 
-      await sync.save('b1', page: 2, completed: false);
+      await sync.save('b1', page: 2, completed: false, scope: '');
       final firstFlush = sync.flush();
       // 第一轮上传尚未完成时，用户又翻到第 3 页并触发 save + flush。
-      await sync.save('b1', page: 3, completed: false);
+      await sync.save('b1', page: 3, completed: false, scope: '');
       final secondFlush = sync.flush();
 
       firstGate.complete();
@@ -127,18 +127,18 @@ void main() {
       final sync = build();
       final merged = await sync.overlay(<Book>[
         book('b1', progress: remote(3, DateTime.utc(2026, 1, 1))),
-      ]);
+      ], scope: '');
       expect(merged.single.readProgress!.page, 3);
     });
 
     test('本地有未提交进度（离线读的）→ 显示本地，不被旧的服务端覆盖', () async {
       final sync = build();
       networkDown = true;
-      await sync.save('b1', page: 6, completed: false);
+      await sync.save('b1', page: 6, completed: false, scope: '');
 
       final merged = await sync.overlay(<Book>[
         book('b1', progress: remote(2, DateTime.utc(2026, 1, 1))),
-      ]);
+      ], scope: '');
       expect(merged.single.readProgress!.page, 6, reason: '用户刚读到第 6 页');
     });
 
@@ -149,7 +149,7 @@ void main() {
 
       final merged = await sync.overlay(<Book>[
         book('b1', progress: remote(5, DateTime.utc(2026, 1, 2))),
-      ]);
+      ], scope: '');
       expect(merged.single.readProgress!.page, 5);
       expect((await store.record('b1'))!.page, 5, reason: '写回本地');
     });
@@ -160,7 +160,7 @@ void main() {
 
       final merged = await sync.overlay(<Book>[
         book('b1', progress: remote(3, DateTime.utc(2026, 1, 1))),
-      ]);
+      ], scope: '');
       expect(merged.single.readProgress!.page, 5);
     });
 
@@ -168,14 +168,14 @@ void main() {
       final sync = build();
       await store.adoptRemote('b1', remote(5, DateTime.utc(2026, 1, 5)));
 
-      final merged = await sync.overlay(<Book>[book('b1')]);
+      final merged = await sync.overlay(<Book>[book('b1')], scope: '');
       expect(merged.single.readProgress, isNull);
       expect(await store.record('b1'), isNull);
     });
 
     test('overlayOne 对 null 原样返回（书被删了）', () async {
       final sync = build();
-      expect(await sync.overlayOne(null), isNull);
+      expect(await sync.overlayOne(null, scope: ''), isNull);
     });
   });
 }

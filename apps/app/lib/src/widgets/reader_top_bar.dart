@@ -14,7 +14,6 @@ import 'package:yomu/src/widgets/reader_palette.dart';
 import 'package:yomu/src/widgets/reader_quick_settings_sheet.dart';
 import 'package:yomu/src/widgets/reader_settings_sheet.dart';
 import 'package:yomu/src/widgets/reader_toc_sheet.dart';
-import 'package:yomu/src/widgets/scoped_source_scope.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu_reader/yomu_reader.dart';
 
@@ -25,6 +24,7 @@ import 'package:yomu_reader/yomu_reader.dart';
 class ReaderTopBar extends ConsumerWidget {
   const ReaderTopBar({
     required this.bookId,
+    required this.sourceKey,
     this.seriesId,
     required this.title,
     required this.pageLabel,
@@ -43,6 +43,9 @@ class ReaderTopBar extends ConsumerWidget {
   });
 
   final String bookId;
+
+  /// 当前书所属内容源（非空，供书签、目录与设置面板透传）。
+  final String sourceKey;
 
   /// 当前书的系列 id；设置面板用它决定是否显示"按系列记住"（UI-P3-2）。
   final String? seriesId;
@@ -75,7 +78,6 @@ class ReaderTopBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sourceKey = ScopedSourceScope.maybeOf(context);
     final caps = ref.watch(sourceCapabilitiesForKeyProvider(sourceKey));
     final canSetAsCover = caps.canMutateCatalog && seriesId != null;
     final tocQuery = (sourceKey: sourceKey, bookId: bookId);
@@ -112,6 +114,7 @@ class ReaderTopBar extends ConsumerWidget {
         onOpenQuickSettings: () => showReaderQuickSettingsSheet(
           context,
           palette: palette,
+          sourceKey: sourceKey,
           seriesId: seriesId,
         ),
         onOpenPages: () => unawaited(
@@ -132,6 +135,7 @@ class ReaderTopBar extends ConsumerWidget {
                 context,
                 seriesId: seriesId,
                 currentBookId: bookId,
+                sourceKey: sourceKey,
                 palette: palette,
                 direction: direction,
                 currentPage: page,
@@ -140,6 +144,7 @@ class ReaderTopBar extends ConsumerWidget {
         onOpenSettings: () => showReaderSettingsSheet(
           context,
           palette: palette,
+          sourceKey: sourceKey,
           page: page,
           total: total,
           seriesId: seriesId,
@@ -154,7 +159,6 @@ class ReaderTopBar extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final messenger = ScaffoldMessenger.maybeOf(context);
     try {
-      final sourceKey = ScopedSourceScope.readOf(context);
       final added = await ref
           .read(bookmarkControllerProvider)
           .toggle(bookId: bookId, page: page, sourceKey: sourceKey);

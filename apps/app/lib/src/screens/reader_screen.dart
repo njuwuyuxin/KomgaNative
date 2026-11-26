@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:yomu/src/data/reader_prefs.dart';
+import 'package:yomu/src/providers/active_source_provider.dart';
 import 'package:yomu/src/providers/library_providers.dart';
-import 'package:yomu/src/providers/pinned_series_provider.dart';
 import 'package:yomu/src/providers/progress_providers.dart';
 import 'package:yomu/src/providers/reader_prefs_provider.dart';
 import 'package:yomu/src/providers/reader_providers.dart';
@@ -87,10 +87,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     isActive: () => mounted,
   );
 
-  String? get _sourceKey => _session.resolvedSourceKey;
+  String get _sourceKey => _session.resolvedSourceKey;
   ReaderBookQuery get _bookQuery =>
       (sourceKey: _sourceKey, bookId: widget.bookId);
-  String get _serverKey => _sourceKey ?? ref.read(activeServerKeyProvider);
 
   String? get _seriesId =>
       (_session.lastBook ??
@@ -101,14 +100,21 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
           ?.seriesId;
 
   ReaderConfig _effectiveConfig(ReaderPrefs prefs) =>
-      prefs.forSeries(_seriesId, serverKey: _serverKey);
+      prefs.forSeries(_seriesId, serverKey: _sourceKey);
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    final initialKey = widget.sourceKey;
+    final resolvedInitialSource = (initialKey != null && initialKey.isNotEmpty)
+        ? initialKey
+        : (widget.book?.isCloud ?? false)
+        ? widget.book!.sourceKey
+        : ref.read(activeSourceProvider).sourceKey;
     _session = ReaderSessionCoordinator(
       bookId: widget.bookId,
+      sourceKey: resolvedInitialSource,
       initialBook: widget.book,
       progressSync: ref.read(progressSyncProvider),
       recorder: ref.read(readingSessionRecorderProvider),
@@ -121,12 +127,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         if (mounted) setState(() {});
       },
     );
-    final initialKey = widget.sourceKey;
-    if (initialKey != null && initialKey.isNotEmpty) {
-      _session.resolvedSourceKey = initialKey;
-    } else if (widget.book?.isCloud ?? false) {
-      _session.resolvedSourceKey = widget.book!.sourceKey;
-    }
     _session.start(initialPage: widget.book?.readProgress?.page ?? 1);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _keyboardFocus.requestFocus();
@@ -163,7 +163,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     final allPrefs = ref.watch(readerPrefsProvider);
     final config = allPrefs.forSeries(
       book?.seriesId ?? _seriesId,
-      serverKey: _sourceKey ?? ref.watch(activeServerKeyProvider),
+      serverKey: _sourceKey,
     );
     final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     final body = PopScope(
@@ -202,9 +202,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         ),
       ),
     );
-    return _sourceKey == null
-        ? body
-        : ScopedSourceScope(sourceKey: _sourceKey, child: body);
+    return ScopedSourceScope(sourceKey: _sourceKey, child: body);
   }
 
   Widget _buildPages(
@@ -277,7 +275,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         ?.page,
     groupFrom: ref
         .read(readerPrefsProvider)
-        .spreadFromFor(widget.bookId, serverKey: _serverKey),
+        .spreadFromFor(widget.bookId, serverKey: _sourceKey),
   );
 
   ReaderLayout? _currentLayout() {

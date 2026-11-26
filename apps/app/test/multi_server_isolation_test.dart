@@ -83,17 +83,19 @@ void main() {
     expect(container.read(activeServerKeyProvider), serverA.address.baseUrl);
 
     // 1. 在服务器 A 产生未提交进度（A 当前 503）、下载记录、阅读历史、系列覆盖与分屏起点。
+    final scopeA = serverA.address.baseUrl;
+    final scopeB = serverB.address.baseUrl;
     final sync = container.read(progressSyncProvider);
-    await sync.save('b1', page: 12, completed: false);
-    await sync.flush();
+    await sync.save('b1', page: 12, completed: false, scope: scopeA);
+    await sync.flush(scope: scopeA);
     expect(
-      await userDb.pending(scope: serverA.address.baseUrl),
+      await userDb.pending(scope: scopeA),
       hasLength(1),
       reason: '服务器 A 返回 503，进度留在服务器 A 的专属队列中',
     );
 
     await cacheDb.markDownloaded(
-      scope: serverA.address.baseUrl,
+      scope: scopeA,
       bookId: 'b1',
       seriesId: 's1',
       pageCount: 20,
@@ -112,15 +114,16 @@ void main() {
             endPage: 12,
             completed: false,
           ),
+          scope: scopeA,
         );
     container.read(readerPrefsProvider.notifier)
-      ..setSeriesOverride('s1', true)
-      ..setMode(ReaderModeChoice.double, seriesId: 's1')
-      ..setSpreadFrom('b1', 3);
+      ..setSeriesOverride('s1', true, serverKey: scopeA)
+      ..setMode(ReaderModeChoice.double, seriesId: 's1', serverKey: scopeA)
+      ..setSpreadFrom('b1', 3, serverKey: scopeA);
 
-    // 2. 切换到服务器 B：验证完全隔离。
+    // 2. 切换到服务器 B：验证进度/下载/阅读偏好隔离，同时阅读历史按 ADR 0008 全局汇聚但携带显式 scope 分区。
     await container.read(sessionProvider.notifier).switchTo(serverB);
-    await sync.flush();
+    await sync.flush(scope: scopeB);
 
     expect(
       serverBRequests,
@@ -129,7 +132,9 @@ void main() {
     );
     expect(await container.read(downloadedBooksProvider.future), isEmpty);
     expect((await container.read(downloadsUsageProvider.future)).entries, 0);
-    expect(await container.read(readingSessionsProvider.future), isEmpty);
+    final globalSessions = await container.read(readingSessionsProvider.future);
+    expect(globalSessions, hasLength(1));
+    expect(globalSessions.single.scope, scopeA);
 
     final prefsOnB = container.read(readerPrefsProvider);
     final keyB = container.read(activeServerKeyProvider);
@@ -143,10 +148,10 @@ void main() {
     serverAOnline = true;
     serverARequests.clear();
     await container.read(sessionProvider.notifier).switchTo(serverA);
-    await sync.flush();
+    await sync.flush(scope: scopeA);
 
     expect(serverARequests, <String>['PATCH /api/v1/books/b1/read-progress']);
-    expect(await userDb.pending(scope: serverA.address.baseUrl), isEmpty);
+    expect(await userDb.pending(scope: scopeA), isEmpty);
 
     final downloadsOnA = await container.read(downloadedBooksProvider.future);
     expect(downloadsOnA.map((DownloadedBookRecord d) => d.bookId), <String>[

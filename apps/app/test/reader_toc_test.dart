@@ -69,6 +69,7 @@ void main() {
         context,
         seriesId: 's1',
         currentBookId: currentBookId,
+        sourceKey: kTestKomgaSourceKey,
         palette: ReaderPalette.dark,
         direction: ReadingDirection.rightToLeft,
       ),

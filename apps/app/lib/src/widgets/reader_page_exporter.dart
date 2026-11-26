@@ -109,7 +109,7 @@ class ReaderPageExporter {
     required String bookId,
     required int page,
     required int total,
-    required String? serverKey,
+    required String serverKey,
     required int? currentSpreadFrom,
     required ReaderPrefsController prefsController,
     required AppLocalizations l10n,
@@ -132,7 +132,7 @@ class ReaderPageExporter {
     BuildContext context, {
     required Book next,
     required ReadingDirection direction,
-    required String? sourceKey,
+    required String sourceKey,
     void Function(Book next)? overrideHandler,
   }) {
     if (overrideHandler != null) {
@@ -141,11 +141,7 @@ class ReaderPageExporter {
     }
     context.pushReplacement(
       '/reader/${next.id}',
-      extra: ReaderArgs(
-        book: next,
-        direction: direction,
-        sourceKey: sourceKey ?? next.sourceKey,
-      ),
+      extra: ReaderArgs(book: next, direction: direction, sourceKey: sourceKey),
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yomu_domain/yomu_domain.dart' show kLocalSourceKey;
 import 'package:yomu/src/data/reader_prefs.dart';
 import 'package:yomu/src/data/reader_prefs_store.dart';
 import 'package:yomu/src/providers/reader_prefs_provider.dart';
@@ -83,7 +84,9 @@ void main() {
       container.read(readerPrefsProvider);
       await Future<void>.delayed(Duration.zero);
 
-      container.read(readerPrefsProvider.notifier).setSpreadFrom('b1', 2);
+      container
+          .read(readerPrefsProvider.notifier)
+          .setSpreadFrom('b1', 2, serverKey: kLocalSourceKey);
       await Future<void>.delayed(Duration.zero);
 
       expect(store.prefs?.spreadFrom['b1'], 2);

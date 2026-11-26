@@ -294,7 +294,7 @@ class KomgaLibraryRepository implements LibraryRepository {
 Future<PageResult<Book>> overlayBooksPage(
   ProgressSyncService sync,
   PageResult<Book> result, {
-  String? scope,
+  required String scope,
 }) async => PageResult<Book>(
   items: await sync.overlay(result.items, scope: scope),
   totalElements: result.totalElements,

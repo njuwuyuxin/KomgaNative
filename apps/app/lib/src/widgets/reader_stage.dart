@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/src/data/reader_prefs.dart';
-import 'package:yomu/src/providers/pinned_series_provider.dart';
 import 'package:yomu/src/providers/reader_prefs_provider.dart';
 import 'package:yomu/src/providers/reader_providers.dart';
 import 'package:yomu/src/providers/source_scoped_providers.dart';
@@ -49,7 +48,7 @@ class ReaderStage extends ConsumerWidget {
 
   final String bookId;
   final Book? book;
-  final String? sourceKey;
+  final String sourceKey;
   final bool isEink;
   final List<PageInfo> pages;
   final ReaderConfig config;
@@ -111,15 +110,14 @@ class ReaderStage extends ConsumerWidget {
     }
 
     void groupFromPage(int targetPage) {
-      final serverKey = sourceKey ?? ref.read(activeServerKeyProvider);
       final result = exporter.toggleGroupFrom(
         bookId: bookId,
         page: targetPage,
         total: total,
-        serverKey: serverKey,
+        serverKey: sourceKey,
         currentSpreadFrom: ref
             .read(readerPrefsProvider)
-            .spreadFromFor(bookId, serverKey: serverKey),
+            .spreadFromFor(bookId, serverKey: sourceKey),
         prefsController: ref.read(readerPrefsProvider.notifier),
         l10n: AppLocalizations.of(context),
       );
@@ -184,6 +182,7 @@ class ReaderStage extends ConsumerWidget {
                 : null,
             topBar: ReaderTopBar(
               bookId: bookId,
+              sourceKey: sourceKey,
               seriesId: book?.seriesId,
               title: book?.name ?? l10n.readerBookFallback,
               pageLabel: pageLabel,

@@ -78,7 +78,6 @@ void main() {
       var remoteUploads = 0;
       final sync = ProgressSyncService(
         store: DriftProgressStore(db),
-        activeScope: () => kLocalSourceKey,
         scopedUpload: (String scope, ProgressTarget target) async {
           remoteUploads++;
         },

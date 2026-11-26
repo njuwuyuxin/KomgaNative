@@ -47,26 +47,20 @@ class ReaderProgressCommitter {
     required Future<bool> Function() flushProgress,
     required String bookId,
     String? seriesId,
-    String? sourceKey,
+    required String sourceKey,
     Book? completedBook,
   }) async {
     final wrote = await flushProgress();
     if (!wrote || _disposed) return;
 
     if (completedBook != null) {
-      await _maybeAutoDeleteCompleted(completedBook);
+      await _maybeAutoDeleteCompleted(completedBook, sourceKey: sourceKey);
       if (_disposed) return;
     }
 
     final sync = _ref.read(progressSyncProvider);
     // 第一阶段：本地 Outbox 已写入，立即刷新支持本地叠加的列表与继续阅读。
-    if (sourceKey != null) {
-      _ref.invalidate(
-        readerBookProvider((sourceKey: sourceKey, bookId: bookId)),
-      );
-    } else {
-      _ref.invalidate(readerBookProvider);
-    }
+    _ref.invalidate(readerBookProvider((sourceKey: sourceKey, bookId: bookId)));
     invalidateAfterReadStatusChange(
       _ref,
       seriesId: seriesId,
@@ -76,7 +70,7 @@ class ReaderProgressCommitter {
     // 第二阶段：等服务端 PATCH 完成后，再刷一次依赖服务端聚合计数的系列详情与书架。
     await sync.flush(scope: sourceKey);
     if (_disposed) return;
-    if (seriesId != null && sourceKey != null) {
+    if (seriesId != null) {
       _ref.invalidate(
         seriesDetailProvider((sourceKey: sourceKey, seriesId: seriesId)),
       );
@@ -90,13 +84,21 @@ class ReaderProgressCommitter {
   }
 
   /// 自然读完最后一页退出时按"读完自动删除"策略清理已下载副本。
-  Future<void> _maybeAutoDeleteCompleted(Book book) async {
+  Future<void> _maybeAutoDeleteCompleted(
+    Book book, {
+    required String sourceKey,
+  }) async {
     try {
       final policy = _ref.read(downloadPolicyProvider).value;
       if (policy == null || !policy.autoDeleteRead) return;
-      final record = await _ref.read(downloadedProvider(book.id).future);
+      final record = await _ref.read(
+        downloadedForSourceProvider((sourceKey: sourceKey, bookId: book.id))
+            .future,
+      );
       if (record == null || _disposed) return;
-      await _ref.read(downloadsProvider.notifier).delete(book);
+      await _ref
+          .read(downloadsProvider.notifier)
+          .delete(book.withSource(sourceKey));
     } on Object catch (error) {
       // 自动清理属于增强行为，失败不影响进度结算。
       debugPrint(

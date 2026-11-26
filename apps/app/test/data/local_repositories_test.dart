@@ -13,7 +13,6 @@ import 'package:yomu/src/data/progress/progress_database.dart';
 import 'package:yomu/src/data/progress/progress_store.dart';
 import 'package:yomu/src/data/progress/progress_sync_service.dart';
 import 'package:yomu/src/data/shelf_failure.dart';
-import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu_local_archive/yomu_local_archive.dart';
 import 'package:yomu_sync/yomu_sync.dart';
 
@@ -94,7 +93,6 @@ void main() {
       storage = LocalComicsStorage(rootResolver: () async => tempDir);
       sync = ProgressSyncService(
         store: DriftProgressStore(db),
-        activeScope: () => kLocalSourceKey,
         scopedUpload: (String s, ProgressTarget t) async {
           fail('本地源不应发起远程上传');
         },

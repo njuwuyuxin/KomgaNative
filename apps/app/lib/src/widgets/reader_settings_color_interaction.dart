@@ -16,7 +16,7 @@ class ReaderSettingsColorInteraction extends StatelessWidget {
     required this.palette,
     required this.controller,
     required this.writeSeriesId,
-    this.serverKey,
+    required this.serverKey,
     super.key,
   });
 
@@ -24,7 +24,7 @@ class ReaderSettingsColorInteraction extends StatelessWidget {
   final ReaderPalette palette;
   final ReaderPrefsController controller;
   final String? writeSeriesId;
-  final String? serverKey;
+  final String serverKey;
 
   @override
   Widget build(BuildContext context) {
