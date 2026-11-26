@@ -2,17 +2,30 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:drift/drift.dart';
-import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/data/local/local_tables.dart';
 import 'package:yomu/src/data/progress/user_tables.dart';
+import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu_sync/yomu_sync.dart';
 
+export 'package:yomu/src/data/local/local_tables.dart';
 export 'package:yomu/src/data/progress/user_tables.dart';
 
 part 'progress_database.g.dart';
 part 'progress_user_dao.dart';
 
-/// 用户本地资产数据库（`komga_native.sqlite`）：阅读进度、系列置顶与阅读会话统计。
-@DriftDatabase(tables: <Type>[LocalProgress, PinnedSeriesRows, ReadingSessions])
+/// 用户本地资产数据库（`komga_native.sqlite`）：阅读进度、置顶、阅读会话与本机漫画目录。
+@DriftDatabase(
+  tables: <Type>[
+    LocalProgress,
+    PinnedSeriesRows,
+    ReadingSessions,
+    LocalSeriesRows,
+    LocalBooksRows,
+    LocalPagesRows,
+    LocalCollectionsRows,
+    LocalReadListsRows,
+  ],
+)
 class ProgressDatabase extends _$ProgressDatabase {
   ProgressDatabase(
     super.executor, {
@@ -24,7 +37,7 @@ class ProgressDatabase extends _$ProgressDatabase {
   final FutureOr<String> Function()? defaultLegacyScope;
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -48,6 +61,13 @@ class ProgressDatabase extends _$ProgressDatabase {
             "UPDATE reading_sessions SET scope = '$escaped' WHERE scope = ''",
           );
         }
+      }
+      if (from < 4) {
+        await m.createTable(localSeriesRows);
+        await m.createTable(localBooksRows);
+        await m.createTable(localPagesRows);
+        await m.createTable(localCollectionsRows);
+        await m.createTable(localReadListsRows);
       }
     },
     beforeOpen: (OpeningDetails details) async {

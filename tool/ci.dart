@@ -150,6 +150,7 @@ Future<int> _codegenDrift() async {
   const driftGroups = <({List<String> sources, String generated})>[
     (
       sources: <String>[
+        'apps/app/lib/src/data/local/local_tables.dart',
         'apps/app/lib/src/data/progress/progress_database.dart',
         'apps/app/lib/src/data/progress/progress_user_dao.dart',
         'apps/app/lib/src/data/progress/user_tables.dart',

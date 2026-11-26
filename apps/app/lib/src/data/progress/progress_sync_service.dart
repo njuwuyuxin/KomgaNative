@@ -54,21 +54,39 @@ class ProgressSyncService {
   }
 
   /// 用户显式改了阅读状态（标记已读/未读）后调用：本地那份 pending 已过期。
-  Future<void> forceAdopt(String bookId, ReadProgress? remote) =>
-      _store.forceAdopt(bookId, remote, scope: _activeScope());
+  Future<void> forceAdopt(
+    String bookId,
+    ReadProgress? remote, {
+    String? scope,
+  }) => _store.forceAdopt(bookId, remote, scope: scope ?? _activeScope());
 
-  /// 记一页进度：先落入当前服务器分区，再尽力提交（不阻塞调用方）。
+  /// 记一页进度：
+  /// - 本机书籍（`scope == kLocalSourceKey`）直接落盘（`pendingSeq = null`），不入远程队列；
+  /// - 远程服务器书籍先落入对应服务器分区，再尽力提交（不阻塞调用方）。
   Future<void> save(
     String bookId, {
     required int page,
     required bool completed,
+    String? scope,
   }) async {
-    final scope = _activeScope();
+    final effectiveScope = scope ?? _activeScope();
+    if (effectiveScope == kLocalSourceKey) {
+      await _store.forceAdopt(
+        bookId,
+        ReadProgress(
+          page: page,
+          completed: completed,
+          lastModified: DateTime.now().toUtc(),
+        ),
+        scope: kLocalSourceKey,
+      );
+      return;
+    }
     await _store.enqueue(
       ProgressTarget(bookId: bookId, page: page, completed: completed),
-      scope: scope,
+      scope: effectiveScope,
     );
-    _authBlockedScopes.remove(scope);
+    _authBlockedScopes.remove(effectiveScope);
     unawaited(flush());
   }
 
@@ -109,7 +127,7 @@ class ProgressSyncService {
 
   Future<void> _flushLoop() async {
     final scope = _activeScope();
-    if (_authBlockedScopes.contains(scope)) return;
+    if (scope == kLocalSourceKey || _authBlockedScopes.contains(scope)) return;
     for (final item in await _store.pending(scope: scope)) {
       // 若冲洗中途用户切换了服务器，立即停手，绝不把旧服条目发给新服。
       if (_activeScope() != scope) return;

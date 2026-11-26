@@ -24,6 +24,8 @@ dependencies:
     path: ../../packages/yomu_design_system
   yomu_domain:
     path: ../../packages/yomu_domain
+  yomu_local_archive:
+    path: ../../packages/yomu_local_archive
   yomu_platform:
     path: ../../packages/yomu_platform
   yomu_reader:
