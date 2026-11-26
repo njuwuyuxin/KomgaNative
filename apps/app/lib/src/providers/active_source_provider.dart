@@ -146,18 +146,6 @@ class ActiveSourceController extends Notifier<ContentSource> {
       state = bundle.source;
     }
     await _persistSourceKey(sourceKey);
-
-    final currentSession = ref.read(sessionProvider);
-    if (currentSession is! SessionConnected ||
-        currentSession.server.id != sourceKey) {
-      final servers = await ref.read(serverStoreProvider).all();
-      for (final s in servers) {
-        if (s.id == sourceKey) {
-          await ref.read(sessionProvider.notifier).switchTo(s);
-          break;
-        }
-      }
-    }
   }
 
   Future<void> _persistSourceKey(String key) {

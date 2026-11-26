@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_api/komga_api.dart';
 import 'package:yomu/src/data/collections_repository.dart';
+import 'package:yomu/src/data/download/download_service.dart';
 import 'package:yomu/src/data/library_repository.dart';
 import 'package:yomu/src/data/local/local_collections_repository.dart';
 import 'package:yomu/src/data/local/local_comics_storage.dart';
@@ -28,6 +29,7 @@ final class SourceBundle {
     required this.reader,
     required this.collections,
     required this.readStatus,
+    this.download = const NoopDownloadService(),
   });
 
   final ContentSource source;
@@ -35,6 +37,7 @@ final class SourceBundle {
   final ReaderRepository reader;
   final CollectionsRepository collections;
   final ReadStatusRepository readStatus;
+  final DownloadService download;
 }
 
 /// 多源插件注册表：按 `sourceKey` 寻址对应的 [SourceBundle]。
@@ -51,6 +54,8 @@ final class SourceRegistry {
     localBundle.source,
     for (final bundle in _remoteBundles.values) bundle.source,
   ];
+
+  Iterable<SourceBundle> get remoteBundles => _remoteBundles.values;
 
   bool get hasRemoteSources => _remoteBundles.isNotEmpty;
 
@@ -119,6 +124,7 @@ final Provider<SourceRegistry> sourceRegistryProvider =
       final savedServers =
           ref.watch(serverListProvider).value ?? const <StoredServer>[];
       final cache = ref.watch(httpCacheProvider);
+      final cacheDb = ref.watch(httpCacheDatabaseProvider);
       final sync = ref.watch(progressSyncProvider);
 
       final serversById = <String, StoredServer>{
@@ -150,6 +156,7 @@ final Provider<SourceRegistry> sourceRegistryProvider =
           reader: KomgaReaderRepository(session, sync),
           collections: KomgaCollectionsRepository(session, sync),
           readStatus: KomgaReadStatusRepository(session, sync),
+          download: KomgaDownloadService.forSession(session, cacheDb),
         );
       }
 

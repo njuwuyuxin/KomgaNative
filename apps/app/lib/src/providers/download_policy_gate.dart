@@ -17,7 +17,11 @@ Future<void> maybeDeleteReadDownload(WidgetRef ref, Book book) async {
   try {
     final policy = ref.read(downloadPolicyProvider).value;
     if (policy == null || !policy.autoDeleteRead) return;
-    final record = await ref.read(downloadedProvider(book.id).future);
+    final sourceKey = book.isCloud ? book.sourceKey : null;
+    final record = await ref.read(
+      downloadedForSourceProvider((sourceKey: sourceKey, bookId: book.id))
+          .future,
+    );
     if (record == null) return;
     await ref.read(downloadsProvider.notifier).delete(book);
   } on Object {

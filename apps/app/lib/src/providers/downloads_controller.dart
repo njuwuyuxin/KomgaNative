@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/src/data/cache/http_cache_database.dart';
+import 'package:yomu/src/data/download/download_queue_persistence.dart';
 import 'package:yomu/src/data/download/download_service.dart';
 import 'package:yomu/src/data/shelf_failure.dart';
 import 'package:yomu/src/providers/cache_providers.dart';
@@ -104,32 +105,40 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
     return const <String, DownloadStatus>{};
   }
 
-  DownloadService get _service => ref.read(downloadServiceProvider);
-  HttpCacheDatabase get _db => ref.read(httpCacheDatabaseProvider);
+  DownloadService _serviceFor(String scope) =>
+      ref.read(downloadServiceForSourceProvider(scope.isEmpty ? null : scope));
 
-  void _persist(Future<void> work) {
-    unawaited(work.catchError((Object _) {}));
+  String _scopeForBook(Book book) => book.isCloud ? book.sourceKey : _scope;
+
+  String _scopeForId(String bookId) {
+    final known = _knownBooks[bookId];
+    return known != null ? _scopeForBook(known) : _scope;
   }
+
+  void _invalidateDownloaded(String bookId, String scope) {
+    ref.invalidate(downloadedProvider(bookId));
+    ref.invalidate(
+      downloadedForSourceProvider((
+        sourceKey: scope.isEmpty ? null : scope,
+        bookId: bookId,
+      )),
+    );
+  }
+
+  HttpCacheDatabase get _db => ref.read(httpCacheDatabaseProvider);
+  DownloadQueuePersistence get _queueStore => DownloadQueuePersistence(_db);
 
   Future<void> _restore(List<DownloadQueueEntry> entries) async {
     if (_restored || _disposed) return;
     _restored = true;
-
     for (final entry in entries) {
       if (_disposed) return;
       if (_running.contains(entry.bookId) ||
-          _queue.any((Book queued) => queued.id == entry.bookId)) {
+          _queue.any((Book q) => q.id == entry.bookId)) {
         continue;
       }
-      var alreadyDownloaded = false;
-      try {
-        alreadyDownloaded =
-            await _db.download(entry.bookId, scope: _scope) != null;
-      } on Object {
-        // 查不了按未下完恢复。
-      }
-      if (alreadyDownloaded) {
-        _persist(_db.dequeueDownload(entry.bookId, scope: _scope));
+      if (await _queueStore.isDownloaded(entry.bookId, scope: _scope)) {
+        _queueStore.dequeue(entry.bookId, scope: _scope);
         continue;
       }
       final book = Book(
@@ -165,8 +174,9 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
     var queued = 0;
     var skipped = 0;
     for (final book in books) {
+      final scope = _scopeForBook(book);
       final already =
-          await _service.downloaded(book.id) != null ||
+          await _serviceFor(scope).downloaded(book.id) != null ||
           _isActiveOrQueued(book.id);
       if (already) {
         skipped++;
@@ -185,21 +195,13 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
       _queue.any((Book q) => q.id == bookId);
 
   void _enqueueAndPersist(Book book) {
+    final scope = _scopeForBook(book);
     _knownBooks[book.id] = book;
     _queue.add(book);
     if (state[book.id] == null) {
       _set(book.id, const DownloadStatus(queued: true));
     }
-    _persist(
-      _db.enqueueDownload(
-        scope: _scope,
-        bookId: book.id,
-        seriesId: book.seriesId,
-        name: book.name,
-        number: book.number,
-        pagesCount: book.pagesCount,
-      ),
-    );
+    _queueStore.enqueue(book, scope: scope);
   }
 
   void cancelMany(Iterable<String> bookIds) {
@@ -239,30 +241,19 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
     }
   }
 
-  void _persistActive(String scope, String bookId, int done, int total) =>
-      _persist(
-        _db.updateQueueEntry(
-          scope: scope,
-          bookId: bookId,
-          state: 'active',
-          done: done,
-          total: total,
-        ),
-      );
-
   Future<void> _runOne(Book book) async {
-    final scope = _scope;
+    final scope = _scopeForBook(book);
     _set(
       book.id,
       const DownloadStatus(progress: DownloadProgress(done: 0, total: 0)),
     );
-    _persistActive(scope, book.id, 0, 0);
+    _queueStore.markActive(scope, book.id, 0, 0);
     try {
-      await _service.download(
+      await _serviceFor(scope).download(
         book,
         onProgress: (DownloadProgress progress) {
           _set(book.id, DownloadStatus(progress: progress));
-          _persistActive(scope, book.id, progress.done, progress.total);
+          _queueStore.markActive(scope, book.id, progress.done, progress.total);
         },
       );
     } on ShelfFailure catch (failure) {
@@ -270,8 +261,8 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
     } finally {
       _running.remove(book.id);
       if (!_disposed) {
-        _persist(_db.dequeueDownload(book.id, scope: scope));
-        ref.invalidate(downloadedProvider(book.id));
+        _queueStore.dequeue(book.id, scope: scope);
+        _invalidateDownloaded(book.id, scope);
       }
     }
     if (_disposed) return;
@@ -280,20 +271,21 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
   }
 
   void cancel(String bookId) {
+    final scope = _scopeForId(bookId);
     _queue.removeWhere((Book book) => book.id == bookId);
-    _service.cancel(bookId);
-    _persist(_db.dequeueDownload(bookId, scope: _scope));
+    _serviceFor(scope).cancel(bookId);
+    _queueStore.dequeue(bookId, scope: scope);
     _clear(bookId);
-    if (!_disposed) ref.invalidate(downloadedProvider(bookId));
+    if (!_disposed) _invalidateDownloaded(bookId, scope);
   }
 
   void cancelAll() {
     final pending = <String>{..._queue.map((Book b) => b.id), ..._running};
     _queue.clear();
     for (final id in pending) {
-      _service.cancel(id);
+      _serviceFor(_scopeForId(id)).cancel(id);
     }
-    _persist(_db.clearDownloadQueue(scope: _scope));
+    _queueStore.clear(scope: _scope);
     if (_disposed) return;
     state = <String, DownloadStatus>{
       for (final entry in state.entries)
@@ -302,10 +294,11 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
   }
 
   Future<void> delete(Book book) async {
-    await _service.delete(book);
-    _persist(_db.dequeueDownload(book.id, scope: _scope));
+    final scope = _scopeForBook(book);
+    await _serviceFor(scope).delete(book);
+    _queueStore.dequeue(book.id, scope: scope);
     _clear(book.id);
-    if (!_disposed) ref.invalidate(downloadedProvider(book.id));
+    if (!_disposed) _invalidateDownloaded(book.id, scope);
   }
 
   void dismiss(String bookId) => _clear(bookId);

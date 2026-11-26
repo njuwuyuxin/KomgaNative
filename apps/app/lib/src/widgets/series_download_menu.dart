@@ -6,6 +6,7 @@ import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/src/providers/download_policy_gate.dart';
 import 'package:yomu/src/providers/download_providers.dart';
+import 'package:yomu/src/widgets/scoped_source_scope.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 系列页的"下载"菜单（SER-03）：全部 / 未读前 N 本。
@@ -92,10 +93,14 @@ class SeriesDownloadMenu extends ConsumerWidget {
       return;
     }
 
-    final ids = <String>[for (final book in targets) book.id];
+    final scopedSourceKey = ScopedSourceScope.readOf(context);
+    final scopedTargets = scopedSourceKey != null
+        ? <Book>[for (final b in targets) b.withSource(scopedSourceKey)]
+        : targets;
+    final ids = <String>[for (final book in scopedTargets) book.id];
     final result = await ref
         .read(downloadsProvider.notifier)
-        .startMany(targets);
+        .startMany(scopedTargets);
     messenger.showSnackBar(
       SnackBar(
         content: Text(

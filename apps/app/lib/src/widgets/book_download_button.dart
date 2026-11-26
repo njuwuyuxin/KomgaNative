@@ -7,6 +7,7 @@ import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/src/l10n/failure_text.dart';
 import 'package:yomu/src/providers/download_policy_gate.dart';
 import 'package:yomu/src/providers/download_providers.dart';
+import 'package:yomu/src/widgets/scoped_source_scope.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 一本书的下载按钮：未下载 / 下载中（可取消）/ 已下载（可删除）。
@@ -21,8 +22,15 @@ class BookDownloadButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final scopedSourceKey = ScopedSourceScope.maybeOf(context);
+    final sourceKey = scopedSourceKey ?? (book.isCloud ? book.sourceKey : null);
+    final scopedBook = sourceKey != null ? book.withSource(sourceKey) : book;
     final status = ref.watch(downloadsProvider)[book.id];
-    final downloaded = ref.watch(downloadedProvider(book.id)).value;
+    final downloaded = ref
+        .watch(
+          downloadedForSourceProvider((sourceKey: sourceKey, bookId: book.id)),
+        )
+        .value;
     final controller = ref.read(downloadsProvider.notifier);
 
     if (status?.isRunning ?? false) {
@@ -49,7 +57,7 @@ class BookDownloadButton extends ConsumerWidget {
         tooltip: l10n.downloadRetryTooltip(l10n.failureTitle(errorKind)),
         onPressed: () {
           controller.dismiss(book.id);
-          unawaited(controller.start(book));
+          unawaited(controller.start(scopedBook));
         },
         icon: Icon(Icons.error_outline, color: theme.colorScheme.error),
       );
@@ -59,7 +67,7 @@ class BookDownloadButton extends ConsumerWidget {
       return IconButton(
         key: Key('book-download-${book.id}'),
         tooltip: l10n.downloadedTapToRemove,
-        onPressed: () => _confirmDelete(context, controller),
+        onPressed: () => _confirmDelete(context, controller, scopedBook),
         icon: Icon(Icons.download_done, color: theme.colorScheme.primary),
       );
     }
@@ -67,7 +75,8 @@ class BookDownloadButton extends ConsumerWidget {
     return IconButton(
       key: Key('book-download-${book.id}'),
       tooltip: l10n.downloadForOffline,
-      onPressed: () => unawaited(_start(ref, context, l10n, controller, book)),
+      onPressed: () =>
+          unawaited(_start(ref, context, l10n, controller, scopedBook)),
       icon: const Icon(Icons.download_outlined),
     );
   }
@@ -93,6 +102,7 @@ class BookDownloadButton extends ConsumerWidget {
   Future<void> _confirmDelete(
     BuildContext context,
     DownloadsController controller,
+    Book targetBook,
   ) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -114,6 +124,6 @@ class BookDownloadButton extends ConsumerWidget {
         );
       },
     );
-    if (confirmed ?? false) await controller.delete(book);
+    if (confirmed ?? false) await controller.delete(targetBook);
   }
 }

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:komga_api/komga_api.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/src/data/cache/http_cache_database.dart';
+import 'package:yomu/src/data/shelf_failure.dart';
 
 /// 整本下载的进度（0 基已完成页数）。
 class DownloadProgress {
@@ -131,4 +132,54 @@ class KomgaDownloadService implements DownloadService {
     await db.removeDownload(book.id, scope: scope);
     await db.deleteCachedPages(scope: scope, bookId: book.id);
   }
+
+  /// 基于指定 [KomgaSession] 构造带分区隔离的下载服务。
+  factory KomgaDownloadService.forSession(
+    KomgaSession session,
+    HttpCacheDatabase db,
+  ) => KomgaDownloadService(
+    pages: (String bookId) async {
+      try {
+        return await session.fetchBookPages(bookId);
+      } on KomgaError catch (error) {
+        throw shelfFailureOf(error);
+      }
+    },
+    pageImage: (String bookId, int page) async {
+      try {
+        return await session.fetchPageImage(bookId, page);
+      } on KomgaError catch (error) {
+        throw shelfFailureOf(error);
+      }
+    },
+    bookMeta: (String bookId) async {
+      try {
+        await session.fetchBook(bookId);
+      } on KomgaError {
+        // 元信息预热失败不阻断页图下载。
+      }
+    },
+    db: db,
+    scope: session.address.baseUrl,
+  );
+}
+
+/// 不支持离线下载的内容源（如本机书库或未连接远程源）的空实现。
+class NoopDownloadService implements DownloadService {
+  const NoopDownloadService();
+
+  @override
+  Future<DownloadedBook?> downloaded(String bookId) async => null;
+
+  @override
+  Future<bool> download(
+    Book book, {
+    required void Function(DownloadProgress progress) onProgress,
+  }) async => false;
+
+  @override
+  void cancel(String bookId) {}
+
+  @override
+  Future<void> delete(Book book) async {}
 }

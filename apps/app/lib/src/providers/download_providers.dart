@@ -1,18 +1,20 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:komga_api/komga_api.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/src/data/cache/http_cache_database.dart';
 import 'package:yomu/src/data/download/download_service.dart';
-import 'package:yomu/src/data/shelf_failure.dart';
+import 'package:yomu/src/providers/active_source_provider.dart';
 import 'package:yomu/src/providers/cache_providers.dart';
 import 'package:yomu/src/providers/downloads_controller.dart';
-import 'package:yomu/src/providers/komga_session_provider.dart';
 import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/settings_provider.dart';
+import 'package:yomu/src/providers/source_registry_provider.dart';
 import 'package:yomu/src/session/session_controller.dart';
 import 'package:yomu_platform/yomu_platform.dart';
 
 export 'package:yomu/src/providers/downloads_controller.dart';
+
+/// 按源查询单本已下载记录的键。
+typedef ScopedDownloadQuery = ({String? sourceKey, String bookId});
 
 /// 当前生效的下载策略（DLD-01）：仅 Wi-Fi、读完自动删除、并发数。
 typedef DownloadPolicy = ({
@@ -36,43 +38,44 @@ final Provider<NetworkProbe> networkProbeProvider = Provider<NetworkProbe>(
   (Ref ref) => const SystemNetworkProbe(),
 );
 
-/// 下载服务：已连接 Komga 时复用共享连接池，未连接服务器时返回空实现而不抛异常。
-final Provider<DownloadService> downloadServiceProvider =
-    Provider<DownloadService>((Ref ref) {
-      final komga = ref.watch(komgaSessionProvider);
-      if (komga == null) return const _NoopDownloadService();
-      return KomgaDownloadService(
-        pages: (String bookId) async {
-          try {
-            return await komga.fetchBookPages(bookId);
-          } on KomgaError catch (error) {
-            throw shelfFailureOf(error);
-          }
-        },
-        pageImage: (String bookId, int page) async {
-          try {
-            return await komga.fetchPageImage(bookId, page);
-          } on KomgaError catch (error) {
-            throw shelfFailureOf(error);
-          }
-        },
-        bookMeta: (String bookId) async {
-          try {
-            await komga.fetchBook(bookId);
-          } on KomgaError {
-            // 元信息预热失败不阻断页图下载。
-          }
-        },
-        db: ref.watch(httpCacheDatabaseProvider),
-        scope: komga.address.baseUrl,
-      );
-    });
-
-/// 远程离线下载专属的服务器分区键（即使当前书架切到了本机源，仍展示已连接服务器的离线下载）。
+/// 远程离线下载的默认服务器分区键：优先跟随当前激活远程源，其次回退当前已连接会话。
 final Provider<String> downloadScopeProvider = Provider<String>((Ref ref) {
+  final active = ref.watch(activeSourceProvider);
+  if (active.isCloud) return active.sourceKey;
   final session = ref.watch(sessionProvider);
   return session is SessionConnected ? session.server.address.baseUrl : '';
 });
+
+/// 默认下载服务：从当前远程源对应的 [SourceBundle] 获取（未连接远程源时返回空实现）。
+final Provider<DownloadService> downloadServiceProvider =
+    Provider<DownloadService>((Ref ref) {
+      final scope = ref.watch(downloadScopeProvider);
+      if (scope.isEmpty) return const NoopDownloadService();
+      return ref
+              .watch(sourceRegistryProvider)
+              .remoteBundleOrNull(scope)
+              ?.download ??
+          const NoopDownloadService();
+    });
+
+/// 按显式 `sourceKey` 路由获取对应内容源的 [DownloadService]（P1-2）。
+final downloadServiceForSourceProvider =
+    Provider.family<DownloadService, String?>((Ref ref, String? sourceKey) {
+      final primary = ref.watch(downloadServiceProvider);
+      if (sourceKey == null || sourceKey.isEmpty) return primary;
+      final defaultScope = ref.watch(downloadScopeProvider);
+      final defaultBundleService = defaultScope.isEmpty
+          ? const NoopDownloadService()
+          : (ref
+                    .watch(sourceRegistryProvider)
+                    .remoteBundleOrNull(defaultScope)
+                    ?.download ??
+                const NoopDownloadService());
+      // 单测显式 override 了 downloadServiceProvider 时保留被测替身。
+      if (!identical(primary, defaultBundleService)) return primary;
+      if (sourceKey == defaultScope) return primary;
+      return ref.watch(sourceRegistryProvider).bundleFor(sourceKey).download;
+    });
 
 /// 当前服务器已下载书籍的合计占用（设置页，ARC-07 / ARC-10 Drift 表更新流驱动）。
 final downloadsUsageProvider = FutureProvider<CacheUsage>((Ref ref) {
@@ -108,7 +111,7 @@ final bookByIdProvider = FutureProvider.family<Book?, String>((
   return ref.watch(libraryRepositoryProvider).book(bookId);
 });
 
-/// 某本书是否已整本下载（返回记录，含页数与字节数）。
+/// 某本书是否已整本下载（默认活动下载源；兼容既有调用与单测）。
 final downloadedProvider = FutureProvider.family<DownloadedBook?, String>((
   Ref ref,
   String bookId,
@@ -116,26 +119,18 @@ final downloadedProvider = FutureProvider.family<DownloadedBook?, String>((
   return ref.watch(downloadServiceProvider).downloaded(bookId);
 });
 
+/// 按显式 `sourceKey` 查询某本书是否已整本下载（P1-2 跨源下载支持）。
+final downloadedForSourceProvider =
+    FutureProvider.family<DownloadedBook?, ScopedDownloadQuery>((
+      Ref ref,
+      ScopedDownloadQuery query,
+    ) {
+      return ref
+          .watch(downloadServiceForSourceProvider(query.sourceKey))
+          .downloaded(query.bookId);
+    });
+
 final downloadsProvider =
     NotifierProvider<DownloadsController, Map<String, DownloadStatus>>(
       DownloadsController.new,
     );
-
-class _NoopDownloadService implements DownloadService {
-  const _NoopDownloadService();
-
-  @override
-  Future<DownloadedBook?> downloaded(String bookId) async => null;
-
-  @override
-  Future<bool> download(
-    Book book, {
-    required void Function(DownloadProgress progress) onProgress,
-  }) async => false;
-
-  @override
-  void cancel(String bookId) {}
-
-  @override
-  Future<void> delete(Book book) async {}
-}

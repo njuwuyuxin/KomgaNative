@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yomu/src/data/shelf_failure.dart';
 import 'package:yomu/src/providers/active_source_provider.dart';
 import 'package:yomu/src/providers/source_registry_provider.dart';
-import 'package:yomu/src/session/session_controller.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 
 /// 跨源单本封面查询参数。
@@ -33,58 +32,81 @@ final scopedSeriesCoverProvider =
       return bundle.library.seriesCover(req.seriesId);
     });
 
-/// 首页「正在读」跨源无感汇聚（ADR 0008 不变量 3）：
-/// - 同时拉取「本机」与当前已连接 Komga 服务器的 `ondeck`；
+/// 首页「正在读」跨源无感汇聚（ADR 0008 不变量 3 / P1-2 多远程源汇聚）：
+/// - 并行拉取「本机」与所有已配置远程内容源的 `ondeck`；
 /// - 在读书籍（`!isUnread && !isCompleted`）按 `lastModified` 倒序排在最前，跨源最新读的那本始终居首；
 /// - 紧随其后展示下一卷未读（`Up Next`）；
-/// - 故障隔离：远程服务器断网失败时，只要本机书库正常可读（或当前处于本机分组），静默保留本机在读书而不让首页报错。
-final FutureProvider<PageResult<Book>> crossSourceOndeckProvider =
-    FutureProvider<PageResult<Book>>((Ref ref) async {
-      const targetSize = 20;
-      final registry = ref.watch(sourceRegistryProvider);
-      final session = ref.watch(sessionProvider);
-      final activeSource = ref.watch(activeSourceProvider);
+/// - 故障隔离：单个远程源断网或鉴权失败时，静默保留其余源的在读书，仅在全部源无书且当前活动远程源失败时抛错。
+final FutureProvider<PageResult<Book>>
+crossSourceOndeckProvider = FutureProvider<PageResult<Book>>((Ref ref) async {
+  const targetSize = 20;
+  final registry = ref.watch(sourceRegistryProvider);
+  final activeSource = ref.watch(activeSourceProvider);
 
-      final localFuture = registry.localBundle.library.ondeck(size: targetSize);
+  final localFuture = registry.localBundle.library.ondeck(size: targetSize);
+  final remoteBundles = registry.remoteBundles.toList(growable: false);
 
-      PageResult<Book>? remotePage;
-      ShelfFailure? remoteFailure;
-      if (session is SessionConnected) {
-        final remoteBundle = registry.remoteBundleOrNull(session.server.id);
-        if (remoteBundle != null) {
-          try {
-            remotePage = await remoteBundle.library.ondeck(size: targetSize);
-          } on ShelfFailure catch (failure) {
-            remoteFailure = failure;
-          }
-        }
+  final remoteResults =
+      await Future.wait<
+        ({String sourceKey, List<Book>? items, ShelfFailure? failure})
+      >(<
+        Future<({String sourceKey, List<Book>? items, ShelfFailure? failure})>
+      >[
+        for (final bundle in remoteBundles)
+          () async {
+            try {
+              final page = await bundle.library.ondeck(size: targetSize);
+              return (
+                sourceKey: bundle.source.sourceKey,
+                items: page.items,
+                failure: null,
+              );
+            } on ShelfFailure catch (failure) {
+              return (
+                sourceKey: bundle.source.sourceKey,
+                items: null,
+                failure: failure,
+              );
+            }
+          }(),
+      ]);
+
+  final localPage = await localFuture;
+  final remoteItems = <Book>[];
+  ShelfFailure? activeRemoteFailure;
+  ShelfFailure? firstRemoteFailure;
+
+  for (final r in remoteResults) {
+    if (r.items != null) {
+      remoteItems.addAll(r.items!);
+    } else if (r.failure != null) {
+      firstRemoteFailure ??= r.failure;
+      if (r.sourceKey == activeSource.sourceKey) {
+        activeRemoteFailure = r.failure;
       }
+    }
+  }
 
-      final localPage = await localFuture;
-      if (remotePage == null) {
-        if (remoteFailure != null &&
-            localPage.items.isEmpty &&
-            activeSource.isCloud) {
-          throw remoteFailure;
-        }
-        return localPage;
-      }
-      if (localPage.items.isEmpty) {
-        return remotePage;
-      }
+  if (remoteItems.isEmpty) {
+    final failure = activeRemoteFailure ?? firstRemoteFailure;
+    if (failure != null && localPage.items.isEmpty && activeSource.isCloud) {
+      throw failure;
+    }
+    return localPage;
+  }
 
-      final merged = mergeCrossSourceContinueReading(
-        localPage.items,
-        remotePage.items,
-        limit: targetSize,
-      );
-      return PageResult<Book>(
-        items: merged,
-        totalElements: merged.length,
-        page: 0,
-        size: targetSize,
-      );
-    });
+  final merged = mergeCrossSourceContinueReading(
+    localPage.items,
+    remoteItems,
+    limit: targetSize,
+  );
+  return PageResult<Book>(
+    items: merged,
+    totalElements: merged.length,
+    page: 0,
+    size: targetSize,
+  );
+});
 
 /// 将多源「继续阅读」列表合并：在读书按最后阅读时间倒序居前，待读下一卷保序追加。
 List<Book> mergeCrossSourceContinueReading(
