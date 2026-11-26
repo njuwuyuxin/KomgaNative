@@ -46,7 +46,7 @@ String buildWifiTransferHtml({required bool pinRequired}) {
   <div class="card">
     <div class="pin-box" id="pinBox">
       <label for="pinInput">PIN 校验码 / Transfer PIN</label>
-      <input id="pinInput" type="text" inputmode="numeric" maxlength="8" placeholder="4-digit PIN" autocomplete="off">
+      <input id="pinInput" type="text" inputmode="numeric" maxlength="8" placeholder="6-digit PIN" autocomplete="off">
     </div>
     <div class="drop" id="dropZone">
       <div class="drop-title">拖拽文件或文件夹到这里</div>
@@ -191,6 +191,8 @@ async function processBatch(entries) {
       const q = '/api/upload?name=' + encodeURIComponent(a.name) + (a.parent ? '&parent=' + encodeURIComponent(a.parent) : '');
       const res = await sendStream(q, a.file, p => row.setProgress(p));
       if (res.status === 401) row.setError('PIN 错误 / Invalid PIN');
+      else if (res.status === 429) row.setError('尝试过多，请稍后重试 / Too many attempts');
+      else if (res.status === 413) row.setError('文件过大 / File too large');
       else if (res.status >= 200 && res.status < 300 && res.data.ok) {
         row.setDone('已导入 ' + (res.data.importedCount || 1) + ' 册');
         const ids = Array.isArray(res.data.seriesIds) ? res.data.seriesIds : [];
@@ -211,6 +213,8 @@ async function processBatch(entries) {
         '&name=' + encodeURIComponent(cov.name);
       const res = await sendStream(q, cov.file, p => row.setProgress(p));
       if (res.status === 401) row.setError('PIN 错误 / Invalid PIN');
+      else if (res.status === 429) row.setError('尝试过多，请稍后重试 / Too many attempts');
+      else if (res.status === 413) row.setError('文件过大 / File too large');
       else if (res.status >= 200 && res.status < 300 && res.data.ok) {
         row.setDone(res.data.applied ? '已设为系列封面' : '已跳过（保留现有封面）');
       } else row.setError(res.data.error || ('HTTP ' + res.status));

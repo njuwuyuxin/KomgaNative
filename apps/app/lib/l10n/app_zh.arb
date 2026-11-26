@@ -539,7 +539,7 @@
   "wifiTransferCopyUrl": "复制地址",
   "wifiTransferCopied": "已复制传书地址",
   "wifiTransferPinToggle": "启用传书 PIN 校验",
-  "wifiTransferPinHint": "开启后浏览器上传需输入 4 位校验码",
+  "wifiTransferPinHint": "开启后浏览器上传需输入 6 位校验码",
   "wifiTransferPinValue": "当前 PIN：{pin}",
   "@wifiTransferPinValue": {
     "placeholders": {

@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:yomu/src/data/local/local_comic_importer.dart';
 import 'package:yomu/src/data/local/wifi_transfer_handlers.dart';
 import 'package:yomu/src/data/local/wifi_transfer_html.dart';
+import 'package:yomu/src/data/local/wifi_transfer_security.dart';
 
 export 'package:yomu/src/data/local/wifi_transfer_handlers.dart'
     show discoverLanIpv4Addresses;
@@ -27,22 +29,46 @@ final class WifiTransferEvent {
   final String? errorDetail;
 }
 
-/// 内置局域网 HTTP Wi-Fi 传书服务端（纯 `dart:io`，零外部依赖，LMB-07）。
+/// 内置局域网 HTTP Wi-Fi 传书服务端（纯 `dart:io`，零外部依赖，LMB-07 / P2-1 安全加固）。
 ///
-/// 流式落盘上传的压缩包或图片目录，直接委托 [LocalComicImporter] 校验并入库，
-/// 完成后立即清理暂存目录，可选 4 位 PIN 防局域网误连。
+/// 安全机制：
+/// - 仅经 `X-Yomu-Pin` 请求头校验 PIN（拒绝 query string）+ 按 IP 限流锁定（[WifiPinGuard]）；
+/// - 单压缩包、单图片及整次会话总上传体积硬上限，流式写盘超限即刻中止并返回 413。
 final class WifiTransferServer {
   WifiTransferServer({
     required LocalComicImporter importer,
     Future<Directory> Function()? stagingRootResolver,
     Future<List<String>> Function()? lanAddressesResolver,
+    this.maxArchiveBytes = defaultMaxArchiveBytes,
+    this.maxImageBytes = defaultMaxImageBytes,
+    this.maxSessionBytes = defaultMaxSessionBytes,
+    int maxPinFailures = defaultMaxPinFailures,
+    Duration pinLockoutDuration = defaultPinLockoutDuration,
+    DateTime Function()? now,
   }) : _importer = importer,
        _stagingRootResolver = stagingRootResolver,
-       _lanAddressesResolver = lanAddressesResolver ?? discoverLanIpv4Addresses;
+       _lanAddressesResolver = lanAddressesResolver ?? discoverLanIpv4Addresses,
+       _now = now ?? (() => DateTime.now().toUtc()),
+       _pinGuard = WifiPinGuard(
+         maxFailures: maxPinFailures,
+         lockoutDuration: pinLockoutDuration,
+         now: now ?? (() => DateTime.now().toUtc()),
+       );
+
+  static const int defaultMaxArchiveBytes = 512 * 1024 * 1024;
+  static const int defaultMaxImageBytes = 32 * 1024 * 1024;
+  static const int defaultMaxSessionBytes = 4 * 1024 * 1024 * 1024;
+  static const int defaultMaxPinFailures = 5;
+  static const Duration defaultPinLockoutDuration = Duration(seconds: 30);
 
   final LocalComicImporter _importer;
   final Future<Directory> Function()? _stagingRootResolver;
   final Future<List<String>> Function() _lanAddressesResolver;
+  final int maxArchiveBytes;
+  final int maxImageBytes;
+  final int maxSessionBytes;
+  final DateTime Function() _now;
+  final WifiPinGuard _pinGuard;
   final StreamController<WifiTransferEvent> _events =
       StreamController<WifiTransferEvent>.broadcast();
 
@@ -50,6 +76,7 @@ final class WifiTransferServer {
   Directory? _stagingDir;
   String? _pin;
   int _receivedCount = 0;
+  int _sessionBytesReceived = 0;
 
   Stream<WifiTransferEvent> get events => _events.stream;
   bool get isRunning => _server != null;
@@ -60,6 +87,7 @@ final class WifiTransferServer {
   void setPin(String? pin) {
     final cleaned = pin?.trim() ?? '';
     _pin = cleaned.isEmpty ? null : cleaned;
+    _pinGuard.reset();
   }
 
   /// 启动 HTTP 传书服务，返回可供浏览器访问的完整 URL 列表。
@@ -68,10 +96,9 @@ final class WifiTransferServer {
     int preferredPort = 8080,
     String? pin,
   }) async {
-    if (_server != null) {
-      return _buildUrls(_server!.port);
-    }
+    if (_server != null) return _buildUrls(_server!.port);
     setPin(pin);
+    _sessionBytesReceived = 0;
     final addr = bindAddress ?? InternetAddress.anyIPv4;
     HttpServer bound;
     try {
@@ -89,14 +116,12 @@ final class WifiTransferServer {
   Future<void> stop() async {
     final server = _server;
     _server = null;
-    if (server != null) {
-      await server.close(force: true);
-    }
+    _sessionBytesReceived = 0;
+    _pinGuard.reset();
+    if (server != null) await server.close(force: true);
     final dir = _stagingDir;
     _stagingDir = null;
-    if (dir != null) {
-      await tryDeleteImportDir(dir);
-    }
+    if (dir != null) await tryDeleteImportDir(dir);
   }
 
   Future<void> dispose() async {
@@ -118,9 +143,7 @@ final class WifiTransferServer {
 
   Future<List<String>> _buildUrls(int boundPort) async {
     final ips = await _lanAddressesResolver();
-    if (ips.isEmpty) {
-      return <String>['http://127.0.0.1:$boundPort'];
-    }
+    if (ips.isEmpty) return <String>['http://127.0.0.1:$boundPort'];
     return <String>[for (final ip in ips) 'http://$ip:$boundPort'];
   }
 
@@ -128,6 +151,11 @@ final class WifiTransferServer {
     await for (final request in server) {
       unawaited(_handleRequest(request));
     }
+  }
+
+  int _effectiveLimit(int perFileLimit) {
+    final remaining = maxSessionBytes - _sessionBytesReceived;
+    return remaining <= 0 ? 0 : math.min(perFileLimit, remaining);
   }
 
   Future<void> _handleRequest(HttpRequest request) async {
@@ -156,39 +184,8 @@ final class WifiTransferServer {
               path == '/api/upload-image' ||
               path == '/api/commit-folder' ||
               path == '/api/upload-series-cover')) {
-        if (!_checkPin(request)) {
-          await writeWifiJson(
-            request.response,
-            HttpStatus.unauthorized,
-            const <String, Object?>{'ok': false, 'error': 'invalid_pin'},
-          );
-          return;
-        }
-        final staging = _stagingDir ?? await _createStagingDir();
-        if (path == '/api/upload') {
-          _receivedCount += await handleWifiArchiveUpload(
-            request: request,
-            importer: _importer,
-            staging: staging,
-            emit: _emit,
-          );
-        } else if (path == '/api/upload-image') {
-          await handleWifiImageUpload(request: request, staging: staging);
-        } else if (path == '/api/upload-series-cover') {
-          await handleWifiSeriesCoverUpload(
-            request: request,
-            importer: _importer,
-            staging: staging,
-            emit: _emit,
-          );
-        } else {
-          _receivedCount += await handleWifiCommitFolder(
-            request: request,
-            importer: _importer,
-            staging: _stagingDir,
-            emit: _emit,
-          );
-        }
+        if (!await _authorizePost(request)) return;
+        await _dispatchPost(path, request);
         return;
       }
 
@@ -210,12 +207,69 @@ final class WifiTransferServer {
     }
   }
 
-  bool _checkPin(HttpRequest request) {
-    final expected = _pin;
-    if (expected == null || expected.isEmpty) return true;
-    final headerPin = request.headers.value('x-yomu-pin')?.trim();
-    final queryPin = request.uri.queryParameters['pin']?.trim();
-    return headerPin == expected || queryPin == expected;
+  Future<bool> _authorizePost(HttpRequest request) async {
+    final res = _pinGuard.verify(request, expectedPin: _pin);
+    if (res.status == WifiPinStatus.locked) {
+      request.response.headers.set(
+        HttpHeaders.retryAfterHeader,
+        '${res.retryAfterSeconds}',
+      );
+      await writeWifiJson(
+        request.response,
+        HttpStatus.tooManyRequests,
+        <String, Object?>{
+          'ok': false,
+          'error': 'too_many_attempts',
+          'retryAfterSeconds': res.retryAfterSeconds,
+        },
+      );
+      return false;
+    }
+    if (res.status == WifiPinStatus.invalid) {
+      await writeWifiJson(
+        request.response,
+        HttpStatus.unauthorized,
+        const <String, Object?>{'ok': false, 'error': 'invalid_pin'},
+      );
+      return false;
+    }
+    return true;
+  }
+
+  Future<void> _dispatchPost(String path, HttpRequest request) async {
+    final staging = _stagingDir ?? await _createStagingDir();
+    if (path == '/api/upload') {
+      final outcome = await handleWifiArchiveUpload(
+        request: request,
+        importer: _importer,
+        staging: staging,
+        emit: _emit,
+        maxBytes: _effectiveLimit(maxArchiveBytes),
+      );
+      _receivedCount += outcome.importedCount;
+      _sessionBytesReceived += outcome.bytesReceived;
+    } else if (path == '/api/upload-image') {
+      _sessionBytesReceived += await handleWifiImageUpload(
+        request: request,
+        staging: staging,
+        maxBytes: _effectiveLimit(maxImageBytes),
+      );
+    } else if (path == '/api/upload-series-cover') {
+      _sessionBytesReceived += await handleWifiSeriesCoverUpload(
+        request: request,
+        importer: _importer,
+        staging: staging,
+        emit: _emit,
+        maxBytes: _effectiveLimit(maxImageBytes),
+      );
+    } else {
+      _receivedCount += await handleWifiCommitFolder(
+        request: request,
+        importer: _importer,
+        staging: _stagingDir,
+        emit: _emit,
+      );
+    }
   }
 
   void _emit(
@@ -229,7 +283,7 @@ final class WifiTransferServer {
       WifiTransferEvent(
         fileName: fileName,
         kind: kind,
-        timestamp: DateTime.now().toUtc(),
+        timestamp: _now(),
         importedCount: importedCount,
         errorDetail: errorDetail,
       ),

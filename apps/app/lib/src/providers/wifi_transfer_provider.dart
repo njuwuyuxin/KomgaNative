@@ -14,7 +14,7 @@ final class WifiTransferState {
     this.running = false,
     this.starting = false,
     this.urls = const <String>[],
-    this.pinEnabled = false,
+    this.pinEnabled = true,
     this.pin = '',
     this.receivedCount = 0,
     this.activeFileName,
@@ -71,7 +71,7 @@ final Provider<WifiTransferServer> wifiTransferServerProvider =
 /// 局域网 Wi-Fi 传书状态控制器（LMB-07）。
 class WifiTransferController extends Notifier<WifiTransferState> {
   StreamSubscription<WifiTransferEvent>? _sub;
-  final Random _rng = Random();
+  final Random _rng = Random.secure();
 
   @override
   WifiTransferState build() {
@@ -82,7 +82,7 @@ class WifiTransferController extends Notifier<WifiTransferState> {
     return WifiTransferState(pin: _generatePin());
   }
 
-  String _generatePin() => (1000 + _rng.nextInt(9000)).toString();
+  String _generatePin() => (100000 + _rng.nextInt(900000)).toString();
 
   Future<void> start() async {
     if (state.running || state.starting) return;

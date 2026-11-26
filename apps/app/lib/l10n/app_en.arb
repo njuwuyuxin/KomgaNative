@@ -690,7 +690,7 @@
   "wifiTransferCopyUrl": "Copy address",
   "wifiTransferCopied": "Address copied to clipboard",
   "wifiTransferPinToggle": "Require transfer PIN",
-  "wifiTransferPinHint": "Protect LAN uploads with a 4-digit PIN",
+  "wifiTransferPinHint": "Protect LAN uploads with a 6-digit PIN",
   "wifiTransferPinValue": "Current PIN: {pin}",
   "@wifiTransferPinValue": {
     "placeholders": {

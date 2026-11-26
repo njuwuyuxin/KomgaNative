@@ -59,17 +59,23 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 自动启动并展示局域网 URL
+    // 自动启动并展示局域网 URL，默认启用 6 位安全 PIN（P2-1）
     expect(find.byKey(const Key('wifi-transfer-url')), findsOneWidget);
     expect(find.textContaining('http://192.168.1.42:'), findsOneWidget);
     expect(server.isRunning, isTrue);
+    expect(server.pin, isNotNull);
+    expect(server.pin!.length, 6);
+    expect(find.byKey(const Key('wifi-transfer-pin-refresh')), findsOneWidget);
 
-    // 打开 PIN 开关 -> 服务端 PIN 立即生效
+    // 关闭 PIN 开关 -> 服务端 PIN 清除；再次打开 -> 恢复生效
+    await tester.tap(find.byKey(const Key('wifi-transfer-pin-toggle')));
+    await tester.pumpAndSettle();
+    expect(server.pin, isNull);
+
     await tester.tap(find.byKey(const Key('wifi-transfer-pin-toggle')));
     await tester.pumpAndSettle();
     expect(server.pin, isNotNull);
-    expect(server.pin!.length, 4);
-    expect(find.byKey(const Key('wifi-transfer-pin-refresh')), findsOneWidget);
+    expect(server.pin!.length, 6);
 
     // 点击停止按钮 -> 释放端口
     await tester.tap(find.byKey(const Key('wifi-transfer-toggle-btn')));

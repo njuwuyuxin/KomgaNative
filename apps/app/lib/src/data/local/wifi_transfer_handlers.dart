@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:yomu/src/data/local/comic_file_picker.dart';
 import 'package:yomu/src/data/local/local_comic_importer.dart';
+import 'package:yomu/src/data/local/wifi_transfer_security.dart';
 import 'package:yomu/src/data/local/wifi_transfer_server.dart';
 
 /// 枚举本机可用的局域网 IPv4 地址（优先私有网段 `192.168.x.x` / `10.x.x.x` / `172.16-31.x.x`）。
@@ -54,11 +55,12 @@ typedef WifiEmitEvent = void Function(
   String? errorDetail,
 });
 
-Future<int> handleWifiArchiveUpload({
+Future<({int importedCount, int bytesReceived})> handleWifiArchiveUpload({
   required HttpRequest request,
   required LocalComicImporter importer,
   required Directory staging,
   required WifiEmitEvent emit,
+  required int maxBytes,
 }) async {
   final rawName = request.uri.queryParameters['name']?.trim() ?? '';
   final fileName = sanitizeWifiSegment(
@@ -75,7 +77,12 @@ Future<int> handleWifiArchiveUpload({
     '${staging.path}/up_${DateTime.now().microsecondsSinceEpoch}_$fileName',
   );
   try {
-    await writeStreamToFile(request, tempFile);
+    final received = await writeStreamToFileWithLimit(
+      request,
+      tempFile,
+      maxBytes: maxBytes,
+      declaredLength: request.contentLength >= 0 ? request.contentLength : null,
+    );
     final result = await importer.importArchiveFiles(<PickedComicFile>[
       PickedComicFile.fromFile(tempFile, name: fileName),
     ], parentFolderName: parentName);
@@ -92,7 +99,7 @@ Future<int> handleWifiArchiveUpload({
         'seriesIds': result.importedSeriesIds,
         'failures': <String>[for (final f in result.failures) f.reason.name],
       });
-      return result.importedCount;
+      return (importedCount: result.importedCount, bytesReceived: received);
     }
 
     final reason = result.failures.isNotEmpty
@@ -104,7 +111,20 @@ Future<int> handleWifiArchiveUpload({
       HttpStatus.unprocessableEntity,
       <String, Object?>{'ok': false, 'error': reason},
     );
-    return 0;
+    return (importedCount: 0, bytesReceived: received);
+  } on WifiPayloadTooLargeException {
+    emit(
+      fileName,
+      WifiTransferEventKind.failed,
+      errorDetail: 'payload_too_large',
+    );
+    await writeWifiJson(
+      request.response,
+      HttpStatus.requestEntityTooLarge,
+      const <String, Object?>{'ok': false, 'error': 'payload_too_large'},
+      closeConnection: true,
+    );
+    return (importedCount: 0, bytesReceived: 0);
   } finally {
     try {
       if (await tempFile.exists()) await tempFile.delete();
@@ -114,9 +134,10 @@ Future<int> handleWifiArchiveUpload({
   }
 }
 
-Future<void> handleWifiImageUpload({
+Future<int> handleWifiImageUpload({
   required HttpRequest request,
   required Directory staging,
+  required int maxBytes,
 }) async {
   final folder = sanitizeWifiSegment(
     request.uri.queryParameters['folder']?.trim() ?? 'Uploaded Comic',
@@ -130,14 +151,32 @@ Future<void> handleWifiImageUpload({
       HttpStatus.badRequest,
       const <String, Object?>{'ok': false, 'error': 'missing_name'},
     );
-    return;
+    return 0;
   }
   final dest = File('${staging.path}/folders/$folder/$relPath');
   await dest.parent.create(recursive: true);
-  await writeStreamToFile(request, dest);
-  await writeWifiJson(request.response, HttpStatus.ok, const <String, Object?>{
-    'ok': true,
-  });
+  try {
+    final received = await writeStreamToFileWithLimit(
+      request,
+      dest,
+      maxBytes: maxBytes,
+      declaredLength: request.contentLength >= 0 ? request.contentLength : null,
+    );
+    await writeWifiJson(
+      request.response,
+      HttpStatus.ok,
+      const <String, Object?>{'ok': true},
+    );
+    return received;
+  } on WifiPayloadTooLargeException {
+    await writeWifiJson(
+      request.response,
+      HttpStatus.requestEntityTooLarge,
+      const <String, Object?>{'ok': false, 'error': 'payload_too_large'},
+      closeConnection: true,
+    );
+    return 0;
+  }
 }
 
 Future<int> handleWifiCommitFolder({
@@ -192,11 +231,12 @@ Future<int> handleWifiCommitFolder({
   }
 }
 
-Future<void> handleWifiSeriesCoverUpload({
+Future<int> handleWifiSeriesCoverUpload({
   required HttpRequest request,
   required LocalComicImporter importer,
   required Directory staging,
   required WifiEmitEvent emit,
+  required int maxBytes,
 }) async {
   final rawSeriesId = request.uri.queryParameters['seriesId']?.trim();
   final seriesId = (rawSeriesId != null && rawSeriesId.isNotEmpty)
@@ -212,7 +252,7 @@ Future<void> handleWifiSeriesCoverUpload({
       HttpStatus.badRequest,
       const <String, Object?>{'ok': false, 'error': 'missing_series'},
     );
-    return;
+    return 0;
   }
   final rawName = request.uri.queryParameters['name']?.trim() ?? '';
   final fileName = sanitizeWifiSegment(rawName.isEmpty ? 'cover.jpg' : rawName);
@@ -220,7 +260,12 @@ Future<void> handleWifiSeriesCoverUpload({
     '${staging.path}/cov_${DateTime.now().microsecondsSinceEpoch}_$fileName',
   );
   try {
-    await writeStreamToFile(request, tempFile);
+    final received = await writeStreamToFileWithLimit(
+      request,
+      tempFile,
+      maxBytes: maxBytes,
+      declaredLength: request.contentLength >= 0 ? request.contentLength : null,
+    );
     final bytes = await tempFile.readAsBytes();
     if (bytes.isEmpty) {
       await writeWifiJson(
@@ -228,7 +273,7 @@ Future<void> handleWifiSeriesCoverUpload({
         HttpStatus.badRequest,
         const <String, Object?>{'ok': false, 'error': 'empty_cover'},
       );
-      return;
+      return received;
     }
     final appliedId = await importer.applySeriesCoverImage(
       bytes,
@@ -243,6 +288,15 @@ Future<void> handleWifiSeriesCoverUpload({
       'applied': appliedId != null,
       if (appliedId != null) 'seriesId': appliedId,
     });
+    return received;
+  } on WifiPayloadTooLargeException {
+    await writeWifiJson(
+      request.response,
+      HttpStatus.requestEntityTooLarge,
+      const <String, Object?>{'ok': false, 'error': 'payload_too_large'},
+      closeConnection: true,
+    );
+    return 0;
   } finally {
     try {
       if (await tempFile.exists()) await tempFile.delete();
@@ -255,12 +309,15 @@ Future<void> handleWifiSeriesCoverUpload({
 Future<void> writeWifiJson(
   HttpResponse response,
   int statusCode,
-  Map<String, Object?> body,
-) async {
+  Map<String, Object?> body, {
+  bool closeConnection = false,
+}) async {
+  if (closeConnection) response.persistentConnection = false;
   response
     ..statusCode = statusCode
     ..headers.contentType = ContentType.json
     ..write(jsonEncode(body));
+  await response.flush();
   await response.close();
 }
 

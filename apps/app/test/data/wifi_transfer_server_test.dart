@@ -285,5 +285,131 @@ void main() {
       expect(secondCoverJson['applied'], isFalse);
       expect(savedFile.readAsBytesSync(), coverBytes);
     });
+
+    test('P2-1 安全加固：拒绝 query string 传 PIN、连续错 PIN 返回 429 锁定并可超时恢复', () async {
+      var clock = DateTime.utc(2026, 11, 26, 12);
+      final securedServer = WifiTransferServer(
+        importer: LocalComicImporter(
+          db: db,
+          storage: LocalComicsStorage(rootResolver: () async => sandboxTemp),
+          coverEncoder: (
+            Uint8List raw, {
+            required ReadingDirection direction,
+          }) async => raw,
+        ),
+        lanAddressesResolver: () async => const <String>['127.0.0.1'],
+        maxPinFailures: 3,
+        pinLockoutDuration: const Duration(seconds: 30),
+        now: () => clock,
+      );
+      addTearDown(securedServer.dispose);
+
+      final urls = await securedServer.start(
+        bindAddress: InternetAddress.loopbackIPv4,
+        preferredPort: 0,
+        pin: '654321',
+      );
+      final base = Uri.parse(urls.single);
+
+      // 1) 仅通过 URL query ?pin=654321 传递正确 PIN 必须被拒绝（401）
+      final qReq = await client.postUrl(
+        base.resolve('/api/upload-image?folder=A&name=01.png&pin=654321'),
+      );
+      qReq.add(_fakePng(100, 100));
+      final qRes = await qReq.close();
+      await qRes.drain<void>();
+      expect(qRes.statusCode, HttpStatus.unauthorized);
+
+      // 2) 第 2 次失败 -> 401；第 3 次失败触发锁定 -> 429
+      final bad2 = await client.postUrl(
+        base.resolve('/api/upload-image?folder=A&name=01.png'),
+      );
+      bad2.headers.set('x-yomu-pin', '111111');
+      bad2.add(_fakePng(100, 100));
+      final bad2Res = await bad2.close();
+      await bad2Res.drain<void>();
+      expect(bad2Res.statusCode, HttpStatus.unauthorized);
+
+      final bad3 = await client.postUrl(
+        base.resolve('/api/upload-image?folder=A&name=01.png'),
+      );
+      bad3.headers.set('x-yomu-pin', '222222');
+      bad3.add(_fakePng(100, 100));
+      final bad3Res = await bad3.close();
+      await bad3Res.drain<void>();
+      expect(bad3Res.statusCode, HttpStatus.tooManyRequests);
+      expect(bad3Res.headers.value(HttpHeaders.retryAfterHeader), isNotNull);
+
+      // 3) 锁定期内即使提供正确请求头 PIN 也被 429 拦截
+      final lockedReq = await client.postUrl(
+        base.resolve('/api/upload-image?folder=A&name=01.png'),
+      );
+      lockedReq.headers.set('x-yomu-pin', '654321');
+      lockedReq.add(_fakePng(100, 100));
+      final lockedRes = await lockedReq.close();
+      await lockedRes.drain<void>();
+      expect(lockedRes.statusCode, HttpStatus.tooManyRequests);
+
+      // 4) 锁定过期后，正确请求头 PIN 恢复通过
+      clock = clock.add(const Duration(seconds: 31));
+      final okReq = await client.postUrl(
+        base.resolve('/api/upload-image?folder=A&name=01.png'),
+      );
+      okReq.headers.set('x-yomu-pin', '654321');
+      okReq.add(_fakePng(100, 100));
+      final okRes = await okReq.close();
+      await okRes.drain<void>();
+      expect(okRes.statusCode, HttpStatus.ok);
+    });
+
+    test('P2-1 安全加固：单文件与整次会话超体积上限返回 413 并不落盘', () async {
+      final limitedServer = WifiTransferServer(
+        importer: LocalComicImporter(
+          db: db,
+          storage: LocalComicsStorage(rootResolver: () async => sandboxTemp),
+          coverEncoder: (
+            Uint8List raw, {
+            required ReadingDirection direction,
+          }) async => raw,
+        ),
+        lanAddressesResolver: () async => const <String>['127.0.0.1'],
+        maxImageBytes: 64,
+        maxArchiveBytes: 64,
+        maxSessionBytes: 80,
+      );
+      addTearDown(limitedServer.dispose);
+
+      final urls = await limitedServer.start(
+        bindAddress: InternetAddress.loopbackIPv4,
+        preferredPort: 0,
+      );
+      final base = Uri.parse(urls.single);
+
+      // 1) 单张图片超过 64 字节 -> 413
+      final bigImgReq = await client.postUrl(
+        base.resolve('/api/upload-image?folder=Cap&name=big.png'),
+      );
+      bigImgReq.add(Uint8List(100));
+      final bigImgRes = await bigImgReq.close();
+      await bigImgRes.drain<void>();
+      expect(bigImgRes.statusCode, HttpStatus.requestEntityTooLarge);
+
+      // 2) 第一张 50 字节成功；第二张 50 字节累计超过会话 80 字节上限 -> 413
+      final okReq = await client.postUrl(
+        base.resolve('/api/upload-image?folder=Cap&name=01.png'),
+      );
+      okReq.add(Uint8List(50));
+      final okRes = await okReq.close();
+      await okRes.drain<void>();
+      expect(okRes.statusCode, HttpStatus.ok);
+
+      final overSessionReq = await client.postUrl(
+        base.resolve('/api/upload-image?folder=Cap&name=02.png'),
+      );
+      overSessionReq.add(Uint8List(50));
+      final overSessionRes = await overSessionReq.close();
+      await overSessionRes.drain<void>();
+      expect(overSessionRes.statusCode, HttpStatus.requestEntityTooLarge);
+    });
   });
 }
