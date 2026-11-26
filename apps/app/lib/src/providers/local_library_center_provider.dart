@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:yomu/src/data/local/external_directory_scanner.dart';
 import 'package:yomu/src/data/local/external_roots_dao.dart';
+import 'package:yomu/src/data/local/mounted_root_summary.dart';
 import 'package:yomu/src/data/progress/progress_database.dart';
 import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/progress_providers.dart';
@@ -12,6 +13,7 @@ import 'package:yomu_platform/yomu_platform.dart';
 
 export 'package:yomu/src/data/local/external_directory_scanner.dart';
 export 'package:yomu/src/data/local/external_roots_dao.dart';
+export 'package:yomu/src/data/local/mounted_root_summary.dart';
 
 /// 外部挂载目录桥接 Provider（测试可覆盖注入假桥）。
 final Provider<ExternalRootsBridge> externalRootsBridgeProvider =
@@ -26,13 +28,27 @@ final Provider<ExternalDirectoryScanner> externalDirectoryScannerProvider =
       );
     });
 
-/// 已挂载外部漫画目录的实时流。
-final StreamProvider<List<LocalMountedRootsRow>> mountedRootsProvider =
-    StreamProvider<List<LocalMountedRootsRow>>((Ref ref) async* {
+MountedRootSummary _summaryFromRow(LocalMountedRootsRow row) {
+  final external = mountedRootFromRow(row);
+  return MountedRootSummary(
+    id: row.id,
+    displayName: row.displayName,
+    uriOrBookmark: row.uriOrBookmark,
+    kind: external.kind,
+    enabled: row.enabled,
+    hasNomedia: row.hasNomedia,
+    booksCount: row.booksCount,
+    createdAt: row.createdAt,
+  );
+}
+
+/// 已挂载外部漫画目录的实时流（对外仅暴露纯视图模型 [MountedRootSummary]，屏蔽 Drift 行类型）。
+final StreamProvider<List<MountedRootSummary>> mountedRootsProvider =
+    StreamProvider<List<MountedRootSummary>>((Ref ref) async* {
       final db = ref.watch(progressDatabaseProvider);
-      yield await db.allMountedRoots();
+      yield (await db.allMountedRoots()).map(_summaryFromRow).toList();
       await for (final _ in db.mountedRootsUpdates()) {
-        yield await db.allMountedRoots();
+        yield (await db.allMountedRoots()).map(_summaryFromRow).toList();
       }
     });
 
@@ -169,15 +185,15 @@ class LocalLibraryScanController extends Notifier<LocalLibraryScanState> {
   }
 
   /// 为指定目录创建 `.nomedia` 文件并写回状态。
-  Future<bool> ensureNomedia(LocalMountedRootsRow row) async {
-    final root = mountedRootFromRow(row);
+  Future<bool> ensureNomedia(MountedRootSummary summary) async {
+    final root = summary.toExternalRoot();
     final ok = await ref.read(externalRootsBridgeProvider).ensureNomedia(root);
     if (ok) {
       await ref
           .read(progressDatabaseProvider)
           .updateMountedRootScanStats(
-            rootId: row.id,
-            booksCount: row.booksCount,
+            rootId: summary.id,
+            booksCount: summary.booksCount,
             hasNomedia: true,
           );
     }
@@ -185,11 +201,11 @@ class LocalLibraryScanController extends Notifier<LocalLibraryScanState> {
   }
 
   /// 安全卸载外部挂载目录（仅清库索引与缩略图缓存，绝不删用户外部源文件）。
-  Future<void> unmountRoot(LocalMountedRootsRow row) async {
-    final root = mountedRootFromRow(row);
+  Future<void> unmountRoot(MountedRootSummary summary) async {
+    final root = summary.toExternalRoot();
     final db = ref.read(progressDatabaseProvider);
     final storage = ref.read(localComicsStorageProvider);
-    final coverPaths = await db.unmountExternalRootFromDb(row.id);
+    final coverPaths = await db.unmountExternalRootFromDb(summary.id);
     for (final rel in coverPaths) {
       try {
         final f = await storage.resolveFile(rel);

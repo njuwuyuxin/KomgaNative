@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/src/data/cache/http_cache_database.dart';
 import 'package:yomu/src/data/download/download_service.dart';
+import 'package:yomu/src/data/download/downloaded_book_record.dart';
 import 'package:yomu/src/providers/active_source_provider.dart';
 import 'package:yomu/src/providers/cache_providers.dart';
 import 'package:yomu/src/providers/downloads_controller.dart';
@@ -11,6 +12,7 @@ import 'package:yomu/src/providers/source_registry_provider.dart';
 import 'package:yomu/src/session/session_controller.dart';
 import 'package:yomu_platform/yomu_platform.dart';
 
+export 'package:yomu/src/data/download/downloaded_book_record.dart';
 export 'package:yomu/src/providers/downloads_controller.dart';
 
 /// 按源查询单本已下载记录的键。
@@ -91,12 +93,26 @@ final downloadsUsageProvider = FutureProvider<CacheUsage>((Ref ref) {
 });
 
 /// 当前服务器已下载书籍列表（下载管理页，UI-P3-13 / ARC-07 / ARC-10 Drift 表更新流驱动）。
-final downloadedBooksProvider = FutureProvider<List<DownloadedBook>>((Ref ref) {
+final downloadedBooksProvider = FutureProvider<List<DownloadedBookRecord>>((
+  Ref ref,
+) async {
   final scope = ref.watch(downloadScopeProvider);
   final db = ref.watch(httpCacheDatabaseProvider);
   final sub = db.downloadedBooksUpdates().listen((_) => ref.invalidateSelf());
   ref.onDispose(sub.cancel);
-  return db.downloads(scope: scope);
+  final rows = await db.downloads(scope: scope);
+  return <DownloadedBookRecord>[
+    for (final row in rows)
+      DownloadedBookRecord(
+        scope: row.scope,
+        bookId: row.bookId,
+        seriesId: row.seriesId,
+        bookName: row.bookName,
+        pageCount: row.pageCount,
+        bytes: row.bytes,
+        savedAt: row.savedAt,
+      ),
+  ];
 });
 
 /// 当前服务器待恢复的下载队列（ARC-07）。

@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:yomu/l10n/app_localizations.dart';
-import 'package:yomu/src/data/progress/progress_database.dart';
 import 'package:yomu/src/providers/local_import_provider.dart';
 import 'package:yomu/src/providers/local_library_center_provider.dart';
 import 'package:yomu/src/widgets/archive_password_dialog.dart';
@@ -24,7 +23,7 @@ class LocalLibraryCenterScreen extends ConsumerWidget {
     final scanState = ref.watch(localLibraryScanProvider);
     final scanController = ref.read(localLibraryScanProvider.notifier);
     final roots =
-        ref.watch(mountedRootsProvider).value ?? const <LocalMountedRootsRow>[];
+        ref.watch(mountedRootsProvider).value ?? const <MountedRootSummary>[];
     final usage = ref.watch(localStorageUsageProvider).value;
 
     return Scaffold(
@@ -136,20 +135,24 @@ class LocalLibraryCenterScreen extends ConsumerWidget {
                             ),
                           ]
                         : <Widget>[
-                            for (final row in roots)
+                            for (final root in roots)
                               LocalMountedRootTile(
-                                row: row,
+                                root: root,
                                 scanning: scanState.scanning,
                                 onRescan: () => unawaited(
                                   scanController.scanSingleRoot(
-                                    mountedRootFromRow(row),
+                                    root.toExternalRoot(),
                                   ),
                                 ),
                                 onEnsureNomedia: () => unawaited(
-                                  scanController.ensureNomedia(row),
+                                  scanController.ensureNomedia(root),
                                 ),
                                 onUnmount: () => unawaited(
-                                  confirmUnmountExternalRoot(context, ref, row),
+                                  confirmUnmountExternalRoot(
+                                    context,
+                                    ref,
+                                    root,
+                                  ),
                                 ),
                               ),
                           ],

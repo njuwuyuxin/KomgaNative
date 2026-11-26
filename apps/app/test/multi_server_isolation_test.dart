@@ -149,7 +149,9 @@ void main() {
     expect(await userDb.pending(scope: serverA.address.baseUrl), isEmpty);
 
     final downloadsOnA = await container.read(downloadedBooksProvider.future);
-    expect(downloadsOnA.map((DownloadedBook d) => d.bookId), <String>['b1']);
+    expect(downloadsOnA.map((DownloadedBookRecord d) => d.bookId), <String>[
+      'b1',
+    ]);
     final sessionsOnA = await container.read(readingSessionsProvider.future);
     expect(sessionsOnA.map((ReadingSession s) => s.bookId), <String>['b1']);
 

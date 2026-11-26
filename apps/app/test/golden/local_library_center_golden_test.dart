@@ -5,11 +5,11 @@ import 'package:material_ui/material_ui.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/l10n/l10n.dart';
 import 'package:yomu/src/data/cache/http_cache_tables.dart';
-import 'package:yomu/src/data/progress/progress_database.dart';
 import 'package:yomu/src/providers/local_import_provider.dart';
 import 'package:yomu/src/providers/local_library_center_provider.dart';
 import 'package:yomu/src/screens/local_library_center_screen.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu_platform/yomu_platform.dart';
 
 import 'golden_harness.dart';
 
@@ -22,22 +22,22 @@ Future<void> _pumpCenter(
   tester.view.devicePixelRatio = 2;
   addTearDown(tester.view.reset);
 
-  final sampleRoots = <LocalMountedRootsRow>[
-    LocalMountedRootsRow(
+  final sampleRoots = <MountedRootSummary>[
+    MountedRootSummary(
       id: 'root_sd',
       displayName: 'SD Card · Comics',
       uriOrBookmark: 'content://tree/comics',
-      kind: 'androidSaf',
+      kind: ExternalRootKind.androidSaf,
       enabled: true,
       hasNomedia: true,
       booksCount: 28,
       createdAt: DateTime.utc(2026, 11, 20),
     ),
-    LocalMountedRootsRow(
+    MountedRootSummary(
       id: 'root_files',
       displayName: 'Files · Yomu',
       uriOrBookmark: '/Documents',
-      kind: 'iosBookmark',
+      kind: ExternalRootKind.iosBookmark,
       enabled: true,
       hasNomedia: true,
       booksCount: 12,
@@ -49,7 +49,7 @@ Future<void> _pumpCenter(
     ProviderScope(
       overrides: <Override>[
         mountedRootsProvider.overrideWithValue(
-          AsyncValue<List<LocalMountedRootsRow>>.data(sampleRoots),
+          AsyncValue<List<MountedRootSummary>>.data(sampleRoots),
         ),
         localStorageUsageProvider.overrideWithValue(
           const AsyncValue<CacheUsage>.data(

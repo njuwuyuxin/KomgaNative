@@ -49,6 +49,14 @@ Future<int> layerCheck() async {
       ], reason: 'UI 不得直接访问 API 层'),
     );
     violations.addAll(
+      _scanImports(dir, <String>[
+        'package:drift/',
+        'package:yomu/src/data/cache/',
+        'package:yomu/src/data/progress/progress_database.dart',
+        'package:yomu/src/data/progress/progress_tables.dart',
+      ], reason: 'UI 不得直接依赖 Drift 数据库或表行类型，请经由 Provider 暴露纯领域/视图模型'),
+    );
+    violations.addAll(
       _scanCode(dir, <String>[
         'BackdropFilter(',
         'HapticFeedback.',

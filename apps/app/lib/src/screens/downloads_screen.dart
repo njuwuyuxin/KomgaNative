@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/l10n/app_localizations.dart';
-import 'package:yomu/src/data/cache/http_cache_database.dart';
 import 'package:yomu/src/l10n/failure_text.dart';
 import 'package:yomu/src/providers/download_providers.dart';
 import 'package:yomu/src/providers/library_providers.dart';
@@ -24,7 +23,7 @@ class DownloadsScreen extends ConsumerWidget {
     final records = ref.watch(downloadedBooksProvider);
     final active = ref.watch(downloadsProvider);
     final ids = <String>{
-      ...?records.value?.map((DownloadedBook r) => r.bookId),
+      ...?records.value?.map((DownloadedBookRecord r) => r.bookId),
       ...active.keys,
     }.toList(growable: false);
 
@@ -151,8 +150,9 @@ class _DownloadRow extends ConsumerWidget {
     final theme = Theme.of(context);
     final book = ref.watch(bookByIdProvider(bookId)).value;
     final records = ref.watch(downloadedBooksProvider).value;
-    DownloadedBook? record;
-    for (final DownloadedBook item in records ?? const <DownloadedBook>[]) {
+    DownloadedBookRecord? record;
+    for (final DownloadedBookRecord item
+        in records ?? const <DownloadedBookRecord>[]) {
       if (item.bookId == bookId) {
         record = item;
         break;
@@ -277,7 +277,7 @@ class _DownloadRow extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     Book? book,
-    DownloadedBook? record,
+    DownloadedBookRecord? record,
   ) async {
     final confirmed = await showDialog<bool>(
       context: context,
