@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/src/widgets/reader_layout.dart';
-import 'package:yomu/src/widgets/reader_progress_writer.dart';
+import 'package:yomu/src/features/reader/reader_progress_writer.dart';
 import 'package:yomu_reader/yomu_reader.dart';
 
 /// 竖版页（宽 < 高），双页模式会两两配对。
