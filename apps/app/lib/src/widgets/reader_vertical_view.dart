@@ -3,6 +3,7 @@ import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/src/widgets/reader_page.dart';
 import 'package:yomu/src/widgets/reader_palette.dart';
+import 'package:yomu/src/widgets/reader_tall_page_tile.dart';
 import 'package:yomu_reader/yomu_reader.dart';
 import 'package:flutter/scheduler.dart' show Ticker;
 import 'package:material_ui/material_ui.dart';
@@ -64,6 +65,7 @@ class ReaderVerticalView extends StatefulWidget {
 class _ReaderVerticalViewState extends State<ReaderVerticalView>
     with SingleTickerProviderStateMixin {
   final ScrollController _controller = ScrollController();
+  final TallImageSliceCache _tileCache = TallImageSliceCache();
 
   /// 自动滚动（RDR-08）：用 ticker 而不是 `animateTo(maxScrollExtent, duration)`，
   /// 后者在用户中途暂停/恢复时没法平滑接上，且长条漫画的时长会算成几分钟。
@@ -84,6 +86,7 @@ class _ReaderVerticalViewState extends State<ReaderVerticalView>
 
   @override
   void dispose() {
+    _tileCache.dispose();
     _autoScroll.dispose();
     _controller.removeListener(_onScroll);
     _controller.dispose();
@@ -185,6 +188,28 @@ class _ReaderVerticalViewState extends State<ReaderVerticalView>
         // 首次拿到宽度后才能算偏移，因此跳转放在帧后。
         _jumpToInitialPage();
 
+        final slots = buildVerticalRenderSlots(
+          layout: layout,
+          sizeAt: (int index) => (
+            width: widget.pages[index].width,
+            height: widget.pages[index].height,
+          ),
+        );
+        final tilesByPage = <int, List<TallImageTile>>{};
+        for (final slot in slots) {
+          final tile = slot.tile;
+          if (tile != null) {
+            tilesByPage
+                .putIfAbsent(slot.pageIndex, () => <TallImageTile>[])
+                .add(tile);
+          }
+        }
+        final dpr = MediaQuery.devicePixelRatioOf(context);
+        final targetDecodeW = (constraints.maxWidth * dpr).round().clamp(
+          360,
+          2048,
+        );
+
         return Stack(
           children: <Widget>[
             Listener(
@@ -196,19 +221,33 @@ class _ReaderVerticalViewState extends State<ReaderVerticalView>
                 child: ListView.builder(
                   key: const Key('reader-vertical-list'),
                   controller: _controller,
-                  itemCount: widget.pages.length,
+                  itemCount: slots.length,
                   // 预取上下两屏，快速滚动时不会看到一片空白。
                   scrollCacheExtent: const ScrollCacheExtent.viewport(2),
-                  itemBuilder: (BuildContext context, int index) => SizedBox(
-                    height: layout.pageHeights[index],
-                    width: double.infinity,
-                    child: ReaderPage(
-                      bookId: widget.bookId,
-                      pageIndex: index,
-                      palette: widget.palette,
-                      trimBorders: widget.trimBorders,
-                    ),
-                  ),
+                  itemBuilder: (BuildContext context, int index) {
+                    final slot = slots[index];
+                    final tile = slot.tile;
+                    return SizedBox(
+                      height: slot.displayHeight,
+                      width: double.infinity,
+                      child: tile == null
+                          ? ReaderPage(
+                              bookId: widget.bookId,
+                              pageIndex: slot.pageIndex,
+                              palette: widget.palette,
+                              trimBorders: widget.trimBorders,
+                            )
+                          : ReaderTallPageTile(
+                              bookId: widget.bookId,
+                              pageIndex: slot.pageIndex,
+                              tile: tile,
+                              allTiles: tilesByPage[slot.pageIndex]!,
+                              palette: widget.palette,
+                              cache: _tileCache,
+                              targetDecodeWidth: targetDecodeW,
+                            ),
+                    );
+                  },
                 ),
               ),
             ),

@@ -13,6 +13,7 @@ export 'src/page_turn.dart';
 export 'src/preload.dart';
 export 'src/spreads.dart';
 export 'src/stitch.dart';
+export 'src/tall_tiles.dart';
 export 'src/tap_zones.dart';
 export 'src/vertical.dart';
 export 'src/wide_split.dart';
