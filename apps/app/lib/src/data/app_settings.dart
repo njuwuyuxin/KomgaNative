@@ -30,6 +30,7 @@ class AppSettings {
     this.downloadWifiOnly = false,
     this.downloadAutoDeleteRead = false,
     this.downloadConcurrency = 1,
+    this.activeSourceKey,
   });
 
   /// 全默认值（没有存档、存档写坏、字段缺失时都用它）。
@@ -76,6 +77,9 @@ class AppSettings {
   /// 而阅读体验的瓶颈通常在服务端而不是本地带宽。
   final int downloadConcurrency;
 
+  /// 用户上次显式选中的书架源分区键（`null` 表示从未手动切过，用于老用户升级兼容）。
+  final String? activeSourceKey;
+
   AppSettings copyWith({
     ThemeMode? themeMode,
     bool? forceEink,
@@ -91,6 +95,7 @@ class AppSettings {
     bool? downloadWifiOnly,
     bool? downloadAutoDeleteRead,
     int? downloadConcurrency,
+    Object? activeSourceKey = _unset,
   }) => AppSettings(
     themeMode: themeMode ?? this.themeMode,
     forceEink: forceEink ?? this.forceEink,
@@ -109,6 +114,9 @@ class AppSettings {
     downloadAutoDeleteRead:
         downloadAutoDeleteRead ?? this.downloadAutoDeleteRead,
     downloadConcurrency: downloadConcurrency ?? this.downloadConcurrency,
+    activeSourceKey: identical(activeSourceKey, _unset)
+        ? this.activeSourceKey
+        : activeSourceKey as String?,
   );
 
   /// 记下某台服务器选的库；[libraryId] 为 null 表示"全部库"。
@@ -193,6 +201,8 @@ class AppSettings {
     if (downloadWifiOnly) 'downloadWifiOnly': true,
     if (downloadAutoDeleteRead) 'downloadAutoDeleteRead': true,
     if (downloadConcurrency != 1) 'downloadConcurrency': downloadConcurrency,
+    if (activeSourceKey != null && activeSourceKey!.isNotEmpty)
+      'activeSourceKey': activeSourceKey,
     if (filterPresets.isNotEmpty)
       'filterPresets': <String, Object?>{
         for (final entry in filterPresets.entries)
@@ -240,6 +250,11 @@ class AppSettings {
                   ? json['downloadConcurrency']! as int
                   : 1)
               .clamp(1, 3),
+      activeSourceKey:
+          json['activeSourceKey'] is String &&
+              (json['activeSourceKey']! as String).isNotEmpty
+          ? json['activeSourceKey']! as String
+          : null,
     );
   }
 
