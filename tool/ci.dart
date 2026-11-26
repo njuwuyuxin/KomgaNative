@@ -9,6 +9,7 @@ const List<String> _purePackages = <String>[
   'packages/yomu_domain',
   'packages/yomu_reader',
   'packages/yomu_sync',
+  'packages/yomu_local_archive',
   'packages/komga_api',
 ];
 

@@ -7,6 +7,7 @@ const List<String> _productionRoots = <String>[
   'packages/yomu_domain/lib',
   'packages/yomu_reader/lib',
   'packages/yomu_sync/lib',
+  'packages/yomu_local_archive/lib',
   'packages/komga_api/lib',
   'packages/yomu_platform/lib',
   'packages/yomu_design_system/lib',
@@ -14,7 +15,7 @@ const List<String> _productionRoots = <String>[
 ];
 
 /// 分层与代码规范规则（ADR-0001 + ARC-12 门禁加固）：
-/// - `yomu_domain` / `yomu_reader` / `yomu_sync` 不得依赖 Flutter、HTTP、数据库；
+/// - `yomu_domain` / `yomu_reader` / `yomu_sync` / `yomu_local_archive` 不得依赖 Flutter、HTTP、数据库；
 /// - UI 层（screens/widgets）不得直接依赖 `komga_api`，只能经 Repository；
 /// - 非生成生产 `.dart` 文件严格 ≤ 350 行，单类 ≤ 300 行；
 /// - 非注释生产代码中禁止裸 `catch (_)`。
@@ -31,6 +32,7 @@ Future<int> layerCheck() async {
     'packages/yomu_domain',
     'packages/yomu_reader',
     'packages/yomu_sync',
+    'packages/yomu_local_archive',
   ]) {
     violations.addAll(
       _scanImports(pkg, pureForbidden, reason: '纯逻辑包不得依赖 UI / 网络 / 数据库'),

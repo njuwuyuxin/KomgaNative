@@ -13,3 +13,4 @@ workspace:
   - packages/komga_api
   - packages/yomu_design_system
   - packages/yomu_platform
+  - packages/yomu_local_archive

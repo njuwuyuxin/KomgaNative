@@ -1,0 +1,13 @@
+/// 纯 Dart 本地漫画归档引擎。
+///
+/// 约束：零第三方依赖，禁止 import flutter / dio / drift / go_router（由 `tool/ci.dart layers` 保障）。
+library;
+
+export 'src/archive_errors.dart';
+export 'src/byte_source.dart';
+export 'src/comic_info_parser.dart';
+export 'src/folder_page_reader.dart';
+export 'src/image_dimensions.dart';
+export 'src/natural_sort.dart';
+export 'src/zip_directory.dart';
+export 'src/zip_page_reader.dart';
