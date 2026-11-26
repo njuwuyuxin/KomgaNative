@@ -23,7 +23,10 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
 
   ReaderPrefsStore get _store => ref.read(readerPrefsStoreProvider);
 
-  String get _serverKey => ref.read(activeServerKeyProvider);
+  String _resolveServerKey(String? serverKey) {
+    if (serverKey != null && serverKey.isNotEmpty) return serverKey;
+    return ref.read(activeServerKeyProvider);
+  }
 
   Future<void> _restore() async {
     try {
@@ -35,128 +38,204 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
     }
   }
 
-  void setMode(ReaderModeChoice mode, {String? seriesId}) =>
-      _updateConfig(seriesId, (ReaderConfig c) => c.copyWith(mode: mode));
+  void setMode(ReaderModeChoice mode, {String? seriesId, String? serverKey}) =>
+      _updateConfig(
+        seriesId,
+        (ReaderConfig c) => c.copyWith(mode: mode),
+        serverKey: serverKey,
+      );
 
-  void setBrightness(double brightness, {String? seriesId}) => _updateConfig(
+  void setBrightness(
+    double brightness, {
+    String? seriesId,
+    String? serverKey,
+  }) => _updateConfig(
     seriesId,
     (ReaderConfig c) => c.copyWith(brightness: brightness),
+    serverKey: serverKey,
   );
 
-  void setKeepAwake(bool enabled, {String? seriesId}) => _updateConfig(
+  void setKeepAwake(bool enabled, {String? seriesId, String? serverKey}) =>
+      _updateConfig(
+        seriesId,
+        (ReaderConfig c) => c.copyWith(keepAwake: enabled),
+        serverKey: serverKey,
+      );
+
+  void setFit(ReaderFitChoice fit, {String? seriesId, String? serverKey}) =>
+      _updateConfig(
+        seriesId,
+        (ReaderConfig c) => c.copyWith(fit: fit),
+        serverKey: serverKey,
+      );
+
+  void setDirection(
+    ReaderDirectionChoice direction, {
+    String? seriesId,
+    String? serverKey,
+  }) => _updateConfig(
     seriesId,
-    (ReaderConfig c) => c.copyWith(keepAwake: enabled),
+    (ReaderConfig c) => c.copyWith(direction: direction),
+    serverKey: serverKey,
   );
 
-  void setFit(ReaderFitChoice fit, {String? seriesId}) =>
-      _updateConfig(seriesId, (ReaderConfig c) => c.copyWith(fit: fit));
-
-  void setDirection(ReaderDirectionChoice direction, {String? seriesId}) =>
-      _updateConfig(
-        seriesId,
-        (ReaderConfig c) => c.copyWith(direction: direction),
-      );
-
-  void setBackground(ReaderBackgroundChoice background, {String? seriesId}) =>
-      _updateConfig(
-        seriesId,
-        (ReaderConfig c) => c.copyWith(background: background),
-      );
-
-  void setImageFilter(ReaderImageFilter filter, {String? seriesId}) =>
-      _updateConfig(
-        seriesId,
-        (ReaderConfig c) => c.copyWith(imageFilter: filter),
-      );
-
-  void setLockZoom(bool enabled, {String? seriesId}) => _updateConfig(
+  void setBackground(
+    ReaderBackgroundChoice background, {
+    String? seriesId,
+    String? serverKey,
+  }) => _updateConfig(
     seriesId,
-    (ReaderConfig c) => c.copyWith(lockZoom: enabled),
+    (ReaderConfig c) => c.copyWith(background: background),
+    serverKey: serverKey,
   );
 
-  void setTrimBorders(bool enabled, {String? seriesId}) => _updateConfig(
+  void setImageFilter(
+    ReaderImageFilter filter, {
+    String? seriesId,
+    String? serverKey,
+  }) => _updateConfig(
     seriesId,
-    (ReaderConfig c) => c.copyWith(trimBorders: enabled),
+    (ReaderConfig c) => c.copyWith(imageFilter: filter),
+    serverKey: serverKey,
   );
 
-  void setSplitWidePages(WidePageSplitMode mode, {String? seriesId}) =>
+  void setLockZoom(bool enabled, {String? seriesId, String? serverKey}) =>
       _updateConfig(
         seriesId,
-        (ReaderConfig c) => c.copyWith(splitWidePages: mode),
+        (ReaderConfig c) => c.copyWith(lockZoom: enabled),
+        serverKey: serverKey,
       );
 
-  void setPageTurn(ReaderPageTurnChoice choice, {String? seriesId}) =>
-      _updateConfig(seriesId, (ReaderConfig c) => c.copyWith(pageTurn: choice));
+  void setTrimBorders(bool enabled, {String? seriesId, String? serverKey}) =>
+      _updateConfig(
+        seriesId,
+        (ReaderConfig c) => c.copyWith(trimBorders: enabled),
+        serverKey: serverKey,
+      );
+
+  void setSplitWidePages(
+    WidePageSplitMode mode, {
+    String? seriesId,
+    String? serverKey,
+  }) => _updateConfig(
+    seriesId,
+    (ReaderConfig c) => c.copyWith(splitWidePages: mode),
+    serverKey: serverKey,
+  );
+
+  void setPageTurn(
+    ReaderPageTurnChoice choice, {
+    String? seriesId,
+    String? serverKey,
+  }) => _updateConfig(
+    seriesId,
+    (ReaderConfig c) => c.copyWith(pageTurn: choice),
+    serverKey: serverKey,
+  );
 
   /// 点击区预设 / 反转 / 双击缩放（RDR-07）：都随 [ReaderConfig] 支持按系列覆盖。
-  void setTapZone(TapZonePreset preset, {String? seriesId}) =>
-      _updateConfig(seriesId, (ReaderConfig c) => c.copyWith(tapZone: preset));
-
-  void setInvertTapZones(bool enabled, {String? seriesId}) => _updateConfig(
+  void setTapZone(
+    TapZonePreset preset, {
+    String? seriesId,
+    String? serverKey,
+  }) => _updateConfig(
     seriesId,
-    (ReaderConfig c) => c.copyWith(invertTapZones: enabled),
+    (ReaderConfig c) => c.copyWith(tapZone: preset),
+    serverKey: serverKey,
   );
 
-  void setDoubleTapZoom(bool enabled, {String? seriesId}) => _updateConfig(
-    seriesId,
-    (ReaderConfig c) => c.copyWith(doubleTapZoom: enabled),
-  );
+  void setInvertTapZones(bool enabled, {String? seriesId, String? serverKey}) =>
+      _updateConfig(
+        seriesId,
+        (ReaderConfig c) => c.copyWith(invertTapZones: enabled),
+        serverKey: serverKey,
+      );
+
+  void setDoubleTapZoom(bool enabled, {String? seriesId, String? serverKey}) =>
+      _updateConfig(
+        seriesId,
+        (ReaderConfig c) => c.copyWith(doubleTapZoom: enabled),
+        serverKey: serverKey,
+      );
 
   /// 自动滚动速度 1–10（RDR-08）：随 [ReaderConfig] 走。
-  void setAutoScrollSpeed(int speed, {String? seriesId}) => _updateConfig(
-    seriesId,
-    (ReaderConfig c) => c.copyWith(autoScrollSpeed: speed.clamp(1, 10)),
-  );
+  void setAutoScrollSpeed(int speed, {String? seriesId, String? serverKey}) =>
+      _updateConfig(
+        seriesId,
+        (ReaderConfig c) => c.copyWith(autoScrollSpeed: speed.clamp(1, 10)),
+        serverKey: serverKey,
+      );
 
   /// 平板默认排版（PLT-02）：全局设置，不进系列覆盖。
   void setTabletLayout(TabletLayoutChoice choice) =>
       _update(state.copyWith(tabletLayout: choice));
 
   /// chrome 是否显示本次阅读时长（HIS-04）：随 [ReaderConfig] 走。
-  void setShowSessionTime(bool enabled, {String? seriesId}) => _updateConfig(
+  void setShowSessionTime(
+    bool enabled, {
+    String? seriesId,
+    String? serverKey,
+  }) => _updateConfig(
     seriesId,
     (ReaderConfig c) => c.copyWith(showSessionTime: enabled),
+    serverKey: serverKey,
   );
 
   /// 记住/清除某本书的双页分组起点（RDR-06 / ARC-07）；[index] 为 null 表示恢复自动。
-  void setSpreadFrom(String bookId, int? index) =>
-      _update(state.withSpreadFrom(bookId, index, serverKey: _serverKey));
+  void setSpreadFrom(String bookId, int? index, {String? serverKey}) => _update(
+    state.withSpreadFrom(
+      bookId,
+      index,
+      serverKey: _resolveServerKey(serverKey),
+    ),
+  );
 
   /// 把某一组设置恢复默认（RDR-04）：只动这一组，其它组不受影响。
-  void resetGroup(ReaderSettingsGroup group, {String? seriesId}) =>
-      _updateConfig(seriesId, (ReaderConfig c) => c.resetGroup(group));
+  void resetGroup(
+    ReaderSettingsGroup group, {
+    String? seriesId,
+    String? serverKey,
+  }) => _updateConfig(
+    seriesId,
+    (ReaderConfig c) => c.resetGroup(group),
+    serverKey: serverKey,
+  );
 
   /// 打开/关闭"按系列记住"（UI-P3-2 / ARC-07 按服务器分区）。
-  void setSeriesOverride(String seriesId, bool enabled) {
-    final serverKey = _serverKey;
+  void setSeriesOverride(String seriesId, bool enabled, {String? serverKey}) {
+    final resolvedKey = _resolveServerKey(serverKey);
     if (!enabled) {
-      if (!state.hasSeriesOverride(seriesId, serverKey: serverKey)) return;
-      _update(state.withSeriesOverride(seriesId, null, serverKey: serverKey));
+      if (!state.hasSeriesOverride(seriesId, serverKey: resolvedKey)) return;
+      _update(state.withSeriesOverride(seriesId, null, serverKey: resolvedKey));
       return;
     }
     _update(
       state.withSeriesOverride(
         seriesId,
-        state.forSeries(seriesId, serverKey: serverKey),
-        serverKey: serverKey,
+        state.forSeries(seriesId, serverKey: resolvedKey),
+        serverKey: resolvedKey,
       ),
     );
   }
 
   /// 把当前配置存成一个命名预设（UI-P3-1）。
-  void savePreset(String name, {String? seriesId}) {
+  void savePreset(String name, {String? seriesId, String? serverKey}) {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return;
     final preset = ReaderPreset(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       name: trimmed,
-      config: state.forSeries(seriesId, serverKey: _serverKey),
+      config: state.forSeries(
+        seriesId,
+        serverKey: _resolveServerKey(serverKey),
+      ),
     );
     _update(state.copyWith(presets: <ReaderPreset>[...state.presets, preset]));
   }
 
   /// 应用一个预设：直接替换全局 [ReaderConfig] 或指定系列的覆盖。
-  void applyPreset(String id, {String? seriesId}) {
+  void applyPreset(String id, {String? seriesId, String? serverKey}) {
+    final resolvedKey = _resolveServerKey(serverKey);
     for (final preset in state.presets) {
       if (preset.id != id) continue;
       if (seriesId != null) {
@@ -164,7 +243,7 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
           state.withSeriesOverride(
             seriesId,
             preset.config,
-            serverKey: _serverKey,
+            serverKey: resolvedKey,
           ),
         );
       } else {
@@ -183,21 +262,22 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
     _update(state.copyWith(presets: next));
   }
 
-  /// 有 seriesId 时只改当前服务器下这个系列的覆盖；没有时改全局 [ReaderConfig]。
+  /// 有 seriesId 时只改目标内容源下这个系列的覆盖；没有时改全局 [ReaderConfig]。
   void _updateConfig(
     String? seriesId,
-    ReaderConfig Function(ReaderConfig current) change,
-  ) {
+    ReaderConfig Function(ReaderConfig current) change, {
+    String? serverKey,
+  }) {
     if (seriesId == null) {
       _update(state.copyWith(global: change(state.global)));
       return;
     }
-    final serverKey = _serverKey;
+    final resolvedKey = _resolveServerKey(serverKey);
     _update(
       state.withSeriesOverride(
         seriesId,
-        change(state.forSeries(seriesId, serverKey: serverKey)),
-        serverKey: serverKey,
+        change(state.forSeries(seriesId, serverKey: resolvedKey)),
+        serverKey: resolvedKey,
       ),
     );
   }

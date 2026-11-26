@@ -77,11 +77,8 @@ Future<void> _uploadProgress(
   String scope,
   ProgressTarget target,
 ) async {
-  final komga = ref.read(komgaSessionProvider);
+  final komga = ref.read(komgaSessionForServerProvider(scope));
   if (komga == null) throw const NetworkFailure();
-  if (scope.isNotEmpty && komga.address.baseUrl != scope) {
-    throw const NetworkFailure();
-  }
 
   try {
     await komga.updateReadProgress(

@@ -14,7 +14,7 @@ typedef ScopedProgressUpload = Future<void> Function(
   ProgressTarget target,
 );
 
-/// 进度同步：本地按服务器分区先写，再仅对当前连接服务器尽力提交。
+/// 进度同步：本地按服务器分区先写，再按所属分区尽力提交至对应源。
 class ProgressSyncService {
   ProgressSyncService({
     required ProgressStore store,
@@ -33,7 +33,7 @@ class ProgressSyncService {
   final ScopedProgressUpload _upload;
 
   Future<void>? _inFlight;
-  bool _needsAnotherPass = false;
+  final Set<String> _pendingFlushScopes = <String>{};
   final Set<String> _authBlockedScopes = <String>{};
   static const int _maxKnownBooksPerScope = 256;
   final Map<String, Map<String, Book>> _knownBooks =
@@ -61,15 +61,21 @@ class ProgressSyncService {
   }) => _store.forceAdopt(bookId, remote, scope: scope ?? _activeScope());
 
   /// 记一页进度：
-  /// - 本机书籍（`bookId` 以 `'local:'` 开头）直接落盘至 `kLocalSourceKey`（`pendingSeq = null`），不入远程队列；
-  /// - 远程服务器书籍先落入对应服务器分区，再尽力提交（不阻塞调用方）。
+  /// - 本机源（[scope] 为 [kLocalSourceKey]）直接落盘至 `kLocalSourceKey`（`pendingSeq = null`），不入远程队列；
+  /// - 远程服务器先落入对应 [scope] 分区，再针对该分区触发冲洗提交（不阻塞调用方）。
   Future<void> save(
     String bookId, {
     required int page,
     required bool completed,
     String? scope,
   }) async {
-    if (bookId.startsWith('local:')) {
+    final effectiveScope = (scope != null && scope.isNotEmpty)
+        ? scope
+        : _activeScope();
+    final isLocalTarget =
+        effectiveScope == kLocalSourceKey ||
+        (effectiveScope.isEmpty && bookId.startsWith('local:'));
+    if (isLocalTarget) {
       await _store.forceAdopt(
         bookId,
         ReadProgress(
@@ -81,15 +87,12 @@ class ProgressSyncService {
       );
       return;
     }
-    final effectiveScope = (scope != null && !isLocalSourceKey(scope))
-        ? scope
-        : _activeScope();
     await _store.enqueue(
       ProgressTarget(bookId: bookId, page: page, completed: completed),
       scope: effectiveScope,
     );
     _authBlockedScopes.remove(effectiveScope);
-    unawaited(flush());
+    unawaited(flush(scope: effectiveScope));
   }
 
   /// 解除指定服务器（或全部）的鉴权停手标记（切换服务器或重登后调用）。
@@ -101,14 +104,13 @@ class ProgressSyncService {
     }
   }
 
-  /// 提交当前活动服务器分区的待提交项。已在跑时记一笔续跑标记并复用同一个 Future，
-  /// 避免上一轮收尾瞬间新入队的进度漏刷。
-  Future<void> flush() {
+  /// 提交指定分区（默认当前活动服务器分区）的待提交项。
+  /// 已在跑时登记待冲洗分区并复用同一个 Future，避免上一轮收尾瞬间新入队的进度漏刷。
+  Future<void> flush({String? scope}) {
+    final targetScope = scope ?? _activeScope();
+    _pendingFlushScopes.add(targetScope);
     final running = _inFlight;
-    if (running != null) {
-      _needsAnotherPass = true;
-      return running;
-    }
+    if (running != null) return running;
     final completer = Completer<void>();
     _inFlight = completer.future;
     unawaited(
@@ -121,18 +123,18 @@ class ProgressSyncService {
   }
 
   Future<void> _drainFlushLoop() async {
-    do {
-      _needsAnotherPass = false;
-      await _flushLoop();
-    } while (_needsAnotherPass);
+    while (_pendingFlushScopes.isNotEmpty) {
+      final batch = List<String>.of(_pendingFlushScopes);
+      _pendingFlushScopes.clear();
+      for (final scope in batch) {
+        await _flushScope(scope);
+      }
+    }
   }
 
-  Future<void> _flushLoop() async {
-    final scope = _activeScope();
+  Future<void> _flushScope(String scope) async {
     if (scope == kLocalSourceKey || _authBlockedScopes.contains(scope)) return;
     for (final item in await _store.pending(scope: scope)) {
-      // 若冲洗中途用户切换了服务器，立即停手，绝不把旧服条目发给新服。
-      if (_activeScope() != scope) return;
       try {
         await _upload(scope, item.target);
         await _store.ack(item.target.bookId, item.seq, scope: scope);
@@ -149,19 +151,19 @@ class ProgressSyncService {
     }
   }
 
-  /// 把一批书的进度换成当前服务器分区"本地优先"的版本。
-  Future<List<Book>> overlay(List<Book> books) async {
+  /// 把一批书的进度换成指定服务器分区"本地优先"的版本。
+  Future<List<Book>> overlay(List<Book> books, {String? scope}) async {
     if (books.isEmpty) return books;
-    final scope = _activeScope();
+    final targetScope = scope ?? _activeScope();
     final records = await _store.records(
       books.map((Book b) => b.id),
-      scope: scope,
+      scope: targetScope,
     );
     var needsFlush = false;
 
     final merged = <Book>[];
     for (final book in books) {
-      noteBook(book, scope: scope);
+      noteBook(book, scope: targetScope);
       final record = records[book.id];
       final decision = _decide(record, book.readProgress);
 
@@ -170,7 +172,11 @@ class ProgressSyncService {
           needsFlush = true;
           merged.add(book.withProgress(record!.toReadProgress()));
         case SyncAction.adoptRemote:
-          await _store.adoptRemote(book.id, decision.remote, scope: scope);
+          await _store.adoptRemote(
+            book.id,
+            decision.remote,
+            scope: targetScope,
+          );
           merged.add(book.withProgress(decision.remote));
         case SyncAction.inSync || SyncAction.staleRemote:
           merged.add(
@@ -179,31 +185,29 @@ class ProgressSyncService {
       }
     }
 
-    if (needsFlush) unawaited(flush());
+    if (needsFlush) unawaited(flush(scope: targetScope));
     return merged;
   }
 
   /// 单本叠加（阅读器 resume 用）。
-  Future<Book?> overlayOne(Book? book) async {
+  Future<Book?> overlayOne(Book? book, {String? scope}) async {
     if (book == null) return null;
-    return (await overlay(<Book>[book])).single;
+    return (await overlay(<Book>[book], scope: scope)).single;
   }
 
-  /// 当前服务器分区中"尚未同步成功且仍在读"的本地书籍（按最近写入倒序）。
-  ///
-  /// 解决"服务端同步失败/离线时，刚打开或翻过的书没有进入服务端 IN_PROGRESS 列表"：
-  /// 优先用内存已知元信息构造 [Book]，未知时再尝试 [loadBook]（命中 HTTP 缓存或在线补查）。
+  /// 指定服务器分区中"尚未同步成功且仍在读"的本地书籍（按最近写入倒序）。
   Future<List<Book>> pendingInProgressBooks({
     Future<Book?> Function(String bookId)? loadBook,
+    String? scope,
   }) async {
-    final scope = _activeScope();
-    final pending = await _store.pending(scope: scope);
+    final targetScope = scope ?? _activeScope();
+    final pending = await _store.pending(scope: targetScope);
     if (pending.isEmpty) return const <Book>[];
 
-    final known = _knownBooks[scope];
+    final known = _knownBooks[targetScope];
     final records = await _store.records(
       pending.map((PendingProgress p) => p.target.bookId),
-      scope: scope,
+      scope: targetScope,
     );
     final result = <Book>[];
     for (final item in pending.reversed) {

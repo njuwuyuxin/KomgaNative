@@ -13,6 +13,7 @@ import 'package:yomu/src/widgets/reader_palette.dart';
 import 'package:yomu/src/widgets/reader_quick_settings_sheet.dart';
 import 'package:yomu/src/widgets/reader_settings_sheet.dart';
 import 'package:yomu/src/widgets/reader_toc_sheet.dart';
+import 'package:yomu/src/widgets/scoped_source_scope.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu_reader/yomu_reader.dart';
 
@@ -73,12 +74,15 @@ class ReaderTopBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final sourceKey = ScopedSourceScope.maybeOf(context);
     final isLocalBook = bookId.startsWith('local:') && seriesId != null;
+    final tocQuery = (sourceKey: sourceKey, bookId: bookId);
     final bookmarks =
-        ref.watch(bookBookmarksProvider(bookId)).value ??
+        ref.watch(bookBookmarksProvider(tocQuery)).value ??
         const <PageBookmark>[];
     final chapters =
-        ref.watch(bookChaptersProvider(bookId)).value ?? const <BookChapter>[];
+        ref.watch(bookChaptersProvider(tocQuery)).value ??
+        const <BookChapter>[];
     final isBookmarked = bookmarks.any((PageBookmark b) => b.page == page);
     final canOpenToc =
         seriesId != null || chapters.isNotEmpty || bookmarks.isNotEmpty;
@@ -148,9 +152,10 @@ class ReaderTopBar extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final messenger = ScaffoldMessenger.maybeOf(context);
     try {
+      final sourceKey = ScopedSourceScope.readOf(context);
       final added = await ref
           .read(bookmarkControllerProvider)
-          .toggle(bookId: bookId, page: page);
+          .toggle(bookId: bookId, page: page, sourceKey: sourceKey);
       if (messenger != null) {
         messenger
           ..hideCurrentSnackBar()

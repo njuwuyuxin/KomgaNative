@@ -212,6 +212,7 @@ void main() {
         final store = InMemoryProgressStore();
         await store.enqueue(
           const ProgressTarget(bookId: 'b1', page: 17, completed: false),
+          scope: 'https://komga.example.com',
         );
         final adapter = _Adapter((RequestOptions options) async {
           if (options.uri.path == '/api/v1/books/b1') {
@@ -282,6 +283,7 @@ void main() {
       final store = InMemoryProgressStore();
       await store.enqueue(
         const ProgressTarget(bookId: 's1-b1', page: 20, completed: true),
+        scope: 'https://komga.example.com',
       );
       final adapter = _Adapter((RequestOptions options) async {
         if (options.uri.path == '/api/v1/books') {
@@ -321,6 +323,7 @@ void main() {
       await repository.books('s1');
       await store.enqueue(
         const ProgressTarget(bookId: 's1-b1', page: 1, completed: false),
+        scope: 'https://komga.example.com',
       );
 
       final page = await repository.ondeck();

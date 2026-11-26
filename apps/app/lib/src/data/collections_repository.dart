@@ -296,7 +296,7 @@ class KomgaCollectionsRepository implements CollectionsRepository {
         page: page,
         size: size,
       );
-      final overlaid = await overlayBooksPage(_sync, result);
+      final overlaid = await overlayBooksPage(_sync, result, scope: _sourceKey);
       return PageResult<Book>(
         items: <Book>[for (final b in overlaid.items) b.withSource(_sourceKey)],
         totalElements: overlaid.totalElements,

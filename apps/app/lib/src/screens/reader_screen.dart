@@ -109,12 +109,12 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     WidgetsBinding.instance.addObserver(this);
     // 阅读会话与进度收尾服务在 initState 预取（dispose 里不能再碰 ref）。
     _session.start(page: widget.book?.readProgress?.page ?? 1);
-    final activeKey = ref.read(activeServerKeyProvider);
-    _bookScope = widget.bookId.startsWith('local:')
-        ? kLocalSourceKey
-        : ((widget.book?.isCloud ?? false)
-              ? widget.book!.sourceKey
-              : activeKey);
+    final initialKey = widget.sourceKey;
+    if (initialKey != null && initialKey.isNotEmpty) {
+      _resolvedSourceKey = initialKey;
+    } else if (widget.book?.isCloud ?? false) {
+      _resolvedSourceKey = widget.book!.sourceKey;
+    }
     _recorder = ref.read(readingSessionRecorderProvider);
     _progressSync = ref.read(progressSyncProvider);
     _committer = ref.read(readerProgressCommitterProvider);
@@ -130,7 +130,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     final scoped = widget.sourceKey ?? ScopedSourceScope.maybeOf(context);
     if (scoped != null && scoped.isNotEmpty) {
       _resolvedSourceKey = scoped;
-      _bookScope = scoped;
     }
   }
 

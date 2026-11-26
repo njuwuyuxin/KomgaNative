@@ -34,6 +34,7 @@ class KomgaReadStatusRepository implements ReadStatusRepository {
         await _session.markSeriesUnread(seriesId);
       }
       final now = DateTime.now().toUtc();
+      final scope = _session.address.baseUrl;
       for (final book in books.items) {
         await _sync.forceAdopt(
           book.id,
@@ -44,6 +45,7 @@ class KomgaReadStatusRepository implements ReadStatusRepository {
                   lastModified: now,
                 )
               : null,
+          scope: scope,
         );
       }
     } on KomgaError catch (error) {
@@ -59,6 +61,7 @@ class KomgaReadStatusRepository implements ReadStatusRepository {
   }) async {
     try {
       final now = DateTime.now().toUtc();
+      final scope = _session.address.baseUrl;
       if (read) {
         await _session.updateReadProgress(
           bookId,
@@ -72,10 +75,11 @@ class KomgaReadStatusRepository implements ReadStatusRepository {
             completed: true,
             lastModified: now,
           ),
+          scope: scope,
         );
       } else {
         await _session.markBookUnread(bookId);
-        await _sync.forceAdopt(bookId, null);
+        await _sync.forceAdopt(bookId, null, scope: scope);
       }
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);

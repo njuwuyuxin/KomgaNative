@@ -16,6 +16,7 @@ class ReaderSettingsColorInteraction extends StatelessWidget {
     required this.palette,
     required this.controller,
     required this.writeSeriesId,
+    this.serverKey,
     super.key,
   });
 
@@ -23,6 +24,7 @@ class ReaderSettingsColorInteraction extends StatelessWidget {
   final ReaderPalette palette;
   final ReaderPrefsController controller;
   final String? writeSeriesId;
+  final String? serverKey;
 
   @override
   Widget build(BuildContext context) {
@@ -40,6 +42,7 @@ class ReaderSettingsColorInteraction extends StatelessWidget {
           onReset: () => controller.resetGroup(
             ReaderSettingsGroup.color,
             seriesId: writeSeriesId,
+            serverKey: serverKey,
           ),
         ),
         if (!palette.isEink) ...<Widget>[
@@ -52,7 +55,11 @@ class ReaderSettingsColorInteraction extends StatelessWidget {
             keyPrefix: 'reader-background',
             palette: palette,
             onSelect: (ReaderBackgroundChoice value) =>
-                controller.setBackground(value, seriesId: writeSeriesId),
+                controller.setBackground(
+                  value,
+                  seriesId: writeSeriesId,
+                  serverKey: serverKey,
+                ),
           ),
           const SizedBox(height: AppSpacing.sm),
         ],
@@ -72,8 +79,11 @@ class ReaderSettingsColorInteraction extends StatelessWidget {
                 max: 1,
                 activeColor: palette.foreground,
                 inactiveColor: palette.outline,
-                onChanged: (double value) =>
-                    controller.setBrightness(value, seriesId: writeSeriesId),
+                onChanged: (double value) => controller.setBrightness(
+                  value,
+                  seriesId: writeSeriesId,
+                  serverKey: serverKey,
+                ),
               ),
             ),
             SizedBox(
@@ -108,7 +118,11 @@ class ReaderSettingsColorInteraction extends StatelessWidget {
                   preset: ReaderImageFilterPreset.custom,
                 ),
             };
-            controller.setImageFilter(next, seriesId: writeSeriesId);
+            controller.setImageFilter(
+              next,
+              seriesId: writeSeriesId,
+              serverKey: serverKey,
+            );
           },
         ),
         if (prefs.imageFilter.preset ==
@@ -124,6 +138,7 @@ class ReaderSettingsColorInteraction extends StatelessWidget {
             onChanged: (double v) => controller.setImageFilter(
               prefs.imageFilter.copyWith(contrast: v),
               seriesId: writeSeriesId,
+              serverKey: serverKey,
             ),
           ),
           _FilterSliderRow(
@@ -137,6 +152,7 @@ class ReaderSettingsColorInteraction extends StatelessWidget {
             onChanged: (double v) => controller.setImageFilter(
               prefs.imageFilter.copyWith(whiteThreshold: v.round()),
               seriesId: writeSeriesId,
+              serverKey: serverKey,
             ),
           ),
           ReaderSettingsSwitch(
@@ -148,6 +164,7 @@ class ReaderSettingsColorInteraction extends StatelessWidget {
             onChanged: (bool value) => controller.setImageFilter(
               prefs.imageFilter.copyWith(grayscale: value),
               seriesId: writeSeriesId,
+              serverKey: serverKey,
             ),
           ),
         ],
@@ -160,6 +177,7 @@ class ReaderSettingsColorInteraction extends StatelessWidget {
           onReset: () => controller.resetGroup(
             ReaderSettingsGroup.interaction,
             seriesId: writeSeriesId,
+            serverKey: serverKey,
           ),
         ),
         ReaderOptionSection<ReaderPageTurnChoice>(
@@ -170,8 +188,11 @@ class ReaderSettingsColorInteraction extends StatelessWidget {
           hint: readerPageTurnHint,
           keyPrefix: 'reader-turn',
           palette: palette,
-          onSelect: (ReaderPageTurnChoice value) =>
-              controller.setPageTurn(value, seriesId: writeSeriesId),
+          onSelect: (ReaderPageTurnChoice value) => controller.setPageTurn(
+            value,
+            seriesId: writeSeriesId,
+            serverKey: serverKey,
+          ),
         ),
         const SizedBox(height: AppSpacing.sm),
         ReaderSettingsSwitch(
@@ -180,8 +201,11 @@ class ReaderSettingsColorInteraction extends StatelessWidget {
           title: l10n.readerLockZoom,
           hint: l10n.readerLockZoomHint,
           palette: palette,
-          onChanged: (bool value) =>
-              controller.setLockZoom(value, seriesId: writeSeriesId),
+          onChanged: (bool value) => controller.setLockZoom(
+            value,
+            seriesId: writeSeriesId,
+            serverKey: serverKey,
+          ),
         ),
         ReaderSettingsSwitch(
           switchKey: const Key('reader-keep-awake'),
@@ -189,8 +213,11 @@ class ReaderSettingsColorInteraction extends StatelessWidget {
           title: l10n.keepScreenAwake,
           hint: l10n.keepScreenAwakeHint,
           palette: palette,
-          onChanged: (bool value) =>
-              controller.setKeepAwake(value, seriesId: writeSeriesId),
+          onChanged: (bool value) => controller.setKeepAwake(
+            value,
+            seriesId: writeSeriesId,
+            serverKey: serverKey,
+          ),
         ),
       ],
     );

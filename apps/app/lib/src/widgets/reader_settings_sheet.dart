@@ -11,6 +11,7 @@ import 'package:yomu/src/widgets/reader_preset_section.dart';
 import 'package:yomu/src/widgets/reader_settings_color_interaction.dart';
 import 'package:yomu/src/widgets/reader_settings_group.dart';
 import 'package:yomu/src/widgets/reader_settings_rows.dart';
+import 'package:yomu/src/widgets/scoped_source_scope.dart';
 import 'package:yomu_reader/yomu_reader.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -21,30 +22,36 @@ Future<void> showReaderSettingsSheet(
   required int page,
   required int total,
   String? seriesId,
+  String? sourceKey,
   required ValueChanged<int> onJump,
 }) {
+  final resolvedSource = sourceKey ?? ScopedSourceScope.readOf(context);
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     enableDrag: true,
     backgroundColor: Colors.transparent,
     elevation: 0,
-    builder: (BuildContext context) => FrostedSurface(
-      kind: AppMaterialKind.sheet,
-      material: AppMaterial.resolve(
-        AppMaterialKind.sheet,
-        eink: palette.isEink,
-        dark: !palette.isEink,
-      ),
-      shape: AppShapes.sheet(eink: palette.isEink),
-      child: Material(
-        type: MaterialType.transparency,
-        child: ReaderSettingsSheet(
-          palette: palette,
-          page: page,
-          total: total,
-          seriesId: seriesId,
-          onJump: onJump,
+    builder: (BuildContext context) => ScopedSourceScope(
+      sourceKey: resolvedSource,
+      child: FrostedSurface(
+        kind: AppMaterialKind.sheet,
+        material: AppMaterial.resolve(
+          AppMaterialKind.sheet,
+          eink: palette.isEink,
+          dark: !palette.isEink,
+        ),
+        shape: AppShapes.sheet(eink: palette.isEink),
+        child: Material(
+          type: MaterialType.transparency,
+          child: ReaderSettingsSheet(
+            palette: palette,
+            page: page,
+            total: total,
+            seriesId: seriesId,
+            sourceKey: resolvedSource,
+            onJump: onJump,
+          ),
         ),
       ),
     ),
@@ -58,6 +65,7 @@ class ReaderSettingsSheet extends ConsumerWidget {
     required this.total,
     required this.onJump,
     this.seriesId,
+    this.sourceKey,
     super.key,
   });
 
@@ -66,12 +74,16 @@ class ReaderSettingsSheet extends ConsumerWidget {
   final int total;
   final ValueChanged<int> onJump;
   final String? seriesId;
+  final String? sourceKey;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final global = ref.watch(readerPrefsProvider);
-    final serverKey = ref.watch(activeServerKeyProvider);
+    final serverKey =
+        sourceKey ??
+        ScopedSourceScope.maybeOf(context) ??
+        ref.watch(activeServerKeyProvider);
     final controller = ref.read(readerPrefsProvider.notifier);
     final textStyle = Theme.of(context).textTheme;
     final seriesId = this.seriesId;
@@ -159,19 +171,28 @@ class ReaderSettingsSheet extends ConsumerWidget {
                         title: l10n.readerSeriesRemember,
                         hint: l10n.readerSeriesRememberHint,
                         palette: palette,
-                        onChanged: (bool value) =>
-                            controller.setSeriesOverride(seriesId, value),
+                        onChanged: (bool value) => controller.setSeriesOverride(
+                          seriesId,
+                          value,
+                          serverKey: serverKey,
+                        ),
                       ),
                       const SizedBox(height: AppSpacing.sm),
                     ],
                     ReaderPresetSection(
                       presets: global.presets,
                       palette: palette,
-                      onApply: (String id) =>
-                          controller.applyPreset(id, seriesId: writeSeriesId),
+                      onApply: (String id) => controller.applyPreset(
+                        id,
+                        seriesId: writeSeriesId,
+                        serverKey: serverKey,
+                      ),
                       onDelete: controller.deletePreset,
-                      onSave: (String name) =>
-                          controller.savePreset(name, seriesId: writeSeriesId),
+                      onSave: (String name) => controller.savePreset(
+                        name,
+                        seriesId: writeSeriesId,
+                        serverKey: serverKey,
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.md),
                     ReaderSettingsGroupHeader(
@@ -182,6 +203,7 @@ class ReaderSettingsSheet extends ConsumerWidget {
                       onReset: () => controller.resetGroup(
                         ReaderSettingsGroup.pages,
                         seriesId: writeSeriesId,
+                        serverKey: serverKey,
                       ),
                     ),
                     ReaderOptionSection<ReaderModeChoice>(
@@ -192,8 +214,11 @@ class ReaderSettingsSheet extends ConsumerWidget {
                       hint: readerModeHint,
                       keyPrefix: 'reader-mode',
                       palette: palette,
-                      onSelect: (ReaderModeChoice value) =>
-                          controller.setMode(value, seriesId: writeSeriesId),
+                      onSelect: (ReaderModeChoice value) => controller.setMode(
+                        value,
+                        seriesId: writeSeriesId,
+                        serverKey: serverKey,
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     ReaderJumpSlider(
@@ -213,6 +238,7 @@ class ReaderSettingsSheet extends ConsumerWidget {
                       onReset: () => controller.resetGroup(
                         ReaderSettingsGroup.layout,
                         seriesId: writeSeriesId,
+                        serverKey: serverKey,
                       ),
                     ),
                     ReaderOptionSection<ReaderFitChoice>(
@@ -225,8 +251,11 @@ class ReaderSettingsSheet extends ConsumerWidget {
                       palette: palette,
                       preview: (BuildContext context, ReaderFitChoice value) =>
                           ReaderFitPreview(fit: value, palette: palette),
-                      onSelect: (ReaderFitChoice value) =>
-                          controller.setFit(value, seriesId: writeSeriesId),
+                      onSelect: (ReaderFitChoice value) => controller.setFit(
+                        value,
+                        seriesId: writeSeriesId,
+                        serverKey: serverKey,
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.md),
                     ReaderOptionSection<ReaderDirectionChoice>(
@@ -237,8 +266,12 @@ class ReaderSettingsSheet extends ConsumerWidget {
                       hint: readerDirectionHint,
                       keyPrefix: 'reader-direction',
                       palette: palette,
-                      onSelect: (ReaderDirectionChoice value) => controller
-                          .setDirection(value, seriesId: writeSeriesId),
+                      onSelect: (ReaderDirectionChoice value) =>
+                          controller.setDirection(
+                            value,
+                            seriesId: writeSeriesId,
+                            serverKey: serverKey,
+                          ),
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     ReaderSettingsSwitch(
@@ -250,6 +283,7 @@ class ReaderSettingsSheet extends ConsumerWidget {
                       onChanged: (bool value) => controller.setTrimBorders(
                         value,
                         seriesId: writeSeriesId,
+                        serverKey: serverKey,
                       ),
                     ),
                     const SizedBox(height: AppSpacing.sm),
@@ -261,8 +295,12 @@ class ReaderSettingsSheet extends ConsumerWidget {
                       hint: readerSplitWideHint,
                       keyPrefix: 'reader-split-wide',
                       palette: palette,
-                      onSelect: (WidePageSplitMode value) => controller
-                          .setSplitWidePages(value, seriesId: writeSeriesId),
+                      onSelect: (WidePageSplitMode value) =>
+                          controller.setSplitWidePages(
+                            value,
+                            seriesId: writeSeriesId,
+                            serverKey: serverKey,
+                          ),
                     ),
                     const SizedBox(height: AppSpacing.md),
                     ReaderSettingsColorInteraction(
@@ -270,6 +308,7 @@ class ReaderSettingsSheet extends ConsumerWidget {
                       palette: palette,
                       controller: controller,
                       writeSeriesId: writeSeriesId,
+                      serverKey: serverKey,
                     ),
                   ],
                 ),

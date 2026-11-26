@@ -60,9 +60,10 @@ class KomgaReaderRepository implements ReaderRepository {
   @override
   Future<Book?> book(String bookId) async {
     try {
+      final scope = _session.address.baseUrl;
       final book = await _session.fetchBook(bookId);
-      final overlaid = await _sync.overlayOne(book);
-      return overlaid?.withSource(_session.address.baseUrl);
+      final overlaid = await _sync.overlayOne(book, scope: scope);
+      return overlaid?.withSource(scope);
     } on KomgaNotFoundError {
       return null;
     } on KomgaError catch (error) {

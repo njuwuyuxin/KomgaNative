@@ -73,7 +73,7 @@ class ReaderProgressCommitter {
     );
 
     // 第二阶段：等服务端 PATCH 完成后，再刷一次依赖服务端聚合计数的系列详情与书架。
-    await sync.flush();
+    await sync.flush(scope: sourceKey);
     if (_disposed) return;
     if (seriesId != null && sourceKey != null) {
       _ref.invalidate(

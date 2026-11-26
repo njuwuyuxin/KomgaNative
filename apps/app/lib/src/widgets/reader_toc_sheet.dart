@@ -122,11 +122,10 @@ class _ReaderTocSheetState extends ConsumerState<ReaderTocSheet> {
   }
 
   void _openBook(Book book) {
-    final route = '/reader/${book.id}';
     final sourceKey = widget.sourceKey ?? ScopedSourceScope.readOf(context);
     Navigator.of(context).pop();
-    this.context.pushReplacement(
-      route,
+    context.pushReplacement(
+      '/reader/${book.id}',
       extra: ReaderArgs(
         book: book,
         direction: widget.direction,
@@ -141,10 +140,15 @@ class _ReaderTocSheetState extends ConsumerState<ReaderTocSheet> {
   }
 
   void _removeBookmark(int page) {
+    final sourceKey = widget.sourceKey ?? ScopedSourceScope.readOf(context);
     unawaited(
       ref
           .read(bookmarkControllerProvider)
-          .remove(bookId: widget.currentBookId, page: page),
+          .remove(
+            bookId: widget.currentBookId,
+            page: page,
+            sourceKey: sourceKey,
+          ),
     );
   }
 
@@ -153,12 +157,14 @@ class _ReaderTocSheetState extends ConsumerState<ReaderTocSheet> {
     final l10n = AppLocalizations.of(context);
     final palette = widget.palette;
     final textStyle = AppTypography.of(context);
+    final sourceKey = widget.sourceKey ?? ScopedSourceScope.maybeOf(context);
+    final tocQuery = (sourceKey: sourceKey, bookId: widget.currentBookId);
 
     final chapters =
-        ref.watch(bookChaptersProvider(widget.currentBookId)).value ??
+        ref.watch(bookChaptersProvider(tocQuery)).value ??
         const <BookChapter>[];
     final bookmarks =
-        ref.watch(bookBookmarksProvider(widget.currentBookId)).value ??
+        ref.watch(bookBookmarksProvider(tocQuery)).value ??
         const <PageBookmark>[];
     final hasBookEntries = chapters.isNotEmpty || bookmarks.isNotEmpty;
     final hasSeries = widget.seriesId != null;
@@ -180,7 +186,6 @@ class _ReaderTocSheetState extends ConsumerState<ReaderTocSheet> {
         onRemoveBookmark: _removeBookmark,
       );
     } else if (hasSeries) {
-      final sourceKey = widget.sourceKey ?? ScopedSourceScope.maybeOf(context);
       final query = (
         sourceKey: sourceKey,
         seriesId: widget.seriesId!,

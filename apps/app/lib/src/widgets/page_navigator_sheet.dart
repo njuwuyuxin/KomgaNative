@@ -3,6 +3,7 @@ import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/src/widgets/page_thumbnail.dart';
 import 'package:yomu/src/widgets/reader_palette.dart';
+import 'package:yomu/src/widgets/scoped_source_scope.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 页缩略图面板的选择结果。
@@ -23,19 +24,24 @@ Future<void> showPageNavigator(
   required ReaderPalette palette,
   required ValueChanged<int> onJump,
   ValueChanged<int>? onGroupFrom,
+  String? sourceKey,
 }) async {
+  final resolvedSource = sourceKey ?? ScopedSourceScope.readOf(context);
   final choice = await showModalBottomSheet<PageNavigatorChoice>(
     context: context,
     isScrollControlled: true,
     backgroundColor: palette.background,
-    builder: (BuildContext context) => FractionallySizedBox(
-      heightFactor: 0.75,
-      child: PageNavigatorSheet(
-        bookId: bookId,
-        total: total,
-        currentPage: currentPage,
-        palette: palette,
-        allowGroup: onGroupFrom != null,
+    builder: (BuildContext context) => ScopedSourceScope(
+      sourceKey: resolvedSource,
+      child: FractionallySizedBox(
+        heightFactor: 0.75,
+        child: PageNavigatorSheet(
+          bookId: bookId,
+          total: total,
+          currentPage: currentPage,
+          palette: palette,
+          allowGroup: onGroupFrom != null,
+        ),
       ),
     ),
   );

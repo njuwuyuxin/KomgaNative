@@ -8,6 +8,7 @@ import 'package:yomu/src/providers/pinned_series_provider.dart';
 import 'package:yomu/src/providers/reader_prefs_provider.dart';
 import 'package:yomu/src/widgets/reader_palette.dart';
 import 'package:yomu/src/widgets/reader_settings_rows.dart';
+import 'package:yomu/src/widgets/scoped_source_scope.dart';
 import 'package:yomu_reader/yomu_reader.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -22,23 +23,32 @@ Future<void> showReaderQuickSettingsSheet(
   BuildContext context, {
   required ReaderPalette palette,
   String? seriesId,
+  String? sourceKey,
 }) {
+  final resolvedSource = sourceKey ?? ScopedSourceScope.readOf(context);
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     elevation: 0,
-    builder: (BuildContext context) => FrostedSurface(
-      kind: AppMaterialKind.sheet,
-      material: AppMaterial.resolve(
-        AppMaterialKind.sheet,
-        eink: palette.isEink,
-        dark: !palette.isEink,
-      ),
-      shape: AppShapes.sheet(eink: palette.isEink),
-      child: Material(
-        type: MaterialType.transparency,
-        child: ReaderQuickSettingsSheet(palette: palette, seriesId: seriesId),
+    builder: (BuildContext context) => ScopedSourceScope(
+      sourceKey: resolvedSource,
+      child: FrostedSurface(
+        kind: AppMaterialKind.sheet,
+        material: AppMaterial.resolve(
+          AppMaterialKind.sheet,
+          eink: palette.isEink,
+          dark: !palette.isEink,
+        ),
+        shape: AppShapes.sheet(eink: palette.isEink),
+        child: Material(
+          type: MaterialType.transparency,
+          child: ReaderQuickSettingsSheet(
+            palette: palette,
+            seriesId: seriesId,
+            sourceKey: resolvedSource,
+          ),
+        ),
       ),
     ),
   );
@@ -48,6 +58,7 @@ class ReaderQuickSettingsSheet extends ConsumerWidget {
   const ReaderQuickSettingsSheet({
     required this.palette,
     this.seriesId,
+    this.sourceKey,
     super.key,
   });
 
@@ -55,13 +66,17 @@ class ReaderQuickSettingsSheet extends ConsumerWidget {
 
   /// 当前书的系列：有值时这些改动只作用在这个系列（"按系列记住"开着的话）。
   final String? seriesId;
+  final String? sourceKey;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final all = ref.watch(readerPrefsProvider);
-    final serverKey = ref.watch(activeServerKeyProvider);
+    final serverKey =
+        sourceKey ??
+        ScopedSourceScope.maybeOf(context) ??
+        ref.watch(activeServerKeyProvider);
     // 与完整面板同一条规则：只有这个系列**已经**开了"按系列记住"才写覆盖，
     // 否则改动应该是全局的（否则用户会发现"改了只有这一本生效"）。
     final writeSeriesId = all.hasSeriesOverride(seriesId, serverKey: serverKey)
@@ -120,6 +135,7 @@ class ReaderQuickSettingsSheet extends ConsumerWidget {
                       onChanged: (double value) => controller.setBrightness(
                         value,
                         seriesId: writeSeriesId,
+                        serverKey: serverKey,
                       ),
                     ),
                   ),
@@ -145,8 +161,11 @@ class ReaderQuickSettingsSheet extends ConsumerWidget {
                   palette: palette,
                   keyPrefix: 'quick-background',
                   label: readerBackgroundLabel,
-                  onSelect: (value) =>
-                      controller.setBackground(value, seriesId: writeSeriesId),
+                  onSelect: (value) => controller.setBackground(
+                    value,
+                    seriesId: writeSeriesId,
+                    serverKey: serverKey,
+                  ),
                 ),
               ] else ...<Widget>[
                 const SizedBox(height: AppSpacing.sm),
@@ -161,6 +180,7 @@ class ReaderQuickSettingsSheet extends ConsumerWidget {
                         ? ReaderImageFilter.einkCrisp
                         : ReaderImageFilter.none,
                     seriesId: writeSeriesId,
+                    serverKey: serverKey,
                   ),
                   activeThumbColor: palette.foreground,
                   title: Text(
@@ -178,8 +198,11 @@ class ReaderQuickSettingsSheet extends ConsumerWidget {
                 palette: palette,
                 keyPrefix: 'quick-direction',
                 label: readerDirectionLabel,
-                onSelect: (value) =>
-                    controller.setDirection(value, seriesId: writeSeriesId),
+                onSelect: (value) => controller.setDirection(
+                  value,
+                  seriesId: writeSeriesId,
+                  serverKey: serverKey,
+                ),
               ),
               const SizedBox(height: AppSpacing.sm),
               ReaderSectionLabel(l10n.readerFit, palette: palette),
@@ -189,16 +212,22 @@ class ReaderQuickSettingsSheet extends ConsumerWidget {
                 palette: palette,
                 keyPrefix: 'quick-fit',
                 label: readerFitLabel,
-                onSelect: (value) =>
-                    controller.setFit(value, seriesId: writeSeriesId),
+                onSelect: (value) => controller.setFit(
+                  value,
+                  seriesId: writeSeriesId,
+                  serverKey: serverKey,
+                ),
               ),
               const SizedBox(height: AppSpacing.sm),
               SwitchListTile(
                 key: const Key('quick-lock-zoom'),
                 contentPadding: EdgeInsets.zero,
                 value: prefs.lockZoom,
-                onChanged: (bool value) =>
-                    controller.setLockZoom(value, seriesId: writeSeriesId),
+                onChanged: (bool value) => controller.setLockZoom(
+                  value,
+                  seriesId: writeSeriesId,
+                  serverKey: serverKey,
+                ),
                 activeThumbColor: palette.foreground,
                 title: Text(
                   l10n.readerLockZoom,

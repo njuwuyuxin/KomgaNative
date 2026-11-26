@@ -58,9 +58,7 @@ mixin _ReaderActions on ConsumerState<ReaderScreen>, _ReaderDerive {
       page: _page > 0 ? _page : null,
     );
     if (draft == null) return;
-    unawaited(
-      _recorder.record(draft, scope: _bookScope.isEmpty ? null : _bookScope),
-    );
+    unawaited(_recorder.record(draft, scope: _resolvedSourceKey));
   }
 
   /// 退出阅读器或切换下一本书时幂等落盘进度并通知书架/"正在读"联动刷新。
@@ -200,24 +198,23 @@ mixin _ReaderActions on ConsumerState<ReaderScreen>, _ReaderDerive {
   }
 
   void _groupFromPage(int page, int total) {
-    final index = page.clamp(1, total) - 1;
+    final clamped = page.clamp(1, total);
+    final index = clamped - 1;
     final next = _spreadFrom == index ? null : index;
-    ref.read(readerPrefsProvider.notifier).setSpreadFrom(widget.bookId, next);
+    final prefs = ref.read(readerPrefsProvider.notifier);
+    prefs.setSpreadFrom(
+      widget.bookId,
+      next,
+      serverKey: _resolvedSourceKey ?? ref.read(activeServerKeyProvider),
+    );
     if (next != null) {
-      _page = page.clamp(1, total);
+      _page = clamped;
       _scheduleProgress(_page);
     }
     unawaited(AppHaptics.selection());
     final l10n = AppLocalizations.of(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          next == null
-              ? l10n.readerGroupAutomatic
-              : l10n.readerGroupFrom(page.clamp(1, total)),
-        ),
-        duration: const Duration(seconds: 2),
-      ),
+    _showReaderToast(
+      next == null ? l10n.readerGroupAutomatic : l10n.readerGroupFrom(clamped),
     );
   }
 

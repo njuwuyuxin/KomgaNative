@@ -135,7 +135,7 @@ class KomgaLibraryRepository implements LibraryRepository {
   Future<Book?> book(String bookId) async {
     try {
       final fetched = await _session.fetchBook(bookId);
-      final overlaid = await _sync.overlayOne(fetched);
+      final overlaid = await _sync.overlayOne(fetched, scope: _sourceKey);
       return overlaid?.withSource(_sourceKey);
     } on KomgaNotFoundError {
       return null;
@@ -152,7 +152,9 @@ class KomgaLibraryRepository implements LibraryRepository {
   }) async {
     try {
       final result = await _session.searchBooks(query, page: page, size: size);
-      return _tagBooksPage(await overlayBooksPage(_sync, result));
+      return _tagBooksPage(
+        await overlayBooksPage(_sync, result, scope: _sourceKey),
+      );
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);
     }
@@ -174,7 +176,9 @@ class KomgaLibraryRepository implements LibraryRepository {
         sort: sort,
         readStatus: readStatus,
       );
-      return _tagBooksPage(await overlayBooksPage(_sync, result));
+      return _tagBooksPage(
+        await overlayBooksPage(_sync, result, scope: _sourceKey),
+      );
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);
     }
@@ -184,7 +188,7 @@ class KomgaLibraryRepository implements LibraryRepository {
   Future<PageResult<Book>> ondeck({int size = 20}) async {
     // 先尽力把本地积压的进度推上服务端，避免刚退出阅读器就拉到旧列表；
     // 断网时 flush 内部吞掉 ShelfFailure 立即返回，不阻塞离线回退。
-    await _sync.flush();
+    await _sync.flush(scope: _sourceKey);
 
     final PageResult<Book> inProgressRaw;
     try {
@@ -193,6 +197,7 @@ class KomgaLibraryRepository implements LibraryRepository {
       if (error is KomgaNetworkError || error is KomgaServerError) {
         final localOnly = await _sync.pendingInProgressBooks(
           loadBook: _tryLoadBook,
+          scope: _sourceKey,
         );
         if (localOnly.isNotEmpty) {
           final items = localOnly
@@ -217,17 +222,22 @@ class KomgaLibraryRepository implements LibraryRepository {
       if (inProgressRaw.items.isEmpty) {
         final localOnly = await _sync.pendingInProgressBooks(
           loadBook: _tryLoadBook,
+          scope: _sourceKey,
         );
         if (localOnly.isEmpty) throw shelfFailureOf(error);
       }
     }
 
-    final inProgressOverlay = await _sync.overlay(inProgressRaw.items);
+    final inProgressOverlay = await _sync.overlay(
+      inProgressRaw.items,
+      scope: _sourceKey,
+    );
     final nextOverlay = nextUnreadRaw == null
         ? const <Book>[]
-        : await _sync.overlay(nextUnreadRaw.items);
+        : await _sync.overlay(nextUnreadRaw.items, scope: _sourceKey);
     final pendingLocal = await _sync.pendingInProgressBooks(
       loadBook: _tryLoadBook,
+      scope: _sourceKey,
     );
 
     final merged = _mergeContinueReading(
@@ -283,9 +293,10 @@ class KomgaLibraryRepository implements LibraryRepository {
 /// 书籍分页结果的本地进度叠加辅助函数（供目录仓库与阅读列表仓库共用）。
 Future<PageResult<Book>> overlayBooksPage(
   ProgressSyncService sync,
-  PageResult<Book> result,
-) async => PageResult<Book>(
-  items: await sync.overlay(result.items),
+  PageResult<Book> result, {
+  String? scope,
+}) async => PageResult<Book>(
+  items: await sync.overlay(result.items, scope: scope),
   totalElements: result.totalElements,
   page: result.page,
   size: result.size,
