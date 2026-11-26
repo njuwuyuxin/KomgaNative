@@ -184,6 +184,7 @@ void main() {
     testWidgets('本地书籍书行按 SourceCapabilities 隐藏下载按钮，云端书行保留下载按钮（与 ID 前缀无关）', (
       WidgetTester tester,
     ) async {
+      const remoteKey = 'https://komga.example.com';
       // 故意不用 `local:` 前缀，验证 UI 依赖 SourceCapabilities 而非 ID 前缀。
       const localBook = Book(
         id: 'arbitrary-local-id-1',
@@ -191,17 +192,49 @@ void main() {
         name: 'Vol. 1',
         pagesCount: 20,
       );
-      // 故意用 `local:` 前缀但标记为云端源，验证绝不被误判为本机书。
+      // 故意用 `local:` 前缀但标记为已注册云端源，验证绝不被误判为本机书。
       final cloudBook = const Book(
         id: 'local:remote-id-2',
         seriesId: 'local:remote-series-2',
         name: 'Vol. 2',
         pagesCount: 20,
-      ).withSource('https://komga.example.com');
+      ).withSource(remoteKey);
+      // 未知/已删除服务器：最保守能力集 SourceCapabilities.none，不得误显示下载按钮。
+      final unknownSourceBook = const Book(
+        id: 'deleted-remote-id-3',
+        seriesId: 'deleted-remote-series-3',
+        name: 'Vol. 3',
+        pagesCount: 20,
+      ).withSource('https://deleted.example.com');
+
+      final fakeLocal = FakeLibraryRepository();
+      final fakeRemote = FakeLibraryRepository();
+      final registry = SourceRegistry(
+        localBundle: SourceBundle(
+          source: const LocalContentSource(),
+          library: fakeLocal,
+          reader: FakeReaderRepository(),
+          collections: fakeLocal,
+          readStatus: fakeLocal,
+        ),
+        remoteBundles: <String, SourceBundle>{
+          remoteKey: SourceBundle(
+            source: const RemoteContentSource(
+              sourceKey: remoteKey,
+              displayName: 'Example Komga',
+            ),
+            library: fakeRemote,
+            reader: FakeReaderRepository(),
+            collections: fakeRemote,
+            readStatus: fakeRemote,
+          ),
+        },
+      );
 
       await tester.pumpWidget(
         ProviderScope(
           overrides: <Override>[
+            sourceRegistryProvider.overrideWithValue(registry),
             bookCoverProvider.overrideWith((Ref _, CoverQuery _) async => null),
           ],
           child: MaterialApp(
@@ -214,6 +247,7 @@ void main() {
                 children: <Widget>[
                   SeriesBookRow(book: localBook, onOpen: () async {}),
                   SeriesBookRow(book: cloudBook, onOpen: () async {}),
+                  SeriesBookRow(book: unknownSourceBook, onOpen: () async {}),
                 ],
               ),
             ),
@@ -226,6 +260,10 @@ void main() {
       expect(
         find.byKey(const Key('book-download-local:remote-id-2')),
         findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('book-download-deleted-remote-id-3')),
+        findsNothing,
       );
     });
   });

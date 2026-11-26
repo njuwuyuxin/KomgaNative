@@ -31,6 +31,14 @@ void main() {
       );
       expect(kavita.isCloud, isTrue);
       expect(kavita.kind, SourceKind.kavita);
+
+      const unknown = SourceCapabilities.none;
+      expect(unknown.canImportLocalFiles, isFalse);
+      expect(unknown.canMutateCatalog, isFalse);
+      expect(unknown.canDownloadOffline, isFalse);
+      expect(unknown.showsNetworkOfflineBanner, isFalse);
+      expect(unknown.supportsCollections, isFalse);
+      expect(unknown.syncsProgressRemotely, isFalse);
     });
 
     test('Series / Book / Collection / ReadList 默认本机，withSource 切换云端并由 withProgress 保留', () {

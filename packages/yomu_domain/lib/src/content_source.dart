@@ -48,6 +48,16 @@ final class SourceCapabilities {
     syncsProgressRemotely: true,
   );
 
+  /// 未知或已移除内容源的最保守能力集（全部能力关闭，避免误判为可下载或可远程同步）。
+  static const SourceCapabilities none = SourceCapabilities(
+    canImportLocalFiles: false,
+    canMutateCatalog: false,
+    canDownloadOffline: false,
+    showsNetworkOfflineBanner: false,
+    supportsCollections: false,
+    syncsProgressRemotely: false,
+  );
+
   final bool canImportLocalFiles;
   final bool canMutateCatalog;
   final bool canDownloadOffline;

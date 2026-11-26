@@ -24,7 +24,7 @@ final sourceCapabilitiesForKeyProvider =
         for (final source in registry.sources) {
           if (source.sourceKey == sourceKey) return source.capabilities;
         }
-        return SourceCapabilities.komga;
+        return SourceCapabilities.none;
       }
       final active = ref.watch(activeSourceProvider);
       if (active.isCloud) return active.capabilities;

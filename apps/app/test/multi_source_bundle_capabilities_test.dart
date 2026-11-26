@@ -12,6 +12,7 @@ import 'package:yomu/src/providers/cross_source_reading_provider.dart';
 import 'package:yomu/src/providers/download_providers.dart';
 import 'package:yomu/src/providers/settings_provider.dart';
 import 'package:yomu/src/providers/source_registry_provider.dart';
+import 'package:yomu/src/providers/source_scoped_providers.dart';
 import 'package:yomu/src/session/server_store.dart';
 import 'package:yomu/src/session/session_controller.dart';
 import 'package:yomu_domain/yomu_domain.dart';
@@ -296,5 +297,45 @@ void main() {
         .selectSource(serverBKey);
     expect(container.read(activeSourceProvider).sourceKey, serverBKey);
     expect(sessionCtrl.switchToCalls, 0);
+  });
+
+  test('未知或已删除的 sourceKey 能力查询返回最保守能力集 SourceCapabilities.none', () {
+    final registry = SourceRegistry(
+      localBundle: makeBundle(
+        source: const LocalContentSource(),
+        library: FakeLibraryRepository(),
+      ),
+      remoteBundles: <String, SourceBundle>{
+        serverAKey: makeBundle(
+          source: remoteSourceOfServer(serverA),
+          library: FakeLibraryRepository(),
+        ),
+      },
+    );
+
+    final container = ProviderContainer(
+      overrides: <Override>[
+        sourceRegistryProvider.overrideWithValue(registry),
+        settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    expect(
+      container.read(sourceCapabilitiesForKeyProvider(kLocalSourceKey)),
+      same(SourceCapabilities.local),
+    );
+    expect(
+      container.read(sourceCapabilitiesForKeyProvider(serverAKey)),
+      same(SourceCapabilities.komga),
+    );
+    final unknownCaps = container.read(
+      sourceCapabilitiesForKeyProvider('https://deleted-server.komga.test'),
+    );
+    expect(unknownCaps, same(SourceCapabilities.none));
+    expect(unknownCaps.canDownloadOffline, isFalse);
+    expect(unknownCaps.syncsProgressRemotely, isFalse);
+    expect(unknownCaps.canMutateCatalog, isFalse);
+    expect(unknownCaps.canImportLocalFiles, isFalse);
   });
 }
