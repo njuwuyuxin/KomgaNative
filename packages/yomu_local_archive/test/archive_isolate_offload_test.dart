@@ -133,6 +133,8 @@ Uint8List _buildTar(Map<String, Uint8List> files) {
 }
 
 void main() {
+  tearDownAll(shutdownArchiveWorker);
+
   group('P2-2 后台 Isolate 卸载归档解码与扫描', () {
     test('超过阈值的 Deflate 条目在后台 Isolate 正确解压且结果一致', () async {
       final largePage = _pseudoRandomPng(96 * 1024, 1200, 1800);
@@ -226,6 +228,96 @@ void main() {
       expect(reader.pages[0].width, 1000);
       expect(reader.pages[1].width, 1100);
       expect(await reader.readPage(2), page2);
+    });
+
+    test('连续翻页与并发预读复用长驻 Worker 池，不再每页新建 Isolate', () async {
+      await shutdownArchiveWorker();
+      final before = archiveWorkerStats();
+
+      final pages = <Uint8List>[
+        for (var i = 0; i < 6; i++)
+          _pseudoRandomPng(80 * 1024 + i * 16, 1000 + i, 1500),
+      ];
+      final zipBytes = _buildZip(<
+        ({String name, Uint8List payload, int method, Uint8List? passwordBytes})
+      >[
+        for (var i = 0; i < pages.length; i++)
+          (
+            name: '${(i + 1).toString().padLeft(2, '0')}.png',
+            payload: pages[i],
+            method: 8,
+            passwordBytes: null,
+          ),
+      ]);
+
+      final reader = await ZipComicReader.open(
+        MemoryByteSource(zipBytes),
+        sniffDimensions: false,
+      );
+      addTearDown(reader.close);
+
+      // 连续顺序读 6 页，再并发预读 4 页：共 10 次后台任务，Worker 创建次数必须 ≤ 2。
+      for (var i = 1; i <= pages.length; i++) {
+        expect(await reader.readPage(i), pages[i - 1]);
+      }
+      final concurrent = await Future.wait<Uint8List>(<Future<Uint8List>>[
+        reader.readPage(1),
+        reader.readPage(2),
+        reader.readPage(3),
+        reader.readPage(4),
+      ]);
+      for (var i = 0; i < concurrent.length; i++) {
+        expect(concurrent[i], pages[i]);
+      }
+
+      final after = archiveWorkerStats();
+      expect(
+        after.completedTasks - before.completedTasks,
+        greaterThanOrEqualTo(10),
+      );
+      expect(
+        after.totalSpawns - before.totalSpawns,
+        inInclusiveRange(1, 2),
+        reason: '长驻 Worker 池最多扩容到 2 条线程并持续复用，不应每页新建 Isolate',
+      );
+      expect(after.activeWorkers, inInclusiveRange(1, 2));
+
+      // 主动关闭后存活 Worker 归零，再次读取应自动懒重启恢复。
+      await shutdownArchiveWorker();
+      expect(archiveWorkerStats().activeWorkers, 0);
+      expect(await reader.readPage(1), pages[0]);
+      expect(archiveWorkerStats().activeWorkers, greaterThanOrEqualTo(1));
+    });
+
+    test('后台 Worker 执行抛错时准确透传异常且不破坏后续任务复用', () async {
+      final tempDir = Directory.systemTemp.createTempSync('yomu_tar_bad_');
+      addTearDown(() => tempDir.deleteSync(recursive: true));
+
+      final corruptFile = File('${tempDir.path}/corrupt.cbt')
+        ..writeAsBytesSync(Uint8List(300 * 1024)..fillRange(0, 512, 0xFF));
+
+      await expectLater(
+        () async => TarComicReader.open(await FileByteSource.open(corruptFile)),
+        throwsA(
+          isA<ArchiveException>().having(
+            (ArchiveException e) => e.kind,
+            'kind',
+            ArchiveErrorKind.corruptedArchive,
+          ),
+        ),
+      );
+
+      // 异常后同一池子仍可正常解压大页。
+      final page = _pseudoRandomPng(80 * 1024, 800, 1200);
+      final zip = _buildZip(<
+        ({String name, Uint8List payload, int method, Uint8List? passwordBytes})
+      >[(name: '01.png', payload: page, method: 8, passwordBytes: null)]);
+      final reader = await ZipComicReader.open(
+        MemoryByteSource(zip),
+        sniffDimensions: false,
+      );
+      addTearDown(reader.close);
+      expect(await reader.readPage(1), page);
     });
   });
 }

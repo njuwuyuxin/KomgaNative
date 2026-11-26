@@ -4,6 +4,8 @@
 library;
 
 export 'src/archive_errors.dart';
+export 'src/archive_isolate.dart'
+    show ArchiveWorkerStats, archiveWorkerStats, shutdownArchiveWorker;
 export 'src/byte_source.dart';
 export 'src/chapter_extractor.dart';
 export 'src/comic_info_parser.dart';

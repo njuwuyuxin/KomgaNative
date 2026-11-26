@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:yomu_local_archive/src/archive_errors.dart';
@@ -49,8 +48,9 @@ final class TarComicReader implements ComicArchiveReader {
 
       final ({List<ArchivePageEntry> pages, Uint8List? comicInfoBytes}) scanned;
       if (source is FileByteSource && totalLength >= kTarScanIsolateThreshold) {
+        // RandomAccessFile 句柄不可跨 Isolate 传输，因此在长驻工作线程按只读路径完成顺序头扫描后立即关闭句柄。
         final path = source.filePath;
-        scanned = await Isolate.run(() async {
+        scanned = await offloadArchiveTask(() async {
           final bgSource = await FileByteSource.open(File(path));
           try {
             return await _scanTarArchive(
