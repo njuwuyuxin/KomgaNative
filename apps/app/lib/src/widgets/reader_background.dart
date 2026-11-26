@@ -17,6 +17,7 @@ ReaderPalette resolveReaderPalette({
   required ReaderLayout layout,
   required WidgetRef ref,
   required String bookId,
+  String? sourceKey,
 }) {
   if (isEink) {
     return ReaderPalette.resolve(isEink: true, choice: config.background);
@@ -26,7 +27,11 @@ ReaderPalette resolveReaderPalette({
       for (final index in layout.spread)
         ref
                 .watch(
-                  pageEdgeGradientProvider((bookId: bookId, page: index + 1)),
+                  pageEdgeGradientProvider((
+                    sourceKey: sourceKey,
+                    bookId: bookId,
+                    page: index + 1,
+                  )),
                 )
                 .value ??
             const <RgbColor>[],
@@ -50,7 +55,15 @@ ReaderPalette resolveReaderPalette({
   }
   final colors = <RgbColor?>[
     for (final index in layout.spread)
-      ref.watch(pageEdgeColorProvider((bookId: bookId, page: index + 1))).value,
+      ref
+          .watch(
+            pageEdgeColorProvider((
+              sourceKey: sourceKey,
+              bookId: bookId,
+              page: index + 1,
+            )),
+          )
+          .value,
   ];
   return ReaderPalette.resolve(
     isEink: false,

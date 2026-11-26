@@ -61,7 +61,8 @@ class KomgaReaderRepository implements ReaderRepository {
   Future<Book?> book(String bookId) async {
     try {
       final book = await _session.fetchBook(bookId);
-      return await _sync.overlayOne(book);
+      final overlaid = await _sync.overlayOne(book);
+      return overlaid?.withSource(_session.address.baseUrl);
     } on KomgaNotFoundError {
       return null;
     } on KomgaError catch (error) {

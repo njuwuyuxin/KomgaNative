@@ -22,7 +22,12 @@ void main() {
     );
     addTearDown(container.dispose);
     final subscription = container.listen(
-      seriesBooksProvider((seriesId: 's1', sort: null, readStatus: null)),
+      seriesBooksProvider((
+        sourceKey: null,
+        seriesId: 's1',
+        sort: null,
+        readStatus: null,
+      )),
       (
         AsyncValue<PageResult<Book>>? previous,
         AsyncValue<PageResult<Book>> next,
@@ -43,7 +48,12 @@ void main() {
       await Future<void>.delayed(Duration.zero);
     }
     final state = container.read(
-      seriesBooksProvider((seriesId: 's1', sort: null, readStatus: null)),
+      seriesBooksProvider((
+        sourceKey: null,
+        seriesId: 's1',
+        sort: null,
+        readStatus: null,
+      )),
     );
 
     expect(state.hasError, isTrue);
@@ -65,7 +75,12 @@ void main() {
       await Future<void>.delayed(Duration.zero);
     }
     final state = container.read(
-      seriesBooksProvider((seriesId: 's1', sort: null, readStatus: null)),
+      seriesBooksProvider((
+        sourceKey: null,
+        seriesId: 's1',
+        sort: null,
+        readStatus: null,
+      )),
     );
 
     expect(state.hasError, isFalse);

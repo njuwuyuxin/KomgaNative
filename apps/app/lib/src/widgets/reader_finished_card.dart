@@ -5,6 +5,7 @@ import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/widgets/cover_image.dart';
 import 'package:yomu/src/widgets/reader_palette.dart';
+import 'package:yomu/src/widgets/scoped_source_scope.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 书末卡片（UI-P1-7）：告诉用户"读完了"，并把下一步做成一个明确的动作。
@@ -132,7 +133,10 @@ class _NextBook extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final typography = AppTypography.of(context);
-    final cover = ref.watch(bookCoverProvider(next.id)).value;
+    final sourceKey = ScopedSourceScope.maybeOf(context) ?? next.sourceKey;
+    final cover = ref
+        .watch(bookCoverProvider((sourceKey: sourceKey, id: next.id)))
+        .value;
     final volume = next.number.isEmpty ? null : '#${next.number}';
 
     return Column(

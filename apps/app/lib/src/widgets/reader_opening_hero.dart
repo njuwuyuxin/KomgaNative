@@ -7,6 +7,7 @@ import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/reader_providers.dart';
 import 'package:yomu/src/widgets/cover_image.dart';
+import 'package:yomu/src/widgets/scoped_source_scope.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 阅读器开场时的封面 Hero（UI-P2-2）。
@@ -86,15 +87,22 @@ class _ReaderOpeningHeroState extends ConsumerState<ReaderOpeningHero>
   Widget build(BuildContext context) {
     if (_done) return const SizedBox.shrink();
 
+    final sourceKey = ScopedSourceScope.maybeOf(context);
     final image = ref.watch(
-      readerPageImageProvider((bookId: widget.bookId, page: widget.page)),
+      readerPageImageProvider((
+        sourceKey: sourceKey,
+        bookId: widget.bookId,
+        page: widget.page,
+      )),
     );
     if (!_fading && (image.value != null || image.hasError)) {
       // build 里不能直接 forward（会 setState during build），下一帧再开始淡出。
       WidgetsBinding.instance.addPostFrameCallback((_) => _startFade());
     }
 
-    final cover = ref.watch(bookCoverProvider(widget.bookId));
+    final cover = ref.watch(
+      bookCoverProvider((sourceKey: sourceKey, id: widget.bookId)),
+    );
     final Uint8List? bytes = switch (cover) {
       AsyncData<Uint8List?>(:final value) => value,
       _ => null,

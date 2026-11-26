@@ -11,6 +11,7 @@ import 'package:yomu/src/providers/collections_controller.dart';
 import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/widgets/collection_covers.dart';
 import 'package:yomu/src/widgets/curation_dialogs.dart';
+import 'package:yomu/src/widgets/scoped_source_scope.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 弹出「添加到收藏集」勾选面板，支持单个系列或批量多选系列。
@@ -19,23 +20,31 @@ import 'package:material_ui/material_ui.dart';
 Future<bool> showCollectionPickerSheet(
   BuildContext context, {
   required List<String> seriesIds,
+  String? sourceKey,
 }) async {
   if (seriesIds.isEmpty) return false;
+  final resolvedSource = sourceKey ?? ScopedSourceScope.readOf(context);
   final changed = await showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
     useSafeArea: true,
-    builder: (BuildContext context) =>
-        _CollectionPickerSheet(seriesIds: seriesIds),
+    builder: (BuildContext context) => ScopedSourceScope(
+      sourceKey: resolvedSource,
+      child: _CollectionPickerSheet(
+        seriesIds: seriesIds,
+        sourceKey: resolvedSource,
+      ),
+    ),
   );
   return changed == true;
 }
 
 class _CollectionPickerSheet extends ConsumerStatefulWidget {
-  const _CollectionPickerSheet({required this.seriesIds});
+  const _CollectionPickerSheet({required this.seriesIds, this.sourceKey});
 
   final List<String> seriesIds;
+  final String? sourceKey;
 
   @override
   ConsumerState<_CollectionPickerSheet> createState() =>
@@ -91,7 +100,11 @@ class _CollectionPickerSheetState
     try {
       await ref
           .read(collectionsControllerProvider.notifier)
-          .create(name: name, seriesIds: widget.seriesIds);
+          .create(
+            name: name,
+            seriesIds: widget.seriesIds,
+            sourceKey: widget.sourceKey,
+          );
       if (!mounted) return;
       final hasPendingEdits = !_planFor(current).isEmpty;
       final message = l10n.batchAddedToCollection(widget.seriesIds.length);
@@ -139,7 +152,11 @@ class _CollectionPickerSheetState
     try {
       await ref
           .read(collectionsControllerProvider.notifier)
-          .applyCollectionPlan(plan, affectedSeriesIds: widget.seriesIds);
+          .applyCollectionPlan(
+            plan,
+            affectedSeriesIds: widget.seriesIds,
+            sourceKey: widget.sourceKey,
+          );
       if (!mounted) return;
       Navigator.of(context).pop(true);
       final message = plan.isPureAddition
@@ -161,7 +178,7 @@ class _CollectionPickerSheetState
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final async = ref.watch(allCollectionsProvider);
+    final async = ref.watch(allCollectionsForSourceProvider(widget.sourceKey));
     final items = async.value;
     final hasChanges = items != null && !_planFor(items).isEmpty;
     final maxHeight = MediaQuery.sizeOf(context).height * 0.72;
@@ -261,7 +278,8 @@ class _CollectionPickerSheetState
           icon: Icons.cloud_off_outlined,
           title: l10n.failureTitle(failureKindOf(async.error)),
           actionLabel: l10n.retry,
-          onAction: () => ref.invalidate(allCollectionsProvider),
+          onAction: () =>
+              ref.invalidate(allCollectionsForSourceProvider(widget.sourceKey)),
         ),
       );
     }
@@ -320,18 +338,13 @@ class _CollectionPickerSheetState
             name: collection.name,
             seriesIds: collection.seriesIds,
           ),
-          title: Text(
-            collection.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          subtitle: Text(
-            subtitle,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+          title: _ellipsisText(collection.name),
+          subtitle: _ellipsisText(subtitle),
         );
       },
     );
   }
+
+  Widget _ellipsisText(String text) =>
+      Text(text, maxLines: 1, overflow: TextOverflow.ellipsis);
 }

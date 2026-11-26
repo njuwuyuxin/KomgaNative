@@ -225,7 +225,9 @@ class _SeriesMiniCover extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final cover = ref.watch(seriesCoverProvider(seriesId));
+    final cover = ref.watch(
+      seriesCoverProvider((sourceKey: null, id: seriesId)),
+    );
     final Uint8List? bytes = switch (cover) {
       AsyncData<Uint8List?>(:final value) => value,
       _ => null,

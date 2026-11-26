@@ -6,6 +6,7 @@ import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/src/data/book_selection.dart';
 import 'package:yomu/src/providers/library_providers.dart';
+import 'package:yomu/src/widgets/scoped_source_scope.dart';
 import 'package:yomu/src/widgets/series_header_cover.dart';
 import 'package:yomu/src/widgets/series_header_details.dart';
 import 'package:material_ui/material_ui.dart';
@@ -42,7 +43,10 @@ class SeriesHeader extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final isEink = AppTheme.isEink(theme);
-    final cover = ref.watch(seriesCoverProvider(seriesId));
+    final sourceKey = ScopedSourceScope.maybeOf(context) ?? series?.sourceKey;
+    final cover = ref.watch(
+      seriesCoverProvider((sourceKey: sourceKey, id: seriesId)),
+    );
     final Uint8List? bytes = switch (cover) {
       AsyncData<Uint8List?>(:final value) => value,
       _ => null,

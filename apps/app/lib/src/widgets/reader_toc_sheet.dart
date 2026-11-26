@@ -11,6 +11,7 @@ import 'package:yomu/src/providers/reader_toc_providers.dart';
 import 'package:yomu/src/screens/reader_args.dart';
 import 'package:yomu/src/widgets/reader_palette.dart';
 import 'package:yomu/src/widgets/reader_toc_book_tab.dart';
+import 'package:yomu/src/widgets/scoped_source_scope.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 
@@ -26,31 +27,37 @@ Future<void> showReaderTocSheet(
   required String currentBookId,
   required ReaderPalette palette,
   required ReadingDirection direction,
+  String? sourceKey,
   int currentPage = 1,
   void Function(int page)? onJump,
 }) {
+  final resolvedSource = sourceKey ?? ScopedSourceScope.readOf(context);
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     elevation: 0,
-    builder: (BuildContext context) => FrostedSurface(
-      kind: AppMaterialKind.sheet,
-      material: AppMaterial.resolve(
-        AppMaterialKind.sheet,
-        eink: palette.isEink,
-        dark: !palette.isEink,
-      ),
-      shape: AppShapes.sheet(eink: palette.isEink),
-      child: Material(
-        type: MaterialType.transparency,
-        child: ReaderTocSheet(
-          seriesId: seriesId,
-          currentBookId: currentBookId,
-          palette: palette,
-          direction: direction,
-          currentPage: currentPage,
-          onJump: onJump,
+    builder: (BuildContext context) => ScopedSourceScope(
+      sourceKey: resolvedSource,
+      child: FrostedSurface(
+        kind: AppMaterialKind.sheet,
+        material: AppMaterial.resolve(
+          AppMaterialKind.sheet,
+          eink: palette.isEink,
+          dark: !palette.isEink,
+        ),
+        shape: AppShapes.sheet(eink: palette.isEink),
+        child: Material(
+          type: MaterialType.transparency,
+          child: ReaderTocSheet(
+            seriesId: seriesId,
+            currentBookId: currentBookId,
+            palette: palette,
+            direction: direction,
+            sourceKey: resolvedSource,
+            currentPage: currentPage,
+            onJump: onJump,
+          ),
         ),
       ),
     ),
@@ -63,6 +70,7 @@ class ReaderTocSheet extends ConsumerStatefulWidget {
     required this.currentBookId,
     required this.palette,
     required this.direction,
+    this.sourceKey,
     this.currentPage = 1,
     this.onJump,
     super.key,
@@ -74,6 +82,8 @@ class ReaderTocSheet extends ConsumerStatefulWidget {
 
   /// 换书时沿用同一个方向（否则 RTL 系列换一本就反着翻）。
   final ReadingDirection direction;
+
+  final String? sourceKey;
 
   /// 当前 1 基页码（用于高亮所处章节与书签）。
   final int currentPage;
@@ -113,10 +123,15 @@ class _ReaderTocSheetState extends ConsumerState<ReaderTocSheet> {
 
   void _openBook(Book book) {
     final route = '/reader/${book.id}';
+    final sourceKey = widget.sourceKey ?? ScopedSourceScope.readOf(context);
     Navigator.of(context).pop();
     this.context.pushReplacement(
       route,
-      extra: ReaderArgs(book: book, direction: widget.direction),
+      extra: ReaderArgs(
+        book: book,
+        direction: widget.direction,
+        sourceKey: sourceKey ?? book.sourceKey,
+      ),
     );
   }
 
@@ -165,7 +180,13 @@ class _ReaderTocSheetState extends ConsumerState<ReaderTocSheet> {
         onRemoveBookmark: _removeBookmark,
       );
     } else if (hasSeries) {
-      final query = (seriesId: widget.seriesId!, sort: null, readStatus: null);
+      final sourceKey = widget.sourceKey ?? ScopedSourceScope.maybeOf(context);
+      final query = (
+        sourceKey: sourceKey,
+        seriesId: widget.seriesId!,
+        sort: null,
+        readStatus: null,
+      );
       final async = ref.watch(seriesBooksProvider(query));
       body = _buildVolumesBody(context, l10n, palette, textStyle, async);
     } else {

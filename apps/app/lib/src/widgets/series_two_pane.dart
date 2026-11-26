@@ -225,3 +225,92 @@ class SeriesTwoPane extends StatelessWidget {
     );
   }
 }
+
+/// 根据窗口形态自动分派宽屏双栏或窄屏单流布局。
+class SeriesAdaptiveBody extends StatelessWidget {
+  const SeriesAdaptiveBody({
+    required this.wide,
+    required this.series,
+    required this.books,
+    required this.failure,
+    required this.metadataLoading,
+    required this.seriesId,
+    required this.heroTag,
+    required this.onRefresh,
+    required this.onRetry,
+    required this.onOpenBook,
+    this.topPadding = 0,
+    this.toolbar,
+    this.filtered = false,
+    this.selected = const <String>{},
+    this.selecting = false,
+    this.onToggleSelect,
+    this.onMarkManyBooks,
+    this.onLoadMore,
+    super.key,
+  });
+
+  final bool wide;
+  final Series? series;
+  final PageResult<Book>? books;
+  final Object? failure;
+  final bool metadataLoading;
+  final String seriesId;
+  final String heroTag;
+  final double topPadding;
+  final Future<void> Function() onRefresh;
+  final VoidCallback onRetry;
+  final OpenSeriesBook onOpenBook;
+  final Widget? toolbar;
+  final bool filtered;
+  final Set<String> selected;
+  final bool selecting;
+  final void Function(String bookId)? onToggleSelect;
+  final Future<void> Function(List<String> bookIds, {required bool read})?
+  onMarkManyBooks;
+  final VoidCallback? onLoadMore;
+
+  @override
+  Widget build(BuildContext context) {
+    if (wide) {
+      return SeriesTwoPane(
+        series: series,
+        books: books,
+        failure: failure,
+        metadataLoading: metadataLoading,
+        seriesId: seriesId,
+        heroTag: heroTag,
+        topPadding: topPadding,
+        onRefresh: onRefresh,
+        onRetry: onRetry,
+        onLoadMore: onLoadMore,
+        onOpenBook: onOpenBook,
+        toolbar: toolbar,
+        filtered: filtered,
+        selected: selected,
+        selecting: selecting,
+        onToggleSelect: onToggleSelect,
+        onMarkManyBooks: onMarkManyBooks,
+      );
+    }
+    return SeriesSinglePane(
+      series: series,
+      books: books,
+      failure: failure,
+      metadataLoading: metadataLoading,
+      seriesId: seriesId,
+      heroTag: heroTag,
+      topPadding: topPadding,
+      onRefresh: onRefresh,
+      onRetry: onRetry,
+      onLoadMore: onLoadMore,
+      onOpenBook: onOpenBook,
+      toolbar: toolbar,
+      filtered: filtered,
+      selected: selected,
+      selecting: selecting,
+      onToggleSelect: onToggleSelect,
+      onMarkManyBooks: onMarkManyBooks,
+    );
+  }
+}

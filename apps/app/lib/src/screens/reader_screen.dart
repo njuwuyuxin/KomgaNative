@@ -23,6 +23,7 @@ import 'package:yomu/src/providers/reader_prefs_provider.dart';
 import 'package:yomu/src/providers/reader_providers.dart';
 import 'package:yomu/src/providers/series_read_provider.dart';
 import 'package:yomu/src/providers/settings_provider.dart';
+import 'package:yomu/src/providers/source_scoped_providers.dart';
 import 'package:yomu/src/widgets/edge_swipe_back.dart';
 import 'package:yomu/src/widgets/page_curl.dart';
 import 'package:yomu/src/widgets/reader_background.dart';
@@ -38,6 +39,7 @@ import 'package:yomu/src/widgets/reader_system_ui.dart';
 import 'package:yomu/src/widgets/reader_top_bar.dart';
 import 'package:yomu/src/widgets/reader_progress_writer.dart';
 import 'package:yomu/src/widgets/reader_vertical_view.dart';
+import 'package:yomu/src/widgets/scoped_source_scope.dart';
 import 'package:yomu/src/widgets/volume_key_scope.dart';
 import 'package:yomu/src/widgets/wake_lock_scope.dart';
 import 'package:yomu_platform/yomu_platform.dart';
@@ -63,6 +65,7 @@ class ReaderScreen extends ConsumerStatefulWidget {
   const ReaderScreen({
     required this.bookId,
     this.book,
+    this.sourceKey,
     this.direction = ReadingDirection.unknown,
     this.heroTag,
     this.onOpenNext,
@@ -74,6 +77,9 @@ class ReaderScreen extends ConsumerStatefulWidget {
 
   /// 从系列详情带过来的书；深链时为空，用 [readerBookProvider] 现取。
   final Book? book;
+
+  /// 该书所属内容源标识；为空时依次从祖先 [ScopedSourceScope] 或激活源回退。
+  final String? sourceKey;
 
   final ReadingDirection direction;
 
@@ -119,6 +125,16 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final scoped = widget.sourceKey ?? ScopedSourceScope.maybeOf(context);
+    if (scoped != null && scoped.isNotEmpty) {
+      _resolvedSourceKey = scoped;
+      _bookScope = scoped;
+    }
+  }
+
+  @override
   void dispose() {
     stopSessionTicker();
     _settleSession(completed: false);
@@ -133,21 +149,21 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   @override
   Widget build(BuildContext context) {
     final isEink = ref.watch(effectiveEinkProvider);
+    final bookQuery = _bookQuery;
     // 方向每次 build 重新解析（系列详情可能晚到），事件回调读这个缓存。
     _direction = _resolveDirection();
     // 偏好与书都在**本 build** 里 watch：写在 gate 的 builder 里时，
     // 偏好恢复/换书不一定会让这一层重建（RDR-05 踩到过）。
     final allPrefs = ref.watch(readerPrefsProvider);
-    final serverKey = ref.watch(activeServerKeyProvider);
-    final book =
-        widget.book ?? ref.watch(readerBookProvider(widget.bookId)).value;
+    final serverKey = _resolvedSourceKey ?? ref.watch(activeServerKeyProvider);
+    final book = widget.book ?? ref.watch(readerBookProvider(bookQuery)).value;
     final config = allPrefs.forSeries(
       book?.seriesId ?? _seriesId,
       serverKey: serverKey,
     );
     final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     final openingHero = widget.heroTag;
-    return PopScope(
+    final body = PopScope(
       onPopInvokedWithResult: (bool didPop, Object? _) {
         if (didPop) _settleProgressOnLeave();
       },
@@ -158,10 +174,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
             fit: StackFit.expand,
             children: <Widget>[
               ReaderPagesGate(
-                pages: ref.watch(readerPagesProvider(widget.bookId)),
+                pages: ref.watch(readerPagesProvider(bookQuery)),
                 palette: ReaderPalette.of(isEink: isEink),
-                onRetry: () =>
-                    ref.invalidate(readerPagesProvider(widget.bookId)),
+                onRetry: () => ref.invalidate(readerPagesProvider(bookQuery)),
                 builder: (List<PageInfo> pages) => _buildPages(
                   context,
                   isEink,
@@ -184,6 +199,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         ),
       ),
     );
+    return _resolvedSourceKey == null
+        ? body
+        : ScopedSourceScope(sourceKey: _resolvedSourceKey, child: body);
   }
 
   Widget _buildPages(
@@ -210,6 +228,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       layout: layout,
       ref: ref,
       bookId: widget.bookId,
+      sourceKey: _resolvedSourceKey,
     );
     final mode = layout.mode;
     final page = layout.page;
@@ -239,51 +258,16 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       onSavePage: () => unawaited(_saveScreenImage(layout, rightToLeft)),
       onSharePage: () => unawaited(_sharePage(page)),
     );
-    final content = switch (mode) {
-      ReadingMode.verticalScroll => ReaderVerticalView(
-        bookId: widget.bookId,
-        pages: pages,
-        initialPage: page,
-        jumpToken: _jumpToken,
-        jumpPage: _jumpPage,
-        palette: palette,
-        trimBorders: config.trimBorders,
-        // 自动滚动（RDR-08）：墨水屏不启用——每次滚动都是整屏刷新。
-        autoScrollSpeed: config.autoScrollSpeed,
-        autoScrollAllowed: !isEink,
-        onPageChanged: (int p) => _setPage(p, total),
-        onToggleChrome: _toggleChrome,
-      ),
-      _ => ReaderPagedView(
-        key: _pagedKey,
-        bookId: widget.bookId,
-        pages: pages,
-        spread: layout.spread,
-        rightToLeft: rightToLeft,
-        palette: palette,
-        fit: config.fit.fit,
-        doublePage: mode == ReadingMode.doublePage,
-        lockZoom: config.lockZoom,
-        trimBorders: config.trimBorders,
-        tapZone: config.tapZone,
-        invertTapZones: config.invertTapZones,
-        doubleTapZoom: config.doubleTapZoom,
-        nextSpread: layout.neighbour(1),
-        previousSpread: layout.neighbour(-1),
-        pageHalf: layout.currentFrameHalf,
-        nextPageHalf: layout.splitNeighbour(1)?.half ?? PageHalf.full,
-        previousPageHalf: layout.splitNeighbour(-1)?.half ?? PageHalf.full,
-        style: PageTurnStyle.resolve(
-          choice: config.pageTurn,
-          eink: isEink,
-          disableAnimations:
-              MediaQuery.maybeDisableAnimationsOf(context) ?? false,
-          duration: AppMotion.of(context).emphasized,
-        ),
-        onTurn: (int delta) => _handlePagedTurn(layout, delta, total, nextBook),
-        onToggleChrome: _toggleChrome,
-      ),
-    };
+    final content = _buildReaderContent(
+      context,
+      isEink: isEink,
+      pages: pages,
+      config: config,
+      layout: layout,
+      palette: palette,
+      rightToLeft: rightToLeft,
+      nextBook: nextBook,
+    );
 
     return Focus(
       focusNode: _keyboardFocus,

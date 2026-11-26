@@ -79,6 +79,7 @@ mixin _ReaderActions on ConsumerState<ReaderScreen>, _ReaderDerive {
         flushProgress: _flushProgressForLeave,
         bookId: widget.bookId,
         seriesId: seriesId,
+        sourceKey: _resolvedSourceKey,
         completedBook: completedBook,
       ),
     );
@@ -106,7 +107,9 @@ mixin _ReaderActions on ConsumerState<ReaderScreen>, _ReaderDerive {
         spread: layout.spread,
         rightToLeft: rightToLeft,
       );
-      final repo = ref.read(readerRepositoryProvider);
+      final repo = ref.read(
+        readerRepositoryForSourceProvider(_resolvedSourceKey),
+      );
       final prepared = await prepareScreenImageForSave(
         bookId: widget.bookId,
         orderedPages: orderedPages,
@@ -156,7 +159,7 @@ mixin _ReaderActions on ConsumerState<ReaderScreen>, _ReaderDerive {
     }
     try {
       final bytes = await ref
-          .read(readerRepositoryProvider)
+          .read(readerRepositoryForSourceProvider(_resolvedSourceKey))
           .pageImage(widget.bookId, page);
       await sharePageImage(
         bytes,
@@ -218,9 +221,99 @@ mixin _ReaderActions on ConsumerState<ReaderScreen>, _ReaderDerive {
     );
   }
 
+  Widget _buildReaderContent(
+    BuildContext context, {
+    required bool isEink,
+    required List<PageInfo> pages,
+    required ReaderConfig config,
+    required ReaderLayout layout,
+    required ReaderPalette palette,
+    required bool rightToLeft,
+    required Book? nextBook,
+  }) {
+    final mode = layout.mode;
+    final total = pages.length;
+    if (mode == ReadingMode.verticalScroll) {
+      return ReaderVerticalView(
+        bookId: widget.bookId,
+        pages: pages,
+        initialPage: layout.page,
+        jumpToken: _jumpToken,
+        jumpPage: _jumpPage,
+        palette: palette,
+        trimBorders: config.trimBorders,
+        autoScrollSpeed: config.autoScrollSpeed,
+        autoScrollAllowed: !isEink,
+        onPageChanged: (int p) => _setPage(p, total),
+        onToggleChrome: _toggleChrome,
+      );
+    }
+    return ReaderPagedView(
+      key: _pagedKey,
+      bookId: widget.bookId,
+      pages: pages,
+      spread: layout.spread,
+      rightToLeft: rightToLeft,
+      palette: palette,
+      fit: config.fit.fit,
+      doublePage: mode == ReadingMode.doublePage,
+      lockZoom: config.lockZoom,
+      trimBorders: config.trimBorders,
+      tapZone: config.tapZone,
+      invertTapZones: config.invertTapZones,
+      doubleTapZoom: config.doubleTapZoom,
+      nextSpread: layout.neighbour(1),
+      previousSpread: layout.neighbour(-1),
+      pageHalf: layout.currentFrameHalf,
+      nextPageHalf: layout.splitNeighbour(1)?.half ?? PageHalf.full,
+      previousPageHalf: layout.splitNeighbour(-1)?.half ?? PageHalf.full,
+      style: PageTurnStyle.resolve(
+        choice: config.pageTurn,
+        eink: isEink,
+        disableAnimations:
+            MediaQuery.maybeDisableAnimationsOf(context) ?? false,
+        duration: AppMotion.of(context).emphasized,
+      ),
+      onTurn: (int delta) => _handlePagedTurn(layout, delta, total, nextBook),
+      onToggleChrome: _toggleChrome,
+    );
+  }
+
+  void _toggleTempMerge(int pageIndex) {
+    setState(() {
+      _mergedWidePageIndex = _mergedWidePageIndex == pageIndex
+          ? null
+          : pageIndex;
+      _pageHalf = null;
+    });
+  }
+
+  void _handlePagedTurn(
+    ReaderLayout layout,
+    int delta,
+    int total,
+    Book? nextBook,
+  ) {
+    if (layout.isWideSplitActive) {
+      final splitTarget = layout.turnSplitTarget(delta);
+      if (splitTarget != null) {
+        _setPage(splitTarget.pageNumber, total, half: splitTarget.half);
+        return;
+      }
+      if (delta > 0 && nextBook != null) _openNext(nextBook);
+      return;
+    }
+    final target = layout.turnTarget(delta);
+    if (target != null) {
+      _setPage(target, total);
+      return;
+    }
+    if (delta > 0 && nextBook != null) _openNext(nextBook);
+  }
+
   KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
-    final pages = ref.read(readerPagesProvider(widget.bookId)).value;
+    final pages = ref.read(readerPagesProvider(_bookQuery)).value;
     if (pages == null || pages.isEmpty) return KeyEventResult.ignored;
     final allPrefs = ref.read(readerPrefsProvider);
     final config = _effectiveConfig(allPrefs);

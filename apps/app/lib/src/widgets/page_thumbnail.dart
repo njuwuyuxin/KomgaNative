@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu/src/providers/reader_providers.dart';
+import 'package:yomu/src/providers/source_scoped_providers.dart';
 import 'package:yomu/src/widgets/reader_palette.dart';
+import 'package:yomu/src/widgets/scoped_source_scope.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 一张页缩略图：优先走低精度页缩略图端点 + 解码降采样 + 加载/失败态。
@@ -33,8 +35,9 @@ class PageThumbnailImage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final request = (bookId: bookId, page: page);
-    final repo = ref.watch(readerRepositoryProvider);
+    final sourceKey = ScopedSourceScope.maybeOf(context);
+    final request = (sourceKey: sourceKey, bookId: bookId, page: page);
+    final repo = ref.watch(readerRepositoryForSourceProvider(sourceKey));
     final syncThumb = repo.cachedPageThumbnail(bookId, page);
     final syncFull = syncThumb == null
         ? repo.cachedPageImage(bookId, page)

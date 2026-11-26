@@ -10,6 +10,7 @@ import 'package:yomu/src/l10n/failure_text.dart';
 import 'package:yomu/src/providers/collections_controller.dart';
 import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/widgets/curation_dialogs.dart';
+import 'package:yomu/src/widgets/scoped_source_scope.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 弹出「添加到阅读列表」勾选面板，支持单本书或批量多选书。
@@ -18,22 +19,28 @@ import 'package:material_ui/material_ui.dart';
 Future<bool> showReadListPickerSheet(
   BuildContext context, {
   required List<String> bookIds,
+  String? sourceKey,
 }) async {
   if (bookIds.isEmpty) return false;
+  final resolvedSource = sourceKey ?? ScopedSourceScope.readOf(context);
   final changed = await showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
     useSafeArea: true,
-    builder: (BuildContext context) => _ReadListPickerSheet(bookIds: bookIds),
+    builder: (BuildContext context) => ScopedSourceScope(
+      sourceKey: resolvedSource,
+      child: _ReadListPickerSheet(bookIds: bookIds, sourceKey: resolvedSource),
+    ),
   );
   return changed == true;
 }
 
 class _ReadListPickerSheet extends ConsumerStatefulWidget {
-  const _ReadListPickerSheet({required this.bookIds});
+  const _ReadListPickerSheet({required this.bookIds, this.sourceKey});
 
   final List<String> bookIds;
+  final String? sourceKey;
 
   @override
   ConsumerState<_ReadListPickerSheet> createState() =>
@@ -92,6 +99,7 @@ class _ReadListPickerSheetState extends ConsumerState<_ReadListPickerSheet> {
             name: form.name,
             summary: form.summary,
             bookIds: widget.bookIds,
+            sourceKey: widget.sourceKey,
           );
       if (!mounted) return;
       final hasPendingEdits = !_planFor(current).isEmpty;
@@ -139,7 +147,7 @@ class _ReadListPickerSheetState extends ConsumerState<_ReadListPickerSheet> {
     try {
       await ref
           .read(collectionsControllerProvider.notifier)
-          .applyReadListPlan(plan);
+          .applyReadListPlan(plan, sourceKey: widget.sourceKey);
       if (!mounted) return;
       Navigator.of(context).pop(true);
       final message = plan.isPureAddition
@@ -161,7 +169,7 @@ class _ReadListPickerSheetState extends ConsumerState<_ReadListPickerSheet> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final async = ref.watch(allReadListsProvider);
+    final async = ref.watch(allReadListsForSourceProvider(widget.sourceKey));
     final items = async.value;
     final hasChanges = items != null && !_planFor(items).isEmpty;
     final maxHeight = MediaQuery.sizeOf(context).height * 0.72;
@@ -261,7 +269,8 @@ class _ReadListPickerSheetState extends ConsumerState<_ReadListPickerSheet> {
           icon: Icons.cloud_off_outlined,
           title: l10n.failureTitle(failureKindOf(async.error)),
           actionLabel: l10n.retry,
-          onAction: () => ref.invalidate(allReadListsProvider),
+          onAction: () =>
+              ref.invalidate(allReadListsForSourceProvider(widget.sourceKey)),
         ),
       );
     }

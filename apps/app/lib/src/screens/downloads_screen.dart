@@ -161,7 +161,9 @@ class _DownloadRow extends ConsumerWidget {
     final status = ref.watch(downloadsProvider)[bookId];
     final controller = ref.read(downloadsProvider.notifier);
     final known = controller.knownBook(bookId);
-    final cover = ref.watch(bookCoverProvider(bookId)).value;
+    final cover = ref
+        .watch(bookCoverProvider((sourceKey: book?.sourceKey, id: bookId)))
+        .value;
 
     final title =
         book?.name ??

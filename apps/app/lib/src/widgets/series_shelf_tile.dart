@@ -38,7 +38,9 @@ class SeriesShelfTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    final cover = ref.watch(seriesCoverProvider(series.id));
+    final cover = ref.watch(
+      seriesCoverProvider((sourceKey: series.sourceKey, id: series.id)),
+    );
     final Uint8List? bytes = switch (cover) {
       AsyncData<Uint8List?>(:final value) => value,
       _ => null,
@@ -123,7 +125,9 @@ class SeriesShelfRow extends ConsumerWidget {
     final dark = theme.brightness == Brightness.dark;
     final motion = AppMotion.of(context);
     final showSelection = selecting || selected;
-    final cover = ref.watch(seriesCoverProvider(series.id));
+    final cover = ref.watch(
+      seriesCoverProvider((sourceKey: series.sourceKey, id: series.id)),
+    );
     final Uint8List? bytes = switch (cover) {
       AsyncData<Uint8List?>(:final value) => value,
       _ => null,

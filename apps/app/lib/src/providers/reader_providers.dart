@@ -6,7 +6,7 @@ import 'package:yomu/src/data/page_border_crop.dart';
 import 'package:yomu/src/data/page_edge_color.dart';
 import 'package:yomu/src/data/reader_repository.dart';
 import 'package:yomu/src/providers/active_source_provider.dart';
-import 'package:yomu/src/providers/library_providers.dart';
+import 'package:yomu/src/providers/source_scoped_providers.dart';
 import 'package:yomu_platform/yomu_platform.dart';
 import 'package:yomu_reader/yomu_reader.dart';
 
@@ -15,29 +15,38 @@ final Provider<ImageSaver> imageSaverProvider = Provider<ImageSaver>(
   (Ref ref) => ChannelImageSaver(),
 );
 
-/// 阅读器仓库：默认跟随激活内容源；跨源打开阅读器时由局部 `ProviderScope` 按 `sourceKey` 覆盖。
+/// 阅读器默认仓库（跟随当前激活内容源）；跨源阅读请经 [readerRepositoryForSourceProvider]
+/// 按显式 `sourceKey` 寻址，避免嵌套 `ProviderScope` 作用域逃逸。
 final Provider<ReaderRepository> readerRepositoryProvider =
     Provider<ReaderRepository>((Ref ref) {
       return ref.watch(activeSourceBundleProvider).reader;
     });
 
-final readerBookProvider = FutureProvider.family<Book?, String>((
+/// 按源寻址单本书的查询键。
+typedef ReaderBookQuery = ({String? sourceKey, String bookId});
+
+final readerBookProvider = FutureProvider.family<Book?, ReaderBookQuery>((
   Ref ref,
-  String bookId,
+  ReaderBookQuery query,
 ) {
-  return ref.watch(readerRepositoryProvider).book(bookId);
+  return ref
+      .watch(readerRepositoryForSourceProvider(query.sourceKey))
+      .book(query.bookId);
 });
 
 /// 页列表（尺寸用于布局；页码 1 基）。
-final readerPagesProvider = FutureProvider.family<List<PageInfo>, String>((
-  Ref ref,
-  String bookId,
-) {
-  return ref.watch(readerRepositoryProvider).pages(bookId);
-});
+final readerPagesProvider =
+    FutureProvider.family<List<PageInfo>, ReaderBookQuery>((
+      Ref ref,
+      ReaderBookQuery query,
+    ) {
+      return ref
+          .watch(readerRepositoryForSourceProvider(query.sourceKey))
+          .pages(query.bookId);
+    });
 
 /// 一页的图片字节。family 参数用 record，值相等即同一个 provider。
-typedef PageRequest = ({String bookId, int page});
+typedef PageRequest = ({String? sourceKey, String bookId, int page});
 
 /// 单页字节。**故意是 autoDispose**：Riverpod 3 默认不回收，页图一张几百 KB
 /// 到 2 MB，读一本 200 页的书就等于把整本留在内存里（还会一直涨）。
@@ -47,7 +56,9 @@ final readerPageImageProvider = FutureProvider.family<Uint8List, PageRequest>((
   Ref ref,
   PageRequest req,
 ) {
-  return ref.watch(readerRepositoryProvider).pageImage(req.bookId, req.page);
+  return ref
+      .watch(readerRepositoryForSourceProvider(req.sourceKey))
+      .pageImage(req.bookId, req.page);
 }, isAutoDispose: true);
 
 /// 单页低精度缩略图字节（服务端 300px JPEG，autoDispose）。
@@ -57,7 +68,7 @@ final readerPageImageProvider = FutureProvider.family<Uint8List, PageRequest>((
 final readerPageThumbnailProvider =
     FutureProvider.family<Uint8List, PageRequest>((Ref ref, PageRequest req) {
       return ref
-          .watch(readerRepositoryProvider)
+          .watch(readerRepositoryForSourceProvider(req.sourceKey))
           .pageThumbnail(req.bookId, req.page);
     }, isAutoDispose: true);
 
@@ -93,8 +104,8 @@ final pageBorderCropProvider = FutureProvider.family<BorderCrop?, PageRequest>((
   return pageBorderCrop(bytes);
 }, isAutoDispose: true);
 
-/// 查"下一本"的键：书 id + 所属系列。
-typedef NextBookQuery = ({String seriesId, String bookId});
+/// 查"下一本"的键：所属源 + 系列 id + 书 id。
+typedef NextBookQuery = ({String? sourceKey, String seriesId, String bookId});
 
 /// 同一系列里的下一本（按服务端返回顺序，也就是卷号顺序）。
 ///
@@ -105,7 +116,9 @@ final nextBookProvider = FutureProvider.family<Book?, NextBookQuery>((
   Ref ref,
   NextBookQuery query,
 ) async {
-  final page = await ref.watch(libraryRepositoryProvider).books(query.seriesId);
+  final page = await ref
+      .watch(libraryRepositoryForSourceProvider(query.sourceKey))
+      .books(query.seriesId);
   final index = page.items.indexWhere((Book book) => book.id == query.bookId);
   if (index < 0 || index + 1 >= page.items.length) return null;
   return page.items[index + 1];

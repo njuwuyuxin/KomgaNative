@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/widgets/cover_image.dart';
+import 'package:yomu/src/widgets/scoped_source_scope.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 收藏集的封面拼贴（UI-02）：最多 4 张系列封面。
@@ -89,7 +90,10 @@ class _Cover extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final bytes = ref.watch(seriesCoverProvider(seriesId)).value;
+    final sourceKey = ScopedSourceScope.maybeOf(context);
+    final bytes = ref
+        .watch(seriesCoverProvider((sourceKey: sourceKey, id: seriesId)))
+        .value;
     return SizedBox.expand(child: _paint(context, bytes));
   }
 

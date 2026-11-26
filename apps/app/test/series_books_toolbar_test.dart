@@ -65,6 +65,7 @@ void main() {
     final page = container
         .read(
           seriesBooksProvider((
+            sourceKey: null,
             seriesId: demoShelf().first.id,
             sort: BooksSort.numberDesc,
             readStatus: null,

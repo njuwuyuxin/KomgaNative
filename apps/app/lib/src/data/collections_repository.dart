@@ -78,13 +78,23 @@ class KomgaCollectionsRepository implements CollectionsRepository {
 
   KomgaSession get debugSession => _session;
 
+  String get _sourceKey => _session.address.baseUrl;
+
   @override
   Future<PageResult<KomgaCollection>> collections({
     int page = 0,
     int size = 20,
   }) async {
     try {
-      return await _session.fetchCollections(page: page, size: size);
+      final result = await _session.fetchCollections(page: page, size: size);
+      return PageResult<KomgaCollection>(
+        items: <KomgaCollection>[
+          for (final c in result.items) c.withSource(_sourceKey),
+        ],
+        totalElements: result.totalElements,
+        page: result.page,
+        size: result.size,
+      );
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);
     }
@@ -93,7 +103,8 @@ class KomgaCollectionsRepository implements CollectionsRepository {
   @override
   Future<KomgaCollection?> collectionById(String collectionId) async {
     try {
-      return await _session.fetchCollection(collectionId);
+      final c = await _session.fetchCollection(collectionId);
+      return c.withSource(_sourceKey);
     } on KomgaNotFoundError {
       return null;
     } on KomgaError catch (error) {
@@ -104,7 +115,8 @@ class KomgaCollectionsRepository implements CollectionsRepository {
   @override
   Future<List<KomgaCollection>> seriesCollections(String seriesId) async {
     try {
-      return await _session.fetchSeriesCollections(seriesId);
+      final items = await _session.fetchSeriesCollections(seriesId);
+      return <KomgaCollection>[for (final c in items) c.withSource(_sourceKey)];
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);
     }
@@ -117,11 +129,12 @@ class KomgaCollectionsRepository implements CollectionsRepository {
     bool ordered = false,
   }) async {
     try {
-      return await _session.createCollection(
+      final created = await _session.createCollection(
         name: name,
         seriesIds: seriesIds,
         ordered: ordered,
       );
+      return created.withSource(_sourceKey);
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);
     }
@@ -166,10 +179,16 @@ class KomgaCollectionsRepository implements CollectionsRepository {
     int size = 20,
   }) async {
     try {
-      return await _session.fetchCollectionSeries(
+      final result = await _session.fetchCollectionSeries(
         collectionId,
         page: page,
         size: size,
+      );
+      return PageResult<Series>(
+        items: <Series>[for (final s in result.items) s.withSource(_sourceKey)],
+        totalElements: result.totalElements,
+        page: result.page,
+        size: result.size,
       );
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);
@@ -179,7 +198,15 @@ class KomgaCollectionsRepository implements CollectionsRepository {
   @override
   Future<PageResult<ReadList>> readLists({int page = 0, int size = 20}) async {
     try {
-      return await _session.fetchReadLists(page: page, size: size);
+      final result = await _session.fetchReadLists(page: page, size: size);
+      return PageResult<ReadList>(
+        items: <ReadList>[
+          for (final r in result.items) r.withSource(_sourceKey),
+        ],
+        totalElements: result.totalElements,
+        page: result.page,
+        size: result.size,
+      );
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);
     }
@@ -188,7 +215,8 @@ class KomgaCollectionsRepository implements CollectionsRepository {
   @override
   Future<ReadList?> readListById(String readListId) async {
     try {
-      return await _session.fetchReadList(readListId);
+      final r = await _session.fetchReadList(readListId);
+      return r.withSource(_sourceKey);
     } on KomgaNotFoundError {
       return null;
     } on KomgaError catch (error) {
@@ -199,7 +227,8 @@ class KomgaCollectionsRepository implements CollectionsRepository {
   @override
   Future<List<ReadList>> bookReadLists(String bookId) async {
     try {
-      return await _session.fetchBookReadLists(bookId);
+      final items = await _session.fetchBookReadLists(bookId);
+      return <ReadList>[for (final r in items) r.withSource(_sourceKey)];
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);
     }
@@ -213,12 +242,13 @@ class KomgaCollectionsRepository implements CollectionsRepository {
     bool ordered = false,
   }) async {
     try {
-      return await _session.createReadList(
+      final created = await _session.createReadList(
         name: name,
         summary: summary,
         bookIds: bookIds,
         ordered: ordered,
       );
+      return created.withSource(_sourceKey);
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);
     }
@@ -266,7 +296,13 @@ class KomgaCollectionsRepository implements CollectionsRepository {
         page: page,
         size: size,
       );
-      return await overlayBooksPage(_sync, result);
+      final overlaid = await overlayBooksPage(_sync, result);
+      return PageResult<Book>(
+        items: <Book>[for (final b in overlaid.items) b.withSource(_sourceKey)],
+        totalElements: overlaid.totalElements,
+        page: overlaid.page,
+        size: overlaid.size,
+      );
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);
     }

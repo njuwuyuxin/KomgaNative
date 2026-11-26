@@ -69,6 +69,23 @@ class KomgaLibraryRepository implements LibraryRepository {
   /// 测试诊断用：暴露底层会话引用以验证连接池共享。
   KomgaSession get debugSession => _session;
 
+  String get _sourceKey => _session.address.baseUrl;
+
+  PageResult<Series> _tagSeriesPage(PageResult<Series> page) =>
+      PageResult<Series>(
+        items: <Series>[for (final s in page.items) s.withSource(_sourceKey)],
+        totalElements: page.totalElements,
+        page: page.page,
+        size: page.size,
+      );
+
+  PageResult<Book> _tagBooksPage(PageResult<Book> page) => PageResult<Book>(
+    items: <Book>[for (final b in page.items) b.withSource(_sourceKey)],
+    totalElements: page.totalElements,
+    page: page.page,
+    size: page.size,
+  );
+
   @override
   Future<List<Library>> libraries() async {
     try {
@@ -89,7 +106,7 @@ class KomgaLibraryRepository implements LibraryRepository {
     String? tag,
   }) async {
     try {
-      return await _session.fetchSeries(
+      final result = await _session.fetchSeries(
         libraryId: libraryId,
         search: query,
         page: page,
@@ -98,6 +115,7 @@ class KomgaLibraryRepository implements LibraryRepository {
         readStatus: readStatus,
         tag: tag,
       );
+      return _tagSeriesPage(result);
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);
     }
@@ -106,7 +124,8 @@ class KomgaLibraryRepository implements LibraryRepository {
   @override
   Future<Series?> seriesById(String seriesId) async {
     try {
-      return await _session.fetchSeriesById(seriesId);
+      final fetched = await _session.fetchSeriesById(seriesId);
+      return fetched?.withSource(_sourceKey);
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);
     }
@@ -116,7 +135,8 @@ class KomgaLibraryRepository implements LibraryRepository {
   Future<Book?> book(String bookId) async {
     try {
       final fetched = await _session.fetchBook(bookId);
-      return await _sync.overlayOne(fetched);
+      final overlaid = await _sync.overlayOne(fetched);
+      return overlaid?.withSource(_sourceKey);
     } on KomgaNotFoundError {
       return null;
     } on KomgaError catch (error) {
@@ -132,7 +152,7 @@ class KomgaLibraryRepository implements LibraryRepository {
   }) async {
     try {
       final result = await _session.searchBooks(query, page: page, size: size);
-      return await overlayBooksPage(_sync, result);
+      return _tagBooksPage(await overlayBooksPage(_sync, result));
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);
     }
@@ -154,7 +174,7 @@ class KomgaLibraryRepository implements LibraryRepository {
         sort: sort,
         readStatus: readStatus,
       );
-      return await overlayBooksPage(_sync, result);
+      return _tagBooksPage(await overlayBooksPage(_sync, result));
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);
     }
@@ -175,7 +195,10 @@ class KomgaLibraryRepository implements LibraryRepository {
           loadBook: _tryLoadBook,
         );
         if (localOnly.isNotEmpty) {
-          final items = localOnly.take(size).toList(growable: false);
+          final items = localOnly
+              .take(size)
+              .map((Book b) => b.withSource(_sourceKey))
+              .toList(growable: false);
           return PageResult<Book>(
             items: items,
             totalElements: localOnly.length,
@@ -212,7 +235,10 @@ class KomgaLibraryRepository implements LibraryRepository {
       inProgress: inProgressOverlay,
       ondeck: nextOverlay,
     );
-    final items = merged.take(size).toList(growable: false);
+    final items = merged
+        .take(size)
+        .map((Book b) => b.withSource(_sourceKey))
+        .toList(growable: false);
     return PageResult<Book>(
       items: items,
       totalElements: merged.length,

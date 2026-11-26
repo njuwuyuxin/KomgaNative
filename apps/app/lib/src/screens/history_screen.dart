@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu/l10n/app_localizations.dart';
-import 'package:yomu/src/providers/cross_source_reading_provider.dart';
 import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/reading_history_provider.dart';
 import 'package:yomu/src/widgets/cover_image.dart';
@@ -242,16 +241,14 @@ class _HistoryRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final cover = session.scope.isEmpty
-        ? ref.watch(bookCoverProvider(session.bookId)).value
-        : ref
-              .watch(
-                scopedBookCoverProvider((
-                  sourceKey: session.scope,
-                  bookId: session.bookId,
-                )),
-              )
-              .value;
+    final cover = ref
+        .watch(
+          bookCoverProvider((
+            sourceKey: session.scope.isEmpty ? null : session.scope,
+            id: session.bookId,
+          )),
+        )
+        .value;
     final minutes = session.durationMs ~/ 60000;
     final seconds = (session.durationMs % 60000) ~/ 1000;
     final duration = minutes > 0

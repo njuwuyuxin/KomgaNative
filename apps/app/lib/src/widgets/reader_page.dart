@@ -3,8 +3,10 @@ import 'dart:ui' as ui;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yomu/src/providers/reader_providers.dart';
+import 'package:yomu/src/providers/source_scoped_providers.dart';
 import 'package:yomu/src/widgets/reader_chrome.dart';
 import 'package:yomu/src/widgets/reader_palette.dart';
+import 'package:yomu/src/widgets/scoped_source_scope.dart';
 import 'package:yomu_reader/yomu_reader.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -71,8 +73,9 @@ class ReaderPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final page = pageIndex + 1;
-    final request = (bookId: bookId, page: page);
-    final repo = ref.watch(readerRepositoryProvider);
+    final sourceKey = ScopedSourceScope.maybeOf(context);
+    final request = (sourceKey: sourceKey, bookId: bookId, page: page);
+    final repo = ref.watch(readerRepositoryForSourceProvider(sourceKey));
     final async = ref.watch(readerPageImageProvider(request));
 
     // 同步问一句"这页的字节现在在不在内存里"：在就直接画第一帧。

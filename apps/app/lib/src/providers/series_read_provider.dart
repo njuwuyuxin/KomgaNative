@@ -5,11 +5,18 @@ import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/pinned_series_provider.dart';
 import 'package:yomu/src/providers/progress_providers.dart';
 import 'package:yomu/src/providers/reader_providers.dart';
+import 'package:yomu/src/providers/source_scoped_providers.dart';
 
 /// 阅读状态变更后的统一跨模块联动刷新钩子（ARC-10）。
-void invalidateAfterReadStatusChange(Ref ref, {String? seriesId}) {
-  if (seriesId != null) {
-    ref.invalidate(seriesDetailProvider(seriesId));
+void invalidateAfterReadStatusChange(
+  Ref ref, {
+  String? seriesId,
+  String? sourceKey,
+}) {
+  if (seriesId != null && sourceKey != null) {
+    ref.invalidate(
+      seriesDetailProvider((sourceKey: sourceKey, seriesId: seriesId)),
+    );
   } else {
     ref.invalidate(seriesDetailProvider);
   }
@@ -39,6 +46,7 @@ class ReaderProgressCommitter {
     required Future<bool> Function() flushProgress,
     required String bookId,
     String? seriesId,
+    String? sourceKey,
     Book? completedBook,
   }) async {
     final wrote = await flushProgress();
@@ -51,14 +59,26 @@ class ReaderProgressCommitter {
 
     final sync = _ref.read(progressSyncProvider);
     // 第一阶段：本地 Outbox 已写入，立即刷新支持本地叠加的列表与继续阅读。
-    _ref.invalidate(readerBookProvider(bookId));
-    invalidateAfterReadStatusChange(_ref, seriesId: seriesId);
+    if (sourceKey != null) {
+      _ref.invalidate(
+        readerBookProvider((sourceKey: sourceKey, bookId: bookId)),
+      );
+    } else {
+      _ref.invalidate(readerBookProvider);
+    }
+    invalidateAfterReadStatusChange(
+      _ref,
+      seriesId: seriesId,
+      sourceKey: sourceKey,
+    );
 
     // 第二阶段：等服务端 PATCH 完成后，再刷一次依赖服务端聚合计数的系列详情与书架。
     await sync.flush();
     if (_disposed) return;
-    if (seriesId != null) {
-      _ref.invalidate(seriesDetailProvider(seriesId));
+    if (seriesId != null && sourceKey != null) {
+      _ref.invalidate(
+        seriesDetailProvider((sourceKey: sourceKey, seriesId: seriesId)),
+      );
     } else {
       _ref.invalidate(seriesDetailProvider);
     }
@@ -95,15 +115,23 @@ class SeriesReadController extends Notifier<Set<String>> {
     return const <String>{};
   }
 
-  Future<void> setRead(String seriesId, {required bool read}) async {
+  Future<void> setRead(
+    String seriesId, {
+    required bool read,
+    String? sourceKey,
+  }) async {
     if (state.contains(seriesId)) return;
     state = <String>{...state, seriesId};
     try {
       await ref
-          .read(readStatusRepositoryProvider)
+          .read(readStatusRepositoryForSourceProvider(sourceKey))
           .setSeriesRead(seriesId, read: read);
       if (_disposed) return;
-      invalidateAfterReadStatusChange(ref, seriesId: seriesId);
+      invalidateAfterReadStatusChange(
+        ref,
+        seriesId: seriesId,
+        sourceKey: sourceKey,
+      );
     } finally {
       if (!_disposed) state = <String>{...state}..remove(seriesId);
     }

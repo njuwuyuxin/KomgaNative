@@ -14,6 +14,7 @@ import 'package:yomu/src/providers/local_catalog_mutator_provider.dart';
 import 'package:yomu/src/widgets/book_download_button.dart';
 import 'package:yomu/src/widgets/context_menu.dart';
 import 'package:yomu/src/widgets/cover_image.dart';
+import 'package:yomu/src/widgets/scoped_source_scope.dart';
 import 'package:yomu/src/widgets/local_metadata_sheets.dart';
 import 'package:yomu/src/widgets/readlist_picker_sheet.dart';
 import 'package:material_ui/material_ui.dart';
@@ -60,7 +61,10 @@ class SeriesBookRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final cover = ref.watch(bookCoverProvider(book.id));
+    final sourceKey = ScopedSourceScope.maybeOf(context) ?? book.sourceKey;
+    final cover = ref.watch(
+      bookCoverProvider((sourceKey: sourceKey, id: book.id)),
+    );
     final bytes = switch (cover) {
       AsyncData<Uint8List?>(:final value) => value,
       _ => null,

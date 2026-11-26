@@ -8,10 +8,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/src/data/shelf_failure.dart';
-import 'package:yomu/src/providers/reader_providers.dart';
+import 'package:yomu/src/providers/source_scoped_providers.dart';
 import 'package:yomu/src/widgets/page_curl.dart';
 import 'package:yomu/src/widgets/reader_page.dart';
 import 'package:yomu/src/widgets/reader_palette.dart';
+import 'package:yomu/src/widgets/scoped_source_scope.dart';
 import 'package:yomu_reader/yomu_reader.dart';
 import 'package:material_ui/material_ui.dart';
 

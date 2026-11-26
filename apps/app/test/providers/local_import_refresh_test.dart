@@ -219,11 +219,17 @@ void main() {
           .pickAndImportArchives();
       expect(first?.importedCount, 1);
       final seriesId = first!.importedSeriesIds.single;
-      final query = (seriesId: seriesId, sort: null, readStatus: null);
+      final seriesQuery = (sourceKey: null, seriesId: seriesId);
+      final query = (
+        sourceKey: null,
+        seriesId: seriesId,
+        sort: null,
+        readStatus: null,
+      );
 
       // 模拟用户先打开过一次详情页，令 seriesDetailProvider 与 seriesBooksProvider 进入缓存。
       final detailBefore = await container.read(
-        seriesDetailProvider(seriesId).future,
+        seriesDetailProvider(seriesQuery).future,
       );
       final booksBefore = await container.read(
         seriesBooksProvider(query).future,
@@ -248,7 +254,7 @@ void main() {
 
       // 无需手动下拉刷新，再次读取详情与分卷列表即直接包含新导入的第 2 卷。
       final detailAfter = await container.read(
-        seriesDetailProvider(seriesId).future,
+        seriesDetailProvider(seriesQuery).future,
       );
       final booksAfter = await container.read(
         seriesBooksProvider(query).future,
@@ -265,7 +271,13 @@ void main() {
         .read(localImportProvider.notifier)
         .importExternalFile(vol1.path, fileName: 'Dandadan Vol 1.cbz');
     final seriesId = first!.importedSeriesIds.single;
-    final query = (seriesId: seriesId, sort: null, readStatus: null);
+    final seriesQuery = (sourceKey: null, seriesId: seriesId);
+    final query = (
+      sourceKey: null,
+      seriesId: seriesId,
+      sort: null,
+      readStatus: null,
+    );
 
     final booksBefore = await container.read(seriesBooksProvider(query).future);
     expect(booksBefore.items, hasLength(1));
@@ -278,7 +290,7 @@ void main() {
     expect(second?.importedSeriesIds.single, seriesId);
 
     final detailAfter = await container.read(
-      seriesDetailProvider(seriesId).future,
+      seriesDetailProvider(seriesQuery).future,
     );
     final booksAfter = await container.read(seriesBooksProvider(query).future);
     expect(detailAfter?.booksCount, 2);

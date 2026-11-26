@@ -6,8 +6,10 @@ import 'dart:ui' as ui;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:yomu/src/providers/reader_providers.dart';
+import 'package:yomu/src/providers/source_scoped_providers.dart';
 import 'package:yomu/src/widgets/reader_chrome.dart';
 import 'package:yomu/src/widgets/reader_palette.dart';
+import 'package:yomu/src/widgets/scoped_source_scope.dart';
 import 'package:yomu_reader/yomu_reader.dart';
 
 /// 超高条漫长图（> 4096px）的分片 `ui.Image` 缓存与生命周期管理（LMB-02）。
@@ -235,8 +237,9 @@ class _ReaderTallPageTileState extends ConsumerState<ReaderTallPageTile> {
   @override
   Widget build(BuildContext context) {
     final page = widget.pageIndex + 1;
-    final request = (bookId: widget.bookId, page: page);
-    final repo = ref.watch(readerRepositoryProvider);
+    final sourceKey = ScopedSourceScope.maybeOf(context);
+    final request = (sourceKey: sourceKey, bookId: widget.bookId, page: page);
+    final repo = ref.watch(readerRepositoryForSourceProvider(sourceKey));
     final async = ref.watch(readerPageImageProvider(request));
     final bytes = async.value ?? repo.cachedPageImage(widget.bookId, page);
     final error = async.error;

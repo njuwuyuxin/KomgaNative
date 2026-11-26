@@ -77,7 +77,12 @@ class ContinueCard extends ConsumerWidget {
     final Uint8List? bytes = ref.watch(bookCoverForEntityProvider(book)).value;
     final direction =
         ref
-            .watch(seriesDetailProvider(book.seriesId))
+            .watch(
+              seriesDetailProvider((
+                sourceKey: book.sourceKey,
+                seriesId: book.seriesId,
+              )),
+            )
             .value
             ?.readingDirection ??
         ReadingDirection.unknown;

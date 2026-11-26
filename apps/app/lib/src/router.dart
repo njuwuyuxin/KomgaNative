@@ -179,6 +179,7 @@ GoRouter createRouter({
             sourceKey: resolvedSource,
             child: SeriesDetailScreen(
               seriesId: state.pathParameters['seriesId'] ?? '',
+              sourceKey: resolvedSource,
               heroTag: args?.heroTag,
             ),
           );
@@ -198,6 +199,7 @@ GoRouter createRouter({
             child: ReaderScreen(
               bookId: state.pathParameters['bookId'] ?? '',
               book: args?.book,
+              sourceKey: resolvedSource,
               direction: args?.direction ?? ReadingDirection.unknown,
               heroTag: args?.heroTag,
             ),

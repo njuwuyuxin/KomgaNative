@@ -9,6 +9,10 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
   late ProgressSyncService _progressSync;
   late ReaderProgressCommitter _committer;
   String _bookScope = '';
+  String? _resolvedSourceKey;
+
+  ReaderBookQuery get _bookQuery =>
+      (sourceKey: _resolvedSourceKey, bookId: widget.bookId);
 
   late final ReaderProgressWriter _progress = ReaderProgressWriter(
     write: (int page) => _progressSync.save(
@@ -23,8 +27,9 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
   );
 
   late final ReaderPreloader _preloader = ReaderPreloader(
-    fetch: (int page) =>
-        ref.read(readerRepositoryProvider).pageImage(widget.bookId, page),
+    fetch: (int page) => ref
+        .read(readerRepositoryForSourceProvider(_resolvedSourceKey))
+        .pageImage(widget.bookId, page),
     decode: (bytes) => unawaited(
       precacheImage(
         MemoryImage(bytes),
@@ -94,7 +99,7 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
       .read(readerPrefsProvider)
       .spreadFromFor(
         widget.bookId,
-        serverKey: ref.read(activeServerKeyProvider),
+        serverKey: _resolvedSourceKey ?? ref.read(activeServerKeyProvider),
       );
 
   /// 最近一次 build 解析出的**有效**阅读方向。
@@ -121,7 +126,7 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
   /// 音量上 = 上一页，音量下 = 下一页（阅读顺序，不跟着 RTL 反转）。
   /// 纵向模式忽略：滚动交给 ListView；页数据没到时也没有 total 可用。
   void _onVolumeKey(PageTurnKey key) {
-    final pages = ref.read(readerPagesProvider(widget.bookId)).value;
+    final pages = ref.read(readerPagesProvider(_bookQuery)).value;
     if (pages == null || pages.isEmpty) return;
     final mode = _modeFor(ref.read(readerPrefsProvider));
     _requestTurn(key == PageTurnKey.next ? 1 : -1, mode);
@@ -132,13 +137,15 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
       (_lastBook ??
               widget.book ??
               (!_settledLeave && mounted
-                  ? ref.read(readerBookProvider(widget.bookId)).value
+                  ? ref.read(readerBookProvider(_bookQuery)).value
                   : null))
           ?.seriesId;
 
   /// 系列覆盖优先，其余用全局。
-  ReaderConfig _effectiveConfig(ReaderPrefs prefs) =>
-      prefs.forSeries(_seriesId, serverKey: ref.read(activeServerKeyProvider));
+  ReaderConfig _effectiveConfig(ReaderPrefs prefs) => prefs.forSeries(
+    _seriesId,
+    serverKey: _resolvedSourceKey ?? ref.read(activeServerKeyProvider),
+  );
 
   /// 外部翻页（底栏箭头 / 音量键）统一入口：交给绘制层播动画，动画结束后
   /// 它再回调 `onTurn` 真正换页；绘制层还没建好时（页数据未到）什么也不做。
@@ -178,11 +185,18 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
   /// 系列查不到（离线/深链脏数据）时回 unknown，界面按从左到右兜底，不阻塞打开。
   ReadingDirection _resolveDirection() {
     if (widget.direction != ReadingDirection.unknown) return widget.direction;
-    final book =
-        widget.book ?? ref.watch(readerBookProvider(widget.bookId)).value;
+    final book = widget.book ?? ref.watch(readerBookProvider(_bookQuery)).value;
     final seriesId = book?.seriesId;
     if (seriesId == null) return ReadingDirection.unknown;
-    return ref.watch(seriesDetailProvider(seriesId)).value?.readingDirection ??
+    return ref
+            .watch(
+              seriesDetailProvider((
+                sourceKey: _resolvedSourceKey,
+                seriesId: seriesId,
+              )),
+            )
+            .value
+            ?.readingDirection ??
         ReadingDirection.unknown;
   }
 
@@ -216,7 +230,7 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
 
   /// 用当前状态现算一份布局；页数据还没到时为 null。
   ReaderLayout? _currentLayout() {
-    final pages = ref.read(readerPagesProvider(widget.bookId)).value;
+    final pages = ref.read(readerPagesProvider(_bookQuery)).value;
     if (pages == null || pages.isEmpty) return null;
     final prefs = ref.read(readerPrefsProvider);
     return _buildLayout(pages, prefs.tabletLayout, _effectiveConfig(prefs));
@@ -226,7 +240,7 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
     if (total <= 0) return 1;
     if (_page > 0) return _page.clamp(1, total);
     final resumed =
-        (widget.book ?? ref.read(readerBookProvider(widget.bookId)).value)
+        (widget.book ?? ref.read(readerBookProvider(_bookQuery)).value)
             ?.readProgress
             ?.page ??
         1;
@@ -262,39 +276,6 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
     _scheduleProgress(page);
   }
 
-  /// 宽页自动切分态下临时合页/恢复切分当前物理页（LMB-01）。
-  void _toggleTempMerge(int pageIndex) {
-    setState(() {
-      _mergedWidePageIndex = _mergedWidePageIndex == pageIndex
-          ? null
-          : pageIndex;
-      _pageHalf = null;
-    });
-  }
-
-  void _handlePagedTurn(
-    ReaderLayout layout,
-    int delta,
-    int total,
-    Book? nextBook,
-  ) {
-    if (layout.isWideSplitActive) {
-      final splitTarget = layout.turnSplitTarget(delta);
-      if (splitTarget != null) {
-        _setPage(splitTarget.pageNumber, total, half: splitTarget.half);
-        return;
-      }
-      if (delta > 0 && nextBook != null) _openNext(nextBook);
-      return;
-    }
-    final target = layout.turnTarget(delta);
-    if (target != null) {
-      _setPage(target, total);
-      return;
-    }
-    if (delta > 0 && nextBook != null) _openNext(nextBook);
-  }
-
   /// 打开下一本：**替换**当前页而不是压栈（连读十本不必按十次返回）。
   void _openNext(Book next) {
     final handler = widget.onOpenNext;
@@ -304,7 +285,11 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
     }
     context.pushReplacement(
       '/reader/${next.id}',
-      extra: ReaderArgs(book: next, direction: _direction),
+      extra: ReaderArgs(
+        book: next,
+        direction: _direction,
+        sourceKey: _resolvedSourceKey ?? next.sourceKey,
+      ),
     );
   }
 
@@ -325,7 +310,13 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
   Book? _nextBookFor(ReaderLayout layout, Book? book) {
     if (!layout.completed || book == null) return null;
     return ref
-        .watch(nextBookProvider((seriesId: book.seriesId, bookId: book.id)))
+        .watch(
+          nextBookProvider((
+            sourceKey: _resolvedSourceKey,
+            seriesId: book.seriesId,
+            bookId: book.id,
+          )),
+        )
         .value;
   }
 

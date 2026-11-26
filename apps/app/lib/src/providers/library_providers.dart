@@ -10,6 +10,7 @@ import 'package:yomu/src/providers/cross_source_reading_provider.dart';
 import 'package:yomu/src/providers/paged_list_controller.dart';
 import 'package:yomu/src/providers/shelf_controller.dart';
 import 'package:yomu/src/providers/source_registry_provider.dart';
+import 'package:yomu/src/providers/source_scoped_providers.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 
 export 'package:yomu/src/providers/collections_providers.dart';
@@ -37,24 +38,35 @@ final FutureProvider<List<Library>> librariesProvider =
       return ref.watch(libraryRepositoryProvider).libraries();
     });
 
+/// 按源寻址单个系列的查询键。
+typedef SeriesQuery = ({String? sourceKey, String seriesId});
+
+/// 按源寻址封面图片的查询键（系列或书籍）。
+typedef CoverQuery = ({String? sourceKey, String id});
+
 /// 单张系列封面。失败返回 null，由占位图兜住。
-final seriesCoverProvider = FutureProvider.family<Uint8List?, String>((
+final seriesCoverProvider = FutureProvider.family<Uint8List?, CoverQuery>((
   Ref ref,
-  String seriesId,
+  CoverQuery query,
 ) {
-  return ref.watch(libraryRepositoryProvider).seriesCover(seriesId);
+  return ref
+      .watch(libraryRepositoryForSourceProvider(query.sourceKey))
+      .seriesCover(query.id);
 });
 
 /// 单个系列（详情页头部用；系列被删时返回 null）。
-final seriesDetailProvider = FutureProvider.family<Series?, String>((
+final seriesDetailProvider = FutureProvider.family<Series?, SeriesQuery>((
   Ref ref,
-  String seriesId,
+  SeriesQuery query,
 ) {
-  return ref.watch(libraryRepositoryProvider).seriesById(seriesId);
+  return ref
+      .watch(libraryRepositoryForSourceProvider(query.sourceKey))
+      .seriesById(query.seriesId);
 });
 
 /// 系列内书列表查询条件（SER-01 / ARC-12：增量分页每页固定 100 本）。
 typedef SeriesBooksQuery = ({
+  String? sourceKey,
   String seriesId,
   BooksSort? sort,
   SeriesReadStatus? readStatus,
@@ -73,7 +85,7 @@ class SeriesBooksController extends PagedListController<Book> {
 
   @override
   Future<PageResult<Book>> fetchPage(int page, int size) => ref
-      .watch(libraryRepositoryProvider)
+      .watch(libraryRepositoryForSourceProvider(query.sourceKey))
       .books(
         query.seriesId,
         page: page,
@@ -91,11 +103,13 @@ final seriesBooksProvider =
     >(SeriesBooksController.new);
 
 /// 单本书的封面。
-final bookCoverProvider = FutureProvider.family<Uint8List?, String>((
+final bookCoverProvider = FutureProvider.family<Uint8List?, CoverQuery>((
   Ref ref,
-  String bookId,
+  CoverQuery query,
 ) {
-  return ref.watch(libraryRepositoryProvider).bookCover(bookId);
+  return ref
+      .watch(libraryRepositoryForSourceProvider(query.sourceKey))
+      .bookCover(query.id);
 });
 
 /// 最近添加的系列（"正在读"首页的第二块，UI-P2-6）。
@@ -143,15 +157,8 @@ final bookCoverForEntityProvider = FutureProvider.family<Uint8List?, Book>((
   Ref ref,
   Book book,
 ) {
-  final primary = ref.watch(libraryRepositoryProvider);
-  final activeBundle = ref.watch(activeSourceBundleProvider);
-  if (!identical(primary, activeBundle.library)) {
-    return primary.bookCover(book.id);
-  }
   return ref
-      .watch(sourceRegistryProvider)
-      .bundleFor(book.sourceKey)
-      .library
+      .watch(libraryRepositoryForSourceProvider(book.sourceKey))
       .bookCover(book.id);
 });
 

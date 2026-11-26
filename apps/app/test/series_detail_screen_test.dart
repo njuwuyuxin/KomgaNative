@@ -323,7 +323,12 @@ void main() {
     final container = ProviderScope.containerOf(
       tester.element(find.byType(SeriesDetailScreen)),
     );
-    const query = (seriesId: 's1', sort: null, readStatus: null);
+    const query = (
+      sourceKey: null,
+      seriesId: 's1',
+      sort: null,
+      readStatus: null,
+    );
 
     await container.read(seriesBooksProvider(query).notifier).loadMore();
     await tester.pumpAndSettle();

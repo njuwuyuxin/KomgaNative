@@ -126,8 +126,12 @@ class LocalCatalogMutator {
       seriesId: seriesId,
       coverRelativePath: relPath,
     );
-    _ref.invalidate(bookCoverProvider(bookId));
-    _ref.invalidate(seriesCoverProvider(seriesId));
+    _ref.invalidate(
+      bookCoverProvider((sourceKey: kLocalSourceKey, id: bookId)),
+    );
+    _ref.invalidate(
+      seriesCoverProvider((sourceKey: kLocalSourceKey, id: seriesId)),
+    );
     _invalidateAfterMutation();
     return true;
   }
