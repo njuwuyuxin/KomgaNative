@@ -118,7 +118,7 @@ class SeriesBookRow extends ConsumerWidget {
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              BookDownloadButton(book: book),
+              if (!book.id.startsWith('local:')) BookDownloadButton(book: book),
               if (trailingAction != null) trailingAction!,
               Icon(
                 completed ? Icons.check_circle : Icons.chevron_right,

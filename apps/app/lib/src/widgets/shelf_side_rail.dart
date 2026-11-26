@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/providers/active_source_provider.dart';
+import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu_domain/yomu_domain.dart';
-import 'package:yomu/l10n/app_localizations.dart';
-import 'package:yomu/src/providers/library_providers.dart';
-import 'package:material_ui/material_ui.dart';
 
 /// 平板书架左侧的"库"导航（PLT-01）。
 ///
@@ -16,6 +19,8 @@ class ShelfSideRail extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
+    final sources = ref.watch(availableSourcesProvider);
+    final activeSource = ref.watch(activeSourceProvider);
     final libraries = ref.watch(librariesProvider).value ?? const <Library>[];
     final shelf = ref.watch(shelfProvider);
     final controller = ref.read(shelfProvider.notifier);
@@ -35,6 +40,26 @@ class ShelfSideRail extends ConsumerWidget {
           bottom: AppSizes.navBarClearance,
         ),
         children: <Widget>[
+          if (sources.length > 1) ...<Widget>[
+            for (final src in sources)
+              _RailTile(
+                key: Key('side-rail-source-${src.sourceKey}'),
+                icon: src.isCloud
+                    ? Icons.cloud_outlined
+                    : Icons.smartphone_outlined,
+                label: switch (src) {
+                  LocalContentSource() => l10n.localLibraryFull,
+                  RemoteContentSource(:final displayName) => displayName,
+                },
+                selected: src.sourceKey == activeSource.sourceKey,
+                onTap: () => unawaited(
+                  ref
+                      .read(activeSourceProvider.notifier)
+                      .selectSource(src.sourceKey),
+                ),
+              ),
+            const Divider(height: AppSpacing.md),
+          ],
           Padding(
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.md,

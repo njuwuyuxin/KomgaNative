@@ -1,13 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/providers/active_source_provider.dart';
 import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/progress_providers.dart';
-import 'package:yomu/src/session/session_controller.dart';
+import 'package:yomu_domain/yomu_domain.dart';
 
-/// 当前服务器的稳定标识（LIB-02）。
+/// 当前激活内容源的稳定分区键（本机为 `'local://device'`，Komga 为规范化 `baseUrl`）。
 final Provider<String> activeServerKeyProvider = Provider<String>((Ref ref) {
-  final session = ref.watch(sessionProvider);
-  return session is SessionConnected ? session.server.address.baseUrl : '';
+  return ref.watch(activeSourceProvider).sourceKey;
 });
 
 /// 这台服务器上置顶的系列 id（ARC-10 Drift 表更新流自动刷新）。

@@ -242,11 +242,13 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                     label: l10n.addToCollection,
                     onPressed: () => unawaited(_openCollectionsPicker()),
                   ),
-                  const SizedBox(width: AppSpacing.sm),
-                  SeriesDownloadMenu(
-                    seriesId: seriesId,
-                    books: page?.items ?? const <Book>[],
-                  ),
+                  if (!seriesId.startsWith('local:')) ...<Widget>[
+                    const SizedBox(width: AppSpacing.sm),
+                    SeriesDownloadMenu(
+                      seriesId: seriesId,
+                      books: page?.items ?? const <Book>[],
+                    ),
+                  ],
                   const SizedBox(width: AppSpacing.sm),
                   GlassMenuButton(
                     key: const Key('series-mark-menu'),

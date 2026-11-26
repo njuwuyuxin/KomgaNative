@@ -103,6 +103,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     WidgetsBinding.instance.addObserver(this);
     // 阅读会话与进度收尾服务在 initState 预取（dispose 里不能再碰 ref）。
     _session.start(page: widget.book?.readProgress?.page ?? 1);
+    _bookScope = ref.read(activeServerKeyProvider);
     _recorder = ref.read(readingSessionRecorderProvider);
     _progressSync = ref.read(progressSyncProvider);
     _committer = ref.read(readerProgressCommitterProvider);

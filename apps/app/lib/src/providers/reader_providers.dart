@@ -5,9 +5,8 @@ import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/src/data/page_border_crop.dart';
 import 'package:yomu/src/data/page_edge_color.dart';
 import 'package:yomu/src/data/reader_repository.dart';
-import 'package:yomu/src/providers/komga_session_provider.dart';
+import 'package:yomu/src/providers/active_source_provider.dart';
 import 'package:yomu/src/providers/library_providers.dart';
-import 'package:yomu/src/providers/progress_providers.dart';
 import 'package:yomu_platform/yomu_platform.dart';
 import 'package:yomu_reader/yomu_reader.dart';
 
@@ -16,11 +15,10 @@ final Provider<ImageSaver> imageSaverProvider = Provider<ImageSaver>(
   (Ref ref) => ChannelImageSaver(),
 );
 
-/// 阅读器仓库：复用共享 [komgaSessionProvider] 连接池（ARC-09）。
+/// 阅读器仓库：默认跟随激活内容源；跨源打开阅读器时由局部 `ProviderScope` 按 `sourceKey` 覆盖。
 final Provider<ReaderRepository> readerRepositoryProvider =
     Provider<ReaderRepository>((Ref ref) {
-      final komga = requireKomgaSession(ref, reason: '未连接服务器时不应打开阅读器');
-      return KomgaReaderRepository(komga, ref.watch(progressSyncProvider));
+      return ref.watch(activeSourceBundleProvider).reader;
     });
 
 final readerBookProvider = FutureProvider.family<Book?, String>((

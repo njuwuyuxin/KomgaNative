@@ -1,10 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/providers/active_source_provider.dart';
 import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/screens/collections_tab.dart';
 import 'package:yomu/src/screens/readlists_tab.dart';
 import 'package:yomu/src/widgets/offline_banner.dart';
+import 'package:yomu/src/widgets/source_group_bar.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 收藏集 / 阅读列表入口（UI-P3-8 / ARC-12 拆分子标签页）。
@@ -59,8 +61,15 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen>
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final tab = _tab!;
+    final hasMultipleSources = ref.watch(availableSourcesProvider).length > 1;
+    final activeSource = ref.watch(activeSourceProvider);
+    final extraBarHeight = hasMultipleSources
+        ? (AppSizes.minTouch - AppSpacing.xs)
+        : 0.0;
     final topInset =
-        MediaQuery.paddingOf(context).top + AppSizes.glassHeaderClearance;
+        MediaQuery.paddingOf(context).top +
+        AppSizes.glassHeaderClearance +
+        extraBarHeight;
 
     return Scaffold(
       body: GlassPageBackground(
@@ -79,38 +88,47 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen>
               right: 0,
               child: SafeArea(
                 bottom: false,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                  child: GlassHeader(
-                    bar: AnimatedBuilder(
-                      animation: tab,
-                      builder: (BuildContext context, _) =>
-                          GlassSegmentedControl<int>(
-                            segments: <GlassSegment<int>>[
-                              GlassSegment<int>(
-                                value: 0,
-                                label: l10n.collectionsTab,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: AppSpacing.sm,
+                      ),
+                      child: GlassHeader(
+                        bar: AnimatedBuilder(
+                          animation: tab,
+                          builder: (BuildContext context, _) =>
+                              GlassSegmentedControl<int>(
+                                segments: <GlassSegment<int>>[
+                                  GlassSegment<int>(
+                                    value: 0,
+                                    label: l10n.collectionsTab,
+                                  ),
+                                  GlassSegment<int>(
+                                    value: 1,
+                                    label: l10n.readListsTab,
+                                  ),
+                                ],
+                                selected: tab.index,
+                                position: tab.animation,
+                                onSelected: tab.animateTo,
                               ),
-                              GlassSegment<int>(
-                                value: 1,
-                                label: l10n.readListsTab,
-                              ),
-                            ],
-                            selected: tab.index,
-                            position: tab.animation,
-                            onSelected: tab.animateTo,
-                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                    const SourceGroupBar(),
+                  ],
                 ),
               ),
             ),
-            OfflineOverlay(
-              onRetry: () {
-                ref.invalidate(collectionsProvider);
-                ref.invalidate(readListsProvider);
-              },
-            ),
+            if (activeSource.capabilities.showsNetworkOfflineBanner)
+              OfflineOverlay(
+                onRetry: () {
+                  ref.invalidate(collectionsProvider);
+                  ref.invalidate(readListsProvider);
+                },
+              ),
           ],
         ),
       ),

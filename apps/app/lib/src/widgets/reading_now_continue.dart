@@ -74,7 +74,7 @@ class ContinueCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final Uint8List? bytes = ref.watch(bookCoverProvider(book.id)).value;
+    final Uint8List? bytes = ref.watch(bookCoverForEntityProvider(book)).value;
     final direction =
         ref
             .watch(seriesDetailProvider(book.seriesId))
@@ -132,11 +132,24 @@ class ContinueCard extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
-                          Text(
-                            l10n.pickUpWhereYouLeftOff,
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
+                          Row(
+                            children: <Widget>[
+                              Expanded(
+                                child: Text(
+                                  l10n.pickUpWhereYouLeftOff,
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                              if (book.isCloud)
+                                Icon(
+                                  Icons.cloud_outlined,
+                                  key: Key('continue-cloud-${book.id}'),
+                                  size: AppSizes.iconXs,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                            ],
                           ),
                           const SizedBox(height: AppSpacing.xxs),
                           Text(
@@ -183,7 +196,12 @@ class ContinueCard extends ConsumerWidget {
   ) async {
     await context.push(
       '/reader/${book.id}',
-      extra: ReaderArgs(book: book, direction: direction, heroTag: heroTag),
+      extra: ReaderArgs(
+        book: book,
+        direction: direction,
+        heroTag: heroTag,
+        sourceKey: book.sourceKey,
+      ),
     );
   }
 }

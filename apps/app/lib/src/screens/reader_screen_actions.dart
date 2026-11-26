@@ -58,7 +58,9 @@ mixin _ReaderActions on ConsumerState<ReaderScreen>, _ReaderDerive {
       page: _page > 0 ? _page : null,
     );
     if (draft == null) return;
-    unawaited(_recorder.record(draft));
+    unawaited(
+      _recorder.record(draft, scope: _bookScope.isEmpty ? null : _bookScope),
+    );
   }
 
   /// 退出阅读器或切换下一本书时幂等落盘进度并通知书架/"正在读"联动刷新。

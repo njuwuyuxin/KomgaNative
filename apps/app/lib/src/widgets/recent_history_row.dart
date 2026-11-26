@@ -2,8 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/providers/cross_source_reading_provider.dart';
 import 'package:yomu/src/providers/library_providers.dart';
-import 'package:yomu/src/providers/pinned_series_provider.dart';
 import 'package:yomu/src/providers/reading_history_provider.dart';
 import 'package:yomu/src/widgets/cover_image.dart';
 import 'package:material_ui/material_ui.dart';
@@ -81,26 +81,26 @@ class _RecentHistoryTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final cover = ref.watch(bookCoverProvider(session.bookId)).value;
+    final cover = session.scope.isEmpty
+        ? ref.watch(bookCoverProvider(session.bookId)).value
+        : ref
+              .watch(
+                scopedBookCoverProvider((
+                  sourceKey: session.scope,
+                  bookId: session.bookId,
+                )),
+              )
+              .value;
     return SizedBox(
       width: AppSizes.recentHistoryTileWidth,
       child: InkWell(
         key: Key('recent-history-${session.bookId}'),
         borderRadius: BorderRadius.circular(AppRadii.sm),
         onTap: () {
-          final activeScope = ref.read(activeServerKeyProvider);
-          if (session.scope.isNotEmpty &&
-              activeScope.isNotEmpty &&
-              session.scope != activeScope) {
-            final l10n = AppLocalizations.of(context);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(l10n.historyDifferentServer(session.scope)),
-              ),
-            );
-            return;
-          }
-          context.push('/reader/${session.bookId}');
+          final query = session.scope.isEmpty
+              ? ''
+              : '?source=${Uri.encodeComponent(session.scope)}';
+          context.push('/reader/${session.bookId}$query');
         },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

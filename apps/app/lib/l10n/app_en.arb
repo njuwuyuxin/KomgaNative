@@ -652,5 +652,71 @@
       "version": {"type": "int"}
     }
   },
-  "backupErrorInvalidPrefs": "Could not parse the settings inside this backup."
+  "backupErrorInvalidPrefs": "Could not parse the settings inside this backup.",
+  "localLibrary": "On Device",
+  "localLibraryFull": "Local library",
+  "importComics": "Import comics",
+  "importArchiveFiles": "Import CBZ / ZIP files",
+  "importComicFolder": "Import comic folder",
+  "importingProgress": "Importing ({done}/{total})",
+  "@importingProgress": {
+    "placeholders": {
+      "done": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
+  "importSucceeded": "Imported {count} books",
+  "@importSucceeded": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "importPartialResult": "Imported {imported} books, {failed} skipped",
+  "@importPartialResult": {
+    "placeholders": {
+      "imported": {"type": "int"},
+      "failed": {"type": "int"}
+    }
+  },
+  "importFailedUnsupported": "Unsupported or encrypted archive ({name})",
+  "@importFailedUnsupported": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "localEmptyShelfTitle": "Your shelf is ready",
+  "localEmptyShelfHint": "Import CBZ or ZIP comics to start reading right away, or connect a Komga server for cloud sync.",
+  "connectKomgaOptional": "Connect Komga server",
+  "useLocalLibraryInstead": "Continue with local library",
+  "cloudSyncHeader": "Cloud library & sync",
+  "cloudSyncSubtitle": "Connect a Komga server to stream your remote library and sync reading progress & collections across devices.",
+  "localComicsStorage": "Imported local comics",
+  "localComicsUsage": "{count} books · {size}",
+  "@localComicsUsage": {
+    "placeholders": {
+      "count": {"type": "int"},
+      "size": {"type": "String"}
+    }
+  },
+  "deleteFromDevice": "Delete from device",
+  "deleteLocalSeriesTitle": "Delete from device?",
+  "deleteLocalSeriesBody": "This will remove {count} imported items from Yomu's local storage.",
+  "@deleteLocalSeriesBody": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "editMetadata": "Edit info",
+  "editSeriesTitleLabel": "Series title",
+  "editBookTitleLabel": "Book title",
+  "editBookNumberLabel": "Volume / chapter number",
+  "editSummaryLabel": "Summary",
+  "editAuthorsLabel": "Authors (comma-separated)",
+  "editTagsLabel": "Tags (comma-separated)",
+  "mergeIntoSeries": "Merge into one series",
+  "mergeSeriesDialogTitle": "Merge selected series",
+  "mergeTargetSeriesHint": "Merged series title",
+  "splitIntoOwnSeries": "Split into standalone series",
+  "setPageAsCover": "Set current page as cover",
+  "coverUpdated": "Cover updated"
 }

@@ -6,7 +6,6 @@ import 'package:yomu/src/data/reader_prefs.dart';
 import 'package:yomu_reader/yomu_reader.dart' show TapZonePreset;
 import 'package:yomu/src/data/shelf_view_options.dart';
 import 'package:yomu/src/providers/library_providers.dart';
-import 'package:yomu/src/session/session_controller.dart';
 import 'package:yomu/src/providers/reader_prefs_provider.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -228,11 +227,6 @@ class SettingsLibrarySection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    // 没有连接服务器时 `shelfProvider` 会直接抛（"未连接服务器时不应读取书架"），
-    // 这一组也就没有意义——整组不显示，而不是让设置页跟着炸。
-    if (ref.watch(sessionProvider) is! SessionConnected) {
-      return const SizedBox.shrink();
-    }
     final state = ref.watch(shelfProvider);
     final controller = ref.read(shelfProvider.notifier);
 

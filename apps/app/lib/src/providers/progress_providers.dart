@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
+import 'package:flutter/services.dart' show MissingPluginException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_api/komga_api.dart';
 import 'package:yomu/src/data/progress/progress_database.dart';
@@ -38,9 +39,13 @@ final Provider<ProgressDatabase> progressDatabaseProvider =
 
 LazyDatabase _openConnection() {
   return LazyDatabase(() async {
-    final dir = await getApplicationSupportDirectory();
-    final file = File('${dir.path}/komga_native.sqlite');
-    return NativeDatabase.createInBackground(file);
+    try {
+      final dir = await getApplicationSupportDirectory();
+      final file = File('${dir.path}/komga_native.sqlite');
+      return NativeDatabase.createInBackground(file);
+    } on MissingPluginException {
+      return NativeDatabase.memory();
+    }
   });
 }
 

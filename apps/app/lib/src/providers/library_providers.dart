@@ -1,32 +1,31 @@
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/src/data/library_repository.dart';
 import 'package:yomu/src/data/read_status_repository.dart';
-import 'package:yomu/src/providers/komga_session_provider.dart';
+import 'package:yomu/src/providers/active_source_provider.dart';
+import 'package:yomu/src/providers/cross_source_reading_provider.dart';
 import 'package:yomu/src/providers/paged_list_controller.dart';
-import 'package:yomu/src/providers/progress_providers.dart';
+import 'package:yomu/src/providers/source_registry_provider.dart';
+import 'package:yomu_domain/yomu_domain.dart';
 
 export 'package:yomu/src/providers/collections_providers.dart';
 export 'package:yomu/src/providers/paged_list_controller.dart';
 export 'package:yomu/src/providers/search_providers.dart';
 export 'package:yomu/src/providers/shelf_controller.dart';
 
-/// 书架目录仓库：复用共享 [komgaSessionProvider] 连接池（ARC-09）。
+/// 书架目录仓库：跟随当前激活内容源（本机或已选 Komga 服务器，ADR 0008）。
 final Provider<LibraryRepository> libraryRepositoryProvider =
     Provider<LibraryRepository>((Ref ref) {
-      final komga = requireKomgaSession(ref, reason: '未连接服务器时不应读取书架');
-      return KomgaLibraryRepository(komga, ref.watch(progressSyncProvider));
+      return ref.watch(activeSourceBundleProvider).library;
     });
 
-/// 已读/未读状态变更仓库（ARC-09）。
+/// 已读/未读状态变更仓库（ARC-09 / ADR 0008）。
 final Provider<ReadStatusRepository> readStatusRepositoryProvider =
     Provider<ReadStatusRepository>((Ref ref) {
       final lib = ref.watch(libraryRepositoryProvider);
       if (lib is ReadStatusRepository) return lib as ReadStatusRepository;
-      final komga = requireKomgaSession(ref, reason: '未连接服务器时不应修改阅读状态');
-      return KomgaReadStatusRepository(komga, ref.watch(progressSyncProvider));
+      return ref.watch(activeSourceBundleProvider).readStatus;
     });
 
 /// 当前账号可见的库（用于筛选条）。
@@ -126,7 +125,29 @@ class ReadStatusEpoch extends Notifier<int> {
 final NotifierProvider<ReadStatusEpoch, int> readStatusEpochProvider =
     NotifierProvider<ReadStatusEpoch, int>(ReadStatusEpoch.new);
 
-/// 继续阅读（优先 `IN_PROGRESS` 在读书籍，无在读书时兜底 Komga `ondeck` 下一卷未读）。
+/// 继续阅读：生产态跨源无感汇聚（本机 + 已连服务器），单测 override 仓库时走被测仓库。
 final ondeckProvider = FutureProvider<PageResult<Book>>((Ref ref) {
-  return ref.watch(libraryRepositoryProvider).ondeck();
+  final primary = ref.watch(libraryRepositoryProvider);
+  final activeBundle = ref.watch(activeSourceBundleProvider);
+  if (!identical(primary, activeBundle.library)) {
+    return primary.ondeck();
+  }
+  return ref.watch(crossSourceOndeckProvider.future);
+});
+
+/// 按书籍实体所属 `sourceKey` 路由封面（兼容单测 override `libraryRepositoryProvider`）。
+final bookCoverForEntityProvider = FutureProvider.family<Uint8List?, Book>((
+  Ref ref,
+  Book book,
+) {
+  final primary = ref.watch(libraryRepositoryProvider);
+  final activeBundle = ref.watch(activeSourceBundleProvider);
+  if (!identical(primary, activeBundle.library)) {
+    return primary.bookCover(book.id);
+  }
+  return ref
+      .watch(sourceRegistryProvider)
+      .bundleFor(book.sourceKey)
+      .library
+      .bookCover(book.id);
 });

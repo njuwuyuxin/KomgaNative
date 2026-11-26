@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:komga_api/komga_api.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/src/app.dart';
@@ -59,14 +60,20 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('未登录 → 直接落在连接页（不闪现书架）', (WidgetTester tester) async {
+  Future<void> openConnectScreen(WidgetTester tester) async {
+    final element = tester.element(find.byType(ReadingNowScreen));
+    GoRouter.of(element).go('/connect');
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('未登录 → 免登录直达首页，底部悬浮导航与全套标签可直接访问', (WidgetTester tester) async {
     await pumpApp(tester, store: InMemoryServerStore());
-    expect(find.text('Yomu'), findsOneWidget);
-    expect(find.text('Connect to your Komga server'), findsOneWidget);
-    expect(find.text('Library'), findsNothing);
+    expect(find.byType(ReadingNowScreen), findsOneWidget);
+    expect(find.byType(FloatingNavBar), findsOneWidget);
+    expect(find.text('Connect to your Komga server'), findsNothing);
   });
 
-  testWidgets('已登录 → 冷启动直接进入书架，底部导航可见', (WidgetTester tester) async {
+  testWidgets('已登录 → 冷启动直接进入首页，底部导航可见', (WidgetTester tester) async {
     await pumpApp(tester, store: InMemoryServerStore(storedServer()));
     expect(find.text('Library'), findsWidgets);
     expect(find.text('Frieren'), findsOneWidget);
@@ -96,10 +103,11 @@ void main() {
     expect(find.byType(LibraryScreen), findsOneWidget);
   });
 
-  testWidgets('填写账号密码并连接 → 进入书架', (WidgetTester tester) async {
+  testWidgets('填写账号密码并连接 → 自动跳转回首页', (WidgetTester tester) async {
     final store = InMemoryServerStore();
     final service = FakeConnectionService();
     await pumpApp(tester, store: store, service: service);
+    await openConnectScreen(tester);
 
     await tester.enterText(find.byType(TextField).at(0), 'komga.example.com');
     await tester.enterText(find.byType(TextField).at(1), 'me@example.com');
@@ -120,6 +128,7 @@ void main() {
         onConnect: (ServerAddress address, _) async => throw authError(),
       ),
     );
+    await openConnectScreen(tester);
 
     await tester.enterText(
       find.byType(TextField).at(0),
@@ -140,6 +149,7 @@ void main() {
 
   testWidgets('切到 API Key 模式只需一个输入框', (WidgetTester tester) async {
     await pumpApp(tester, store: InMemoryServerStore());
+    await openConnectScreen(tester);
     await tester.tap(find.text('API key'));
     await tester.pumpAndSettle();
 
@@ -176,6 +186,7 @@ void main() {
       },
     );
     await pumpApp(tester, store: store, service: service);
+    await openConnectScreen(tester);
 
     await tester.enterText(
       find.byType(TextField).at(0),
@@ -212,6 +223,7 @@ void main() {
         onConnect: (ServerAddress address, _) async => throw tlsError(),
       ),
     );
+    await openConnectScreen(tester);
 
     await tester.tap(find.text('API key'));
     await tester.pumpAndSettle();

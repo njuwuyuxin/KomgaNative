@@ -8,6 +8,7 @@ part of 'reader_screen.dart';
 mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
   late ProgressSyncService _progressSync;
   late ReaderProgressCommitter _committer;
+  String _bookScope = '';
 
   late final ReaderProgressWriter _progress = ReaderProgressWriter(
     write: (int page) => _progressSync.save(
@@ -17,6 +18,7 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
           ((!_settledLeave && mounted ? _currentLayout() : null) ?? _lastLayout)
               ?.isCompletedAt(page) ??
           false,
+      scope: _bookScope.isEmpty ? null : _bookScope,
     ),
   );
 

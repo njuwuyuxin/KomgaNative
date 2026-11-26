@@ -4,8 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/providers/cross_source_reading_provider.dart';
 import 'package:yomu/src/providers/library_providers.dart';
-import 'package:yomu/src/providers/pinned_series_provider.dart';
 import 'package:yomu/src/providers/reading_history_provider.dart';
 import 'package:yomu/src/widgets/cover_image.dart';
 import 'package:material_ui/material_ui.dart';
@@ -242,7 +242,16 @@ class _HistoryRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final cover = ref.watch(bookCoverProvider(session.bookId)).value;
+    final cover = session.scope.isEmpty
+        ? ref.watch(bookCoverProvider(session.bookId)).value
+        : ref
+              .watch(
+                scopedBookCoverProvider((
+                  sourceKey: session.scope,
+                  bookId: session.bookId,
+                )),
+              )
+              .value;
     final minutes = session.durationMs ~/ 60000;
     final seconds = (session.durationMs % 60000) ~/ 1000;
     final duration = minutes > 0
@@ -290,16 +299,10 @@ class _HistoryRow extends ConsumerWidget {
     WidgetRef ref,
     AppLocalizations l10n,
   ) {
-    final activeScope = ref.read(activeServerKeyProvider);
-    if (session.scope.isNotEmpty &&
-        activeScope.isNotEmpty &&
-        session.scope != activeScope) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.historyDifferentServer(session.scope))),
-      );
-      return;
-    }
-    unawaited(context.push('/reader/${session.bookId}'));
+    final query = session.scope.isEmpty
+        ? ''
+        : '?source=${Uri.encodeComponent(session.scope)}';
+    unawaited(context.push('/reader/${session.bookId}$query'));
   }
 
   static String _two(int value) => value.toString().padLeft(2, '0');

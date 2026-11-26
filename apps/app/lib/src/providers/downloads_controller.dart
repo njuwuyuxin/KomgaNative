@@ -7,7 +7,6 @@ import 'package:yomu/src/data/download/download_service.dart';
 import 'package:yomu/src/data/shelf_failure.dart';
 import 'package:yomu/src/providers/cache_providers.dart';
 import 'package:yomu/src/providers/download_providers.dart';
-import 'package:yomu/src/providers/pinned_series_provider.dart';
 import 'package:yomu_platform/yomu_platform.dart';
 
 /// 单本书的下载状态：进行中（带进度）、排队中或失败种类（按 Locale 渲染）。
@@ -92,7 +91,7 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
     _queue.clear();
     _knownBooks.clear();
     _running.clear();
-    _scope = ref.watch(activeServerKeyProvider);
+    _scope = ref.watch(downloadScopeProvider);
     ref.onDispose(() => _disposed = true);
     ref.listen<AsyncValue<List<DownloadQueueEntry>>>(downloadQueueProvider, (
       AsyncValue<List<DownloadQueueEntry>>? _,

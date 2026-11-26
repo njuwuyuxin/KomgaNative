@@ -169,10 +169,15 @@ extension ProgressUserDao on ProgressDatabase {
 
   Future<List<ReadingSession>> readingSessionList({
     String? scope,
+    Set<String>? scopes,
     int limit = 200,
   }) {
     final query = select(readingSessions);
-    if (scope != null && scope.isNotEmpty) {
+    if (scopes != null && scopes.isNotEmpty) {
+      query.where(
+        (ReadingSessions t) => t.scope.isIn(scopes) | t.scope.equals(''),
+      );
+    } else if (scope != null && scope.isNotEmpty) {
       query.where(
         (ReadingSessions t) => t.scope.equals(scope) | t.scope.equals(''),
       );

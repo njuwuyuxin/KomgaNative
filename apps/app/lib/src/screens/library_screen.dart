@@ -8,6 +8,7 @@ import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/src/data/shelf_failure.dart';
 import 'package:yomu/src/data/shelf_view_options.dart';
 import 'package:yomu/src/l10n/failure_text.dart';
+import 'package:yomu/src/providers/active_source_provider.dart';
 import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/pinned_series_provider.dart';
 import 'package:yomu/src/providers/shelf_selection_provider.dart';
@@ -22,6 +23,7 @@ import 'package:yomu/src/widgets/shelf_side_rail.dart';
 import 'package:yomu/src/widgets/shelf_views.dart';
 import 'package:yomu/src/widgets/series_shelf_tile.dart';
 import 'package:yomu/src/providers/series_read_provider.dart';
+import 'package:yomu/src/widgets/source_group_bar.dart';
 import 'package:material_ui/material_ui.dart';
 
 part 'library_screen_batch.dart';
@@ -88,6 +90,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     final controller = ref.read(shelfProvider.notifier);
     final selection = ref.watch(shelfSelectionProvider);
     final selecting = ref.read(shelfSelectionProvider.notifier);
+    final activeSource = ref.watch(activeSourceProvider);
+    final activeBundle = ref.watch(activeSourceBundleProvider);
+    final currentRepo = ref.watch(libraryRepositoryProvider);
+    final isRealLocalShelf =
+        activeSource.capabilities.canImportLocalFiles &&
+        identical(currentRepo, activeBundle.library);
     final allSelected =
         state.series.isNotEmpty && selection.ids.length == state.series.length;
 
@@ -141,7 +149,15 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                                       _markSelected(read: false),
                                   onAddToCollection: _addSelectedToCollection,
                                 ),
+                                trailing: isRealLocalShelf && !selection.active
+                                    ? const LocalImportMenuOrb()
+                                    : null,
                               ),
+                            ),
+                            if (sizeClass != WindowSizeClass.expanded)
+                              const SliverToBoxAdapter(child: SourceGroupBar()),
+                            const SliverToBoxAdapter(
+                              child: LocalImportProgressBanner(),
                             ),
                             // 多选态紧凑信息行：常态不占高度，直接展示书架内容；
                             // 进入管理模式后平滑展开已选数量与全选动作（墨水屏直接瞬切）。
@@ -172,8 +188,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                             PhaseFade(
                               phase: _phaseOf(state),
                               slivers: <Widget>[
-                                ..._shelfSlivers(l10n, state, controller),
-                                // 底部留白：悬浮导航条压在内容之上，最后一行要能让开它。
+                                ..._shelfSlivers(
+                                  l10n,
+                                  state,
+                                  controller,
+                                  isRealLocalShelf: isRealLocalShelf,
+                                ),
                                 const SliverToBoxAdapter(
                                   child: SizedBox(
                                     height: AppSizes.navBarClearance,
@@ -186,8 +206,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                       ),
                     ),
                   ),
-                  // 断网时底部悬浮胶囊提示"看的是缓存"，完全脱离滚动流，不挤占页面布局。
-                  OfflineOverlay(onRetry: () => unawaited(_refresh())),
+                  if (activeSource.capabilities.showsNetworkOfflineBanner ||
+                      !isRealLocalShelf)
+                    OfflineOverlay(onRetry: () => unawaited(_refresh())),
                 ],
               ),
             ),

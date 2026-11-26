@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show MissingPluginException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yomu/src/data/cache/drift_http_cache.dart';
 import 'package:yomu/src/data/cache/http_cache_database.dart';
@@ -29,9 +30,13 @@ final Provider<HttpCacheDatabase> httpCacheDatabaseProvider =
 
 LazyDatabase _openCacheConnection() {
   return LazyDatabase(() async {
-    final dir = await getApplicationSupportDirectory();
-    final file = File('${dir.path}/komga_cache.sqlite');
-    return NativeDatabase.createInBackground(file);
+    try {
+      final dir = await getApplicationSupportDirectory();
+      final file = File('${dir.path}/komga_cache.sqlite');
+      return NativeDatabase.createInBackground(file);
+    } on MissingPluginException {
+      return NativeDatabase.memory();
+    }
   });
 }
 

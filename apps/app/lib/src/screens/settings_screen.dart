@@ -5,6 +5,7 @@ import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/src/providers/app_info_provider.dart';
 import 'package:yomu/src/providers/cache_providers.dart';
 import 'package:yomu/src/providers/download_providers.dart';
+import 'package:yomu/src/providers/local_import_provider.dart';
 import 'package:yomu/src/providers/settings_provider.dart';
 import 'package:yomu/src/widgets/download_settings_section.dart';
 import 'package:yomu/src/widgets/settings_backup_section.dart';
@@ -31,6 +32,7 @@ class SettingsScreen extends ConsumerWidget {
         ref.watch(serverListProvider).value ?? const <StoredServer>[];
     final usage = ref.watch(cacheUsageProvider);
     final downloads = ref.watch(downloadsUsageProvider).value;
+    final localUsage = ref.watch(localStorageUsageProvider).value;
     final cacheUsage = usage.value;
     final appInfo = ref.watch(appInfoProvider).value;
     // 不用 AsyncValue.when：Riverpod 3 首次失败是 AsyncLoading + hasError，
@@ -133,12 +135,13 @@ class SettingsScreen extends ConsumerWidget {
                       ],
                     ),
                     AppListGroup(
-                      header: l10n.servers,
+                      header: l10n.cloudSyncHeader,
                       children: <Widget>[
                         if (servers.isEmpty)
                           ListTile(
+                            leading: const Icon(Icons.cloud_outlined),
                             title: Text(l10n.noSavedServers),
-                            subtitle: Text(l10n.noSavedServersHint),
+                            subtitle: Text(l10n.cloudSyncSubtitle),
                           ),
                         for (final item in servers)
                           ListTile(
@@ -146,7 +149,7 @@ class SettingsScreen extends ConsumerWidget {
                             leading: Icon(
                               item.id == current?.id
                                   ? Icons.check_circle
-                                  : Icons.dns_outlined,
+                                  : Icons.cloud_outlined,
                               color: item.id == current?.id
                                   ? Theme.of(context).colorScheme.primary
                                   : null,
@@ -171,14 +174,29 @@ class SettingsScreen extends ConsumerWidget {
                           leading: const Icon(Icons.add),
                           title: Text(l10n.addServer),
                           subtitle: Text(l10n.addServerHint),
-                          onTap: () =>
-                              ref.read(sessionProvider.notifier).signOut(),
+                          onTap: () {
+                            ref.read(sessionProvider.notifier).signOut();
+                            GoRouter.maybeOf(context)?.push('/connect');
+                          },
                         ),
                       ],
                     ),
                     AppListGroup(
                       header: l10n.storage,
                       children: <Widget>[
+                        ListTile(
+                          key: const Key('settings-local-comics'),
+                          leading: const Icon(Icons.folder_zip_outlined),
+                          title: Text(l10n.localComicsStorage),
+                          subtitle: Text(
+                            localUsage == null
+                                ? '—'
+                                : l10n.localComicsUsage(
+                                    localUsage.entries,
+                                    localUsage.humanSize,
+                                  ),
+                          ),
+                        ),
                         ListTile(
                           title: Text(l10n.offlineContent),
                           subtitle: Text(cacheSubtitle),

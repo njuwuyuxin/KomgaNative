@@ -8,9 +8,9 @@ import 'package:yomu/src/data/settings_store.dart';
 import 'package:yomu/src/data/shelf_failure.dart';
 import 'package:yomu/src/data/shelf_filter_preset.dart';
 import 'package:yomu/src/data/shelf_view_options.dart';
+import 'package:yomu/src/providers/active_source_provider.dart';
 import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/settings_provider.dart';
-import 'package:yomu/src/session/session_controller.dart';
 
 export 'package:yomu/src/providers/shelf_state.dart';
 
@@ -38,10 +38,7 @@ class ShelfController extends Notifier<ShelfState> {
 
   SettingsStore get _store => ref.read(settingsStoreProvider);
 
-  String? get _serverKey {
-    final session = ref.read(sessionProvider);
-    return session is SessionConnected ? session.server.id : null;
-  }
+  String? get _serverKey => ref.read(activeSourceProvider).sourceKey;
 
   Future<void> _restore() async {
     final saved = await _store.load();

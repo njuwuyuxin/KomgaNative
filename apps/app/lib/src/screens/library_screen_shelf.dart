@@ -23,8 +23,9 @@ mixin _ShelfSlivers on ConsumerState<LibraryScreen> {
   List<Widget> _shelfSlivers(
     AppLocalizations l10n,
     ShelfState state,
-    ShelfController controller,
-  ) {
+    ShelfController controller, {
+    required bool isRealLocalShelf,
+  }) {
     if (state.loading && state.series.isEmpty) {
       return <Widget>[const SliverFillRemaining(child: ShelfSkeleton())];
     }
@@ -48,6 +49,44 @@ mixin _ShelfSlivers on ConsumerState<LibraryScreen> {
       ];
     }
     if (state.isEmpty) {
+      if (isRealLocalShelf && state.query.isEmpty) {
+        return <Widget>[
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.xl),
+                child: Column(
+                  key: const Key('shelf-local-onboarding'),
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    StatusView(
+                      icon: Icons.auto_stories_outlined,
+                      title: l10n.localEmptyShelfTitle,
+                      message: l10n.localEmptyShelfHint,
+                      actionLabel: l10n.importComics,
+                      onAction: () =>
+                          unawaited(runLocalArchiveImport(context, ref)),
+                    ),
+                    if (GoRouter.maybeOf(context) != null) ...<Widget>[
+                      const SizedBox(height: AppSpacing.sm),
+                      TextButton.icon(
+                        key: const Key('shelf-connect-komga-button'),
+                        onPressed: () => unawaited(context.push('/connect')),
+                        icon: const Icon(
+                          Icons.cloud_outlined,
+                          size: AppSizes.iconSm,
+                        ),
+                        label: Text(l10n.connectKomgaOptional),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ];
+      }
       return <Widget>[
         SliverFillRemaining(
           hasScrollBody: false,

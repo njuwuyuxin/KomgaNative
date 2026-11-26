@@ -8,8 +8,8 @@ import 'package:yomu/src/providers/cache_providers.dart';
 import 'package:yomu/src/providers/downloads_controller.dart';
 import 'package:yomu/src/providers/komga_session_provider.dart';
 import 'package:yomu/src/providers/library_providers.dart';
-import 'package:yomu/src/providers/pinned_series_provider.dart';
 import 'package:yomu/src/providers/settings_provider.dart';
+import 'package:yomu/src/session/session_controller.dart';
 import 'package:yomu_platform/yomu_platform.dart';
 
 export 'package:yomu/src/providers/downloads_controller.dart';
@@ -36,10 +36,11 @@ final Provider<NetworkProbe> networkProbeProvider = Provider<NetworkProbe>(
   (Ref ref) => const SystemNetworkProbe(),
 );
 
-/// 下载服务：复用共享 [komgaSessionProvider] 连接池（ARC-09）。
+/// 下载服务：已连接 Komga 时复用共享连接池，未连接服务器时返回空实现而不抛异常。
 final Provider<DownloadService> downloadServiceProvider =
     Provider<DownloadService>((Ref ref) {
-      final komga = requireKomgaSession(ref, reason: '未连接服务器时不应下载');
+      final komga = ref.watch(komgaSessionProvider);
+      if (komga == null) return const _NoopDownloadService();
       return KomgaDownloadService(
         pages: (String bookId) async {
           try {
@@ -67,9 +68,15 @@ final Provider<DownloadService> downloadServiceProvider =
       );
     });
 
+/// 远程离线下载专属的服务器分区键（即使当前书架切到了本机源，仍展示已连接服务器的离线下载）。
+final Provider<String> downloadScopeProvider = Provider<String>((Ref ref) {
+  final session = ref.watch(sessionProvider);
+  return session is SessionConnected ? session.server.address.baseUrl : '';
+});
+
 /// 当前服务器已下载书籍的合计占用（设置页，ARC-07 / ARC-10 Drift 表更新流驱动）。
 final downloadsUsageProvider = FutureProvider<CacheUsage>((Ref ref) {
-  final scope = ref.watch(activeServerKeyProvider);
+  final scope = ref.watch(downloadScopeProvider);
   final db = ref.watch(httpCacheDatabaseProvider);
   final sub = db.downloadedBooksUpdates().listen((_) => ref.invalidateSelf());
   ref.onDispose(sub.cancel);
@@ -78,7 +85,7 @@ final downloadsUsageProvider = FutureProvider<CacheUsage>((Ref ref) {
 
 /// 当前服务器已下载书籍列表（下载管理页，UI-P3-13 / ARC-07 / ARC-10 Drift 表更新流驱动）。
 final downloadedBooksProvider = FutureProvider<List<DownloadedBook>>((Ref ref) {
-  final scope = ref.watch(activeServerKeyProvider);
+  final scope = ref.watch(downloadScopeProvider);
   final db = ref.watch(httpCacheDatabaseProvider);
   final sub = db.downloadedBooksUpdates().listen((_) => ref.invalidateSelf());
   ref.onDispose(sub.cancel);
@@ -89,7 +96,7 @@ final downloadedBooksProvider = FutureProvider<List<DownloadedBook>>((Ref ref) {
 final downloadQueueProvider = FutureProvider<List<DownloadQueueEntry>>((
   Ref ref,
 ) {
-  final scope = ref.watch(activeServerKeyProvider);
+  final scope = ref.watch(downloadScopeProvider);
   return ref.watch(httpCacheDatabaseProvider).downloadQueue(scope: scope);
 });
 
@@ -113,3 +120,22 @@ final downloadsProvider =
     NotifierProvider<DownloadsController, Map<String, DownloadStatus>>(
       DownloadsController.new,
     );
+
+class _NoopDownloadService implements DownloadService {
+  const _NoopDownloadService();
+
+  @override
+  Future<DownloadedBook?> downloaded(String bookId) async => null;
+
+  @override
+  Future<bool> download(
+    Book book, {
+    required void Function(DownloadProgress progress) onProgress,
+  }) async => false;
+
+  @override
+  void cancel(String bookId) {}
+
+  @override
+  Future<void> delete(Book book) async {}
+}

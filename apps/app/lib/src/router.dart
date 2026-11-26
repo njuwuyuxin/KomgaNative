@@ -18,6 +18,7 @@ import 'package:yomu/src/screens/settings_screen.dart';
 import 'package:yomu/src/screens/splash_screen.dart';
 import 'package:yomu/src/session/session_controller.dart';
 import 'package:yomu/src/widgets/adaptive_shell.dart';
+import 'package:yomu/src/widgets/scoped_source_scope.dart';
 import 'package:yomu/src/widgets/sliding_branch_container.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -39,11 +40,12 @@ GoRouter createRouter({
       if (current is SessionLoading) {
         return location == '/splash' ? null : '/splash';
       }
-      if (current is SessionDisconnected) {
-        return location == '/connect' ? null : '/connect';
+      // 恢复完成后：无论是否连接远程服务器，均免登录直达主壳首页（ADR 0008）；
+      // 仅当用户在 /connect 完成登录成为 SessionConnected 时自动返回首页。
+      if (location == '/splash') return '/reading';
+      if (current is SessionConnected && location == '/connect') {
+        return '/reading';
       }
-      // 已连接：不要再停留在启动/连接页；首页是"正在读"（UI-P2-6）。
-      if (location == '/splash' || location == '/connect') return '/reading';
       return null;
     },
     routes: <RouteBase>[
@@ -163,28 +165,36 @@ GoRouter createRouter({
       GoRoute(
         path: '/series/:seriesId',
         builder: (BuildContext context, GoRouterState state) {
-          // 从货架进来时带着源卡片的 Hero tag：同一页面上同一个系列可能有多份
-          // 副本（"正在读"页的多条货架），不带的话封面会从另一份的位置飞。
           final extra = state.extra;
           final args = extra is SeriesDetailArgs ? extra : null;
-          return SeriesDetailScreen(
-            seriesId: state.pathParameters['seriesId'] ?? '',
-            heroTag: args?.heroTag,
+          final resolvedSource =
+              state.uri.queryParameters['source'] ?? args?.sourceKey;
+          return ScopedSourceScope(
+            sourceKey: resolvedSource,
+            child: SeriesDetailScreen(
+              seriesId: state.pathParameters['seriesId'] ?? '',
+              heroTag: args?.heroTag,
+            ),
           );
         },
       ),
       GoRoute(
         path: '/reader/:bookId',
         builder: (BuildContext context, GoRouterState state) {
-          // 从系列详情点进来时会带上 Book 与阅读方向，省一次请求；
-          // 冷启动/深链没有 extra 时由阅读器自己取书。
           final extra = state.extra;
           final args = extra is ReaderArgs ? extra : null;
-          return ReaderScreen(
-            bookId: state.pathParameters['bookId'] ?? '',
-            book: args?.book,
-            direction: args?.direction ?? ReadingDirection.unknown,
-            heroTag: args?.heroTag,
+          final resolvedSource =
+              state.uri.queryParameters['source'] ??
+              args?.sourceKey ??
+              args?.book.sourceKey;
+          return ScopedSourceScope(
+            sourceKey: resolvedSource,
+            child: ReaderScreen(
+              bookId: state.pathParameters['bookId'] ?? '',
+              book: args?.book,
+              direction: args?.direction ?? ReadingDirection.unknown,
+              heroTag: args?.heroTag,
+            ),
           );
         },
       ),

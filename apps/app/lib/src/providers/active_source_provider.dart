@@ -85,7 +85,16 @@ class ActiveSourceController extends Notifier<ContentSource> {
   }
 
   void _onRegistryChanged(SourceRegistry? _, SourceRegistry _) {
-    _reconcile();
+    unawaited(
+      Future<void>.microtask(() {
+        if (ref.mounted) _reconcile();
+      }),
+    );
+  }
+
+  void _setStateIfChanged(ContentSource next) {
+    if (state == next) return;
+    state = next;
   }
 
   void _reconcile() {
@@ -95,28 +104,28 @@ class ActiveSourceController extends Notifier<ContentSource> {
 
     if (desiredKey == null) {
       if (session is SessionConnected) {
-        state = remoteSourceOfServer(session.server);
+        _setStateIfChanged(remoteSourceOfServer(session.server));
       } else if (_restored && session is! SessionLoading) {
-        state = const LocalContentSource();
+        _setStateIfChanged(const LocalContentSource());
       }
       return;
     }
 
     if (isLocalSourceKey(desiredKey)) {
-      state = const LocalContentSource();
+      _setStateIfChanged(const LocalContentSource());
       return;
     }
 
     final remote = registry.remoteBundleOrNull(desiredKey);
     if (remote != null) {
-      state = remote.source;
+      _setStateIfChanged(remote.source);
       return;
     }
 
     // 若注册表和会话均已加载完毕但找不到目标服务器（已被删除），回退本机源。
     final listLoaded = ref.read(serverListProvider).hasValue;
     if (_restored && session is! SessionLoading && listLoaded) {
-      state = const LocalContentSource();
+      _setStateIfChanged(const LocalContentSource());
     }
   }
 

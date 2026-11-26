@@ -1,9 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/src/data/collections_repository.dart';
-import 'package:yomu/src/providers/komga_session_provider.dart';
+import 'package:yomu/src/providers/active_source_provider.dart';
 import 'package:yomu/src/providers/library_providers.dart';
-import 'package:yomu/src/providers/progress_providers.dart';
+import 'package:yomu_domain/yomu_domain.dart';
 
 /// 一次增量分页拉取的条数（收藏集 / 阅读列表 / 搜索）。
 const int kListPageSize = 30;
@@ -12,13 +11,12 @@ const int kListPageSize = 30;
 const int _kAllPageSize = 100;
 const int _kAllMaxPages = 20;
 
-/// 收藏集与阅读列表仓库（ARC-09）。
+/// 收藏集与阅读列表仓库（跟随当前激活内容源：本机或 Komga 服务器）。
 final Provider<CollectionsRepository> collectionsRepositoryProvider =
     Provider<CollectionsRepository>((Ref ref) {
       final lib = ref.watch(libraryRepositoryProvider);
       if (lib is CollectionsRepository) return lib as CollectionsRepository;
-      final komga = requireKomgaSession(ref, reason: '未连接服务器时不应读取收藏集');
-      return KomgaCollectionsRepository(komga, ref.watch(progressSyncProvider));
+      return ref.watch(activeSourceBundleProvider).collections;
     });
 
 /// 收藏集增量分页控制器（ARC-12）。

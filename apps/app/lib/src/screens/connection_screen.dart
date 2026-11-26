@@ -1,15 +1,16 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:yomu_design_system/yomu_design_system.dart';
-import 'package:yomu_domain/yomu_domain.dart';
+import 'package:go_router/go_router.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/src/l10n/connection_failure_text.dart';
 import 'package:yomu/src/session/server_store.dart';
 import 'package:yomu/src/session/session_controller.dart';
 import 'package:yomu/src/widgets/certificate_panel.dart';
 import 'package:yomu/src/widgets/saved_servers_card.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu_domain/yomu_domain.dart';
 
 /// 首次连接 / 重新连接页。
 ///
@@ -274,6 +275,29 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
+                      if (GoRouter.maybeOf(context) != null) ...<Widget>[
+                        const SizedBox(height: AppSpacing.md),
+                        Center(
+                          child: TextButton.icon(
+                            key: const Key('connect-use-local-button'),
+                            onPressed: submitting
+                                ? null
+                                : () {
+                                    final router = GoRouter.of(context);
+                                    if (router.canPop()) {
+                                      router.pop();
+                                    } else {
+                                      router.go('/reading');
+                                    }
+                                  },
+                            icon: const Icon(
+                              Icons.auto_stories_outlined,
+                              size: AppSizes.iconSm,
+                            ),
+                            label: Text(l10n.useLocalLibraryInstead),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

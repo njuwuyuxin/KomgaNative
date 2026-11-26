@@ -3,20 +3,28 @@ import 'package:yomu/src/data/progress/progress_database.dart';
 import 'package:yomu/src/data/reading_session_tracker.dart';
 import 'package:yomu/src/providers/pinned_series_provider.dart';
 import 'package:yomu/src/providers/progress_providers.dart';
+import 'package:yomu/src/session/session_controller.dart';
+import 'package:yomu_domain/yomu_domain.dart';
 
 export 'package:yomu/src/data/progress/progress_database.dart'
     show ReadingSession;
 
-/// 当前服务器的最近阅读会话（HIS-02 / ARC-07 / ARC-10 Drift 表更新流自动刷新）。
+/// 最近阅读会话（汇聚本机 `'local://device'` 与当前连接服务器，不同远程服务器之间严格隔离）。
 final FutureProvider<List<ReadingSession>> readingSessionsProvider =
     FutureProvider<List<ReadingSession>>((Ref ref) {
-      final scope = ref.watch(activeServerKeyProvider);
+      final activeScope = ref.watch(activeServerKeyProvider);
+      final session = ref.watch(sessionProvider);
+      final scopes = <String>{
+        kLocalSourceKey,
+        if (activeScope.isNotEmpty) activeScope,
+        if (session is SessionConnected) session.server.address.baseUrl,
+      };
       final db = ref.watch(progressDatabaseProvider);
       final sub = db.readingSessionsUpdates().listen(
         (_) => ref.invalidateSelf(),
       );
       ref.onDispose(sub.cancel);
-      return db.readingSessionList(scope: scope);
+      return db.readingSessionList(scopes: scopes);
     });
 
 /// 写入一次阅读会话（HIS-01；写入/删除后由 Drift 流自动通知所有监听页）。
@@ -49,13 +57,13 @@ class ReadingSessionRecorder {
     }
   }
 
-  Future<void> record(ReadingSessionDraft draft) async {
+  Future<void> record(ReadingSessionDraft draft, {String? scope}) async {
     try {
-      final scope = _ref.read(activeServerKeyProvider);
+      final String targetScope = scope ?? _ref.read(activeServerKeyProvider);
       await _ref
           .read(progressDatabaseProvider)
           .addReadingSession(
-            scope: scope,
+            scope: targetScope,
             bookId: draft.bookId,
             seriesId: draft.seriesId,
             bookName: draft.bookName,
@@ -67,7 +75,7 @@ class ReadingSessionRecorder {
             completed: draft.completed,
           );
     } on Object {
-      // 见类注释：历史记录不该影响阅读本身。
+      // 历史记录不该影响阅读本身。
     }
   }
 }

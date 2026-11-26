@@ -238,20 +238,34 @@ class SeriesShelfRow extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: <Widget>[
-                            Text(
-                              series.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: selected && eink
-                                    ? FontWeight.w700
-                                    : FontWeight.w600,
-                                color: selected
-                                    ? (eink
-                                          ? AppTheme.einkInk
-                                          : theme.colorScheme.primary)
-                                    : null,
-                              ),
+                            Row(
+                              children: <Widget>[
+                                Expanded(
+                                  child: Text(
+                                    series.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      fontWeight: selected && eink
+                                          ? FontWeight.w700
+                                          : FontWeight.w600,
+                                      color: selected
+                                          ? (eink
+                                                ? AppTheme.einkInk
+                                                : theme.colorScheme.primary)
+                                          : null,
+                                    ),
+                                  ),
+                                ),
+                                if (series.isCloud) ...<Widget>[
+                                  const SizedBox(width: AppSpacing.xxs),
+                                  Icon(
+                                    Icons.cloud_outlined,
+                                    size: AppSizes.iconXs,
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ],
+                              ],
                             ),
                             const SizedBox(height: AppSpacing.xxs),
                             Text(
