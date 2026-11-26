@@ -64,16 +64,18 @@ extension ProgressUserDao on ProgressDatabase {
       } finally {
         await customStatement('DETACH DATABASE legacy_cache');
       }
-    } on Object {
+    } on Object catch (error) {
       // 迁移失败绝不阻塞用户库打开。
+      debugPrint('ProgressUserDao: legacy v5 migration skipped: $error');
     }
   }
 
   Future<void> _tryDropLegacy(String table) async {
     try {
       await customStatement('DROP TABLE IF EXISTS legacy_cache.$table');
-    } on Object {
+    } on Object catch (error) {
       // 缓存库被写锁占用时下次仍可幂等重试。
+      debugPrint('ProgressUserDao: drop legacy table $table skipped: $error');
     }
   }
 

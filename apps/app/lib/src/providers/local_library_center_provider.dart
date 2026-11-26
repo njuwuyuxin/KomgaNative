@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:yomu/src/data/local/external_directory_scanner.dart';
@@ -153,8 +154,9 @@ class LocalLibraryScanController extends Notifier<LocalLibraryScanState> {
           totalSummary =
               totalSummary +
               await scanner.discoverAndScanDocumentsDirectory(docs);
-        } on Object {
+        } on Object catch (error) {
           // Documents 路径不可用时跳过。
+          debugPrint('LocalLibraryScan: iOS Documents scan skipped: $error');
         }
       }
 

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:yomu/src/data/reader_prefs.dart';
 import 'package:yomu/src/data/secure_storage.dart';
@@ -32,8 +33,9 @@ class SecureReaderPrefsStore implements ReaderPrefsStore {
     } on Object {
       try {
         await _storage.delete(key: _key);
-      } on Object {
+      } on Object catch (error) {
         // 清理失败不阻断阅读器回退默认偏好。
+        debugPrint('ReaderPrefsStore: delete corrupted key failed: $error');
       }
       return null;
     }

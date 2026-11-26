@@ -69,9 +69,12 @@ Future<int> layerCheck() async {
   }
 
   violations.addAll(_scanLocalPrefixLeak('apps/app/lib/src'));
+  violations.addAll(_scanSilentObjectCatch('apps/app/lib/src'));
 
   if (violations.isEmpty) {
-    stdout.writeln('分层与规范规则通过（含 ≤350 行文件、≤300 行类、零裸 catch (_)、零 local: 前缀泄漏）');
+    stdout.writeln(
+      '分层与规范规则通过（含 ≤350 行文件、≤300 行类、零裸 catch (_)、零静默空 on Object、零 local: 前缀泄漏）',
+    );
     return 0;
   }
   for (final v in violations) {
@@ -235,6 +238,64 @@ List<String> _scanLocalPrefixLeak(String dir) {
             '${entity.path}:${i + 1} 禁止在 data/local/ 之外使用 $lit（请改用 SourceCapabilities）',
           );
         }
+      }
+    }
+  }
+  return violations;
+}
+
+final RegExp _onObjectCatchHeader = RegExp(
+  r'\bon\s+Object(?:\s+catch\s*\([^)]*\))?\s*\{',
+);
+
+/// 禁止 `apps/app/lib/src` 中出现完全静默（无可执行语句、未记日志、未抛错、未返回值）的 `on Object` 吞异常块（P3-2）。
+List<String> _scanSilentObjectCatch(String dir) {
+  final directory = Directory(dir);
+  if (!directory.existsSync()) return <String>[];
+  final violations = <String>[];
+  for (final entity in directory.listSync(recursive: true)) {
+    if (entity is! File || !entity.path.endsWith('.dart')) continue;
+    if (_isGeneratedDart(entity.path)) continue;
+    final lines = entity.readAsLinesSync();
+    for (var i = 0; i < lines.length; i++) {
+      final trimmed = lines[i].trimLeft();
+      if (trimmed.startsWith('//')) continue;
+      final match = _onObjectCatchHeader.firstMatch(lines[i]);
+      if (match == null) continue;
+
+      final afterOpen = lines[i].substring(match.end);
+      final bodyCode = StringBuffer();
+      var depth = 1;
+
+      void consume(String text) {
+        for (var c = 0; c < text.length && depth > 0; c++) {
+          final ch = text[c];
+          if (ch == '/' && c + 1 < text.length && text[c + 1] == '/') {
+            break;
+          }
+          if (ch == '{') {
+            depth++;
+            bodyCode.write(ch);
+          } else if (ch == '}') {
+            depth--;
+            if (depth > 0) bodyCode.write(ch);
+          } else {
+            bodyCode.write(ch);
+          }
+        }
+      }
+
+      consume(afterOpen);
+      var j = i + 1;
+      while (depth > 0 && j < lines.length) {
+        consume(lines[j]);
+        j++;
+      }
+
+      if (bodyCode.toString().trim().isEmpty) {
+        violations.add(
+          '${entity.path}:${i + 1} 禁止静默空 on Object 块（请至少记录 debugPrint、更新错误态、返回降级值或 rethrow）',
+        );
       }
     }
   }

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:komga_api/komga_api.dart';
 import 'package:yomu_domain/yomu_domain.dart';
@@ -182,8 +183,9 @@ class SecureServerStore implements ServerStore {
       // Android 换机/密钥失效时自动清掉坏条目，避免后续重新登录也跟着报错。
       try {
         await _storage.delete(key: _key);
-      } on Object {
+      } on Object catch (error) {
         // 清理失败不阻断本次按空状态恢复。
+        debugPrint('ServerStore: delete corrupted key failed: $error');
       }
       return const _ServerState();
     }

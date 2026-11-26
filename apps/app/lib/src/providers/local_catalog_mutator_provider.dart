@@ -185,8 +185,9 @@ class LocalCatalogMutator {
             await targetDir.parent.delete(recursive: true);
           }
         }
-      } on Object {
+      } on Object catch (error) {
         // 磁盘文件已不存在时忽略。
+        debugPrint('LocalCatalogMutator: delete book file skipped: $error');
       }
     }
     for (final coverRel in paths.coverRelativePaths) {
@@ -195,8 +196,9 @@ class LocalCatalogMutator {
         if (await coverFile.exists()) {
           await coverFile.delete();
         }
-      } on Object {
+      } on Object catch (error) {
         // 缩略图不存在时忽略。
+        debugPrint('LocalCatalogMutator: delete cover file skipped: $error');
       }
     }
   }

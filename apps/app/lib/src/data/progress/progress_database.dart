@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:yomu/src/data/local/local_tables.dart';
 import 'package:yomu/src/data/progress/user_tables.dart';
 import 'package:yomu_domain/yomu_domain.dart';

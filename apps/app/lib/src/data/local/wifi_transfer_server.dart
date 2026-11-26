@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:yomu/src/data/local/local_comic_importer.dart';
 import 'package:yomu/src/data/local/wifi_transfer_handlers.dart';
 import 'package:yomu/src/data/local/wifi_transfer_html.dart';
@@ -194,15 +195,19 @@ final class WifiTransferServer {
         HttpStatus.notFound,
         const <String, Object?>{'ok': false, 'error': 'not_found'},
       );
-    } on Object {
+    } on Object catch (error) {
+      debugPrint('WifiTransferServer: unhandled request error: $error');
       try {
         await writeWifiJson(
           request.response,
           HttpStatus.internalServerError,
           const <String, Object?>{'ok': false, 'error': 'internal_error'},
         );
-      } on Object {
+      } on Object catch (writeError) {
         // 响应流已关闭时安全忽略。
+        debugPrint(
+          'WifiTransferServer: error response write skipped: $writeError',
+        );
       }
     }
   }

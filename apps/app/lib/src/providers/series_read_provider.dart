@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/src/providers/download_providers.dart';
@@ -96,8 +97,11 @@ class ReaderProgressCommitter {
       final record = await _ref.read(downloadedProvider(book.id).future);
       if (record == null || _disposed) return;
       await _ref.read(downloadsProvider.notifier).delete(book);
-    } on Object {
+    } on Object catch (error) {
       // 自动清理属于增强行为，失败不影响进度结算。
+      debugPrint(
+        'ReaderProgressCommitter: auto-delete completed download failed: $error',
+      );
     }
   }
 }

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yomu/src/data/reader_prefs.dart';
 import 'package:yomu/src/data/reader_prefs_store.dart';
@@ -33,8 +34,9 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
       final saved = await _store.load();
       if (!ref.mounted || saved == null || _touched) return;
       state = saved;
-    } on Object {
+    } on Object catch (error) {
       // 读不出偏好就用默认值：不能让设置存储读失败挡住阅读。
+      debugPrint('ReaderPrefsController: load prefs failed: $error');
     }
   }
 

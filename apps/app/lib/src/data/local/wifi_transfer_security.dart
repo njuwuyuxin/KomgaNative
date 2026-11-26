@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show debugPrint;
+
 /// 单文件或单次会话上传体积超限时抛出的内部异常（映射为 HTTP 413）。
 final class WifiPayloadTooLargeException implements Exception {
   const WifiPayloadTooLargeException(this.limitBytes);
@@ -72,8 +74,9 @@ Future<void> drainUpToLimit(
       drained += chunk.length;
       if (drained >= maxDrainBytes) break;
     }
-  } on Object {
+  } on Object catch (error) {
     // 客户端已断开或流已被监听时安全忽略。
+    debugPrint('WifiTransfer: drain stream ignored: $error');
   }
 }
 

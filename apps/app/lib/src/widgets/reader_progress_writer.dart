@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show debugPrint;
+
 /// 阅读器的进度回写节流：连续翻页时只写最后停下的那一页。
 ///
 /// 从 `ReaderScreen` 拆出来，只负责"何时写、写没写过"；
@@ -50,10 +52,11 @@ class ReaderProgressWriter {
       await write(page);
       _lastSaved = page;
       _hasWritten = true;
-    } on Object {
+    } on Object catch (error) {
       // 本地库打不开（磁盘满/库损坏/测试环境没有 path_provider 通道）也
       // 不能把阅读打断：这一页只是没落盘，下一次翻页会再试。
       // 只吞不报是因为进度回写是后台行为，用户此刻只想看书。
+      debugPrint('ReaderProgressWriter: flush($page) failed: $error');
     }
   }
 

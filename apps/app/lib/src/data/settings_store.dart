@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:yomu/src/data/app_settings.dart';
 import 'package:yomu/src/data/secure_storage.dart';
@@ -60,8 +61,9 @@ class SecureSettingsStore implements SettingsStore {
       final updated = mutate(await load());
       try {
         await _storage.write(key: _key, value: jsonEncode(updated.toJson()));
-      } on Object {
+      } on Object catch (error) {
         // 偏好写失败只影响下次启动，不该冒泡成 UI 错误。
+        debugPrint('SettingsStore: write failed: $error');
       }
     });
     // 队列不能被单次失败掐断：失败已被吞掉，这里只保证顺序。

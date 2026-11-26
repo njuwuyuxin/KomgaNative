@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/src/data/cache/http_cache_database.dart';
@@ -227,8 +228,9 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
           if (!_disposed && !_paused) pauseAll();
           return;
         }
-      } on Object {
+      } on Object catch (error) {
         // 探测失败按 unknown 放行。
+        debugPrint('DownloadsController: network probe failed: $error');
       } finally {
         _checkingWifi = false;
       }

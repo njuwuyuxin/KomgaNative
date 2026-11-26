@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 
 /// 用户从系统选择器中选中的单个待导入文件（流式读取兼容 Android `content://` URI 与本地路径）。
 final class PickedComicFile {
@@ -88,8 +89,9 @@ final class PlatformComicFilePicker implements ComicFilePicker {
   Future<void> clearTemporaryCache() async {
     try {
       await FilePicker.clearTemporaryFiles();
-    } on Object {
+    } on Object catch (error) {
       // 平台不支持或清理失败绝不阻断已完成的入库结果。
+      debugPrint('ComicFilePicker: clearTemporaryFiles failed: $error');
     }
   }
 

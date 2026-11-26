@@ -171,8 +171,9 @@ class ReaderTopBar extends ConsumerWidget {
             ),
           );
       }
-    } on Object {
+    } on Object catch (error) {
       // 书签写入失败不阻断阅读。
+      debugPrint('ReaderTopBar: toggle bookmark failed: $error');
     }
   }
 
@@ -192,8 +193,9 @@ class ReaderTopBar extends ConsumerWidget {
           ..hideCurrentSnackBar()
           ..showSnackBar(SnackBar(content: Text(l10n.coverUpdated)));
       }
-    } on Object {
+    } on Object catch (error) {
       // 设封面失败不阻断当前阅读会话。
+      debugPrint('ReaderTopBar: set custom cover failed: $error');
     }
   }
 }

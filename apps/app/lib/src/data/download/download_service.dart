@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:komga_api/komga_api.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/src/data/cache/http_cache_database.dart';
@@ -69,8 +70,11 @@ class KomgaDownloadService implements DownloadService {
     if (bookMeta != null) {
       try {
         await bookMeta!(book.id);
-      } on Object {
+      } on Object catch (error) {
         // 仅作离线元信息预热，失败不影响页图下载。
+        debugPrint(
+          'DownloadService: bookMeta(${book.id}) warmup failed: $error',
+        );
       }
     }
 

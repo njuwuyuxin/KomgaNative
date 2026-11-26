@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/l10n/app_localizations.dart';
@@ -24,8 +25,9 @@ Future<void> maybeDeleteReadDownload(WidgetRef ref, Book book) async {
     );
     if (record == null) return;
     await ref.read(downloadsProvider.notifier).delete(book);
-  } on Object {
+  } on Object catch (error) {
     // 自动删除是"锦上添花"：失败不影响标记已读本身。
+    debugPrint('downloadPolicyGate: auto-delete failed: $error');
   }
 }
 

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:yomu/src/data/byte_cache.dart';
 import 'package:yomu/src/data/local/archive_password_store.dart';
 import 'package:yomu/src/data/local/external_byte_source.dart';
@@ -54,8 +55,9 @@ final class LocalReaderRepository implements ReaderRepository {
       try {
         final reader = await future;
         await reader.close();
-      } on Object {
+      } on Object catch (error) {
         // 销毁阶段忽略底层关闭异常。
+        debugPrint('LocalReaderRepository: dispose close failed: $error');
       }
     }
   }
@@ -67,8 +69,11 @@ final class LocalReaderRepository implements ReaderRepository {
     try {
       final reader = await removed;
       await reader.close();
-    } on Object {
+    } on Object catch (error) {
       // 忽略已失效句柄。
+      debugPrint(
+        'LocalReaderRepository: closeBookHandle($bookId) failed: $error',
+      );
     }
   }
 

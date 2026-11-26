@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yomu/src/data/progress/progress_database.dart';
 import 'package:yomu/src/data/reading_session_tracker.dart';
@@ -41,8 +42,9 @@ class ReadingSessionRecorder {
   Future<void> delete(int id) async {
     try {
       await _ref.read(progressDatabaseProvider).deleteReadingSession(id);
-    } on Object {
+    } on Object catch (error) {
       // 见 [record]。
+      debugPrint('ReadingSessionRecorder: delete($id) failed: $error');
     }
   }
 
@@ -52,8 +54,9 @@ class ReadingSessionRecorder {
       await _ref
           .read(progressDatabaseProvider)
           .clearReadingSessions(scope: scope);
-    } on Object {
+    } on Object catch (error) {
       // 见 [record]。
+      debugPrint('ReadingSessionRecorder: clear failed: $error');
     }
   }
 
@@ -74,8 +77,11 @@ class ReadingSessionRecorder {
             endPage: draft.endPage,
             completed: draft.completed,
           );
-    } on Object {
+    } on Object catch (error) {
       // 历史记录不该影响阅读本身。
+      debugPrint(
+        'ReadingSessionRecorder: record(${draft.bookId}) failed: $error',
+      );
     }
   }
 }
