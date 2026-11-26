@@ -13,6 +13,17 @@ extension LocalCatalogQueryDao on ProgressDatabase {
     localBooksRows,
   )..where((t) => t.id.equals(bookId))).getSingleOrNull();
 
+  /// 返回当前本机书库中所有仍存在的书籍 ID 集合（轻量投影，用于历史页状态校验）。
+  Future<Set<String>> existingLocalBookIds() async {
+    final query = selectOnly(localBooksRows)
+      ..addColumns(<Expression<Object>>[localBooksRows.id]);
+    final rows = await query.get();
+    return <String>{for (final row in rows) ?row.read(localBooksRows.id)};
+  }
+
+  Stream<Set<TableUpdate>> localBooksUpdates() =>
+      tableUpdates(TableUpdateQuery.onTable(localBooksRows));
+
   Future<List<LocalPagesRow>> localPagesForBook(String bookId) =>
       (select(localPagesRows)
             ..where((t) => t.bookId.equals(bookId))

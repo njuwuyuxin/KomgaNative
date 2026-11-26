@@ -11,6 +11,7 @@ extension ShelfFailureText on AppLocalizations {
     ShelfFailureKind.network => failureNetworkTitle,
     ShelfFailureKind.server => failureServerTitle,
     ShelfFailureKind.protocol => failureProtocolTitle,
+    ShelfFailureKind.notFound => failureNotFoundTitle,
     ShelfFailureKind.certificate => failureCertificateTitle,
     ShelfFailureKind.unexpected => failureUnexpectedTitle,
   };
@@ -20,6 +21,7 @@ extension ShelfFailureText on AppLocalizations {
     ShelfFailureKind.network => failureNetworkHint,
     ShelfFailureKind.server => failureServerHint,
     ShelfFailureKind.protocol => failureProtocolHint,
+    ShelfFailureKind.notFound => failureNotFoundHint,
     ShelfFailureKind.certificate => failureCertificateHint,
     ShelfFailureKind.unexpected => failureUnexpectedHint,
   };

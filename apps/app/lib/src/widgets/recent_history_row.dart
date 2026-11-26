@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/reading_history_provider.dart';
@@ -10,7 +11,8 @@ import 'package:material_ui/material_ui.dart';
 /// "最近阅读"横滑条（HIS-02）：按会话时间取最近读过的书，点一下直接回到那本书。
 ///
 /// 同一本书只出现一次（最近那次的位置）：用户关心的是"我刚才读的是哪本"，
-/// 不是"这本书我读了几次"。
+/// 不是"这本书我读了几次"。已从本机书库删除的书籍会从快捷入口中过滤，
+/// 但仍保留在 `reading_sessions` 中供阅读统计与热力图使用。
 class RecentHistoryRow extends ConsumerWidget {
   const RecentHistoryRow({super.key});
 
@@ -20,13 +22,26 @@ class RecentHistoryRow extends ConsumerWidget {
     final sessions = ref.watch(readingSessionsProvider).value;
     if (sessions == null || sessions.isEmpty) return const SizedBox.shrink();
 
+    final hasLocal = sessions.any(
+      (ReadingSession session) => isLocalSourceKey(session.scope),
+    );
+    final localAsync = hasLocal
+        ? ref.watch(existingLocalBookIdsProvider)
+        : null;
+    final existingLocalIds = localAsync?.value;
+    final waitingLocalIds =
+        hasLocal && existingLocalIds == null && !(localAsync?.hasError ?? true);
+
     final seen = <String>{};
     final books = <ReadingSession>[];
     for (final session in sessions) {
-      if (!seen.add(session.bookId)) continue;
+      if (isLocalSourceKey(session.scope) && waitingLocalIds) continue;
+      if (isRemovedLocalSession(session, existingLocalIds)) continue;
+      if (!seen.add('${session.scope}|${session.bookId}')) continue;
       books.add(session);
       if (books.length >= 8) break;
     }
+    if (books.isEmpty) return const SizedBox.shrink();
 
     return Column(
       key: const Key('recent-history'),

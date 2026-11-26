@@ -135,6 +135,15 @@
   "@historyMinutesSeconds": { "placeholders": { "minutes": {}, "seconds": {} } },
   "historyRow": "p. {start}–{end} · {duration}",
   "@historyRow": { "placeholders": { "start": {}, "end": {}, "duration": {} } },
+  "historyBookRemoved": "Removed",
+  "historyClearRemoved": "Clean up removed items",
+  "historyClearRemovedTitle": "Clean up removed items?",
+  "historyClearRemovedBody": "This removes {count} history entries for deleted local comics. Reading stats will update accordingly.",
+  "@historyClearRemovedBody": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
   "historySeeAll": "See all",
   "insights": "Insights",
   "insightsEmpty": "No stats yet",
@@ -503,6 +512,8 @@
   "failureServerHint": "Try again later; check the Komga server logs if it persists.",
   "failureProtocolTitle": "Unexpected server response",
   "failureProtocolHint": "Make sure this address is Komga and the proxy is not rewriting it.",
+  "failureNotFoundTitle": "Content not found",
+  "failureNotFoundHint": "This comic may have been deleted or removed.",
   "failureCertificateTitle": "Server certificate changed",
   "failureCertificateHint": "Reconnect and review the certificate before trusting it again.",
   "failureUnexpectedTitle": "Failed to load",

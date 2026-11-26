@@ -50,9 +50,24 @@ void main() {
       ShelfFailureKind.protocol,
     );
     expect(
+      shelfFailureOf(const KomgaNotFoundError('404')).kind,
+      ShelfFailureKind.notFound,
+    );
+    expect(const NotFoundFailure().kind, ShelfFailureKind.notFound);
+    expect(
       shelfFailureOf(const KomgaTlsError('changed')).kind,
       ShelfFailureKind.certificate,
     );
+  });
+
+  test('NotFoundFailure 提示不误导为 Komga 反向代理问题', () async {
+    final en = await load(const Locale('en'));
+    final zh = await load(const Locale('zh'));
+
+    expect(zh.failureHint(ShelfFailureKind.notFound), isNot(contains('Komga')));
+    expect(zh.failureHint(ShelfFailureKind.notFound), isNot(contains('反向代理')));
+    expect(en.failureHint(ShelfFailureKind.notFound), isNot(contains('Komga')));
+    expect(en.failureHint(ShelfFailureKind.notFound), isNot(contains('proxy')));
   });
 
   test('未知错误一律归类为 unexpected，不把原对象拼进界面', () async {

@@ -200,9 +200,21 @@ extension ProgressUserDao on ProgressDatabase {
     readingSessions,
   )..where((ReadingSessions t) => t.id.equals(id))).go();
 
-  Future<void> clearReadingSessions({String? scope}) {
+  Future<void> deleteReadingSessions(Iterable<int> ids) {
+    final list = ids.toSet().toList(growable: false);
+    if (list.isEmpty) return Future<void>.value();
+    return (delete(
+      readingSessions,
+    )..where((ReadingSessions t) => t.id.isIn(list))).go();
+  }
+
+  Future<void> clearReadingSessions({String? scope, Set<String>? scopes}) {
     final stmt = delete(readingSessions);
-    if (scope != null && scope.isNotEmpty) {
+    if (scopes != null && scopes.isNotEmpty) {
+      stmt.where(
+        (ReadingSessions t) => t.scope.isIn(scopes) | t.scope.equals(''),
+      );
+    } else if (scope != null && scope.isNotEmpty) {
       stmt.where(
         (ReadingSessions t) => t.scope.equals(scope) | t.scope.equals(''),
       );

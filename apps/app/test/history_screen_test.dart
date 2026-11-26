@@ -3,14 +3,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/l10n/l10n.dart';
+import 'package:yomu/src/data/local/local_catalog_delete_dao.dart';
+import 'package:yomu/src/data/local/local_catalog_write_dao.dart';
 import 'package:yomu/src/data/progress/progress_database.dart';
 import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/progress_providers.dart';
+import 'package:yomu/src/providers/reading_history_provider.dart';
 import 'package:yomu/src/screens/history_screen.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:yomu/src/widgets/recent_history_row.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu_local_archive/yomu_local_archive.dart';
 
 import 'support/fake_library.dart';
 
@@ -139,5 +145,189 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Vol. b2'), findsOneWidget);
     expect(find.text('Vol. b1'), findsNothing);
+  });
+
+  Future<void> seedLocalBook(String bookId, String title) async {
+    await db.insertImportedLocalBook(
+      LocalBookImportDraft(
+        bookId: bookId,
+        seriesTitle: title,
+        bookName: title,
+        storageKind: 'cbz',
+        relativePath: 'books/$bookId/book.cbz',
+        sizeBytes: 1024,
+        pages: const <ArchivePageEntry>[
+          ArchivePageEntry(
+            number: 1,
+            entryName: '01.jpg',
+            uncompressedSize: 100,
+            compressedSize: 80,
+            localHeaderOffset: 0,
+            compressionMethod: 0,
+          ),
+        ],
+      ),
+      generateSeriesId: () => 'local:s_$bookId',
+    );
+  }
+
+  testWidgets('本机漫画删除后：保留会话统计，历史页标记已移除且不可点击，支持一键清理', (
+    WidgetTester tester,
+  ) async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day, 10);
+    await seedLocalBook('local:b_keep', 'Alive Local');
+    await seedLocalBook('local:b_gone', 'Deleted Local');
+
+    await db.addReadingSession(
+      scope: kLocalSourceKey,
+      bookId: 'local:b_keep',
+      seriesId: 'local:s_local:b_keep',
+      bookName: 'Alive Local',
+      startedAt: today,
+      endedAt: today.add(const Duration(minutes: 5)),
+      durationMs: 5 * 60 * 1000,
+      startPage: 1,
+      endPage: 4,
+      completed: false,
+    );
+    await db.addReadingSession(
+      scope: kLocalSourceKey,
+      bookId: 'local:b_gone',
+      seriesId: 'local:s_local:b_gone',
+      bookName: 'Deleted Local',
+      startedAt: today.add(const Duration(hours: 1)),
+      endedAt: today.add(const Duration(hours: 1, minutes: 8)),
+      durationMs: 8 * 60 * 1000,
+      startPage: 1,
+      endPage: 6,
+      completed: false,
+    );
+
+    // 删除本机书籍：按策略 B，reading_sessions 仍保留以维持阅读统计。
+    await db.deleteLocalBookFromDb('local:b_gone');
+    final container = await pumpHistory(tester);
+    final sessions = await container.read(readingSessionsProvider.future);
+    expect(sessions.length, 2);
+
+    // 已移除条目展示 Removed 标记，且点击不会跳转进阅读器。
+    expect(find.text('Deleted Local'), findsOneWidget);
+    expect(find.textContaining('Removed'), findsOneWidget);
+    await tester.tap(find.text('Deleted Local'));
+    await tester.pumpAndSettle();
+    expect(find.text('reader'), findsNothing);
+
+    // 仍存在的本机书籍点击可正常进入阅读器。
+    await tester.tap(find.text('Alive Local'));
+    await tester.pumpAndSettle();
+    expect(find.text('reader'), findsOneWidget);
+  });
+
+  testWidgets('阅读历史菜单“清理已移除条目”仅删除孤儿本机记录', (WidgetTester tester) async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day, 10);
+    await seedLocalBook('local:b_keep', 'Alive Local');
+    await db.addReadingSession(
+      scope: kLocalSourceKey,
+      bookId: 'local:b_keep',
+      seriesId: 'local:s_local:b_keep',
+      bookName: 'Alive Local',
+      startedAt: today,
+      endedAt: today.add(const Duration(minutes: 5)),
+      durationMs: 5 * 60 * 1000,
+      startPage: 1,
+      endPage: 4,
+      completed: false,
+    );
+    await db.addReadingSession(
+      scope: kLocalSourceKey,
+      bookId: 'local:b_orphan',
+      seriesId: 'local:s_orphan',
+      bookName: 'Orphan Local',
+      startedAt: today.add(const Duration(minutes: 30)),
+      endedAt: today.add(const Duration(minutes: 40)),
+      durationMs: 10 * 60 * 1000,
+      startPage: 1,
+      endPage: 8,
+      completed: false,
+    );
+
+    await pumpHistory(tester);
+    expect(find.text('Orphan Local'), findsOneWidget);
+    expect(find.text('Alive Local'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('history-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('history-clear-removed')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('history-clear-removed-ok')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Orphan Local'), findsNothing);
+    expect(find.text('Alive Local'), findsOneWidget);
+    final remaining = await db.readingSessionList();
+    expect(remaining.map((ReadingSession s) => s.bookId), <String>[
+      'local:b_keep',
+    ]);
+  });
+
+  testWidgets('RecentHistoryRow 自动过滤已删除的本机漫画，全被过滤时隐藏整个区块', (
+    WidgetTester tester,
+  ) async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day, 10);
+    await seedLocalBook('local:b_alive', 'Alive Local');
+    await db.addReadingSession(
+      scope: kLocalSourceKey,
+      bookId: 'local:b_alive',
+      seriesId: 'local:s_local:b_alive',
+      bookName: 'Alive Local',
+      startedAt: today,
+      endedAt: today.add(const Duration(minutes: 5)),
+      durationMs: 5 * 60 * 1000,
+      startPage: 1,
+      endPage: 4,
+      completed: false,
+    );
+    await db.addReadingSession(
+      scope: kLocalSourceKey,
+      bookId: 'local:b_deleted',
+      seriesId: 'local:s_deleted',
+      bookName: 'Deleted Local',
+      startedAt: today.add(const Duration(hours: 1)),
+      endedAt: today.add(const Duration(hours: 1, minutes: 5)),
+      durationMs: 5 * 60 * 1000,
+      startPage: 1,
+      endPage: 4,
+      completed: false,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          progressDatabaseProvider.overrideWithValue(db),
+          libraryRepositoryProvider.overrideWithValue(
+            FakeLibraryRepository(series: demoShelf()),
+          ),
+        ],
+        child: MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: appLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          theme: AppTheme.light(),
+          home: const Scaffold(body: RecentHistoryRow()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('recent-history')), findsOneWidget);
+    expect(find.text('Alive Local'), findsOneWidget);
+    expect(find.text('Deleted Local'), findsNothing);
+
+    // 再把仅存的本机书也删掉，RecentHistoryRow 自动隐藏。
+    await db.deleteLocalBookFromDb('local:b_alive');
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('recent-history')), findsNothing);
   });
 }

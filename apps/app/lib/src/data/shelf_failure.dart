@@ -15,6 +15,7 @@ enum ShelfFailureKind {
   network,
   server,
   protocol,
+  notFound,
   certificate,
   unexpected,
 }
@@ -97,15 +98,15 @@ class CertificateFailure extends ShelfFailure {
       );
 }
 
-/// 404：资源（书/系列/收藏集）在服务端已被删除，原样重试不会恢复。
+/// 404 / 本地条目不存在：资源（书/系列/收藏集）已被删除或移除，原样重试不会恢复。
 class NotFoundFailure extends ShelfFailure {
   @override
-  ShelfFailureKind get kind => ShelfFailureKind.protocol;
+  ShelfFailureKind get kind => ShelfFailureKind.notFound;
 
   const NotFoundFailure()
     : super(
-        'Resource not found',
-        hint: 'This item may have been removed from the server.',
+        'Content not found',
+        hint: 'This comic may have been deleted or removed.',
       );
 }
 
