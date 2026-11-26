@@ -201,20 +201,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     _tablet =
         WindowSizeClass.of(MediaQuery.sizeOf(context).width) ==
         WindowSizeClass.expanded;
-    final layout = ReaderLayout(
-      pages: pages,
-      mode: resolveReaderMode(
-        mode: config.mode,
-        tabletLayout: tabletLayout,
-        direction: _direction,
-        landscape: _landscape,
-        tablet: _tablet,
-      ),
-      page: _resolvePage(total),
-      groupFrom: _spreadFrom,
-    );
+    final rightToLeft = config.direction.resolveRightToLeft(_direction);
+    final layout = _buildLayout(pages, tabletLayout, config);
     _noteBookAndLayout(book, layout);
-    // 配色在这一屏才算得出来：动态背景要读当前屏各页的页边主色（UI-P1-5）。
     final palette = resolveReaderPalette(
       isEink: isEink,
       config: config,
@@ -224,11 +213,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     );
     final mode = layout.mode;
     final page = layout.page;
-    // 打开、翻页、跳页、切模式都会经过这里：页码/模式变了就在下一帧重排预取。
     _schedulePreload(page, mode);
-    // 阅读方向：设置优先，`auto` 时才跟随系列（UI-P1-4）。
-    // 点击区、底栏箭头、缩略图滑条、卷页方向都从这一个值派生。
-    final rightToLeft = config.direction.resolveRightToLeft(_direction);
     final nextBook = _nextBookFor(layout, book);
 
     final readerBar = ReaderTopBar(
@@ -285,24 +270,17 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         doubleTapZoom: config.doubleTapZoom,
         nextSpread: layout.neighbour(1),
         previousSpread: layout.neighbour(-1),
+        pageHalf: layout.currentFrameHalf,
+        nextPageHalf: layout.splitNeighbour(1)?.half ?? PageHalf.full,
+        previousPageHalf: layout.splitNeighbour(-1)?.half ?? PageHalf.full,
         style: PageTurnStyle.resolve(
           choice: config.pageTurn,
           eink: isEink,
           disableAnimations:
               MediaQuery.maybeDisableAnimationsOf(context) ?? false,
-          // 时长走 token（墨水屏 / 减少动态效果时 token 自己会压成 0）。
           duration: AppMotion.of(context).emphasized,
         ),
-        onTurn: (int delta) {
-          final target = layout.turnTarget(delta);
-          if (target != null) {
-            _setPage(target, total);
-            return;
-          }
-          // 到书尾还继续往回翻不了、往前翻得动：直接进下一本（Panels 的行为）。
-          // 拿不到下一本时什么都不做，不报错。
-          if (delta > 0 && nextBook != null) _openNext(nextBook);
-        },
+        onTurn: (int delta) => _handlePagedTurn(layout, delta, total, nextBook),
         onToggleChrome: _toggleChrome,
       ),
     };
@@ -313,13 +291,22 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       onKeyEvent: _onKeyEvent,
       child: WakeLockScope(
         enabled: config.keepAwake,
-        // chrome 显隐同时驱动两件事：浮层动画（ReaderFrame）与系统栏（ReaderSystemUi）。
         child: ReaderSystemUi(
           immersive: !_chromeVisible,
           child: ReaderFrame(
             palette: palette,
             chromeVisible: _chromeVisible,
             dimOpacity: config.dimOpacity,
+            floatingAction: layout.canToggleTempMerge
+                ? ReaderTempMergePill(
+                    merged: layout.isTempMerged,
+                    label: layout.isTempMerged
+                        ? l10n.readerTempSplitSpread
+                        : l10n.readerTempMergeSpread,
+                    palette: palette,
+                    onPressed: () => _toggleTempMerge(page - 1),
+                  )
+                : null,
             topBar: readerBar,
             content: content,
             bottomBar: ReaderBottomChrome(

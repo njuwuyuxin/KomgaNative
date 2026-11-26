@@ -567,5 +567,14 @@
   "mergeTargetSeriesHint": "合并后的系列标题",
   "splitIntoOwnSeries": "拆出为独立系列",
   "setPageAsCover": "将当前页设为封面",
-  "coverUpdated": "封面已更新"
+  "coverUpdated": "封面已更新",
+  "readerSplitWidePages": "宽页自动切分",
+  "readerSplitWideOff": "关闭",
+  "readerSplitWideOffHint": "宽幅合扫页保持整张缩放显示。",
+  "readerSplitWideAuto": "仅竖屏",
+  "readerSplitWideAutoHint": "竖屏单页阅读时，自动按阅读方向将双页合扫宽图拆分为两页。",
+  "readerSplitWideAlways": "始终切分",
+  "readerSplitWideAlwaysHint": "单页阅读模式下，无论横竖屏都将宽图拆分为连续两页。",
+  "readerTempMergeSpread": "合页查看",
+  "readerTempSplitSpread": "恢复切分"
 }

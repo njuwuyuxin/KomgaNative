@@ -47,6 +47,9 @@ class ReaderPagedView extends ConsumerStatefulWidget {
     this.doublePage = false,
     this.nextSpread,
     this.previousSpread,
+    this.pageHalf = PageHalf.full,
+    this.nextPageHalf = PageHalf.full,
+    this.previousPageHalf = PageHalf.full,
     this.style = const PageTurnStyle(),
     this.lockZoom = false,
     this.trimBorders = false,
@@ -81,6 +84,11 @@ class ReaderPagedView extends ConsumerStatefulWidget {
   /// 相邻的跨页：拖动时先画在下面，翻过去才真正换页。
   final List<int>? nextSpread;
   final List<int>? previousSpread;
+
+  /// 宽页自动切分时当前/相邻帧的半幅裁切（LMB-01）。
+  final PageHalf pageHalf;
+  final PageHalf nextPageHalf;
+  final PageHalf previousPageHalf;
 
   final PageTurnStyle style;
 
@@ -117,10 +125,14 @@ class ReaderPagedViewState extends ConsumerState<ReaderPagedView>
   void didUpdateWidget(ReaderPagedView oldWidget) {
     super.didUpdateWidget(oldWidget);
     final bookChanged = oldWidget.bookId != widget.bookId;
-    final spreadChanged = !_sameSpread(oldWidget.spread, widget.spread);
+    final spreadChanged =
+        !_sameSpread(oldWidget.spread, widget.spread) ||
+        oldWidget.pageHalf != widget.pageHalf;
     final neighboursChanged =
         !_sameOptionalSpread(oldWidget.nextSpread, widget.nextSpread) ||
-        !_sameOptionalSpread(oldWidget.previousSpread, widget.previousSpread);
+        !_sameOptionalSpread(oldWidget.previousSpread, widget.previousSpread) ||
+        oldWidget.nextPageHalf != widget.nextPageHalf ||
+        oldWidget.previousPageHalf != widget.previousPageHalf;
     final layoutChanged =
         oldWidget.fit != widget.fit ||
         oldWidget.doublePage != widget.doublePage;
@@ -174,14 +186,17 @@ class ReaderPagedViewState extends ConsumerState<ReaderPagedView>
     List<int> spread,
     SizeD viewport, {
     bool applyZoom = true,
+    PageHalf half = PageHalf.full,
   }) {
     final order = visualOrder(spread, rightToLeft: widget.rightToLeft);
+    final effectiveHalf = order.length == 1 ? half : PageHalf.full;
     final sizes = <int, int>{};
     var totalWidth = 0;
     var maxHeight = kFallbackPageHeight;
     for (final index in order) {
       final info = widget.pages[index];
-      final w = info.width ?? kFallbackPageWidth;
+      final rawW = info.width ?? kFallbackPageWidth;
+      final w = effectiveHalf.effectiveWidth(rawW);
       sizes[index] = w;
       totalWidth += w;
       final h = info.height ?? kFallbackPageHeight;
@@ -244,6 +259,7 @@ class ReaderPagedViewState extends ConsumerState<ReaderPagedView>
       content: content,
       slots: slots,
       wideSolo: wideSolo,
+      half: effectiveHalf,
     );
   }
 
@@ -260,6 +276,7 @@ class ReaderPagedViewState extends ConsumerState<ReaderPagedView>
             palette: widget.palette,
             decodedImage: _sheets.imageFor(index),
             trimBorders: widget.trimBorders,
+            half: frame.half,
           ),
         ),
     ],
@@ -285,10 +302,18 @@ class ReaderPagedViewState extends ConsumerState<ReaderPagedView>
       builder: (BuildContext context, BoxConstraints constraints) {
         final viewport = SizeD(constraints.maxWidth, constraints.maxHeight);
         _viewport = viewport;
-        final frame = _frameFor(widget.spread, viewport);
+        final frame = _frameFor(widget.spread, viewport, half: widget.pageHalf);
+        final neighbourHalf = _forward
+            ? widget.nextPageHalf
+            : widget.previousPageHalf;
         final neighbourFrame = neighbour == null
             ? null
-            : _frameFor(neighbour, viewport, applyZoom: false);
+            : _frameFor(
+                neighbour,
+                viewport,
+                applyZoom: false,
+                half: neighbourHalf,
+              );
 
         return Listener(
           key: const Key('reader-tap-layer'),

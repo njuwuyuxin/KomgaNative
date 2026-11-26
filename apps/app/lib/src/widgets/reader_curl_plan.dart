@@ -12,6 +12,7 @@ class _SpreadFrame {
     required this.content,
     required this.slots,
     this.wideSolo = false,
+    this.half = PageHalf.full,
   });
 
   final List<int> order;
@@ -24,6 +25,9 @@ class _SpreadFrame {
 
   /// 双页模式下单独占满整屏的一张宽页跨页图：翻页时按书脊对半铰接卷曲，不退化为平移。
   final bool wideSolo;
+
+  /// 单页宽图自动切分时的当前半幅。
+  final PageHalf half;
 
   /// 若这一屏对应摊开的双页书本（两张单页，或双页模式下的一张宽页跨页图），
   /// 返回（左半页, 右半页）；单独居中页（如封面）返回 null。
@@ -161,14 +165,16 @@ class _CurlPlan {
       if (rect.isEmpty) return null;
       final nextPage = b.order.first;
       final nextRect = b.slots[nextPage]!;
+      final sheetUv = _uvRectForHalf(rect, a.half);
+      final nextUv = _uvRectForHalf(nextRect, b.half);
       final exitX = mirrored ? rect.right : viewportWidth - rect.left;
       return _CurlPlan(
         sheetPage: page,
         sheetRect: rect,
-        sheetUvRect: rect,
+        sheetUvRect: sheetUv,
         backPage: null,
         backRect: rect,
-        backUvRect: rect,
+        backUvRect: sheetUv,
         spineX: mirrored ? rect.left : rect.right,
         motion: CurlMotion(
           forward: forward,
@@ -176,11 +182,27 @@ class _CurlPlan {
           height: rect.height,
           exitX: exitX,
         ),
-        under: <_HalfSheet>[(page: nextPage, clip: nextRect, image: nextRect)],
+        under: <_HalfSheet>[(page: nextPage, clip: nextRect, image: nextUv)],
       );
     }
     return null;
   }
+
+  static Rect _uvRectForHalf(Rect rect, PageHalf half) => switch (half) {
+    PageHalf.full => rect,
+    PageHalf.left => Rect.fromLTWH(
+      rect.left,
+      rect.top,
+      rect.width * 2,
+      rect.height,
+    ),
+    PageHalf.right => Rect.fromLTWH(
+      rect.left - rect.width,
+      rect.top,
+      rect.width * 2,
+      rect.height,
+    ),
+  };
 }
 
 /// 规划、与 `ImageCache` 同步桥接及后台预解码。
@@ -192,9 +214,11 @@ extension _TurnImages on _PageTurn {
     final before = forward ? widget.spread : widget.previousSpread;
     final after = forward ? widget.nextSpread : widget.spread;
     if (before == null || after == null) return null;
+    final beforeHalf = forward ? widget.pageHalf : widget.previousPageHalf;
+    final afterHalf = forward ? widget.nextPageHalf : widget.pageHalf;
     return _CurlPlan.between(
-      before: _frameFor(before, _viewport, applyZoom: false),
-      after: _frameFor(after, _viewport, applyZoom: false),
+      before: _frameFor(before, _viewport, applyZoom: false, half: beforeHalf),
+      after: _frameFor(after, _viewport, applyZoom: false, half: afterHalf),
       forward: forward,
       rightToLeft: widget.rightToLeft,
       viewportWidth: _viewport.width,

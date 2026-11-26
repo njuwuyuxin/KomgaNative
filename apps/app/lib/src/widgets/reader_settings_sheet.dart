@@ -11,6 +11,7 @@ import 'package:yomu/src/widgets/reader_preset_section.dart';
 import 'package:yomu/src/widgets/reader_settings_color_interaction.dart';
 import 'package:yomu/src/widgets/reader_settings_group.dart';
 import 'package:yomu/src/widgets/reader_settings_rows.dart';
+import 'package:yomu_reader/yomu_reader.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 阅读设置面板：按"页面 / 布局 / 颜色 / 交互"四组排（RDR-04）。
@@ -217,6 +218,18 @@ class ReaderSettingsSheet extends ConsumerWidget {
                 palette: palette,
                 onChanged: (bool value) =>
                     controller.setTrimBorders(value, seriesId: writeSeriesId),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              ReaderOptionSection<WidePageSplitMode>(
+                title: l10n.readerSplitWidePages,
+                values: WidePageSplitMode.values,
+                selected: prefs.splitWidePages,
+                label: readerSplitWideLabel,
+                hint: readerSplitWideHint,
+                keyPrefix: 'reader-split-wide',
+                palette: palette,
+                onSelect: (WidePageSplitMode value) => controller
+                    .setSplitWidePages(value, seriesId: writeSeriesId),
               ),
               const SizedBox(height: AppSpacing.md),
               ReaderSettingsColorInteraction(

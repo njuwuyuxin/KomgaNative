@@ -22,6 +22,7 @@ class ReaderFrame extends StatelessWidget {
     required this.content,
     required this.bottomBar,
     required this.dimOpacity,
+    this.floatingAction,
     super.key,
   });
 
@@ -35,6 +36,9 @@ class ReaderFrame extends StatelessWidget {
 
   /// 亮度遮罩不透明度（0 = 不遮）。
   final double dimOpacity;
+
+  /// 仅在需要时渲染的轻浮操作（如宽页切分态下的「合页查看 / 恢复切分」微胶囊）。
+  final Widget? floatingAction;
 
   @override
   Widget build(BuildContext context) {
@@ -68,6 +72,15 @@ class ReaderFrame extends StatelessWidget {
           ),
           // 阅读区铺满整屏：不做 SafeArea，画面可以伸到刘海 / 圆角下面。
           content,
+          if (floatingAction != null)
+            Positioned(
+              right: insets.right + AppSpacing.md,
+              bottom: chromeVisible ? null : insets.bottom + AppSpacing.md,
+              top: chromeVisible
+                  ? insets.top + AppSizes.glassHeaderClearance + AppSpacing.xs
+                  : null,
+              child: floatingAction!,
+            ),
           Align(
             alignment: Alignment.topCenter,
             child: _ChromeSlot(
@@ -121,6 +134,34 @@ class ReaderFrame extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+/// 宽页自动切分态下的「合页查看 / 恢复切分」微胶囊（LMB-01）。
+class ReaderTempMergePill extends StatelessWidget {
+  const ReaderTempMergePill({
+    required this.merged,
+    required this.label,
+    required this.palette,
+    required this.onPressed,
+    super.key,
+  });
+
+  final bool merged;
+  final String label;
+  final ReaderPalette palette;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassPillButton(
+      key: const Key('reader-temp-merge-pill'),
+      icon: merged
+          ? Icons.vertical_split_outlined
+          : Icons.auto_stories_outlined,
+      label: label,
+      onPressed: onPressed,
     );
   }
 }

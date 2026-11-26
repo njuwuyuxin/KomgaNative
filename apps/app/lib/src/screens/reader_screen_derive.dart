@@ -37,6 +37,13 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
 
   /// 1 基当前页；0 表示"还没翻过页"，此时用服务端进度恢复位置。
   int _page = 0;
+
+  /// 宽页自动切分时的当前半幅；null 表示进入该物理页的首个阅读半幅（LMB-01）。
+  PageHalf? _pageHalf;
+
+  /// 用户点击「合页查看」后临时合并展示整张宽图的 0 基物理页索引；翻离该页自动清空。
+  int? _mergedWidePageIndex;
+
   bool _chromeVisible = true;
 
   /// 最近一次布局与书元信息缓存：供退出阅读器（`dispose` 不能碰 `ref`）时落盘。
@@ -179,16 +186,40 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
         ReadingDirection.unknown;
   }
 
+  /// 用当前状态构造这一屏的 [ReaderLayout]。
+  ReaderLayout _buildLayout(
+    List<PageInfo> pages,
+    TabletLayoutChoice tabletLayout,
+    ReaderConfig config,
+  ) {
+    final mode = resolveReaderMode(
+      mode: config.mode,
+      tabletLayout: tabletLayout,
+      direction: _direction,
+      landscape: _landscape,
+      tablet: _tablet,
+    );
+    return ReaderLayout(
+      pages: pages,
+      mode: mode,
+      page: _resolvePage(pages.length),
+      groupFrom: _spreadFrom,
+      splitWidePages: config.splitWidePages.isActive(
+        mode: mode,
+        landscape: _landscape,
+      ),
+      rightToLeft: config.direction.resolveRightToLeft(_direction),
+      currentHalf: _pageHalf,
+      mergedWidePageIndex: _mergedWidePageIndex,
+    );
+  }
+
   /// 用当前状态现算一份布局；页数据还没到时为 null。
   ReaderLayout? _currentLayout() {
     final pages = ref.read(readerPagesProvider(widget.bookId)).value;
     if (pages == null || pages.isEmpty) return null;
-    return ReaderLayout(
-      pages: pages,
-      mode: _modeFor(ref.read(readerPrefsProvider)),
-      page: _resolvePage(pages.length),
-      groupFrom: _spreadFrom,
-    );
+    final prefs = ref.read(readerPrefsProvider);
+    return _buildLayout(pages, prefs.tabletLayout, _effectiveConfig(prefs));
   }
 
   int _resolvePage(int total) {
@@ -216,13 +247,52 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
     });
   }
 
-  void _setPage(int page, int total) {
-    if (page == _page) return;
-    setState(() => _page = page);
+  void _setPage(int page, int total, {PageHalf? half}) {
+    if (page == _page && half == _pageHalf) return;
+    setState(() {
+      if (page != _page && _mergedWidePageIndex != page - 1) {
+        _mergedWidePageIndex = null;
+      }
+      _page = page;
+      _pageHalf = half;
+    });
     // 阅读会话记下"读到哪"（HIS-01）。
     _session.note(page: page);
     // 预取不用在这里排：`build` 里的 `_schedulePreload` 会看到页码变化重排。
     _scheduleProgress(page);
+  }
+
+  /// 宽页自动切分态下临时合页/恢复切分当前物理页（LMB-01）。
+  void _toggleTempMerge(int pageIndex) {
+    setState(() {
+      _mergedWidePageIndex = _mergedWidePageIndex == pageIndex
+          ? null
+          : pageIndex;
+      _pageHalf = null;
+    });
+  }
+
+  void _handlePagedTurn(
+    ReaderLayout layout,
+    int delta,
+    int total,
+    Book? nextBook,
+  ) {
+    if (layout.isWideSplitActive) {
+      final splitTarget = layout.turnSplitTarget(delta);
+      if (splitTarget != null) {
+        _setPage(splitTarget.pageNumber, total, half: splitTarget.half);
+        return;
+      }
+      if (delta > 0 && nextBook != null) _openNext(nextBook);
+      return;
+    }
+    final target = layout.turnTarget(delta);
+    if (target != null) {
+      _setPage(target, total);
+      return;
+    }
+    if (delta > 0 && nextBook != null) _openNext(nextBook);
   }
 
   /// 打开下一本：**替换**当前页而不是压栈（连读十本不必按十次返回）。
@@ -243,6 +313,8 @@ mixin _ReaderDerive on ConsumerState<ReaderScreen>, WidgetsBindingObserver {
     final target = page.clamp(1, total);
     setState(() {
       _page = target;
+      _pageHalf = null;
+      _mergedWidePageIndex = null;
       _jumpPage = target;
       _jumpToken++;
     });

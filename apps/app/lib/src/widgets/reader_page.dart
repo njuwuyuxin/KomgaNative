@@ -28,6 +28,7 @@ class ReaderPage extends ConsumerWidget {
     required this.palette,
     this.decodedImage,
     this.trimBorders = false,
+    this.half = PageHalf.full,
     super.key,
   });
 
@@ -41,15 +42,31 @@ class ReaderPage extends ConsumerWidget {
   /// 是否按检测到的边框裁剪页图（UI-P3-10）。
   final bool trimBorders;
 
+  /// 宽页自动切分时的水平半幅裁切（LMB-01）。
+  final PageHalf half;
+
   /// 同一页已经解好的卷页位图，由 CurlSheets 持有；这里只借用，不释放。
   /// 字节缓存命中不等于 MemoryImage 的首帧已解码，交接时用它填补解码空窗。
   final ui.Image? decodedImage;
 
-  Widget _decoded(ui.Image image) => RawImage(
-    image: image,
-    fit: BoxFit.contain,
-    filterQuality: FilterQuality.medium,
-  );
+  Widget _decoded(ui.Image image) {
+    if (half.isSplit) {
+      return SizedBox.expand(
+        child: CustomPaint(
+          painter: _CropPainter(
+            image: image,
+            crop: BorderCrop.none,
+            half: half,
+          ),
+        ),
+      );
+    }
+    return RawImage(
+      image: image,
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.medium,
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -75,11 +92,15 @@ class ReaderPage extends ConsumerWidget {
       final crop = trimBorders
           ? ref.watch(pageBorderCropProvider(request)).value
           : null;
-      if (crop != null && !crop.isEmpty) {
+      if (half.isSplit || (crop != null && !crop.isEmpty)) {
         return _CroppedPage(
-          key: Key('reader-image-$pageIndex'),
+          key: half.isSplit
+              ? Key('reader-image-$pageIndex-${half.name}')
+              : Key('reader-image-$pageIndex'),
           bytes: bytes,
-          crop: crop,
+          crop: crop ?? BorderCrop.none,
+          half: half,
+          decodedImage: decodedImage,
         );
       }
       return Image.memory(
@@ -143,10 +164,18 @@ class ReaderPage extends ConsumerWidget {
 /// 用 `MemoryImage` 的 ImageStream 拿到已解码位图，再 `drawImageRect`：
 /// 这样既能精确裁源矩形，又复用 Flutter 的图片缓存，不需要自己解一遍。
 class _CroppedPage extends StatefulWidget {
-  const _CroppedPage({required this.bytes, required this.crop, super.key});
+  const _CroppedPage({
+    required this.bytes,
+    required this.crop,
+    this.half = PageHalf.full,
+    this.decodedImage,
+    super.key,
+  });
 
   final Uint8List bytes;
   final BorderCrop crop;
+  final PageHalf half;
+  final ui.Image? decodedImage;
 
   @override
   State<_CroppedPage> createState() => _CroppedPageState();
@@ -182,30 +211,42 @@ class _CroppedPageState extends State<_CroppedPage> {
 
   @override
   Widget build(BuildContext context) {
-    final image = _image;
+    final image = _image ?? widget.decodedImage;
     if (image == null) {
       return Image.memory(widget.bytes, fit: BoxFit.contain);
     }
     return SizedBox.expand(
       child: CustomPaint(
-        painter: _CropPainter(image: image, crop: widget.crop),
+        painter: _CropPainter(
+          image: image,
+          crop: widget.crop,
+          half: widget.half,
+        ),
       ),
     );
   }
 }
 
 class _CropPainter extends CustomPainter {
-  const _CropPainter({required this.image, required this.crop});
+  const _CropPainter({
+    required this.image,
+    required this.crop,
+    this.half = PageHalf.full,
+  });
 
   final ui.Image image;
   final BorderCrop crop;
+  final PageHalf half;
 
   @override
   void paint(Canvas canvas, Size size) {
+    final frac = half.horizontalFraction;
+    final halfLeft = image.width * frac.left;
+    final halfWidth = image.width * (frac.right - frac.left);
     final src = Rect.fromLTRB(
-      image.width * crop.left,
+      halfLeft + halfWidth * crop.left,
       image.height * crop.top,
-      image.width * (1 - crop.right),
+      halfLeft + halfWidth * (1 - crop.right),
       image.height * (1 - crop.bottom),
     );
     if (src.isEmpty || size.isEmpty) return;
@@ -224,5 +265,7 @@ class _CropPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_CropPainter oldDelegate) =>
-      oldDelegate.image != image || oldDelegate.crop != crop;
+      oldDelegate.image != image ||
+      oldDelegate.crop != crop ||
+      oldDelegate.half != half;
 }

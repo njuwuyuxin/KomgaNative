@@ -718,5 +718,14 @@
   "mergeTargetSeriesHint": "Merged series title",
   "splitIntoOwnSeries": "Split into standalone series",
   "setPageAsCover": "Set current page as cover",
-  "coverUpdated": "Cover updated"
+  "coverUpdated": "Cover updated",
+  "readerSplitWidePages": "Split wide pages",
+  "readerSplitWideOff": "Off",
+  "readerSplitWideOffHint": "Show wide double-page scans as a single scaled image.",
+  "readerSplitWideAuto": "Portrait only",
+  "readerSplitWideAutoHint": "Automatically split wide scans into two halves in portrait mode.",
+  "readerSplitWideAlways": "Always",
+  "readerSplitWideAlwaysHint": "Always split wide scans into two sequential halves in single-page mode.",
+  "readerTempMergeSpread": "Full spread",
+  "readerTempSplitSpread": "Split view"
 }

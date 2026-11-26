@@ -12,15 +12,58 @@ class ReaderLayout {
     required ReadingMode mode,
     required int page,
     int? groupFrom,
+    bool splitWidePages = false,
+    bool rightToLeft = false,
+    PageHalf? currentHalf,
+    int? mergedWidePageIndex,
   }) {
     final spreads = spreadsFor(pages, mode, groupFrom: groupFrom);
     final spreadIndex = spreads.isEmpty ? -1 : spreadIndexOf(spreads, page - 1);
+    final wideSplitActive = mode == ReadingMode.paged && splitWidePages;
+    final splitFrames = wideSplitActive
+        ? buildSplitFrames(
+            pageCount: pages.length,
+            rightToLeft: rightToLeft,
+            mergedPageIndex: mergedWidePageIndex,
+            aspectAt: (int index) {
+              final info = pages[index];
+              return PageAspect(
+                width: info.width?.toDouble(),
+                height: info.height?.toDouble(),
+              );
+            },
+          )
+        : const <SplitFrame>[];
+    final splitFrameIndex = splitFrames.isEmpty
+        ? -1
+        : resolveSplitFrameIndex(
+            splitFrames,
+            pageIndex: page - 1,
+            preferredHalf: currentHalf,
+          );
+    final currentPageIndex = (page - 1).clamp(
+      0,
+      pages.isEmpty ? 0 : pages.length - 1,
+    );
+    final currentPageIsWide =
+        pages.isNotEmpty &&
+        PageAspect(
+          width: pages[currentPageIndex].width?.toDouble(),
+          height: pages[currentPageIndex].height?.toDouble(),
+        ).isWide();
     return ReaderLayout._(
       mode: mode,
       page: page,
       total: pages.length,
       spreads: spreads,
       spreadIndex: spreadIndex,
+      splitFrames: splitFrames,
+      splitFrameIndex: splitFrameIndex,
+      canToggleTempMerge: wideSplitActive && currentPageIsWide,
+      isTempMerged:
+          wideSplitActive &&
+          currentPageIsWide &&
+          mergedWidePageIndex == currentPageIndex,
     );
   }
 
@@ -30,6 +73,10 @@ class ReaderLayout {
     required this.total,
     required this.spreads,
     required this.spreadIndex,
+    required this.splitFrames,
+    required this.splitFrameIndex,
+    required this.canToggleTempMerge,
+    required this.isTempMerged,
   });
 
   final ReadingMode mode;
@@ -43,6 +90,23 @@ class ReaderLayout {
 
   /// 当前屏在 [spreads] 里的下标；非双页模式为 -1。
   final int spreadIndex;
+
+  /// 宽页自动切分帧列表；未启用宽页切分时为空。
+  final List<SplitFrame> splitFrames;
+
+  /// 当前帧在 [splitFrames] 里的下标；未启用时为 -1。
+  final int splitFrameIndex;
+
+  /// 当前物理页是否为宽图且处于宽页切分模式（决定是否显示「合页查看 / 恢复切分」浮钮）。
+  final bool canToggleTempMerge;
+
+  /// 当前宽页是否正处于「临时合页查看」状态。
+  final bool isTempMerged;
+
+  bool get isWideSplitActive => splitFrames.isNotEmpty && splitFrameIndex >= 0;
+
+  PageHalf get currentFrameHalf =>
+      isWideSplitActive ? splitFrames[splitFrameIndex].half : PageHalf.full;
 
   /// 双页模式按"封面单独、宽页单独、其余两两"分组；其他模式返回空。
   /// [groupFrom] 是手动修正的起点（0 基，UI-P3-5）。
@@ -90,13 +154,16 @@ class ReaderLayout {
   }
 
   bool get canGoBack => switch (mode) {
-    ReadingMode.paged => page > 1,
+    ReadingMode.paged => isWideSplitActive ? splitFrameIndex > 0 : page > 1,
     ReadingMode.doublePage => spreadIndex > 0,
     ReadingMode.verticalScroll => false,
   };
 
   bool get canGoForward => switch (mode) {
-    ReadingMode.paged => page < total,
+    ReadingMode.paged =>
+      isWideSplitActive
+          ? splitFrameIndex < splitFrames.length - 1
+          : page < total,
     ReadingMode.doublePage =>
       spreadIndex >= 0 && spreadIndex < spreads.length - 1,
     ReadingMode.verticalScroll => false,
@@ -106,7 +173,9 @@ class ReaderLayout {
   ///
   /// 双页模式下"最后一屏"可能包含倒数两页，此时 `page` 到不了 `total`，
   /// 只看页码会漏掉 `completed`，进度条永远差一页。
-  bool get completed => isCompletedAt(page);
+  bool get completed => isWideSplitActive
+      ? splitFrameIndex >= splitFrames.length - 1
+      : isCompletedAt(page);
 
   bool isCompletedAt(int target) {
     if (target >= total) return true;
@@ -115,10 +184,22 @@ class ReaderLayout {
     return index >= 0 && spreads[index].contains(total - 1);
   }
 
+  /// 相邻那一帧（用于宽页切分模式下获取相邻页及对应半幅）。
+  SplitFrame? splitNeighbour(int delta) {
+    if (!isWideSplitActive) return null;
+    final next = splitFrameIndex + delta;
+    if (next < 0 || next >= splitFrames.length) return null;
+    return splitFrames[next];
+  }
+
   /// 相邻那一屏的页索引；到书头/书尾返回 null。
   ///
   /// 翻页动画需要它：拖动时先把相邻那一屏画在下面，翻过去才真正换页。
   List<int>? neighbour(int delta) {
+    if (isWideSplitActive) {
+      final f = splitNeighbour(delta);
+      return f == null ? null : <int>[f.pageIndex];
+    }
     if (mode == ReadingMode.doublePage && spreads.isNotEmpty) {
       final index = spreadIndex + delta;
       if (index < 0 || index >= spreads.length) return null;
@@ -127,6 +208,13 @@ class ReaderLayout {
     final target = page + delta;
     if (target < 1 || target > total) return null;
     return <int>[target - 1];
+  }
+
+  /// 宽页切分模式下翻 [delta] 帧后的目标帧；未启用或翻不动返回 null。
+  SplitFrame? turnSplitTarget(int delta) {
+    if (mode == ReadingMode.verticalScroll || !isWideSplitActive) return null;
+    final next = (splitFrameIndex + delta).clamp(0, splitFrames.length - 1);
+    return next == splitFrameIndex ? null : splitFrames[next];
   }
 
   /// 翻 [delta] 屏之后的 1 基页码；翻不动时返回 null。

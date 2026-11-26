@@ -17,6 +17,7 @@ class ReaderConfig {
     this.background = ReaderBackgroundChoice.black,
     this.lockZoom = false,
     this.trimBorders = false,
+    this.splitWidePages = WidePageSplitMode.off,
     this.pageTurn = ReaderPageTurnChoice.curl,
     this.tapZone = TapZonePreset.automatic,
     this.invertTapZones = false,
@@ -36,6 +37,7 @@ class ReaderConfig {
   final ReaderBackgroundChoice background;
   final bool lockZoom;
   final bool trimBorders;
+  final WidePageSplitMode splitWidePages;
   final ReaderPageTurnChoice pageTurn;
   final TapZonePreset tapZone;
   final bool invertTapZones;
@@ -53,6 +55,7 @@ class ReaderConfig {
       fit: ReaderFitChoice.contain,
       direction: ReaderDirectionChoice.auto,
       trimBorders: false,
+      splitWidePages: WidePageSplitMode.off,
     ),
     ReaderSettingsGroup.color => copyWith(
       background: ReaderBackgroundChoice.black,
@@ -71,7 +74,8 @@ class ReaderConfig {
     ReaderSettingsGroup.layout =>
       fit == ReaderFitChoice.contain &&
           direction == ReaderDirectionChoice.auto &&
-          !trimBorders,
+          !trimBorders &&
+          splitWidePages == WidePageSplitMode.off,
     ReaderSettingsGroup.color =>
       background == ReaderBackgroundChoice.black && brightness == 1,
     ReaderSettingsGroup.interaction =>
@@ -87,6 +91,7 @@ class ReaderConfig {
     ReaderBackgroundChoice? background,
     bool? lockZoom,
     bool? trimBorders,
+    WidePageSplitMode? splitWidePages,
     ReaderPageTurnChoice? pageTurn,
     TapZonePreset? tapZone,
     bool? invertTapZones,
@@ -102,6 +107,7 @@ class ReaderConfig {
     background: background ?? this.background,
     lockZoom: lockZoom ?? this.lockZoom,
     trimBorders: trimBorders ?? this.trimBorders,
+    splitWidePages: splitWidePages ?? this.splitWidePages,
     pageTurn: pageTurn ?? this.pageTurn,
     tapZone: tapZone ?? this.tapZone,
     invertTapZones: invertTapZones ?? this.invertTapZones,
@@ -119,6 +125,7 @@ class ReaderConfig {
     'background': background.name,
     'lockZoom': lockZoom,
     'trimBorders': trimBorders,
+    'splitWidePages': splitWidePages.name,
     'pageTurn': pageTurn.name,
     'tapZone': tapZone.name,
     'invertTapZones': invertTapZones,
@@ -157,6 +164,11 @@ class ReaderConfig {
       ),
       lockZoom: json['lockZoom'] == true,
       trimBorders: json['trimBorders'] == true,
+      splitWidePages: parseReaderEnum(
+        json['splitWidePages'],
+        WidePageSplitMode.values,
+        WidePageSplitMode.off,
+      ),
       pageTurn: parseReaderEnum(
         json['pageTurn'],
         ReaderPageTurnChoice.values,
@@ -185,6 +197,7 @@ class ReaderConfig {
     background,
     lockZoom,
     trimBorders,
+    splitWidePages,
     pageTurn,
     tapZone,
     invertTapZones,

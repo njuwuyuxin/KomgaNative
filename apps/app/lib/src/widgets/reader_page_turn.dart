@@ -49,6 +49,7 @@ mixin _PageTurn
     List<int> spread,
     SizeD viewport, {
     bool applyZoom = true,
+    PageHalf half = PageHalf.full,
   });
   Widget _spreadRow(_SpreadFrame frame);
   Positioned _positioned(_SpreadFrame frame, Widget child);

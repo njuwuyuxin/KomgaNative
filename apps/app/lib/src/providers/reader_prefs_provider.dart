@@ -5,7 +5,8 @@ import 'package:yomu/src/data/reader_prefs.dart';
 import 'package:yomu/src/data/reader_prefs_store.dart';
 import 'package:yomu/src/providers/pinned_series_provider.dart';
 import 'package:yomu_platform/yomu_platform.dart';
-import 'package:yomu_reader/yomu_reader.dart' show TapZonePreset;
+import 'package:yomu_reader/yomu_reader.dart'
+    show TapZonePreset, WidePageSplitMode;
 
 /// 阅读偏好：模式 / 亮度 / 常亮 / 预设 / 系列覆盖。
 ///
@@ -71,6 +72,12 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
     seriesId,
     (ReaderConfig c) => c.copyWith(trimBorders: enabled),
   );
+
+  void setSplitWidePages(WidePageSplitMode mode, {String? seriesId}) =>
+      _updateConfig(
+        seriesId,
+        (ReaderConfig c) => c.copyWith(splitWidePages: mode),
+      );
 
   void setPageTurn(ReaderPageTurnChoice choice, {String? seriesId}) =>
       _updateConfig(seriesId, (ReaderConfig c) => c.copyWith(pageTurn: choice));
