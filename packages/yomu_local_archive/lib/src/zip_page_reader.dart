@@ -61,6 +61,9 @@ abstract interface class ComicArchiveReader {
   /// 按 1 基页码按需读取并解压单页图片字节。
   Future<Uint8List> readPage(int pageNumber);
 
+  /// 读取容器独立声明的封面字节（如 EPUB 未列入 `<spine>` 的 `cover-image`）；无则 `null`。
+  Future<Uint8List?> readCoverImage();
+
   Future<void> close();
 }
 
@@ -277,6 +280,9 @@ final class ZipComicReader implements ComicArchiveReader {
       passwordBytes: _passwordBytes,
     );
   }
+
+  @override
+  Future<Uint8List?> readCoverImage() async => null;
 
   @override
   Future<void> close() => _source.close();

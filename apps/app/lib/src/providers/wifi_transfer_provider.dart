@@ -157,6 +157,9 @@ class WifiTransferController extends Notifier<WifiTransferState> {
 
   void _refreshLocalShelf() {
     ref.read(localLibraryRepositoryProvider).evictCoverCache();
+    ref.invalidate(seriesCoverProvider);
+    ref.invalidate(seriesDetailProvider);
+    ref.invalidate(seriesBooksProvider);
     ref.invalidate(crossSourceOndeckProvider);
     ref.invalidate(recentSeriesProvider);
     if (!ref.read(activeSourceProvider).isCloud) {

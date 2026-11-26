@@ -75,7 +75,9 @@ final class EpubComicReader implements ComicArchiveReader {
     required List<ArchivePageEntry> pages,
     required ComicInfoMetadata metadata,
     required List<ArchiveChapter> chapters,
+    ZipEntryInfo? standaloneCoverEntry,
   }) : _source = source,
+       _standaloneCoverEntry = standaloneCoverEntry,
        pages = List<ArchivePageEntry>.unmodifiable(pages),
        embeddedMetadata = metadata,
        chapters = List<ArchiveChapter>.unmodifiable(chapters);
@@ -219,13 +221,25 @@ final class EpubComicReader implements ComicArchiveReader {
     }
 
     var frontCoverIndex = opf.metadata.frontCoverPageIndex;
-    final coverHrefLower = opf.coverImageHref?.toLowerCase();
-    if (frontCoverIndex == null && coverHrefLower != null) {
+    ZipEntryInfo? standaloneCover;
+    final coverHref = opf.coverImageHref;
+    final coverHrefLower = coverHref?.toLowerCase();
+    if (frontCoverIndex == null &&
+        coverHref != null &&
+        coverHrefLower != null) {
       for (var i = 0; i < orderedImages.length; i++) {
         if (normalizeArchivePath(orderedImages[i].name).toLowerCase() ==
             coverHrefLower) {
           frontCoverIndex = i;
           break;
+        }
+      }
+      if (frontCoverIndex == null) {
+        final entry = byPath[coverHref] ?? byLower[coverHrefLower];
+        if (entry != null &&
+            !entry.isEncrypted &&
+            isSupportedComicImagePath(entry.name)) {
+          standaloneCover = entry;
         }
       }
     }
@@ -277,10 +291,12 @@ final class EpubComicReader implements ComicArchiveReader {
       pages: pages,
       metadata: metadata,
       chapters: chapters,
+      standaloneCoverEntry: standaloneCover,
     );
   }
 
   final RandomAccessByteSource _source;
+  final ZipEntryInfo? _standaloneCoverEntry;
 
   @override
   final List<ArchivePageEntry> pages;
@@ -316,6 +332,13 @@ final class EpubComicReader implements ComicArchiveReader {
         generalPurposeBitFlag: 0,
       ),
     );
+  }
+
+  @override
+  Future<Uint8List?> readCoverImage() async {
+    final entry = _standaloneCoverEntry;
+    if (entry == null) return null;
+    return ZipComicReader.extractEntry(_source, entry);
   }
 
   @override

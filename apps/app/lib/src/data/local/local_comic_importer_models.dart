@@ -1,9 +1,12 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:yomu/src/data/local/cover_thumbnail_generator.dart';
+import 'package:yomu/src/data/local/local_catalog_edit_dao.dart';
 import 'package:yomu/src/data/local/local_catalog_write_dao.dart';
 import 'package:yomu/src/data/local/local_comics_storage.dart';
 import 'package:yomu/src/data/progress/progress_database.dart';
+import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu_local_archive/yomu_local_archive.dart';
 
 /// 单本导入失败的结构化原因（UI 按枚举展示本地化提示）。
@@ -100,7 +103,8 @@ Future<({String seriesId, String bookId})> commitComicReaderToDatabase({
       : 1;
   String? coverRelPath;
   try {
-    final rawCover = await reader.readPage(coverPageNumber);
+    final rawCover =
+        await reader.readCoverImage() ?? await reader.readPage(coverPageNumber);
     final encoded = await coverEncoder(
       rawCover,
       direction: meta.readingDirection,
@@ -142,6 +146,51 @@ Future<({String seriesId, String bookId})> commitComicReaderToDatabase({
     generateSeriesId: generateSeriesId,
     nowOverride: nowOverride,
   );
+}
+
+/// 将目录侧车封面图（`cover.*` / `folder.*` / `poster.*`）编码落盘并绑定为本地系列封面。
+///
+/// 未找到目标系列，或系列已锁定/已有自定义封面且 [overwriteExisting] 为 `false` 时返回 `null`。
+Future<String?> applySidecarSeriesCover({
+  required ProgressDatabase db,
+  required LocalComicsStorage storage,
+  required CoverThumbnailEncoder coverEncoder,
+  required Uint8List imageBytes,
+  String? seriesId,
+  String? seriesTitle,
+  bool overwriteExisting = false,
+}) async {
+  if (imageBytes.isEmpty) return null;
+  final target = await db.findLocalSeriesForSidecarCover(
+    seriesId: seriesId,
+    seriesTitle: seriesTitle,
+    overwriteExisting: overwriteExisting,
+  );
+  if (target == null) return null;
+
+  final direction = ReadingDirection.values.firstWhere(
+    (d) => d.name == target.readingDirection,
+    orElse: () => ReadingDirection.unknown,
+  );
+  Uint8List? encoded;
+  try {
+    encoded = await coverEncoder(imageBytes, direction: direction);
+  } on Object {
+    encoded = null;
+  }
+  final payload = (encoded != null && encoded.isNotEmpty)
+      ? encoded
+      : imageBytes;
+  final safeSeries = target.id.replaceAll(':', '_');
+  final relPath = 'covers/series_$safeSeries.png';
+  final coverFile = await storage.resolveFile(relPath);
+  await coverFile.parent.create(recursive: true);
+  await coverFile.writeAsBytes(payload, flush: true);
+  await db.setLocalSeriesCustomCoverPath(
+    seriesId: target.id,
+    coverRelativePath: relPath,
+  );
+  return target.id;
 }
 
 String? _nonEmpty(String? s) =>

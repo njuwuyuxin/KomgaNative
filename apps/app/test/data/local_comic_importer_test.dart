@@ -407,5 +407,68 @@ void main() {
       final booksDir = Directory('${sandboxTemp.path}/books');
       expect(booksDir.listSync(), hasLength(3));
     });
+
+    test('importDirectory 导入归档目录时自动绑定同级 cover.png 为系列封面且不创建假书', () async {
+      final dir = Directory('${srcTemp.path}/滅鬼之刃')..createSync();
+      final vol1Cover = _fakePng(500, 750);
+      final vol1Page1 = _fakePng(800, 1200);
+      final seriesCover = _fakePng(640, 960);
+
+      // 构造带独立 OPF cover-image 的 EPUB（cover.png 不在 spine 中）
+      final epubBytes = _buildCbz(
+        entries: <String, List<int>>{
+          'mimetype': utf8.encode('application/epub+zip'),
+          'META-INF/container.xml': utf8.encode(
+            '<container><rootfiles><rootfile full-path="OEBPS/content.opf"/></rootfiles></container>',
+          ),
+          'OEBPS/content.opf': utf8.encode('''
+<package version="3.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title>滅鬼之刃, Vol. 1</dc:title>
+    <meta property="belongs-to-collection">滅鬼之刃</meta>
+    <meta property="group-position">1</meta>
+    <meta name="cover" content="cover-image"/>
+  </metadata>
+  <manifest>
+    <item id="cover-image" href="images/cover.png" media-type="image/png" properties="cover-image"/>
+    <item id="p1" href="text/p1.xhtml" media-type="application/xhtml+xml"/>
+    <item id="i1" href="images/p1.png" media-type="image/png"/>
+  </manifest>
+  <spine page-progression-direction="rtl"><itemref idref="p1"/></spine>
+</package>'''),
+          'OEBPS/text/p1.xhtml': utf8.encode(
+            '<html><body><img src="../images/p1.png"/></body></html>',
+          ),
+          'OEBPS/images/cover.png': vol1Cover,
+          'OEBPS/images/p1.png': vol1Page1,
+        },
+      );
+      File('${dir.path}/Vol. 1.epub').writeAsBytesSync(epubBytes);
+      File('${dir.path}/cover.png').writeAsBytesSync(seriesCover);
+      File('${dir.path}/poster.png').writeAsBytesSync(_fakePng(300, 400));
+
+      final result = await importer.importDirectory(dir.path);
+      expect(result.importedCount, 1);
+      expect(result.importedSeriesIds, hasLength(1));
+
+      final seriesId = result.importedSeriesIds.single;
+      final bookId = result.importedBookIds.single;
+      final seriesRow = await db.localSeriesRowById(seriesId);
+      expect(seriesRow?.customCoverPath, isNotNull);
+      expect(
+        File('${sandboxTemp.path}/${seriesRow!.customCoverPath}')
+            .readAsBytesSync(),
+        seriesCover,
+      );
+
+      // 单卷封面应命中 EPUB 独立的 OPF cover-image，而非正文第一页 p1.png
+      final bookRow = await db.localBookRowById(bookId);
+      expect(bookRow?.coverThumbPath, isNotNull);
+      expect(
+        File('${sandboxTemp.path}/${bookRow!.coverThumbPath}')
+            .readAsBytesSync(),
+        vol1Cover,
+      );
+    });
   });
 }

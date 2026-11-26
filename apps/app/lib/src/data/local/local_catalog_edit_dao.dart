@@ -223,6 +223,55 @@ extension LocalCatalogEditDao on ProgressDatabase {
       );
     });
   }
+
+  /// 按 `seriesId` 或规范化标题查找可写入侧车封面的本地系列；已锁定或已有自定义封面且未强制覆盖时返回 `null`。
+  Future<LocalSeriesRow?> findLocalSeriesForSidecarCover({
+    String? seriesId,
+    String? seriesTitle,
+    bool overwriteExisting = false,
+  }) async {
+    LocalSeriesRow? target;
+    if (seriesId != null && seriesId.trim().isNotEmpty) {
+      target = await (select(
+        localSeriesRows,
+      )..where((t) => t.id.equals(seriesId.trim()))).getSingleOrNull();
+    }
+    if (target == null &&
+        seriesTitle != null &&
+        seriesTitle.trim().isNotEmpty) {
+      final normSort = normalizeTitleSort(seriesTitle);
+      final candidates = await (select(
+        localSeriesRows,
+      )..where((t) => t.titleSort.equals(normSort))).get();
+      final lowerTitle = seriesTitle.trim().toLowerCase();
+      for (final row in candidates) {
+        if (row.title.trim().toLowerCase() == lowerTitle) {
+          target = row;
+          break;
+        }
+      }
+    }
+    if (target == null) return null;
+    if (!overwriteExisting) {
+      if (target.metadataLocked) return null;
+      final existingCover = target.customCoverPath;
+      if (existingCover != null && existingCover.isNotEmpty) return null;
+    }
+    return target;
+  }
+
+  /// 单独更新本地系列的自定义封面相对路径（不修改分卷封面）。
+  Future<void> setLocalSeriesCustomCoverPath({
+    required String seriesId,
+    required String coverRelativePath,
+  }) async {
+    await (update(localSeriesRows)..where((t) => t.id.equals(seriesId))).write(
+      LocalSeriesRowsCompanion(
+        customCoverPath: Value<String?>(coverRelativePath),
+        updatedAt: Value<DateTime>(DateTime.now().toUtc()),
+      ),
+    );
+  }
 }
 
 List<String> _cleanList(List<String> items) {

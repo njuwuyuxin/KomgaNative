@@ -89,6 +89,7 @@ Future<int> handleWifiArchiveUpload({
       await writeWifiJson(request.response, HttpStatus.ok, <String, Object?>{
         'ok': true,
         'importedCount': result.importedCount,
+        'seriesIds': result.importedSeriesIds,
         'failures': <String>[for (final f in result.failures) f.reason.name],
       });
       return result.importedCount;
@@ -188,6 +189,66 @@ Future<int> handleWifiCommitFolder({
     return 0;
   } finally {
     await tryDeleteImportDir(dir);
+  }
+}
+
+Future<void> handleWifiSeriesCoverUpload({
+  required HttpRequest request,
+  required LocalComicImporter importer,
+  required Directory staging,
+  required WifiEmitEvent emit,
+}) async {
+  final rawSeriesId = request.uri.queryParameters['seriesId']?.trim();
+  final seriesId = (rawSeriesId != null && rawSeriesId.isNotEmpty)
+      ? rawSeriesId
+      : null;
+  final rawSeries = request.uri.queryParameters['series']?.trim();
+  final seriesTitle = (rawSeries != null && rawSeries.isNotEmpty)
+      ? sanitizeWifiSegment(rawSeries)
+      : null;
+  if (seriesId == null && seriesTitle == null) {
+    await writeWifiJson(
+      request.response,
+      HttpStatus.badRequest,
+      const <String, Object?>{'ok': false, 'error': 'missing_series'},
+    );
+    return;
+  }
+  final rawName = request.uri.queryParameters['name']?.trim() ?? '';
+  final fileName = sanitizeWifiSegment(rawName.isEmpty ? 'cover.jpg' : rawName);
+  final tempFile = File(
+    '${staging.path}/cov_${DateTime.now().microsecondsSinceEpoch}_$fileName',
+  );
+  try {
+    await writeStreamToFile(request, tempFile);
+    final bytes = await tempFile.readAsBytes();
+    if (bytes.isEmpty) {
+      await writeWifiJson(
+        request.response,
+        HttpStatus.badRequest,
+        const <String, Object?>{'ok': false, 'error': 'empty_cover'},
+      );
+      return;
+    }
+    final appliedId = await importer.applySeriesCoverImage(
+      bytes,
+      seriesId: seriesId,
+      seriesTitle: seriesTitle,
+    );
+    if (appliedId != null) {
+      emit(fileName, WifiTransferEventKind.imported);
+    }
+    await writeWifiJson(request.response, HttpStatus.ok, <String, Object?>{
+      'ok': true,
+      'applied': appliedId != null,
+      if (appliedId != null) 'seriesId': appliedId,
+    });
+  } finally {
+    try {
+      if (await tempFile.exists()) await tempFile.delete();
+    } on FileSystemException {
+      // 清理临时封面文件失败不影响主流程。
+    }
   }
 }
 

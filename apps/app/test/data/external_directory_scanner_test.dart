@@ -194,5 +194,35 @@ void main() {
         expect((await db.queryLocalSeries()).items.single.title, 'Bocchi');
       },
     );
+
+    test('scanRoot 自动识别同级 cover.png 侧车封面绑定到系列且不产生假书', () async {
+      final sub = Directory('${extDir.path}/Kimetsu')..createSync();
+      final coverBytes = _fakePng(620, 930);
+      File('${sub.path}/Vol.1.cbz').writeAsBytesSync(
+        _buildCbz(<String, List<int>>{'01.png': _fakePng(800, 1200)}),
+      );
+      File('${sub.path}/cover.png').writeAsBytesSync(coverBytes);
+
+      final root = MountedExternalRoot(
+        id: 'root_cover_test',
+        displayName: 'Manga',
+        uriOrBookmark: extDir.path,
+        kind: ExternalRootKind.localDirectory,
+      );
+      await db.upsertMountedRoot(root);
+
+      final summary = await scanner.scanRoot(root);
+      expect(summary.added, 1);
+
+      final series = (await db.queryLocalSeries()).items.single;
+      expect(series.booksCount, 1);
+      final seriesRow = await db.localSeriesRowById(series.id);
+      expect(seriesRow?.customCoverPath, isNotNull);
+      expect(
+        File('${sandboxDir.path}/${seriesRow!.customCoverPath}')
+            .readAsBytesSync(),
+        coverBytes,
+      );
+    });
   });
 }

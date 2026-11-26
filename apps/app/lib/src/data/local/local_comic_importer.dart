@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:yomu/src/data/local/archive_password_store.dart';
 import 'package:yomu/src/data/local/comic_file_picker.dart';
@@ -181,7 +182,23 @@ final class LocalComicImporter {
     }
   }
 
-  /// 导入本地文件夹（支持文件夹内含多卷 `.cbz/.zip`，或文件夹内直接放漫画图片页）。
+  /// 将侧车封面字节（如 `cover.jpg` / `folder.png` / `poster.jpg`）绑定为本地系列封面。
+  Future<String?> applySeriesCoverImage(
+    Uint8List imageBytes, {
+    String? seriesId,
+    String? seriesTitle,
+    bool overwriteExisting = false,
+  }) => applySidecarSeriesCover(
+    db: _db,
+    storage: _storage,
+    coverEncoder: _coverEncoder,
+    imageBytes: imageBytes,
+    seriesId: seriesId,
+    seriesTitle: seriesTitle,
+    overwriteExisting: overwriteExisting,
+  );
+
+  /// 导入本地文件夹（支持文件夹内含多卷归档及同级侧车封面，或文件夹内直接放漫画图片页）。
   Future<LocalImportBatchResult> importDirectory(
     String directoryPath, {
     ImportProgressCallback? onProgress,
@@ -199,27 +216,26 @@ final class LocalComicImporter {
       );
     }
 
-    final childArchives = <PickedComicFile>[];
-    await for (final entity in sourceDir.list(followLinks: false)) {
-      if (entity is! File) continue;
-      final name = importBaseName(entity.path);
-      final lower = name.toLowerCase();
-      if (isNestedComicArchivePath(name) ||
-          lower.endsWith('.pdf') ||
-          lower.endsWith('.cbr') ||
-          lower.endsWith('.rar') ||
-          lower.endsWith('.cb7') ||
-          lower.endsWith('.7z')) {
-        childArchives.add(PickedComicFile.fromFile(entity, name: name));
-      }
-    }
-    if (childArchives.isNotEmpty) {
-      childArchives.sort((a, b) => naturalCompare(a.name, b.name));
-      return importArchiveFiles(
-        childArchives,
+    final scanned = await _scanDirectoryForArchivesAndCover(sourceDir);
+    if (scanned.archives.isNotEmpty) {
+      final result = await importArchiveFiles(
+        scanned.archives,
         parentFolderName: folderName,
         onProgress: onProgress,
       );
+      final sidecarCover = scanned.sidecarCover;
+      if (sidecarCover != null && result.importedSeriesIds.length == 1) {
+        try {
+          final bytes = await sidecarCover.readAsBytes();
+          await applySeriesCoverImage(
+            bytes,
+            seriesId: result.importedSeriesIds.single,
+          );
+        } on FileSystemException {
+          // 侧车封面读取失败不影响已导入分卷。
+        }
+      }
+      return result;
     }
 
     onProgress?.call(0, 1, folderName);
@@ -292,4 +308,32 @@ final class LocalComicImporter {
       );
     }
   }
+}
+
+Future<({List<PickedComicFile> archives, File? sidecarCover})>
+_scanDirectoryForArchivesAndCover(Directory sourceDir) async {
+  final archives = <PickedComicFile>[];
+  File? sidecarCover;
+  int? sidecarPrio;
+  await for (final entity in sourceDir.list(followLinks: false)) {
+    if (entity is! File) continue;
+    final name = importBaseName(entity.path);
+    final lower = name.toLowerCase();
+    if (isNestedComicArchivePath(name) ||
+        lower.endsWith('.pdf') ||
+        lower.endsWith('.cbr') ||
+        lower.endsWith('.rar') ||
+        lower.endsWith('.cb7') ||
+        lower.endsWith('.7z')) {
+      archives.add(PickedComicFile.fromFile(entity, name: name));
+      continue;
+    }
+    final prio = sidecarCoverPriority(name);
+    if (prio != null && (sidecarPrio == null || prio < sidecarPrio)) {
+      sidecarCover = entity;
+      sidecarPrio = prio;
+    }
+  }
+  archives.sort((a, b) => naturalCompare(a.name, b.name));
+  return (archives: archives, sidecarCover: sidecarCover);
 }

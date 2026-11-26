@@ -31,6 +31,27 @@ bool isSupportedComicImagePath(String rawPath) {
   return mediaTypeForPath(fileName) != null;
 }
 
+const Map<String, int> _sidecarCoverPriorityMap = <String, int>{
+  'cover': 0,
+  'folder': 1,
+  'poster': 2,
+};
+
+/// 判断文件名是否为约定命名的目录侧车封面（`cover.*` / `folder.*` / `poster.*`），
+/// 命中返回优先级（越小越优先），否则返回 `null`。
+int? sidecarCoverPriority(String rawPath) {
+  if (!isSupportedComicImagePath(rawPath)) return null;
+  final normalized = rawPath.replaceAll(r'\', '/').trim();
+  final fileName = normalized.split('/').last.toLowerCase();
+  final dot = fileName.lastIndexOf('.');
+  if (dot <= 0) return null;
+  return _sidecarCoverPriorityMap[fileName.substring(0, dot)];
+}
+
+/// 是否为侧车系列封面文件名（`cover.*` / `folder.*` / `poster.*`）。
+bool isSidecarCoverFileName(String rawPath) =>
+    sidecarCoverPriority(rawPath) != null;
+
 /// 根据路径后缀推导标准 MIME 类型；不支持的图片扩展名返回 `null`。
 String? mediaTypeForPath(String path) {
   final lower = path.toLowerCase();

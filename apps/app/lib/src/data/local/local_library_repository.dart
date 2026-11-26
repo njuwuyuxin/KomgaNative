@@ -165,12 +165,12 @@ final class LocalLibraryRepository implements LibraryRepository {
         reader = await FolderComicReader.open(dir, sniffDimensions: false);
       } else {
         final file = await _storage.resolveFile(row.relativePath);
-        reader = await ZipComicReader.open(
+        reader = await openComicArchive(
           await FileByteSource.open(file),
           sniffDimensions: false,
         );
       }
-      return await reader.readPage(1);
+      return await reader.readCoverImage() ?? await reader.readPage(1);
     } on Object {
       return null;
     } finally {

@@ -169,6 +169,9 @@ final class FolderComicReader implements ComicArchiveReader {
   }
 
   @override
+  Future<Uint8List?> readCoverImage() async => null;
+
+  @override
   Future<void> close() async {}
 
   static String _normalizeDirPath(String path) {

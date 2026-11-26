@@ -197,5 +197,93 @@ void main() {
       final series = (await db.queryLocalSeries()).items.single;
       expect(series.title, 'Bocchi');
     });
+
+    test('POST /api/upload 返回 seriesIds 且 /api/upload-series-cover 绑定系列封面不产生假书', () async {
+      final urls = await server.start(
+        bindAddress: InternetAddress.loopbackIPv4,
+        preferredPort: 0,
+        pin: '9988',
+      );
+      final base = Uri.parse(urls.single);
+
+      final htmlReq = await client.getUrl(base);
+      final htmlRes = await htmlReq.close();
+      final html = await utf8.decodeStream(htmlRes);
+      expect(html, contains('/api/upload-series-cover'));
+      expect(html, contains('SIDECAR_COVER_PRIO'));
+
+      final cbz = _buildCbz(<String, List<int>>{
+        '01.png': _fakePng(800, 1200),
+        '02.png': _fakePng(800, 1200),
+      });
+      final upReq = await client.postUrl(
+        base.resolve(
+          '/api/upload?name=Vol.1.cbz&parent=%E6%BB%85%E9%AC%BC%E4%B9%8B%E5%88%83',
+        ),
+      );
+      upReq.headers.set('x-yomu-pin', '9988');
+      upReq.add(cbz);
+      final upRes = await upReq.close();
+      final upJson =
+          jsonDecode(await utf8.decodeStream(upRes)) as Map<String, Object?>;
+      expect(upRes.statusCode, HttpStatus.ok);
+      final seriesIds = (upJson['seriesIds'] as List<Object?>).cast<String>();
+      expect(seriesIds, hasLength(1));
+
+      // 错 PIN 上传封面 -> 401
+      final badCoverReq = await client.postUrl(
+        base.resolve(
+          '/api/upload-series-cover?seriesId=${Uri.encodeComponent(seriesIds.single)}&name=cover.png',
+        ),
+      );
+      badCoverReq.headers.set('x-yomu-pin', '0000');
+      badCoverReq.add(_fakePng(600, 900));
+      final badCoverRes = await badCoverReq.close();
+      await badCoverRes.drain<void>();
+      expect(badCoverRes.statusCode, HttpStatus.unauthorized);
+
+      // 正确 PIN 上传 cover.png -> 绑定 customCoverPath 且不新增假书、不增加 receivedCount
+      final coverBytes = _fakePng(600, 900);
+      final coverReq = await client.postUrl(
+        base.resolve(
+          '/api/upload-series-cover?seriesId=${Uri.encodeComponent(seriesIds.single)}&name=cover.png',
+        ),
+      );
+      coverReq.headers.set('x-yomu-pin', '9988');
+      coverReq.add(coverBytes);
+      final coverRes = await coverReq.close();
+      final coverJson =
+          jsonDecode(await utf8.decodeStream(coverRes)) as Map<String, Object?>;
+      expect(coverRes.statusCode, HttpStatus.ok);
+      expect(coverJson['ok'], isTrue);
+      expect(coverJson['applied'], isTrue);
+      expect(server.receivedCount, 1);
+
+      final seriesRow = await db.localSeriesRowById(seriesIds.single);
+      expect(seriesRow?.customCoverPath, isNotNull);
+      final savedFile = File(
+        '${sandboxTemp.path}/${seriesRow!.customCoverPath}',
+      );
+      expect(savedFile.readAsBytesSync(), coverBytes);
+
+      final books = await db.queryLocalSeriesBooks(seriesIds.single);
+      expect(books.items, hasLength(1));
+
+      // 再次上传同名封面不会覆盖已有自定义封面
+      final secondCoverReq = await client.postUrl(
+        base.resolve(
+          '/api/upload-series-cover?seriesId=${Uri.encodeComponent(seriesIds.single)}&name=folder.png',
+        ),
+      );
+      secondCoverReq.headers.set('x-yomu-pin', '9988');
+      secondCoverReq.add(_fakePng(400, 600));
+      final secondCoverRes = await secondCoverReq.close();
+      final secondCoverJson = jsonDecode(
+        await utf8.decodeStream(secondCoverRes),
+      ) as Map<String, Object?>;
+      expect(secondCoverRes.statusCode, HttpStatus.ok);
+      expect(secondCoverJson['applied'], isFalse);
+      expect(savedFile.readAsBytesSync(), coverBytes);
+    });
   });
 }

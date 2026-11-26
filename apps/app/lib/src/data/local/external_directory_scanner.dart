@@ -110,6 +110,7 @@ final class ExternalDirectoryScanner {
     };
 
     final seenRelPaths = <String>{};
+    final dirToSeriesIds = <String, Set<String>>{};
     var added = 0;
     var updated = 0;
     var skipped = 0;
@@ -120,6 +121,7 @@ final class ExternalDirectoryScanner {
     for (var i = 0; i < archiveCandidates.length; i++) {
       final entry = archiveCandidates[i];
       seenRelPaths.add(entry.relativePath);
+      final dirKey = externalParentDirKey(entry.relativePath);
       onProgress?.call(
         ExternalScanProgress(
           rootId: root.id,
@@ -140,16 +142,20 @@ final class ExternalDirectoryScanner {
       if (unchanged) {
         skipped++;
         if (entry.isCloudPlaceholder) cloudPlaceholders++;
+        dirToSeriesIds
+            .putIfAbsent(dirKey, () => <String>{})
+            .add(existing.seriesId);
         continue;
       }
 
       try {
-        await _indexArchiveEntry(
+        final seriesId = await _indexArchiveEntry(
           root: root,
           entry: entry,
           existing: existing,
           nowOverride: nowOverride,
         );
+        dirToSeriesIds.putIfAbsent(dirKey, () => <String>{}).add(seriesId);
         if (entry.isCloudPlaceholder) cloudPlaceholders++;
         if (existing == null) {
           added++;
@@ -162,6 +168,16 @@ final class ExternalDirectoryScanner {
         failed++;
       }
     }
+
+    await applyExternalSidecarCovers(
+      db: _db,
+      storage: _storage,
+      bridge: _bridge,
+      coverEncoder: _coverEncoder,
+      root: root,
+      allEntries: entries,
+      dirToSeriesIds: dirToSeriesIds,
+    );
 
     // 清理外部已删除文件的索引行与缩略图缓存（绝不删外部源文件）。
     for (final row in existingRows) {
@@ -223,7 +239,7 @@ final class ExternalDirectoryScanner {
     return scanRoot(root, nowOverride: nowOverride);
   }
 
-  Future<void> _indexArchiveEntry({
+  Future<String> _indexArchiveEntry({
     required MountedExternalRoot root,
     required ExternalTreeEntry entry,
     required LocalBooksRow? existing,
@@ -238,7 +254,7 @@ final class ExternalDirectoryScanner {
     );
 
     if (entry.isCloudPlaceholder) {
-      await _db.insertImportedLocalBook(
+      final inserted = await _db.insertImportedLocalBook(
         LocalBookImportDraft(
           bookId: bookId,
           seriesIdOverride: existing?.seriesId,
@@ -260,7 +276,7 @@ final class ExternalDirectoryScanner {
         generateSeriesId: () => _nextId('s'),
         nowOverride: nowOverride,
       );
-      return;
+      return inserted.seriesId;
     }
 
     final useBridge = root.kind != ExternalRootKind.localDirectory;
@@ -281,7 +297,7 @@ final class ExternalDirectoryScanner {
         TarComicReader() => 'tar',
         _ => 'zip',
       };
-      await commitComicReaderToDatabase(
+      final committed = await commitComicReaderToDatabase(
         db: _db,
         storage: _storage,
         coverEncoder: _coverEncoder,
@@ -300,6 +316,7 @@ final class ExternalDirectoryScanner {
         sourceModifiedMs: entry.lastModifiedMs,
         nowOverride: nowOverride,
       );
+      return committed.seriesId;
     } finally {
       await reader.close();
     }

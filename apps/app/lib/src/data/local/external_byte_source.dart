@@ -1,7 +1,11 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:yomu/src/data/local/cover_thumbnail_generator.dart';
 import 'package:yomu/src/data/local/external_roots_dao.dart';
+import 'package:yomu/src/data/local/local_catalog_edit_dao.dart';
+import 'package:yomu/src/data/local/local_comic_importer_models.dart';
+import 'package:yomu/src/data/local/local_comics_storage.dart';
 import 'package:yomu/src/data/local/native_pdf_reader.dart';
 import 'package:yomu/src/data/progress/progress_database.dart';
 import 'package:yomu_local_archive/yomu_local_archive.dart';
@@ -134,4 +138,77 @@ Future<ComicArchiveReader> openExternalComicReader({
   return entries.isNotEmpty
       ? ZipComicReader.fromIndexedPages(source, entries)
       : openComicArchive(source);
+}
+
+const int _maxExternalSidecarCoverBytes = 20 * 1024 * 1024;
+
+/// 将外部挂载目录中的同级侧车封面（`cover.*` / `folder.*` / `poster.*`）绑定到对应单一本地系列。
+Future<void> applyExternalSidecarCovers({
+  required ProgressDatabase db,
+  required LocalComicsStorage storage,
+  required ExternalRootsBridge bridge,
+  required CoverThumbnailEncoder coverEncoder,
+  required MountedExternalRoot root,
+  required List<ExternalTreeEntry> allEntries,
+  required Map<String, Set<String>> dirToSeriesIds,
+}) async {
+  final sidecars = <String, ({ExternalTreeEntry entry, int prio})>{};
+  for (final e in allEntries) {
+    if (e.isDirectory || e.isCloudPlaceholder) continue;
+    final prio = sidecarCoverPriority(e.name);
+    if (prio == null) continue;
+    final dirKey = externalParentDirKey(e.relativePath);
+    if (dirKey.isEmpty) continue;
+    final prev = sidecars[dirKey];
+    if (prev == null || prio < prev.prio) {
+      sidecars[dirKey] = (entry: e, prio: prio);
+    }
+  }
+  for (final pair in sidecars.entries) {
+    final seriesIds = dirToSeriesIds[pair.key];
+    if (seriesIds == null || seriesIds.length != 1) continue;
+    final seriesId = seriesIds.single;
+    final target = await db.findLocalSeriesForSidecarCover(seriesId: seriesId);
+    if (target == null) continue;
+    final bytes = await _readExternalSmallFile(bridge, root, pair.value.entry);
+    if (bytes == null || bytes.isEmpty) continue;
+    await applySidecarSeriesCover(
+      db: db,
+      storage: storage,
+      coverEncoder: coverEncoder,
+      imageBytes: bytes,
+      seriesId: seriesId,
+    );
+  }
+}
+
+String externalParentDirKey(String relPath) {
+  final norm = relPath.replaceAll(r'\', '/');
+  final parts = norm.split('/').where((s) => s.isNotEmpty).toList();
+  if (parts.length < 2) return '';
+  return parts.sublist(0, parts.length - 1).join('/');
+}
+
+Future<Uint8List?> _readExternalSmallFile(
+  ExternalRootsBridge bridge,
+  MountedExternalRoot root,
+  ExternalTreeEntry entry,
+) async {
+  try {
+    if (root.kind == ExternalRootKind.localDirectory) {
+      final file = File(entry.uri);
+      final len = await file.length();
+      if (len <= 0 || len > _maxExternalSidecarCoverBytes) return null;
+      return await file.readAsBytes();
+    }
+    final len = entry.sizeBytes > 0
+        ? entry.sizeBytes
+        : await bridge.fileLength(entry.uri, root: root);
+    if (len == null || len <= 0 || len > _maxExternalSidecarCoverBytes) {
+      return null;
+    }
+    return await bridge.readFileRange(entry.uri, 0, len, root: root);
+  } on FileSystemException {
+    return null;
+  }
 }

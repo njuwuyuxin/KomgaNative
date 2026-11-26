@@ -141,9 +141,85 @@ void main() {
         ]);
 
         expect(await reader.readPage(2), img2);
+        expect(await reader.readCoverImage(), isNull);
         await reader.close();
       },
     );
+
+    test('支持 OPF 声明独立 cover-image（未出现在 spine 正文页中）且不污染页表', () async {
+      final coverImg = _fakePng(600, 900);
+      final page1 = _fakePng(800, 1200);
+      final page2 = _fakePng(800, 1200);
+      final epubBytes = buildTestZip(<TestZipEntrySpec>[
+        TestZipEntrySpec(
+          name: 'mimetype',
+          data: utf8.encode('application/epub+zip'),
+        ),
+        TestZipEntrySpec(
+          name: 'META-INF/container.xml',
+          data: utf8.encode(
+            '<container><rootfiles><rootfile full-path="OEBPS/content.opf"/></rootfiles></container>',
+          ),
+        ),
+        TestZipEntrySpec(
+          name: 'OEBPS/content.opf',
+          data: utf8.encode('''
+<package version="3.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title>滅鬼之刃, Vol. 1</dc:title>
+    <meta property="belongs-to-collection">滅鬼之刃</meta>
+    <meta property="group-position">1</meta>
+    <meta name="cover" content="cover-image"/>
+  </metadata>
+  <manifest>
+    <item id="cover-image" href="images/cover.png" media-type="image/png" properties="cover-image"/>
+    <item id="p1" href="text/p0001.xhtml" media-type="application/xhtml+xml"/>
+    <item id="p2" href="text/p0002.xhtml" media-type="application/xhtml+xml"/>
+    <item id="i1" href="images/p0001.png" media-type="image/png"/>
+    <item id="i2" href="images/p0002.png" media-type="image/png"/>
+  </manifest>
+  <spine page-progression-direction="rtl">
+    <itemref idref="p1"/>
+    <itemref idref="p2"/>
+  </spine>
+</package>'''),
+        ),
+        TestZipEntrySpec(
+          name: 'OEBPS/text/p0001.xhtml',
+          data: utf8.encode(
+            '<html><body><img src="../images/p0001.png"/></body></html>',
+          ),
+        ),
+        TestZipEntrySpec(
+          name: 'OEBPS/text/p0002.xhtml',
+          data: utf8.encode(
+            '<html><body><img src="../images/p0002.png"/></body></html>',
+          ),
+        ),
+        TestZipEntrySpec(name: 'OEBPS/images/cover.png', data: coverImg),
+        TestZipEntrySpec(name: 'OEBPS/images/p0001.png', data: page1),
+        TestZipEntrySpec(name: 'OEBPS/images/p0002.png', data: page2),
+      ]);
+
+      final reader = await openComicArchive(MemoryByteSource(epubBytes));
+      expect(reader, isA<EpubComicReader>());
+      expect(reader.pages, hasLength(2));
+      expect(reader.embeddedMetadata?.frontCoverPageIndex, isNull);
+      expect(await reader.readCoverImage(), coverImg);
+      expect(await reader.readPage(1), page1);
+      await reader.close();
+    });
+
+    test('sidecarCoverPriority 识别 cover/folder/poster 并排除非图片与隐藏项', () {
+      expect(sidecarCoverPriority('cover.jpg'), 0);
+      expect(sidecarCoverPriority('FOLDER.PNG'), 1);
+      expect(sidecarCoverPriority('Poster.webp'), 2);
+      expect(isSidecarCoverFileName('sub/cover.jpeg'), isTrue);
+      expect(sidecarCoverPriority('001.jpg'), isNull);
+      expect(sidecarCoverPriority('cover.txt'), isNull);
+      expect(sidecarCoverPriority('.cover.jpg'), isNull);
+      expect(sidecarCoverPriority('__MACOSX/cover.jpg'), isNull);
+    });
 
     test('解析 EPUB2 toc.ncx 与 Calibre 系列元数据', () async {
       final p1 = _fakePng(800, 1200);

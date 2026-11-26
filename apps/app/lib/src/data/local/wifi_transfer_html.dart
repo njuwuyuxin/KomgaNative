@@ -66,6 +66,7 @@ String buildWifiTransferHtml({required bool pinRequired}) {
 <script>
 const ARCHIVE_RE = /\\.(cbz|zip|epub|cbt|tar|pdf|cbr|rar|cb7|7z)\$/i;
 const IMAGE_RE = /\\.(jpe?g|png|webp|gif|bmp|avif|heic|jxl)\$/i;
+const SIDECAR_COVER_PRIO = { cover: 0, folder: 1, poster: 2 };
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
 const folderInput = document.getElementById('folderInput');
@@ -140,33 +141,80 @@ function sendStream(url, file, onProgress) {
   });
 }
 
+function sidecarCoverPrio(name) {
+  if (!IMAGE_RE.test(name)) return -1;
+  const dot = name.lastIndexOf('.');
+  const stem = (dot > 0 ? name.slice(0, dot) : name).toLowerCase();
+  return Object.prototype.hasOwnProperty.call(SIDECAR_COVER_PRIO, stem) ? SIDECAR_COVER_PRIO[stem] : -1;
+}
+
 async function processBatch(entries) {
   const archives = [];
-  const imageFolders = new Map();
+  const archiveDirs = new Set();
+  const imageCandidates = [];
   for (const item of entries) {
     const clean = item.relPath.replace(/\\\\/g, '/');
     const parts = clean.split('/').filter(Boolean);
+    if (!parts.length || parts.some(p => p.startsWith('.') || p === '__MACOSX')) continue;
     const name = parts[parts.length - 1] || item.file.name;
-    if (name.startsWith('.')) continue;
+    const dirPath = parts.length >= 2 ? parts.slice(0, -1).join('/') : '';
+    const parent = parts.length >= 2 ? parts[parts.length - 2] : '';
     if (ARCHIVE_RE.test(name)) {
-      const parent = parts.length >= 2 ? parts[parts.length - 2] : '';
-      archives.push({ file: item.file, name, parent });
+      archives.push({ file: item.file, name, parent, dirPath });
+      archiveDirs.add(dirPath);
     } else if (IMAGE_RE.test(name) || name.toLowerCase() === 'comicinfo.xml') {
-      const folder = parts.length >= 2 ? parts[0] : 'Uploaded Comic';
-      const innerPath = parts.length >= 2 ? parts.slice(1).join('/') : name;
-      if (!imageFolders.has(folder)) imageFolders.set(folder, []);
-      imageFolders.get(folder).push({ file: item.file, innerPath });
+      imageCandidates.push({ file: item.file, parts, name, dirPath, parent });
     }
   }
+  const seriesCovers = new Map();
+  const imageFolders = new Map();
+  for (const img of imageCandidates) {
+    if (archiveDirs.has(img.dirPath)) {
+      const prio = sidecarCoverPrio(img.name);
+      if (prio >= 0) {
+        const prev = seriesCovers.get(img.dirPath);
+        if (!prev || prio < prev.prio) {
+          seriesCovers.set(img.dirPath, { file: img.file, name: img.name, seriesName: img.parent, prio });
+        }
+      }
+      continue;
+    }
+    const folder = img.parts.length >= 2 ? img.parts[0] : 'Uploaded Comic';
+    const innerPath = img.parts.length >= 2 ? img.parts.slice(1).join('/') : img.name;
+    if (!imageFolders.has(folder)) imageFolders.set(folder, []);
+    imageFolders.get(folder).push({ file: img.file, innerPath });
+  }
+  const dirSeriesIds = new Map();
   for (const a of archives) {
     const row = createRow(a.name);
     try {
       const q = '/api/upload?name=' + encodeURIComponent(a.name) + (a.parent ? '&parent=' + encodeURIComponent(a.parent) : '');
       const res = await sendStream(q, a.file, p => row.setProgress(p));
       if (res.status === 401) row.setError('PIN 错误 / Invalid PIN');
-      else if (res.status >= 200 && res.status < 300 && res.data.ok) row.setDone('已导入 ' + (res.data.importedCount || 1) + ' 册');
-      else row.setError(res.data.error || ('HTTP ' + res.status));
+      else if (res.status >= 200 && res.status < 300 && res.data.ok) {
+        row.setDone('已导入 ' + (res.data.importedCount || 1) + ' 册');
+        const ids = Array.isArray(res.data.seriesIds) ? res.data.seriesIds : [];
+        if (ids.length) {
+          if (!dirSeriesIds.has(a.dirPath)) dirSeriesIds.set(a.dirPath, new Set());
+          ids.forEach(id => dirSeriesIds.get(a.dirPath).add(id));
+        }
+      } else row.setError(res.data.error || ('HTTP ' + res.status));
     } catch (e) { row.setError('上传失败'); }
+  }
+  for (const [dirPath, cov] of seriesCovers.entries()) {
+    const ids = Array.from(dirSeriesIds.get(dirPath) || []);
+    if (ids.length !== 1) continue;
+    const row = createRow(cov.name);
+    try {
+      const q = '/api/upload-series-cover?seriesId=' + encodeURIComponent(ids[0]) +
+        (cov.seriesName ? '&series=' + encodeURIComponent(cov.seriesName) : '') +
+        '&name=' + encodeURIComponent(cov.name);
+      const res = await sendStream(q, cov.file, p => row.setProgress(p));
+      if (res.status === 401) row.setError('PIN 错误 / Invalid PIN');
+      else if (res.status >= 200 && res.status < 300 && res.data.ok) {
+        row.setDone(res.data.applied ? '已设为系列封面' : '已跳过（保留现有封面）');
+      } else row.setError(res.data.error || ('HTTP ' + res.status));
+    } catch (e) { row.setError('封面上传失败'); }
   }
   for (const [folder, items] of imageFolders.entries()) {
     const row = createRow(folder + ' (' + items.length + ' files)');

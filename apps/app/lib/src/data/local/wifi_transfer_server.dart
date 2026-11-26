@@ -154,7 +154,8 @@ final class WifiTransferServer {
       if (request.method == 'POST' &&
           (path == '/api/upload' ||
               path == '/api/upload-image' ||
-              path == '/api/commit-folder')) {
+              path == '/api/commit-folder' ||
+              path == '/api/upload-series-cover')) {
         if (!_checkPin(request)) {
           await writeWifiJson(
             request.response,
@@ -173,6 +174,13 @@ final class WifiTransferServer {
           );
         } else if (path == '/api/upload-image') {
           await handleWifiImageUpload(request: request, staging: staging);
+        } else if (path == '/api/upload-series-cover') {
+          await handleWifiSeriesCoverUpload(
+            request: request,
+            importer: _importer,
+            staging: staging,
+            emit: _emit,
+          );
         } else {
           _receivedCount += await handleWifiCommitFolder(
             request: request,
