@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu_domain/yomu_domain.dart';
@@ -10,6 +9,7 @@ import 'package:yomu/src/screens/library_screen.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_library.dart';
+import 'support/test_source_overrides.dart';
 
 /// LIB-01：书架大标题 + 系列数 + 生效中的筛选条件（可单独清除）。
 void main() {
@@ -22,15 +22,14 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       ProviderScope(
-        overrides: <Override>[
-          libraryRepositoryProvider.overrideWithValue(
-            repository ??
-                FakeLibraryRepository(
-                  series: demoShelf(),
-                  libraries: demoLibraries(),
-                ),
-          ),
-        ],
+        overrides: testSourceOverrides(
+          library:
+              repository ??
+              FakeLibraryRepository(
+                series: demoShelf(),
+                libraries: demoLibraries(),
+              ),
+        ),
         child: MaterialApp(
           locale: const Locale('en'),
           localizationsDelegates: appLocalizationsDelegates,

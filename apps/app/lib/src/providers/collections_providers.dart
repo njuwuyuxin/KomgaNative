@@ -15,8 +15,6 @@ const int _kAllMaxPages = 20;
 /// 收藏集与阅读列表仓库（跟随当前激活内容源：本机或 Komga 服务器）。
 final Provider<CollectionsRepository> collectionsRepositoryProvider =
     Provider<CollectionsRepository>((Ref ref) {
-      final lib = ref.watch(libraryRepositoryProvider);
-      if (lib is CollectionsRepository) return lib as CollectionsRepository;
       return ref.watch(activeSourceBundleProvider).collections;
     });
 

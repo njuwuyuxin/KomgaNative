@@ -6,12 +6,13 @@ import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/l10n/l10n.dart';
 import 'package:yomu/src/data/settings_store.dart';
-import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/settings_provider.dart';
+import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/screens/library_screen.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_library.dart';
+import 'support/test_source_overrides.dart';
 
 /// LIB-04：筛选菜单里的"保存当前筛选"与已保存组合的应用。
 void main() {
@@ -25,7 +26,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: <Override>[
-          libraryRepositoryProvider.overrideWithValue(repository),
+          ...testSourceOverrides(library: repository),
           settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
         ],
         child: MaterialApp(

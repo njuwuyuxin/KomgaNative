@@ -63,19 +63,9 @@ final Provider<DownloadService> downloadServiceProvider =
 /// 按显式 `sourceKey` 路由获取对应内容源的 [DownloadService]（P1-2）。
 final downloadServiceForSourceProvider =
     Provider.family<DownloadService, String?>((Ref ref, String? sourceKey) {
-      final primary = ref.watch(downloadServiceProvider);
-      if (sourceKey == null || sourceKey.isEmpty) return primary;
-      final defaultScope = ref.watch(downloadScopeProvider);
-      final defaultBundleService = defaultScope.isEmpty
-          ? const NoopDownloadService()
-          : (ref
-                    .watch(sourceRegistryProvider)
-                    .remoteBundleOrNull(defaultScope)
-                    ?.download ??
-                const NoopDownloadService());
-      // 单测显式 override 了 downloadServiceProvider 时保留被测替身。
-      if (!identical(primary, defaultBundleService)) return primary;
-      if (sourceKey == defaultScope) return primary;
+      if (sourceKey == null || sourceKey.isEmpty) {
+        return ref.watch(downloadServiceProvider);
+      }
       return ref
               .watch(sourceRegistryProvider)
               .bundleOrNull(sourceKey)

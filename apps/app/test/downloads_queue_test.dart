@@ -10,13 +10,15 @@ import 'package:yomu/src/data/download/download_service.dart';
 import 'package:yomu/src/providers/cache_providers.dart';
 import 'package:yomu/src/providers/download_providers.dart';
 
+import 'support/test_source_overrides.dart';
+
 /// UI-P3-13：下载队列一次只跑一本，后面的显示"排队中"。
 void main() {
   test('两本书依次下载：第二本先排队，第一本完成后才开始', () async {
     final service = _QueueDownloadService();
     final container = ProviderContainer(
       overrides: <Override>[
-        downloadServiceProvider.overrideWithValue(service),
+        ...testSourceOverrides(download: service),
         httpCacheDatabaseProvider.overrideWithValue(
           HttpCacheDatabase(NativeDatabase.memory()),
         ),
@@ -51,7 +53,7 @@ void main() {
       final first = _BlockingDownloadService();
       final firstContainer = ProviderContainer(
         overrides: <Override>[
-          downloadServiceProvider.overrideWithValue(first),
+          ...testSourceOverrides(download: first),
           httpCacheDatabaseProvider.overrideWithValue(db),
         ],
       );
@@ -60,14 +62,17 @@ void main() {
           .start(_book('b1'));
       await _drain();
       expect(first.order, <String>['b1']);
-      expect((await db.downloadQueue()).single.bookId, 'b1');
+      expect(
+        (await db.downloadQueue(scope: kTestKomgaSourceKey)).single.bookId,
+        'b1',
+      );
       firstContainer.dispose();
 
       // 重启：同一个库，新的 service。应当自动恢复并下完。
       final second = _OkDownloadService();
       final secondContainer = ProviderContainer(
         overrides: <Override>[
-          downloadServiceProvider.overrideWithValue(second),
+          ...testSourceOverrides(download: second),
           httpCacheDatabaseProvider.overrideWithValue(db),
         ],
       );
@@ -78,7 +83,11 @@ void main() {
 
       expect(second.order, <String>['b1'], reason: '重启后自动接着下');
       expect(secondContainer.read(downloadsProvider), isEmpty);
-      expect(await db.downloadQueue(), isEmpty, reason: '下完要把队列行删掉');
+      expect(
+        await db.downloadQueue(scope: kTestKomgaSourceKey),
+        isEmpty,
+        reason: '下完要把队列行删掉',
+      );
 
       // 第一次那个 future 不会再完成，但也不能留下未捕获异常。
       starting.ignore();
@@ -88,12 +97,14 @@ void main() {
       final db = HttpCacheDatabase(NativeDatabase.memory());
       addTearDown(db.close);
       await db.markDownloaded(
+        scope: kTestKomgaSourceKey,
         bookId: 'b1',
         seriesId: 's1',
         pageCount: 3,
         bytes: 100,
       );
       await db.enqueueDownload(
+        scope: kTestKomgaSourceKey,
         bookId: 'b1',
         seriesId: 's1',
         name: 'b1',
@@ -104,7 +115,7 @@ void main() {
       final service = _QueueDownloadService();
       final container = ProviderContainer(
         overrides: <Override>[
-          downloadServiceProvider.overrideWithValue(service),
+          ...testSourceOverrides(download: service),
           httpCacheDatabaseProvider.overrideWithValue(db),
         ],
       );
@@ -113,7 +124,11 @@ void main() {
       await _drain();
 
       expect(service.order, isEmpty);
-      expect(await db.downloadQueue(), isEmpty, reason: '残留行要清掉');
+      expect(
+        await db.downloadQueue(scope: kTestKomgaSourceKey),
+        isEmpty,
+        reason: '残留行要清掉',
+      );
       expect(container.read(downloadsProvider), isEmpty);
     });
 
@@ -123,7 +138,7 @@ void main() {
       final service = _BlockingDownloadService();
       final container = ProviderContainer(
         overrides: <Override>[
-          downloadServiceProvider.overrideWithValue(service),
+          ...testSourceOverrides(download: service),
           httpCacheDatabaseProvider.overrideWithValue(db),
         ],
       );
@@ -141,7 +156,7 @@ void main() {
 
       expect(service.cancelled, containsAll(<String>['b1', 'b2']));
       expect(container.read(downloadsProvider), isEmpty);
-      expect(await db.downloadQueue(), isEmpty);
+      expect(await db.downloadQueue(scope: kTestKomgaSourceKey), isEmpty);
       running.ignore();
       queued.ignore();
     });

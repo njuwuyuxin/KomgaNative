@@ -1,12 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/l10n/l10n.dart';
-import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/screens/library_screen.dart';
 import 'package:yomu/src/screens/series_detail_screen.dart';
 import 'package:yomu/src/widgets/phase_fade.dart';
@@ -14,6 +12,7 @@ import 'package:yomu/src/widgets/series_hero_tag.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_library.dart';
+import 'support/test_source_overrides.dart';
 
 /// UI-P2-1 封面质感 / UI-P2-2 Hero / UI-P2-3 转场与大标题 / UI-P2-8 骨架与三态过渡。
 void main() {
@@ -28,11 +27,9 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       ProviderScope(
-        overrides: <Override>[
-          libraryRepositoryProvider.overrideWithValue(
-            repository ?? FakeLibraryRepository(series: demoShelf()),
-          ),
-        ],
+        overrides: testSourceOverrides(
+          library: repository ?? FakeLibraryRepository(series: demoShelf()),
+        ),
         child: MaterialApp(
           // 每次 pump 都换一份 key：否则 `AnimatedTheme` 会在两套主题之间插值，
           // 中途 `AppTheme.isEink` 还是 false（踩过一次，微光断言会飘）。

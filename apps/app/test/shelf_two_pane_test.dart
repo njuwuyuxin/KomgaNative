@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu/l10n/app_localizations.dart';
@@ -9,6 +8,7 @@ import 'package:yomu/src/screens/library_screen.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_library.dart';
+import 'support/test_source_overrides.dart';
 
 /// PLT-01：平板（≥1024）书架两栏，手机不变。
 void main() {
@@ -21,14 +21,12 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       ProviderScope(
-        overrides: <Override>[
-          libraryRepositoryProvider.overrideWithValue(
-            FakeLibraryRepository(
-              series: demoShelf(),
-              libraries: demoLibraries(),
-            ),
+        overrides: testSourceOverrides(
+          library: FakeLibraryRepository(
+            series: demoShelf(),
+            libraries: demoLibraries(),
           ),
-        ],
+        ),
         child: MaterialApp(
           locale: const Locale('en'),
           localizationsDelegates: appLocalizationsDelegates,

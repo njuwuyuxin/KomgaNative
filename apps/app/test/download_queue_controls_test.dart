@@ -10,9 +10,9 @@ import 'package:yomu/src/data/download/download_service.dart';
 import 'package:yomu/src/data/shelf_failure.dart';
 import 'package:yomu/src/providers/cache_providers.dart';
 import 'package:yomu/src/providers/download_providers.dart';
-import 'package:yomu/src/providers/library_providers.dart';
 
 import 'support/fake_library.dart';
+import 'support/test_source_overrides.dart';
 
 /// DLD-02：队列的暂停/继续、重试失败、取消。
 void main() {
@@ -36,9 +36,8 @@ void main() {
     db = HttpCacheDatabase(NativeDatabase.memory());
     container = ProviderContainer(
       overrides: <Override>[
-        downloadServiceProvider.overrideWithValue(service),
+        ...testSourceOverrides(library: repository, download: service),
         httpCacheDatabaseProvider.overrideWithValue(db),
-        libraryRepositoryProvider.overrideWithValue(repository),
       ],
     );
     addTearDown(container.dispose);

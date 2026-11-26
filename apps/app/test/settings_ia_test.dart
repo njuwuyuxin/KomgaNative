@@ -7,7 +7,6 @@ import 'package:yomu/l10n/l10n.dart';
 import 'package:yomu/src/data/reader_prefs.dart';
 import 'package:yomu/src/data/reader_prefs_store.dart';
 import 'package:yomu/src/data/settings_store.dart';
-import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/reader_prefs_provider.dart';
 import 'package:yomu/src/providers/settings_provider.dart';
 import 'package:yomu/src/screens/settings_screen.dart';
@@ -15,6 +14,7 @@ import 'package:yomu/src/session/session_controller.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_library.dart';
+import 'support/test_source_overrides.dart';
 
 /// SET-01：设置页的分组与"阅读默认值/书架默认值"提升。
 void main() {
@@ -32,8 +32,8 @@ void main() {
         overrides: <Override>[
           settingsStoreProvider.overrideWithValue(settingsStore),
           readerPrefsStoreProvider.overrideWithValue(prefsStore),
-          libraryRepositoryProvider.overrideWithValue(
-            FakeLibraryRepository(series: demoShelf()),
+          ...testSourceOverrides(
+            library: FakeLibraryRepository(series: demoShelf()),
           ),
         ],
         child: MaterialApp(

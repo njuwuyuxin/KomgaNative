@@ -1,13 +1,11 @@
 import 'dart:math' as math;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/l10n/l10n.dart';
-import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/screens/collection_detail_screen.dart';
 import 'package:yomu/src/screens/collections_screen.dart';
 import 'package:yomu/src/screens/readlist_detail_screen.dart';
@@ -15,6 +13,7 @@ import 'package:yomu/src/screens/search_screen.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_library.dart';
+import 'support/test_source_overrides.dart';
 
 /// FIX-08：收藏集 / 阅读列表 / 搜索以前固定只取 20 条，第 21 条起静默消失。
 void main() {
@@ -26,9 +25,7 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       ProviderScope(
-        overrides: <Override>[
-          libraryRepositoryProvider.overrideWithValue(_PagedRepository()),
-        ],
+        overrides: testSourceOverrides(library: _PagedRepository()),
         child: MaterialApp(
           locale: const Locale('en'),
           localizationsDelegates: appLocalizationsDelegates,

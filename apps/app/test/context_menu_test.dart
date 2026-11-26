@@ -1,16 +1,15 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/l10n/l10n.dart';
 import 'package:yomu/src/data/shelf_failure.dart';
-import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/screens/library_screen.dart';
 import 'package:yomu/src/screens/series_detail_screen.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_library.dart';
+import 'support/test_source_overrides.dart';
 
 /// UI-P2-5：长按上下文菜单 + 单本书标记已读/未读。
 void main() {
@@ -25,9 +24,7 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       ProviderScope(
-        overrides: <Override>[
-          libraryRepositoryProvider.overrideWithValue(library),
-        ],
+        overrides: testSourceOverrides(library: library),
         child: MaterialApp(
           key: UniqueKey(),
           locale: const Locale('en'),
@@ -107,9 +104,7 @@ void main() {
       addTearDown(tester.view.reset);
       await tester.pumpWidget(
         ProviderScope(
-          overrides: <Override>[
-            libraryRepositoryProvider.overrideWithValue(library),
-          ],
+          overrides: testSourceOverrides(library: library),
           child: MaterialApp(
             locale: const Locale('en'),
             localizationsDelegates: appLocalizationsDelegates,

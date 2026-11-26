@@ -14,6 +14,8 @@ import 'package:yomu/src/providers/download_providers.dart';
 import 'package:yomu/src/providers/settings_provider.dart';
 import 'package:yomu_platform/yomu_platform.dart';
 
+import 'support/test_source_overrides.dart';
+
 /// DLD-01：下载设置（仅 Wi-Fi / 读完自动删除 / 并发数）。
 void main() {
   group('AppSettings 下载设置', () {
@@ -100,7 +102,7 @@ void main() {
       addTearDown(db.close);
       final container = ProviderContainer(
         overrides: <Override>[
-          downloadServiceProvider.overrideWithValue(service),
+          ...testSourceOverrides(download: service),
           httpCacheDatabaseProvider.overrideWithValue(db),
           settingsStoreProvider.overrideWithValue(
             InMemorySettingsStore(
@@ -152,7 +154,7 @@ void main() {
       addTearDown(db.close);
       final container = ProviderContainer(
         overrides: <Override>[
-          downloadServiceProvider.overrideWithValue(service),
+          ...testSourceOverrides(download: service),
           httpCacheDatabaseProvider.overrideWithValue(db),
           networkProbeProvider.overrideWithValue(
             const _FixedProbe(NetworkKind.cellular),

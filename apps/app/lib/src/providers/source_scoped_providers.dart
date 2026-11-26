@@ -13,72 +13,46 @@ import 'package:yomu/src/providers/source_registry_provider.dart';
 /// 按显式 `sourceKey` 解析内容源静态能力位（P1-1）。
 ///
 /// UI 与业务层一律基于 [SourceCapabilities] 判断是否展示下载、离线标识、本地编辑等能力，
-/// 绝不嗅探实体 ID 前缀。
+/// 绝不嗅探实体 ID 前缀；未知或已移除的远程 `sourceKey` 统一降级为 [SourceCapabilities.none]。
 final sourceCapabilitiesForKeyProvider =
     Provider.family<SourceCapabilities, String?>((Ref ref, String? sourceKey) {
       if (sourceKey != null && sourceKey.isNotEmpty) {
-        if (isLocalSourceKey(sourceKey)) {
-          return SourceCapabilities.local;
-        }
         final registry = ref.watch(sourceRegistryProvider);
+        if (isLocalSourceKey(sourceKey)) {
+          return registry.localBundle.source.capabilities;
+        }
         for (final source in registry.sources) {
           if (source.sourceKey == sourceKey) return source.capabilities;
         }
         return SourceCapabilities.none;
       }
-      final active = ref.watch(activeSourceProvider);
-      if (active.isCloud) return active.capabilities;
-      // 兼容未配置远程服务器、仅通过 override 注入假仓库的单测与黄金图。
-      final activeBundle = ref.watch(activeSourceBundleProvider);
-      final primaryLibrary = ref.watch(libraryRepositoryProvider);
-      final primaryReader = ref.watch(readerRepositoryProvider);
-      if (!identical(primaryLibrary, activeBundle.library) ||
-          !identical(primaryReader, activeBundle.reader)) {
-        return SourceCapabilities.komga;
-      }
-      return active.capabilities;
+      return ref.watch(activeSourceProvider).capabilities;
     });
 
 /// 根据实体携带的 `entitySourceKey` 与当前作用域 `scopedSourceKey` 解析能力位。
 ///
-/// - 有显式作用域或实体为云端源时直接按其 `sourceKey` 解析；
-/// - 生产环境无覆写仓库时直接按实体 `sourceKey` 解析（确保跨源列表中的本机书仍使用本机能力）；
-/// - 仅在单测通过 override 注入假仓库且未指定作用域时，按 [sourceCapabilitiesForKeyProvider] 回退。
+/// 有显式作用域时优先按 `scopedSourceKey` 解析，否则按实体自身的 `entitySourceKey` 解析。
 final sourceCapabilitiesForItemProvider =
     Provider.family<
       SourceCapabilities,
       ({String? scopedSourceKey, String entitySourceKey})
     >((Ref ref, ({String? scopedSourceKey, String entitySourceKey}) query) {
       final scoped = query.scopedSourceKey;
-      if (scoped != null && scoped.isNotEmpty) {
-        return ref.watch(sourceCapabilitiesForKeyProvider(scoped));
-      }
-      if (!isLocalSourceKey(query.entitySourceKey)) {
-        return ref.watch(
-          sourceCapabilitiesForKeyProvider(query.entitySourceKey),
-        );
-      }
-      final activeBundle = ref.watch(activeSourceBundleProvider);
-      final primaryLibrary = ref.watch(libraryRepositoryProvider);
-      if (!identical(primaryLibrary, activeBundle.library)) {
-        return ref.watch(sourceCapabilitiesForKeyProvider(null));
-      }
-      return ref.watch(sourceCapabilitiesForKeyProvider(query.entitySourceKey));
+      final targetKey = (scoped != null && scoped.isNotEmpty)
+          ? scoped
+          : query.entitySourceKey;
+      return ref.watch(sourceCapabilitiesForKeyProvider(targetKey));
     });
 
 /// 按显式 `sourceKey` 解析 [LibraryRepository]。
 ///
-/// - `sourceKey` 为空或等于当前激活源时返回 [libraryRepositoryProvider]；
-/// - 若单测显式 override 了 [libraryRepositoryProvider]（不再与激活源 bundle 相同），
-///   保留被测 fake 不被绕过；
-/// - 否则通过 [sourceRegistryProvider] 按 `sourceKey` 精确路由，不依赖嵌套 `ProviderScope`。
+/// `sourceKey` 为空时返回当前激活源的 [libraryRepositoryProvider]；
+/// 否则直接经 [sourceRegistryProvider] 精确路由，未知源返回 [MissingSourceRepository]。
 final libraryRepositoryForSourceProvider =
     Provider.family<LibraryRepository, String?>((Ref ref, String? sourceKey) {
-      final primary = ref.watch(libraryRepositoryProvider);
-      if (sourceKey == null || sourceKey.isEmpty) return primary;
-      final activeBundle = ref.watch(activeSourceBundleProvider);
-      if (!identical(primary, activeBundle.library)) return primary;
-      if (sourceKey == activeBundle.source.sourceKey) return primary;
+      if (sourceKey == null || sourceKey.isEmpty) {
+        return ref.watch(libraryRepositoryProvider);
+      }
       return ref
               .watch(sourceRegistryProvider)
               .bundleOrNull(sourceKey)
@@ -89,11 +63,9 @@ final libraryRepositoryForSourceProvider =
 /// 按显式 `sourceKey` 解析 [ReaderRepository]。
 final readerRepositoryForSourceProvider =
     Provider.family<ReaderRepository, String?>((Ref ref, String? sourceKey) {
-      final primary = ref.watch(readerRepositoryProvider);
-      if (sourceKey == null || sourceKey.isEmpty) return primary;
-      final activeBundle = ref.watch(activeSourceBundleProvider);
-      if (!identical(primary, activeBundle.reader)) return primary;
-      if (sourceKey == activeBundle.source.sourceKey) return primary;
+      if (sourceKey == null || sourceKey.isEmpty) {
+        return ref.watch(readerRepositoryProvider);
+      }
       return ref
               .watch(sourceRegistryProvider)
               .bundleOrNull(sourceKey)
@@ -107,11 +79,9 @@ final collectionsRepositoryForSourceProvider =
       Ref ref,
       String? sourceKey,
     ) {
-      final primary = ref.watch(collectionsRepositoryProvider);
-      if (sourceKey == null || sourceKey.isEmpty) return primary;
-      final activeBundle = ref.watch(activeSourceBundleProvider);
-      if (!identical(primary, activeBundle.collections)) return primary;
-      if (sourceKey == activeBundle.source.sourceKey) return primary;
+      if (sourceKey == null || sourceKey.isEmpty) {
+        return ref.watch(collectionsRepositoryProvider);
+      }
       return ref
               .watch(sourceRegistryProvider)
               .bundleOrNull(sourceKey)
@@ -125,11 +95,9 @@ final readStatusRepositoryForSourceProvider =
       Ref ref,
       String? sourceKey,
     ) {
-      final primary = ref.watch(readStatusRepositoryProvider);
-      if (sourceKey == null || sourceKey.isEmpty) return primary;
-      final activeBundle = ref.watch(activeSourceBundleProvider);
-      if (!identical(primary, activeBundle.readStatus)) return primary;
-      if (sourceKey == activeBundle.source.sourceKey) return primary;
+      if (sourceKey == null || sourceKey.isEmpty) {
+        return ref.watch(readStatusRepositoryProvider);
+      }
       return ref
               .watch(sourceRegistryProvider)
               .bundleOrNull(sourceKey)

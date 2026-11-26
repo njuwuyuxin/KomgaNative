@@ -1,13 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/src/data/shelf_failure.dart';
 import 'package:yomu/src/providers/library_providers.dart';
 
 import '../support/fake_library.dart';
+import '../support/test_source_overrides.dart';
 
 /// 控制器里的加载是 fire-and-forget（`unawaited`），用微任务轮转把它推到完成。
 Future<void> settle() async {
@@ -19,9 +19,7 @@ Future<void> settle() async {
 void main() {
   ProviderContainer containerWith(FakeLibraryRepository repository) {
     final container = ProviderContainer(
-      overrides: <Override>[
-        libraryRepositoryProvider.overrideWithValue(repository),
-      ],
+      overrides: testSourceOverrides(library: repository),
     );
     addTearDown(container.dispose);
     // 保持订阅：不订阅的话容器里的派生状态可能被回收。

@@ -19,8 +19,6 @@ import 'package:yomu/src/data/reader_prefs_store.dart';
 import 'package:yomu/src/data/settings_store.dart';
 import 'package:yomu/src/data/shelf_failure.dart';
 import 'package:yomu/src/providers/cache_providers.dart';
-import 'package:yomu/src/providers/download_providers.dart';
-import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/progress_providers.dart';
 import 'package:yomu/src/providers/settings_provider.dart';
 import 'package:yomu/src/providers/reader_prefs_provider.dart';
@@ -49,6 +47,7 @@ import 'package:yomu_sync/yomu_sync.dart';
 import '../support/fake_library.dart';
 import '../support/fake_reader.dart';
 import '../support/fakes.dart';
+import '../support/test_source_overrides.dart';
 import 'golden_harness.dart';
 
 /// UI 基线矩阵。
@@ -128,7 +127,7 @@ void main() {
       textScale: textScale,
       locale: locale ?? const Locale('en'),
       overrides: <Override>[
-        libraryRepositoryProvider.overrideWithValue(repository),
+        ...testSourceOverrides(library: repository),
         httpCacheProvider.overrideWithValue(cache),
       ],
       precacheImages: covers,
@@ -384,7 +383,7 @@ void main() {
       size: size,
       theme: theme,
       overrides: <Override>[
-        libraryRepositoryProvider.overrideWithValue(repository),
+        ...testSourceOverrides(library: repository),
         // 书行里的下载按钮会读"待恢复的下载队列"：给内存库，
         // 否则测试会去开真实的 sqlite（path_provider 没有平台通道）。
         httpCacheDatabaseProvider.overrideWithValue(
@@ -458,9 +457,7 @@ void main() {
       screen: const SeriesDetailScreen(seriesId: 's1'),
       size: size,
       theme: theme,
-      overrides: <Override>[
-        libraryRepositoryProvider.overrideWithValue(repository),
-      ],
+      overrides: <Override>[...testSourceOverrides(library: repository)],
       precacheImages: covers,
       settle: false,
     );
@@ -532,7 +529,7 @@ void main() {
       size: size,
       theme: theme,
       overrides: <Override>[
-        libraryRepositoryProvider.overrideWithValue(repository),
+        ...testSourceOverrides(library: repository),
         // "最近阅读"横滑条读本地会话表（HIS-02 / ARC-06 用户库）：黄金图环境没有 path_provider，
         // 必须换成内存库，否则整页停在 MissingPluginException。
         progressDatabaseProvider.overrideWithValue(
@@ -568,9 +565,7 @@ void main() {
       ),
       size: size,
       theme: theme,
-      overrides: <Override>[
-        libraryRepositoryProvider.overrideWithValue(library),
-      ],
+      overrides: <Override>[...testSourceOverrides(library: library)],
       precacheImages: covers,
       realTimeSettle: true,
     );
@@ -625,7 +620,7 @@ void main() {
       size: size,
       theme: theme,
       overrides: <Override>[
-        libraryRepositoryProvider.overrideWithValue(library),
+        ...testSourceOverrides(library: library),
         // 书行的下载按钮会读待恢复队列：给内存库，别去开真实 sqlite。
         httpCacheDatabaseProvider.overrideWithValue(
           HttpCacheDatabase(NativeDatabase.memory()),
@@ -678,8 +673,8 @@ void main() {
       size: size,
       theme: theme,
       overrides: <Override>[
-        libraryRepositoryProvider.overrideWithValue(
-          FakeLibraryRepository(series: demoShelf()),
+        ...testSourceOverrides(
+          library: FakeLibraryRepository(series: demoShelf()),
         ),
         if (history.isNotEmpty)
           settingsStoreProvider.overrideWithValue(
@@ -754,9 +749,7 @@ void main() {
       size: size,
       theme: theme,
       precacheImages: covers,
-      overrides: <Override>[
-        libraryRepositoryProvider.overrideWithValue(repository),
-      ],
+      overrides: <Override>[...testSourceOverrides(library: repository)],
     );
     await expectGolden(tester, name);
   }
@@ -796,6 +789,7 @@ void main() {
   }) async {
     final db = HttpCacheDatabase(NativeDatabase.memory());
     await db.markDownloaded(
+      scope: kTestKomgaSourceKey,
       bookId: 's1-b1',
       seriesId: 's1',
       pageCount: 12,
@@ -810,8 +804,10 @@ void main() {
       theme: theme,
       overrides: <Override>[
         httpCacheDatabaseProvider.overrideWithValue(db),
-        downloadServiceProvider.overrideWithValue(_GoldenDownloadService()),
-        libraryRepositoryProvider.overrideWithValue(library),
+        ...testSourceOverrides(
+          library: library,
+          download: _GoldenDownloadService(),
+        ),
       ],
       precacheImages: <Uint8List>[if (cover != null) cover],
       realTimeSettle: true,
@@ -1032,6 +1028,7 @@ void main() {
     String bookId = 'b1',
     Book? book,
     FakeReaderRepository? repository,
+    FakeLibraryRepository? library,
     ReaderPrefs? prefs,
     List<Override> extraOverrides = const <Override>[],
     List<Uint8List> extraImages = const <Uint8List>[],
@@ -1053,7 +1050,7 @@ void main() {
       size: size,
       theme: theme,
       overrides: <Override>[
-        readerRepositoryProvider.overrideWithValue(reader),
+        ...testSourceOverrides(library: library, reader: reader),
         // 设置面板会写偏好：黄金图里必须换成内存实现，否则会打真钥匙串通道。
         readerPrefsStoreProvider.overrideWithValue(
           InMemoryReaderPrefsStore(prefs),
@@ -1253,9 +1250,7 @@ void main() {
         number: '1',
         pagesCount: 3,
       ),
-      extraOverrides: <Override>[
-        libraryRepositoryProvider.overrideWithValue(library),
-      ],
+      library: library,
       extraImages: <Uint8List>[if (nextCover != null) nextCover],
       precachePages: <int>[1, 2, 3],
       act: (WidgetTester t) async {

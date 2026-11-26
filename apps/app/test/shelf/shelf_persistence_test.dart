@@ -12,6 +12,7 @@ import 'package:yomu/src/session/session_controller.dart';
 
 import '../support/fake_library.dart';
 import '../support/fakes.dart';
+import '../support/test_source_overrides.dart';
 
 /// 书架偏好的持久化（FIX-02）：视图/封面档位/排序/筛选/库筛选重启后还在，
 /// 且换服务器不会带着上一台的库筛选。
@@ -36,7 +37,7 @@ void main() {
   }) async {
     final container = ProviderContainer(
       overrides: <Override>[
-        libraryRepositoryProvider.overrideWithValue(repository),
+        ...testSourceOverrides(library: repository),
         settingsStoreProvider.overrideWithValue(store),
         serverStoreProvider.overrideWithValue(
           InMemoryServerStore(storedServer()),

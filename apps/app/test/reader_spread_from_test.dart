@@ -9,6 +9,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_reader.dart';
 import 'support/reader_harness.dart';
+import 'support/test_source_overrides.dart';
 
 /// RDR-06：双页"从这一页起分组"按书记住，退出重进仍在，且可以恢复自动。
 void main() {
@@ -114,7 +115,11 @@ void main() {
       await tester.longPress(find.byKey(const Key('page-thumb-3')));
       await tester.pumpAndSettle();
 
-      expect(store.prefs?.spreadFrom['b1'], 2, reason: '0 基的第 3 页 = index 2');
+      expect(
+        store.prefs?.spreadFromFor('b1', serverKey: kTestKomgaSourceKey),
+        2,
+        reason: '0 基的第 3 页 = index 2',
+      );
       final view = tester.widget<ReaderPagedView>(find.byType(ReaderPagedView));
       expect(view.spread, <int>[2, 3]);
 

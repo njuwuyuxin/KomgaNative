@@ -7,8 +7,6 @@ import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/l10n/l10n.dart';
 import 'package:yomu/src/data/cache/http_cache_database.dart';
 import 'package:yomu/src/data/download/download_service.dart';
-import 'package:yomu/src/providers/download_providers.dart';
-import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/screens/library_screen.dart';
 import 'package:yomu/src/screens/reading_now_screen.dart';
 import 'package:yomu/src/screens/series_detail_screen.dart';
@@ -17,6 +15,7 @@ import 'package:material_ui/material_ui.dart';
 import 'support/fake_library.dart';
 import 'support/fake_reader.dart';
 import 'support/reader_harness.dart';
+import 'support/test_source_overrides.dart';
 
 /// 无障碍：读屏标签与最小点击区。
 ///
@@ -73,11 +72,16 @@ void main() {
   testWidgets('书架卡片：整卡是一个按钮，标签含系列名与已读进度', (WidgetTester tester) async {
     final handle = tester.ensureSemantics();
 
-    await pumpApp(tester, const LibraryScreen(), <Override>[
-      libraryRepositoryProvider.overrideWithValue(
-        FakeLibraryRepository(series: demoShelf(), ondeck: demoOndeck()),
+    await pumpApp(
+      tester,
+      const LibraryScreen(),
+      testSourceOverrides(
+        library: FakeLibraryRepository(
+          series: demoShelf(),
+          ondeck: demoOndeck(),
+        ),
       ),
-    ]);
+    );
 
     final finder = find.byKey(const Key('series-s1'));
     final node = tester.getSemantics(finder);
@@ -92,11 +96,16 @@ void main() {
     final handle = tester.ensureSemantics();
 
     // 「继续阅读」从书架搬到了"正在读"首页（UI-P2-6）。
-    await pumpApp(tester, const ReadingNowScreen(), <Override>[
-      libraryRepositoryProvider.overrideWithValue(
-        FakeLibraryRepository(series: demoShelf(), ondeck: demoOndeck()),
+    await pumpApp(
+      tester,
+      const ReadingNowScreen(),
+      testSourceOverrides(
+        library: FakeLibraryRepository(
+          series: demoShelf(),
+          ondeck: demoOndeck(),
+        ),
       ),
-    ]);
+    );
 
     final finder = find.byKey(const Key('reading-now-continue'));
     final node = tester.getSemantics(finder);
@@ -109,12 +118,14 @@ void main() {
   testWidgets('系列书行：可读标签，下载按钮是独立按钮且 48 点按区', (WidgetTester tester) async {
     final handle = tester.ensureSemantics();
 
-    await pumpApp(tester, const SeriesDetailScreen(seriesId: 's1'), <Override>[
-      libraryRepositoryProvider.overrideWithValue(
-        FakeLibraryRepository(series: demoShelf()),
+    await pumpApp(
+      tester,
+      const SeriesDetailScreen(seriesId: 's1'),
+      testSourceOverrides(
+        library: FakeLibraryRepository(series: demoShelf()),
+        download: _NoopDownloadService(),
       ),
-      downloadServiceProvider.overrideWithValue(_NoopDownloadService()),
-    ]);
+    );
 
     final rowFinder = find.byKey(const Key('book-s1-b1'));
     final row = tester.getSemantics(rowFinder);

@@ -7,6 +7,7 @@ import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/src/data/cache/drift_http_cache.dart';
 import 'package:yomu/src/data/cache/http_cache_database.dart';
+import 'package:yomu/src/data/library_repository.dart';
 import 'package:yomu/src/data/reader_prefs.dart';
 import 'package:yomu/src/data/reader_prefs_store.dart';
 import 'package:yomu/src/data/progress/progress_store.dart';
@@ -24,6 +25,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'fake_reader.dart';
 import 'fakes.dart';
+import 'test_source_overrides.dart';
 
 /// 阅读器测试的公共装配：真路由之外的最小环境（假仓库 + 内存偏好 + 假常亮）。
 ///
@@ -32,6 +34,7 @@ import 'fakes.dart';
 Future<InMemoryReaderPrefsStore> pumpReader(
   WidgetTester tester, {
   FakeReaderRepository? repository,
+  LibraryRepository? library,
   Book? book,
   String bookId = 'b1',
   ReadingDirection direction = ReadingDirection.leftToRight,
@@ -81,7 +84,7 @@ Future<InMemoryReaderPrefsStore> pumpReader(
   await tester.pumpWidget(
     ProviderScope(
       overrides: <Override>[
-        readerRepositoryProvider.overrideWithValue(readerRepository),
+        ...testSourceOverrides(library: library, reader: readerRepository),
         progressSyncProvider.overrideWithValue(sync),
         readerPrefsStoreProvider.overrideWithValue(prefsStore),
         wakeLockProvider.overrideWithValue(wakeLock ?? FakeWakeLock()),

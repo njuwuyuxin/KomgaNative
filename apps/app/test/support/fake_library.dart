@@ -741,7 +741,7 @@ List<Book> demoOndeck() => <Book>[
     readProgress: ReadProgress(
       page: 5,
       completed: false,
-      lastModified: DateTime.utc(2026, 11, 1),
+      lastModified: DateTime.utc(2026, 11, 2),
     ),
   ),
   Book(
@@ -754,7 +754,7 @@ List<Book> demoOndeck() => <Book>[
     readProgress: ReadProgress(
       page: 3,
       completed: false,
-      lastModified: DateTime.utc(2026, 11, 2),
+      lastModified: DateTime.utc(2026, 11, 1),
     ),
   ),
 ];

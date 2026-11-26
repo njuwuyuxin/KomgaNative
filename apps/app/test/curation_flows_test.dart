@@ -8,7 +8,6 @@ import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/l10n/l10n.dart';
 import 'package:yomu/src/data/cache/http_cache_database.dart';
 import 'package:yomu/src/providers/cache_providers.dart';
-import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/screens/collection_detail_screen.dart';
 import 'package:yomu/src/screens/collections_screen.dart';
 import 'package:yomu/src/screens/library_screen.dart';
@@ -18,6 +17,7 @@ import 'package:yomu/src/widgets/series_hero_tag.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_library.dart';
+import 'support/test_source_overrides.dart';
 
 void main() {
   Future<void> pumpApp(
@@ -34,7 +34,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: <Override>[
-          libraryRepositoryProvider.overrideWithValue(repository),
+          ...testSourceOverrides(library: repository),
           httpCacheDatabaseProvider.overrideWithValue(db),
         ],
         child: MaterialApp(
@@ -109,7 +109,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: <Override>[
-            libraryRepositoryProvider.overrideWithValue(repo),
+            ...testSourceOverrides(library: repo),
             httpCacheDatabaseProvider.overrideWithValue(db),
           ],
           child: MaterialApp(
@@ -166,7 +166,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: <Override>[
-            libraryRepositoryProvider.overrideWithValue(repo),
+            ...testSourceOverrides(library: repo),
             httpCacheDatabaseProvider.overrideWithValue(db),
           ],
           child: MaterialApp.router(

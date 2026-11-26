@@ -1,17 +1,16 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/l10n/l10n.dart';
 import 'package:yomu/src/data/shelf_failure.dart';
-import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/shelf_selection_provider.dart';
 import 'package:yomu/src/screens/library_screen.dart';
 import 'package:yomu/src/widgets/floating_nav_bar.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_library.dart';
+import 'support/test_source_overrides.dart';
 
 /// LIB-03：书架多选与批量操作。
 ///
@@ -27,9 +26,7 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       ProviderScope(
-        overrides: <Override>[
-          libraryRepositoryProvider.overrideWithValue(repository),
-        ],
+        overrides: testSourceOverrides(library: repository),
         child: MaterialApp(
           locale: const Locale('en'),
           localizationsDelegates: appLocalizationsDelegates,
@@ -115,9 +112,7 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: <Override>[
-          libraryRepositoryProvider.overrideWithValue(repository),
-        ],
+        overrides: testSourceOverrides(library: repository),
         child: MaterialApp(
           locale: const Locale('zh'),
           localizationsDelegates: appLocalizationsDelegates,
@@ -197,9 +192,7 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: <Override>[
-          libraryRepositoryProvider.overrideWithValue(repository),
-        ],
+        overrides: testSourceOverrides(library: repository),
         child: MaterialApp(
           locale: const Locale('en'),
           localizationsDelegates: appLocalizationsDelegates,
@@ -320,9 +313,7 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: <Override>[
-          libraryRepositoryProvider.overrideWithValue(repository),
-        ],
+        overrides: testSourceOverrides(library: repository),
         child: MaterialApp(
           locale: const Locale('zh'),
           localizationsDelegates: appLocalizationsDelegates,

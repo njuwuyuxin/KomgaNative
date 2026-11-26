@@ -27,8 +27,6 @@ final Provider<LibraryRepository> libraryRepositoryProvider =
 /// 已读/未读状态变更仓库（ARC-09 / ADR 0008）。
 final Provider<ReadStatusRepository> readStatusRepositoryProvider =
     Provider<ReadStatusRepository>((Ref ref) {
-      final lib = ref.watch(libraryRepositoryProvider);
-      if (lib is ReadStatusRepository) return lib as ReadStatusRepository;
       return ref.watch(activeSourceBundleProvider).readStatus;
     });
 
@@ -142,17 +140,14 @@ class ReadStatusEpoch extends Notifier<int> {
 final NotifierProvider<ReadStatusEpoch, int> readStatusEpochProvider =
     NotifierProvider<ReadStatusEpoch, int>(ReadStatusEpoch.new);
 
-/// 继续阅读：生产态跨源无感汇聚（本机 + 已连服务器），单测 override 仓库时走被测仓库。
-final ondeckProvider = FutureProvider<PageResult<Book>>((Ref ref) {
-  final primary = ref.watch(libraryRepositoryProvider);
-  final activeBundle = ref.watch(activeSourceBundleProvider);
-  if (!identical(primary, activeBundle.library)) {
-    return primary.ondeck();
-  }
-  return ref.watch(crossSourceOndeckProvider.future);
-});
+/// 继续阅读：跨源无感汇聚（本机 + 所有已配置远程服务器）。
+///
+/// 直接复用 [crossSourceOndeckProvider] 实例，避免 `ref.invalidate(ondeckProvider)`
+/// 只重建外层代理而未真正重拉底层跨源汇聚结果。
+final FutureProvider<PageResult<Book>> ondeckProvider =
+    crossSourceOndeckProvider;
 
-/// 按书籍实体所属 `sourceKey` 路由封面（兼容单测 override `libraryRepositoryProvider`）。
+/// 按书籍实体所属 `sourceKey` 路由封面。
 final bookCoverForEntityProvider = FutureProvider.family<Uint8List?, Book>((
   Ref ref,
   Book book,

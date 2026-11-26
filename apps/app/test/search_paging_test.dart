@@ -13,6 +13,7 @@ import 'package:yomu/src/screens/search_screen.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_library.dart';
+import 'support/test_source_overrides.dart';
 
 /// SCH-03：搜索结果分页（加载更多）、切换查询不串、失败保留旧结果。
 void main() {
@@ -37,7 +38,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: <Override>[
-          libraryRepositoryProvider.overrideWithValue(repository),
+          ...testSourceOverrides(library: repository),
           settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
         ],
         child: MaterialApp(
@@ -77,9 +78,7 @@ void main() {
   test('分页：65 条能靠 PagedListController 增量 page=0,1,2 全部拿到且不重拉第 0 页', () async {
     repository = FakeLibraryRepository(series: manySeries('alpha', 65));
     container = ProviderContainer(
-      overrides: <Override>[
-        libraryRepositoryProvider.overrideWithValue(repository),
-      ],
+      overrides: testSourceOverrides(library: repository),
     );
     addTearDown(container.dispose);
 

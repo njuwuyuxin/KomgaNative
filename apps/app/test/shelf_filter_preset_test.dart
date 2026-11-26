@@ -11,6 +11,7 @@ import 'package:yomu/src/session/server_store.dart';
 import 'package:yomu/src/session/session_controller.dart';
 
 import 'support/fake_library.dart';
+import 'support/test_source_overrides.dart';
 
 /// LIB-04：保存的筛选组合（排序 + 阅读状态 + 库），按服务器分区。
 void main() {
@@ -140,7 +141,13 @@ void main() {
       store = InMemorySettingsStore();
       final c = ProviderContainer(
         overrides: <Override>[
-          libraryRepositoryProvider.overrideWithValue(repository),
+          ...testSourceOverrides(
+            library: repository,
+            source: const RemoteContentSource(
+              sourceKey: 'http://test.local',
+              displayName: 'Test Local',
+            ),
+          ),
           settingsStoreProvider.overrideWithValue(store),
           // 筛选组合按服务器分区：给一个连接好的会话，key 才不是 null。
           sessionProvider.overrideWith(

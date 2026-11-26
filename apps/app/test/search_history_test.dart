@@ -6,12 +6,12 @@ import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/l10n/l10n.dart';
 import 'package:yomu/src/data/app_settings.dart';
 import 'package:yomu/src/data/settings_store.dart';
-import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/settings_provider.dart';
 import 'package:yomu/src/screens/search_screen.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_library.dart';
+import 'support/test_source_overrides.dart';
 
 /// SCH-01：搜索历史（最多 10 条、去重、重启保持）与空态。
 void main() {
@@ -74,8 +74,8 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: <Override>[
-            libraryRepositoryProvider.overrideWithValue(
-              FakeLibraryRepository(series: demoShelf()),
+            ...testSourceOverrides(
+              library: FakeLibraryRepository(series: demoShelf()),
             ),
             settingsStoreProvider.overrideWithValue(store),
           ],

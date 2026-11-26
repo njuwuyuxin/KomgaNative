@@ -1,19 +1,18 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/l10n/l10n.dart';
-import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/widgets/reader_palette.dart';
 import 'package:yomu/src/widgets/reader_toc_sheet.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_library.dart';
+import 'support/test_source_overrides.dart';
 
 /// RDR-02：阅读器"目录"= 本系列的书列表，点一本替换当前页。
 void main() {
@@ -49,11 +48,9 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: <Override>[
-          libraryRepositoryProvider.overrideWithValue(
-            repository ?? booksRepository(),
-          ),
-        ],
+        overrides: testSourceOverrides(
+          library: repository ?? booksRepository(),
+        ),
         child: MaterialApp.router(
           locale: const Locale('en'),
           localizationsDelegates: appLocalizationsDelegates,

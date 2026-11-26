@@ -7,7 +7,6 @@ import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/src/data/reader_prefs.dart';
 import 'package:yomu/src/data/shelf_failure.dart';
-import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/settings_provider.dart';
 import 'package:yomu/src/widgets/book_hero_tag.dart';
 import 'package:yomu/src/widgets/page_curl.dart';
@@ -42,14 +41,10 @@ void main() {
     await pumpReader(
       tester,
       repository: repository,
+      library: FakeLibraryRepository(ondeck: demoOndeck()),
       book: demoReaderBook(),
       heroTag: tag,
       settle: false,
-      extraOverrides: <Override>[
-        libraryRepositoryProvider.overrideWithValue(
-          FakeLibraryRepository(ondeck: demoOndeck()),
-        ),
-      ],
     );
 
     // 第一帧：Hero 落点已经在，且和继续阅读卡片用同一个 tag。

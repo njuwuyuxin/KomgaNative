@@ -1,8 +1,6 @@
-import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/src/data/shelf_failure.dart';
-import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/widgets/reader_finished_card.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -19,18 +17,15 @@ void main() {
     pagesCount: 3,
   );
 
-  List<Override> library({int bookCount = 6}) {
-    final repository = FakeLibraryRepository(series: demoShelf())
-      ..bookCount = bookCount;
-    return <Override>[libraryRepositoryProvider.overrideWithValue(repository)];
-  }
+  FakeLibraryRepository library({int bookCount = 6}) =>
+      FakeLibraryRepository(series: demoShelf())..bookCount = bookCount;
 
   testWidgets('没读完不显示完成卡片', (WidgetTester tester) async {
     await pumpReader(
       tester,
       book: volume(1),
       bookId: 's1-b1',
-      extraOverrides: library(),
+      library: library(),
     );
 
     expect(find.byType(ReaderFinishedCard), findsNothing);
@@ -43,7 +38,7 @@ void main() {
       book: volume(1),
       bookId: 's1-b1',
       onOpenNext: (Book next) => opened = next,
-      extraOverrides: library(),
+      library: library(),
     );
 
     await tapRight(tester);
@@ -65,7 +60,7 @@ void main() {
       tester,
       book: volume(6),
       bookId: 's1-b6',
-      extraOverrides: library(bookCount: 6),
+      library: library(bookCount: 6),
     );
 
     await tapRight(tester);
@@ -81,13 +76,9 @@ void main() {
       tester,
       book: volume(1),
       bookId: 's1-b1',
-      extraOverrides: <Override>[
-        libraryRepositoryProvider.overrideWithValue(
-          FakeLibraryRepository(series: demoShelf())
-            ..booksFailure = const NetworkFailure()
-            ..bookCount = 0,
-        ),
-      ],
+      library: FakeLibraryRepository(series: demoShelf())
+        ..booksFailure = const NetworkFailure()
+        ..bookCount = 0,
     );
 
     await tapRight(tester);
@@ -104,7 +95,7 @@ void main() {
       book: volume(1),
       bookId: 's1-b1',
       onOpenNext: (Book next) => opened = next,
-      extraOverrides: library(),
+      library: library(),
     );
 
     // 第 3 页（书尾）之后没有可翻的屏了，`turn` 会把请求原样抛给 `onTurn`。
@@ -124,7 +115,7 @@ void main() {
       book: volume(1),
       bookId: 's1-b1',
       onOpenNext: (Book next) => opened = next,
-      extraOverrides: library(),
+      library: library(),
     );
 
     await tapRight(tester);

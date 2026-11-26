@@ -98,16 +98,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     final selection = ref.watch(shelfSelectionProvider);
     final selecting = ref.read(shelfSelectionProvider.notifier);
     final activeSource = ref.watch(activeSourceProvider);
-    final activeBundle = ref.watch(activeSourceBundleProvider);
-    final currentRepo = ref.watch(libraryRepositoryProvider);
-    final isRealLocalShelf =
-        activeSource.capabilities.canImportLocalFiles &&
-        identical(currentRepo, activeBundle.library);
-    final browseMode = isRealLocalShelf
+    final isLocalShelf = activeSource.capabilities.canImportLocalFiles;
+    final browseMode = isLocalShelf
         ? ref.watch(localShelfBrowseModeProvider)
         : LocalShelfBrowseMode.series;
     final showFolderTree =
-        isRealLocalShelf &&
+        isLocalShelf &&
         !selection.active &&
         browseMode == LocalShelfBrowseMode.folders &&
         state.series.isNotEmpty;
@@ -169,7 +165,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                             SliverToBoxAdapter(
                               child: SourceGroupBar(
                                 showLocalImport:
-                                    isRealLocalShelf &&
+                                    isLocalShelf &&
                                     !selection.active &&
                                     state.series.isNotEmpty,
                               ),
@@ -189,12 +185,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                                   state.series.map((Series s) => s.id),
                                 ),
                                 onMergeSelected:
-                                    isRealLocalShelf &&
-                                        selection.ids.length >= 2
+                                    isLocalShelf && selection.ids.length >= 2
                                     ? () => _mergeSelectedLocal(state.series)
                                     : null,
                                 onDeleteSelected:
-                                    isRealLocalShelf && selection.ids.isNotEmpty
+                                    isLocalShelf && selection.ids.isNotEmpty
                                     ? _deleteSelectedLocal
                                     : null,
                               ),
@@ -224,7 +219,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                                     l10n,
                                     state,
                                     controller,
-                                    isRealLocalShelf: isRealLocalShelf,
+                                    isRealLocalShelf: isLocalShelf,
                                   ),
                                 const SliverToBoxAdapter(
                                   child: SizedBox(
@@ -238,8 +233,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                       ),
                     ),
                   ),
-                  if (activeSource.capabilities.showsNetworkOfflineBanner ||
-                      !isRealLocalShelf)
+                  if (activeSource.capabilities.showsNetworkOfflineBanner)
                     OfflineOverlay(onRetry: () => unawaited(_refresh())),
                 ],
               ),

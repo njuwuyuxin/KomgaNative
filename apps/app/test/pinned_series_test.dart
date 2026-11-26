@@ -15,6 +15,7 @@ import 'package:yomu/src/widgets/unread_badge.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_library.dart';
+import 'support/test_source_overrides.dart';
 
 /// LIB-02：封面未读角标 + 系列置顶（按服务器分区、重启保持）。
 void main() {
@@ -65,8 +66,8 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: <Override>[
-            libraryRepositoryProvider.overrideWithValue(
-              FakeLibraryRepository(series: demoShelf()),
+            ...testSourceOverrides(
+              library: FakeLibraryRepository(series: demoShelf()),
             ),
             progressDatabaseProvider.overrideWithValue(db),
             // 置顶按服务器分区：测试里没有会话，直接给一个固定 key。

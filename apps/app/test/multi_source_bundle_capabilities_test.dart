@@ -10,6 +10,7 @@ import 'package:yomu/src/providers/active_source_provider.dart';
 import 'package:yomu/src/providers/cache_providers.dart';
 import 'package:yomu/src/providers/cross_source_reading_provider.dart';
 import 'package:yomu/src/providers/download_providers.dart';
+import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/settings_provider.dart';
 import 'package:yomu/src/providers/source_registry_provider.dart';
 import 'package:yomu/src/providers/source_scoped_providers.dart';
@@ -337,5 +338,76 @@ void main() {
     expect(unknownCaps.syncsProgressRemotely, isFalse);
     expect(unknownCaps.canMutateCatalog, isFalse);
     expect(unknownCaps.canImportLocalFiles, isFalse);
+  });
+
+  test('按 sourceKey 路由不因顶层仓库被装饰包装而退回激活源，且 ondeckProvider 与 crossSourceOndeckProvider 共享失效', () async {
+    final repoA = FakeLibraryRepository(
+      ondeck: <Book>[
+        const Book(
+          id: 'a-b1',
+          seriesId: 'a-s1',
+          name: 'Alpha 1',
+          pagesCount: 10,
+        ).withSource(serverAKey),
+      ],
+    );
+    final repoB = FakeLibraryRepository();
+    final dlA = _RecordingDownloadService();
+    final dlB = _RecordingDownloadService();
+
+    final registry = SourceRegistry(
+      localBundle: makeBundle(
+        source: const LocalContentSource(),
+        library: FakeLibraryRepository(),
+      ),
+      remoteBundles: <String, SourceBundle>{
+        serverAKey: makeBundle(
+          source: remoteSourceOfServer(serverA),
+          library: repoA,
+          download: dlA,
+        ),
+        serverBKey: makeBundle(
+          source: remoteSourceOfServer(serverB),
+          library: repoB,
+          download: dlB,
+        ),
+      },
+    );
+
+    final container = ProviderContainer(
+      retry: (int _, Object _) => null,
+      overrides: <Override>[
+        sourceRegistryProvider.overrideWithValue(registry),
+        settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
+        // 模拟生产侧对顶层 provider 施加装饰器：不得影响按 sourceKey 路由。
+        libraryRepositoryProvider.overrideWithValue(FakeLibraryRepository()),
+        downloadServiceProvider.overrideWithValue(_RecordingDownloadService()),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container
+        .read(activeSourceProvider.notifier)
+        .selectSource(serverBKey);
+
+    expect(
+      container.read(libraryRepositoryForSourceProvider(serverAKey)),
+      same(repoA),
+    );
+    expect(
+      container.read(downloadServiceForSourceProvider(serverAKey)),
+      same(dlA),
+    );
+    expect(identical(ondeckProvider, crossSourceOndeckProvider), isTrue);
+
+    final first = await container.read(ondeckProvider.future);
+    expect(first.items.map((Book b) => b.id), <String>['a-b1']);
+
+    repoA.ondeckFailure = const NetworkFailure();
+    container.invalidate(ondeckProvider);
+    await expectLater(
+      container.read(ondeckProvider.future),
+      throwsA(isA<NetworkFailure>()),
+    );
   });
 }

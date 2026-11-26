@@ -1,13 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/l10n/l10n.dart';
-import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/screens/search_screen.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_library.dart';
+import 'support/test_source_overrides.dart';
 
 /// UI-P3-9：全局搜索把系列与书两个来源合并在一个输入框下。
 void main() {
@@ -15,9 +14,7 @@ void main() {
     final repository = FakeLibraryRepository(series: demoShelf());
     await tester.pumpWidget(
       ProviderScope(
-        overrides: <Override>[
-          libraryRepositoryProvider.overrideWithValue(repository),
-        ],
+        overrides: testSourceOverrides(library: repository),
         child: const MaterialApp(
           localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
@@ -42,9 +39,7 @@ void main() {
     );
     await tester.pumpWidget(
       ProviderScope(
-        overrides: <Override>[
-          libraryRepositoryProvider.overrideWithValue(repository),
-        ],
+        overrides: testSourceOverrides(library: repository),
         child: const MaterialApp(
           localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
@@ -64,9 +59,7 @@ void main() {
     final repository = FakeLibraryRepository(series: demoShelf());
     await tester.pumpWidget(
       ProviderScope(
-        overrides: <Override>[
-          libraryRepositoryProvider.overrideWithValue(repository),
-        ],
+        overrides: testSourceOverrides(library: repository),
         child: const MaterialApp(
           localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,

@@ -8,13 +8,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yomu_domain/yomu_domain.dart';
-import 'package:yomu/src/providers/reader_providers.dart';
 import 'package:yomu/src/widgets/page_curl.dart';
 import 'package:yomu/src/widgets/reader_paged_view.dart';
 import 'package:yomu/src/widgets/reader_palette.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../support/fake_reader.dart';
+import '../support/test_source_overrides.dart';
 
 /// 不使用 pumpAndSettle：逐帧检查着色器 → 普通图片交接，不能吞掉解码空窗。
 void main() {
@@ -34,9 +34,7 @@ void main() {
         final captureKey = GlobalKey();
         await tester.pumpWidget(
           ProviderScope(
-            overrides: <Override>[
-              readerRepositoryProvider.overrideWithValue(repository),
-            ],
+            overrides: <Override>[...testSourceOverrides(reader: repository)],
             child: Directionality(
               textDirection: TextDirection.ltr,
               child: StatefulBuilder(
@@ -141,7 +139,7 @@ void main() {
     final key = GlobalKey<ReaderPagedViewState>();
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [readerRepositoryProvider.overrideWithValue(repository)],
+        overrides: testSourceOverrides(reader: repository),
         child: Directionality(
           textDirection: TextDirection.ltr,
           child: ReaderPagedView(

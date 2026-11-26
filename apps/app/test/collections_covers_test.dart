@@ -1,15 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/l10n/l10n.dart';
-import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/screens/collections_screen.dart';
 import 'package:yomu/src/widgets/collection_covers.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_library.dart';
+import 'support/test_source_overrides.dart';
 
 /// UI-02：收藏集封面拼贴 + 搜索 + 排序。
 void main() {
@@ -22,11 +21,9 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       ProviderScope(
-        overrides: <Override>[
-          libraryRepositoryProvider.overrideWithValue(
-            repository ?? FakeLibraryRepository(series: demoShelf()),
-          ),
-        ],
+        overrides: testSourceOverrides(
+          library: repository ?? FakeLibraryRepository(series: demoShelf()),
+        ),
         child: MaterialApp(
           locale: const Locale('en'),
           localizationsDelegates: appLocalizationsDelegates,

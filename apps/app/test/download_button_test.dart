@@ -4,8 +4,6 @@ import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/src/data/cache/http_cache_database.dart';
 import 'package:yomu/src/data/download/download_service.dart';
-import 'package:yomu/src/providers/download_providers.dart';
-import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/screens/series_detail_screen.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/l10n/l10n.dart';
@@ -13,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_library.dart';
+import 'support/test_source_overrides.dart';
 
 /// 假下载服务：不落盘、不联网，只验证按钮状态机。
 class FakeDownloadService implements DownloadService {
@@ -65,8 +64,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: <Override>[
-          libraryRepositoryProvider.overrideWithValue(repository),
-          downloadServiceProvider.overrideWithValue(download),
+          ...testSourceOverrides(library: repository, download: download),
         ],
         child: MaterialApp(
           locale: const Locale('en'),

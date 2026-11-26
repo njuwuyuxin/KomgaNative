@@ -6,9 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:komga_api/komga_api.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/src/app.dart';
-import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/progress_providers.dart';
-import 'package:yomu/src/providers/reader_providers.dart';
 import 'package:yomu/src/data/progress/progress_store.dart';
 import 'package:yomu/src/screens/library_screen.dart';
 import 'package:yomu/src/screens/reading_now_screen.dart';
@@ -23,6 +21,7 @@ import 'golden/golden_harness.dart';
 import 'support/fake_library.dart';
 import 'support/fake_reader.dart';
 import 'support/fakes.dart';
+import 'support/test_source_overrides.dart';
 
 /// 端到端冒烟：真实路由 + 真实会话守卫 + 假网络/假钥匙串。
 void main() {
@@ -47,11 +46,9 @@ void main() {
           // 进度同步走内存库：冒烟测试不该打开 sqlite，也不该碰 path_provider 通道。
           progressStoreProvider.overrideWithValue(InMemoryProgressStore()),
           // 书架与阅读器都走假仓库：冒烟测试不该联网，也不能依赖真实服务器。
-          libraryRepositoryProvider.overrideWithValue(
-            FakeLibraryRepository(series: demoShelf()),
-          ),
-          readerRepositoryProvider.overrideWithValue(
-            FakeReaderRepository(pageCount: 19),
+          ...testSourceOverrides(
+            library: FakeLibraryRepository(series: demoShelf()),
+            reader: FakeReaderRepository(pageCount: 19),
           ),
         ],
         child: const KomgaApp(),

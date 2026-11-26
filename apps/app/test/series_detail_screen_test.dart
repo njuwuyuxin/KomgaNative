@@ -1,16 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/src/data/shelf_failure.dart';
-import 'package:yomu/src/providers/library_providers.dart';
-import 'package:yomu/src/providers/reader_providers.dart';
 import 'package:yomu/src/screens/library_screen.dart';
 import 'package:yomu/src/screens/reader_screen.dart';
+import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/screens/series_detail_screen.dart';
 import 'package:yomu/src/widgets/series_header.dart';
 import 'package:yomu/src/widgets/series_hero_tag.dart';
@@ -20,6 +18,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_library.dart';
 import 'support/fake_reader.dart';
+import 'support/test_source_overrides.dart';
 
 void main() {
   Future<void> pumpDetail(
@@ -62,12 +61,10 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: <Override>[
-          libraryRepositoryProvider.overrideWithValue(repository),
-          readerRepositoryProvider.overrideWithValue(
-            FakeReaderRepository(pageCount: 21),
-          ),
-        ],
+        overrides: testSourceOverrides(
+          library: repository,
+          reader: FakeReaderRepository(pageCount: 21),
+        ),
         child: MaterialApp.router(
           locale: const Locale('en'),
           localizationsDelegates: appLocalizationsDelegates,
@@ -241,9 +238,7 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: <Override>[
-          libraryRepositoryProvider.overrideWithValue(repository),
-        ],
+        overrides: testSourceOverrides(library: repository),
         child: MaterialApp.router(
           locale: const Locale('en'),
           localizationsDelegates: appLocalizationsDelegates,

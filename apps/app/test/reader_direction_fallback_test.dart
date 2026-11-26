@@ -1,7 +1,5 @@
-import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yomu_domain/yomu_domain.dart';
-import 'package:yomu/src/providers/library_providers.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_library.dart';
@@ -29,11 +27,7 @@ void main() {
       tester,
       book: demoReaderBook(),
       direction: explicit ?? ReadingDirection.unknown,
-      extraOverrides: <Override>[
-        libraryRepositoryProvider.overrideWithValue(
-          FakeLibraryRepository(series: series),
-        ),
-      ],
+      library: FakeLibraryRepository(series: series),
     );
   }
 
@@ -116,13 +110,9 @@ void main() {
       // 路由入口不传方向；`pumpReader` 默认值是 LTR，必须显式给 unknown，
       // 否则测的就不是"未知方向"这条路径了。
       direction: ReadingDirection.unknown,
-      extraOverrides: <Override>[
-        libraryRepositoryProvider.overrideWithValue(
-          FakeLibraryRepository(
-            series: <Series>[seriesWith(ReadingDirection.rightToLeft)],
-          ),
-        ),
-      ],
+      library: FakeLibraryRepository(
+        series: <Series>[seriesWith(ReadingDirection.rightToLeft)],
+      ),
     );
 
     expect(find.byKey(const Key('reader-image-0')), findsOneWidget);

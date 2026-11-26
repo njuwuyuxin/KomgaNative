@@ -10,6 +10,8 @@ import 'package:yomu/src/data/download/download_service.dart';
 import 'package:yomu/src/providers/cache_providers.dart';
 import 'package:yomu/src/providers/download_providers.dart';
 
+import 'support/test_source_overrides.dart';
+
 /// SER-03：系列批量下载入队（跳过已下载 / 不重复 / 可取消）。
 void main() {
   late _BatchDownloadService service;
@@ -21,7 +23,7 @@ void main() {
     db = HttpCacheDatabase(NativeDatabase.memory());
     container = ProviderContainer(
       overrides: <Override>[
-        downloadServiceProvider.overrideWithValue(service),
+        ...testSourceOverrides(download: service),
         httpCacheDatabaseProvider.overrideWithValue(db),
       ],
     );
@@ -55,7 +57,11 @@ void main() {
     expect(result.queued, 3);
     expect(result.skipped, 0);
     expect(service.downloadedIds, <String>['b1', 'b2', 'b3']);
-    expect(await db.downloadQueue(), isEmpty, reason: '下完就该清掉队列行');
+    expect(
+      await db.downloadQueue(scope: kTestKomgaSourceKey),
+      isEmpty,
+      reason: '下完就该清掉队列行',
+    );
   });
 
   test('已下载过的跳过，并如实回报跳过数量', () async {
@@ -95,7 +101,7 @@ void main() {
 
     expect(service.cancelled, contains('b1'));
     expect(service.downloadedIds.length, lessThan(3));
-    expect(await db.downloadQueue(), isEmpty);
+    expect(await db.downloadQueue(scope: kTestKomgaSourceKey), isEmpty);
   });
 }
 

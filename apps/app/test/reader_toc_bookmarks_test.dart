@@ -9,7 +9,6 @@ import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/l10n/l10n.dart';
 import 'package:yomu/src/data/local/local_catalog_write_dao.dart';
 import 'package:yomu/src/data/progress/progress_database.dart';
-import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/progress_providers.dart';
 import 'package:yomu/src/widgets/reader_palette.dart';
 import 'package:yomu/src/widgets/reader_toc_sheet.dart';
@@ -20,6 +19,7 @@ import 'package:yomu_local_archive/yomu_local_archive.dart';
 import 'package:yomu_reader/yomu_reader.dart';
 
 import 'support/fake_library.dart';
+import 'support/test_source_overrides.dart';
 
 void main() {
   testWidgets('LMB-05: 顶栏添加页级书签 + 目录面板切换本卷章节/书签与系列各卷 + 跳转与删除书签', (
@@ -82,7 +82,10 @@ void main() {
       ProviderScope(
         overrides: <Override>[
           progressDatabaseProvider.overrideWithValue(db),
-          libraryRepositoryProvider.overrideWithValue(repo),
+          ...testSourceOverrides(
+            library: repo,
+            source: const LocalContentSource(),
+          ),
         ],
         child: MaterialApp(
           locale: const Locale('en'),

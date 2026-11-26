@@ -7,12 +7,12 @@ import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/l10n/l10n.dart';
 import 'package:yomu/src/data/settings_store.dart';
-import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/settings_provider.dart';
 import 'package:yomu/src/screens/search_screen.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_library.dart';
+import 'support/test_source_overrides.dart';
 
 /// SCH-02：搜索筛选（阅读状态 + 标签）。作者筛选被服务端静默忽略，因此不做。
 void main() {
@@ -51,7 +51,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: <Override>[
-          libraryRepositoryProvider.overrideWithValue(repository),
+          ...testSourceOverrides(library: repository),
           settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
         ],
         child: MaterialApp(

@@ -124,6 +124,11 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
         bookId: bookId,
       )),
     );
+    if (scope.isNotEmpty) {
+      ref.invalidate(
+        downloadedForSourceProvider((sourceKey: null, bookId: bookId)),
+      );
+    }
   }
 
   HttpCacheDatabase get _db => ref.read(httpCacheDatabaseProvider);

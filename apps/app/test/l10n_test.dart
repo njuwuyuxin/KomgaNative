@@ -11,9 +11,7 @@ import 'package:yomu/src/data/cache/http_cache_database.dart';
 import 'package:yomu/src/data/progress/progress_store.dart';
 import 'package:yomu/src/data/settings_store.dart';
 import 'package:yomu/src/providers/cache_providers.dart';
-import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/progress_providers.dart';
-import 'package:yomu/src/providers/reader_providers.dart';
 import 'package:yomu/src/providers/settings_provider.dart';
 import 'package:yomu/src/screens/settings_screen.dart';
 import 'package:yomu/src/screens/splash_screen.dart';
@@ -25,6 +23,7 @@ import 'package:material_ui/material_ui.dart';
 import 'support/fake_library.dart';
 import 'support/fake_reader.dart';
 import 'support/fakes.dart';
+import 'support/test_source_overrides.dart';
 
 /// i18n：ARB 文案随 locale 切换、语言设置持久化、坏存档回 system。
 void main() {
@@ -83,10 +82,10 @@ void main() {
           ),
           connectionServiceProvider.overrideWithValue(FakeConnectionService()),
           progressStoreProvider.overrideWithValue(InMemoryProgressStore()),
-          libraryRepositoryProvider.overrideWithValue(
-            FakeLibraryRepository(series: demoShelf()),
+          ...testSourceOverrides(
+            library: FakeLibraryRepository(series: demoShelf()),
+            reader: FakeReaderRepository(),
           ),
-          readerRepositoryProvider.overrideWithValue(FakeReaderRepository()),
           settingsStoreProvider.overrideWithValue(store),
         ],
         child: const KomgaApp(),

@@ -9,7 +9,6 @@ import 'package:yomu/l10n/l10n.dart';
 import 'package:yomu/src/data/local/local_catalog_delete_dao.dart';
 import 'package:yomu/src/data/local/local_catalog_write_dao.dart';
 import 'package:yomu/src/data/progress/progress_database.dart';
-import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/progress_providers.dart';
 import 'package:yomu/src/providers/reading_history_provider.dart';
 import 'package:yomu/src/screens/history_screen.dart';
@@ -19,6 +18,7 @@ import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu_local_archive/yomu_local_archive.dart';
 
 import 'support/fake_library.dart';
+import 'support/test_source_overrides.dart';
 
 /// HIS-02：阅读历史页（按天分组、删除单条、清空、空态）。
 void main() {
@@ -69,8 +69,8 @@ void main() {
       ProviderScope(
         overrides: <Override>[
           progressDatabaseProvider.overrideWithValue(db),
-          libraryRepositoryProvider.overrideWithValue(
-            FakeLibraryRepository(series: demoShelf()),
+          ...testSourceOverrides(
+            library: FakeLibraryRepository(series: demoShelf()),
           ),
         ],
         child: MaterialApp.router(
@@ -306,8 +306,8 @@ void main() {
       ProviderScope(
         overrides: <Override>[
           progressDatabaseProvider.overrideWithValue(db),
-          libraryRepositoryProvider.overrideWithValue(
-            FakeLibraryRepository(series: demoShelf()),
+          ...testSourceOverrides(
+            library: FakeLibraryRepository(series: demoShelf()),
           ),
         ],
         child: MaterialApp(

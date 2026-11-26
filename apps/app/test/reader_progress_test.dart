@@ -16,10 +16,8 @@ import 'package:yomu/src/data/progress/progress_sync_service.dart';
 import 'package:yomu/src/data/reader_prefs_store.dart';
 import 'package:yomu/src/data/shelf_failure.dart';
 import 'package:yomu/src/providers/cache_providers.dart';
-import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/progress_providers.dart';
 import 'package:yomu/src/providers/reader_prefs_provider.dart';
-import 'package:yomu/src/providers/reader_providers.dart';
 import 'package:yomu/src/screens/reader_screen.dart';
 import 'package:yomu/src/screens/reading_now_screen.dart';
 import 'package:yomu_sync/yomu_sync.dart';
@@ -28,6 +26,7 @@ import 'package:material_ui/material_ui.dart';
 import 'support/fake_library.dart';
 import 'support/fake_reader.dart';
 import 'support/fakes.dart';
+import 'support/test_source_overrides.dart';
 import 'support/reader_harness.dart';
 
 /// 阅读器与 outbox 的接缝：翻页必须先落本地，服务端能不能收到是第二件事。
@@ -261,8 +260,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: <Override>[
-          libraryRepositoryProvider.overrideWithValue(library),
-          readerRepositoryProvider.overrideWithValue(readerRepo),
+          ...testSourceOverrides(library: library, reader: readerRepo),
           progressSyncProvider.overrideWithValue(sync),
           readerPrefsStoreProvider.overrideWithValue(
             InMemoryReaderPrefsStore(),

@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
@@ -19,6 +18,7 @@ import 'package:yomu/src/widgets/series_shelf_tile.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_library.dart';
+import 'support/test_source_overrides.dart';
 
 /// UI-P2-6「正在读」首页：继续阅读卡片、最近添加、按库分组。
 void main() {
@@ -39,9 +39,7 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       ProviderScope(
-        overrides: <Override>[
-          libraryRepositoryProvider.overrideWithValue(library),
-        ],
+        overrides: testSourceOverrides(library: library),
         child: MaterialApp(
           locale: const Locale('en'),
           localizationsDelegates: appLocalizationsDelegates,
@@ -258,9 +256,7 @@ void main() {
       );
       await tester.pumpWidget(
         ProviderScope(
-          overrides: <Override>[
-            libraryRepositoryProvider.overrideWithValue(repository),
-          ],
+          overrides: testSourceOverrides(library: repository),
           child: MaterialApp.router(
             locale: const Locale('en'),
             localizationsDelegates: appLocalizationsDelegates,
