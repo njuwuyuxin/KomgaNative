@@ -28,6 +28,7 @@ class MainActivity : FlutterActivity() {
     private var deviceChannel: MethodChannel? = null
     private var incomingFilesChannel: MethodChannel? = null
     private var externalRootsHandler: SafExternalRootsHandler? = null
+    private var nativePdfHandler: NativePdfHandler? = null
     private var dartConsumedInitial = false
     private val pendingIncomingFiles = CopyOnWriteArrayList<Map<String, String>>()
     private val ioExecutor = Executors.newSingleThreadExecutor()
@@ -50,6 +51,7 @@ class MainActivity : FlutterActivity() {
 
     override fun onDestroy() {
         pendingStoragePermissionCallback = null
+        nativePdfHandler?.closeAll()
         ioExecutor.shutdown()
         super.onDestroy()
     }
@@ -134,6 +136,15 @@ class MainActivity : FlutterActivity() {
             SafExternalRootsHandler.CHANNEL,
         ).setMethodCallHandler { call, result ->
             rootsHandler.handle(call, result)
+        }
+
+        val pdfHandler = NativePdfHandler(this, ioExecutor)
+        nativePdfHandler = pdfHandler
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            NativePdfHandler.CHANNEL,
+        ).setMethodCallHandler { call, result ->
+            pdfHandler.handle(call, result)
         }
     }
 

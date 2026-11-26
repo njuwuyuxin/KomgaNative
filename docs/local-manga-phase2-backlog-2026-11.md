@@ -21,7 +21,7 @@
 | **Phase B** | `LMB-08` | 外部目录原位挂载：Android SAF 持久化树 & iOS Security-Scoped Bookmark（含 `.nomedia` & iCloud 感知） | P1 | L | [x] |
 | **Phase B** | `LMB-09` | 后台增量目录扫描器、iOS `Files.app` 目录自发现与「本地书库管理中心」 | P1 | M-L | [x] |
 | **Phase B** | `LMB-10` | 本地书架「按文件夹树浏览」双模视图 | P1 | M | [x] |
-| **Phase C** | `LMB-11` | 原生 `PDF` 阅读支持（Android `PdfRenderer` + iOS `PDFKit` 按需光栅化 + 缩放高清重绘 + 大纲） | P1 | M-L | [ ] |
+| **Phase C** | `LMB-11` | 原生 `PDF` 阅读支持（Android `PdfRenderer` + iOS `PDFKit` 按需光栅化 + 缩放高清重绘 + 大纲） | P1 | M-L | [x] |
 | **Phase C** | `LMB-12` | `CBR (RAR4 / RAR5)` 与 `CB7 (7z)` 原生 FFI 解码（含固实包滑动窗口优化） | P1 | L | [ ] |
 | **Phase C** | `LMB-13` | 加密压缩包与加密 PDF 密码弹窗、中文密码双编码尝试与钥匙串/常用词典记忆 | P1 | M | [ ] |
 | **Phase D** | `LMB-14` | `ComicInfo.xml` 页级指令完善（`DoublePage` / `Delete` / `Translator`）+ 手动屏蔽插播广告页 | P2 | S-M | [ ] |

@@ -8,6 +8,7 @@ import 'package:yomu/src/data/local/external_byte_source.dart';
 import 'package:yomu/src/data/local/external_roots_dao.dart';
 import 'package:yomu/src/data/local/local_catalog_query_dao.dart';
 import 'package:yomu/src/data/local/local_comics_storage.dart';
+import 'package:yomu/src/data/local/native_pdf_reader.dart';
 import 'package:yomu/src/data/progress/progress_database.dart';
 import 'package:yomu/src/data/reader_repository.dart';
 import 'package:yomu/src/data/shelf_failure.dart';
@@ -25,12 +26,15 @@ final class LocalReaderRepository implements ReaderRepository {
     this._storage, {
     int pageCacheCapacity = defaultPageCacheCapacity,
     ExternalRootsBridge? externalRoots,
+    NativePdfBridge? pdfBridge,
   }) : _pages = ByteLruCache(capacity: pageCacheCapacity),
-       _externalRoots = externalRoots ?? ChannelExternalRootsBridge();
+       _externalRoots = externalRoots ?? ChannelExternalRootsBridge(),
+       _pdfBridge = pdfBridge ?? ChannelNativePdfBridge();
 
   final ProgressDatabase _db;
   final LocalComicsStorage _storage;
   final ExternalRootsBridge _externalRoots;
+  final NativePdfBridge _pdfBridge;
   final ByteLruCache _pages;
   final Map<String, Future<Uint8List>> _inFlight =
       <String, Future<Uint8List>>{};
@@ -105,8 +109,38 @@ final class LocalReaderRepository implements ReaderRepository {
       _pages.peek('$bookId#$page');
 
   @override
-  Future<Uint8List> pageThumbnail(String bookId, int page) =>
-      pageImage(bookId, page);
+  Future<Uint8List> pageThumbnail(String bookId, int page) async {
+    final thumbKey = '$bookId#$page#thumb';
+    final cached = _pages.get(thumbKey) ?? _pages.peek('$bookId#$page');
+    if (cached != null) return cached;
+    final bookRow = await _db.localBookRowById(bookId);
+    if (bookRow != null &&
+        (bookRow.storageKind == 'pdf' || bookRow.storageKind == 'ext_pdf')) {
+      final reader = await _acquireReader(bookId, bookRow);
+      if (reader is NativePdfComicReader) {
+        final bytes = await reader.renderAtWidth(
+          page,
+          targetWidthPx: NativePdfComicReader.defaultThumbnailWidthPx,
+        );
+        _pages.put(thumbKey, bytes);
+        return bytes;
+      }
+    }
+    return pageImage(bookId, page);
+  }
+
+  /// PDF 缩放高清重绘接口（LMB-11）：按目标像素宽度重新光栅化当前页。
+  Future<Uint8List?> renderHighResPage(
+    String bookId,
+    int page, {
+    int targetWidthPx = NativePdfComicReader.defaultZoomHdWidthPx,
+  }) async {
+    final bookRow = await _db.localBookRowById(bookId);
+    if (bookRow == null) return null;
+    final reader = await _acquireReader(bookId, bookRow);
+    if (reader is! NativePdfComicReader) return null;
+    return reader.renderAtWidth(page, targetWidthPx: targetWidthPx);
+  }
 
   @override
   Uint8List? cachedPageThumbnail(String bookId, int page) =>
@@ -192,6 +226,15 @@ final class LocalReaderRepository implements ReaderRepository {
     }
 
     final file = await _storage.resolveFile(row.relativePath);
+    if (row.storageKind == 'pdf') {
+      return entries.isNotEmpty
+          ? NativePdfComicReader.fromIndexedPages(
+              _pdfBridge,
+              file.path,
+              entries,
+            )
+          : NativePdfComicReader.open(_pdfBridge, file.path);
+    }
     final source = await FileByteSource.open(file);
     if (row.storageKind == 'tar') {
       return entries.isNotEmpty
@@ -223,6 +266,16 @@ final class LocalReaderRepository implements ReaderRepository {
       return entries.isNotEmpty
           ? FolderComicReader.fromIndexedPages(dir, entries)
           : FolderComicReader.open(dir);
+    }
+
+    if (row.storageKind == 'ext_pdf') {
+      return entries.isNotEmpty
+          ? NativePdfComicReader.fromIndexedPages(
+              _pdfBridge,
+              row.relativePath,
+              entries,
+            )
+          : NativePdfComicReader.open(_pdfBridge, row.relativePath);
     }
 
     final useBridge =

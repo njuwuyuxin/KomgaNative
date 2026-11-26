@@ -4,11 +4,13 @@ import 'dart:typed_data';
 import 'package:yomu/src/data/local/cover_thumbnail_generator.dart';
 import 'package:yomu/src/data/local/local_comic_importer_models.dart';
 import 'package:yomu/src/data/local/local_comics_storage.dart';
+import 'package:yomu/src/data/local/native_pdf_reader.dart';
 import 'package:yomu/src/data/progress/progress_database.dart';
 import 'package:yomu_local_archive/yomu_local_archive.dart';
+import 'package:yomu_platform/yomu_platform.dart';
 
 /// 导入单个归档文件流；若检测到为「嵌套合集包」（内部无直接图片但含多个子归档），
-/// 自动拆包入库并归入同一系列，同时清理外层临时文件（LMB-06）。
+/// 自动拆包入库并归入同一系列，同时清理外层临时文件（LMB-06 / LMB-11）。
 Future<LocalImportBatchResult> importArchiveOrCollectionStream({
   required ProgressDatabase db,
   required LocalComicsStorage storage,
@@ -17,12 +19,16 @@ Future<LocalImportBatchResult> importArchiveOrCollectionStream({
   required String displayFileName,
   required String? parentFolderName,
   required String Function(String prefix) nextId,
+  NativePdfBridge? pdfBridge,
+  String? password,
   bool allowNestedUnpack = true,
 }) async {
   final bookId = nextId('b');
   final safeFolder = bookId.replaceAll(':', '_');
   final lower = displayFileName.toLowerCase();
-  final archiveExt = lower.endsWith('.epub')
+  final archiveExt = lower.endsWith('.pdf')
+      ? 'pdf'
+      : lower.endsWith('.epub')
       ? 'epub'
       : (lower.endsWith('.cbt') || lower.endsWith('.tar'))
       ? 'cbt'
@@ -36,31 +42,49 @@ Future<LocalImportBatchResult> importArchiveOrCollectionStream({
     await destFile.parent.create(recursive: true);
     await writeStreamToFile(openStream(), destFile);
     final sizeBytes = await destFile.length();
-    fileSource = await FileByteSource.open(destFile);
+    if (sizeBytes <= 0) {
+      throw const ArchiveException(ArchiveErrorKind.emptyFile);
+    }
 
-    try {
-      reader = await openComicArchive(fileSource);
-    } on ArchiveException catch (e) {
-      fileSource = null; // openComicArchive 失败时已关闭句柄
-      if (allowNestedUnpack && e.kind == ArchiveErrorKind.noImages) {
-        final unpacked = await _tryUnpackNestedCollection(
-          db: db,
-          storage: storage,
-          coverEncoder: coverEncoder,
-          outerFile: destFile,
-          outerFileName: displayFileName,
-          parentFolderName: parentFolderName,
-          nextId: nextId,
-        );
-        if (unpacked != null) {
-          await tryDeleteImportDir(destFile.parent);
-          return unpacked;
+    final head = await _peekFileHead(destFile, 16);
+    final isPdf =
+        sniffContainerMagic(head) == ContainerMagic.pdf ||
+        lower.endsWith('.pdf');
+
+    if (isPdf) {
+      reader = await NativePdfComicReader.open(
+        pdfBridge ?? ChannelNativePdfBridge(),
+        destFile.path,
+        password: password,
+      );
+    } else {
+      fileSource = await FileByteSource.open(destFile);
+      try {
+        reader = await openComicArchive(fileSource);
+      } on ArchiveException catch (e) {
+        fileSource = null; // openComicArchive 失败时已关闭句柄
+        if (allowNestedUnpack && e.kind == ArchiveErrorKind.noImages) {
+          final unpacked = await _tryUnpackNestedCollection(
+            db: db,
+            storage: storage,
+            coverEncoder: coverEncoder,
+            outerFile: destFile,
+            outerFileName: displayFileName,
+            parentFolderName: parentFolderName,
+            nextId: nextId,
+            pdfBridge: pdfBridge,
+          );
+          if (unpacked != null) {
+            await tryDeleteImportDir(destFile.parent);
+            return unpacked;
+          }
         }
+        rethrow;
       }
-      rethrow;
     }
 
     final storageKind = switch (reader) {
+      NativePdfComicReader() => 'pdf',
       EpubComicReader() => 'epub',
       TarComicReader() => 'tar',
       _ => 'zip',
@@ -102,6 +126,7 @@ Future<LocalImportBatchResult?> _tryUnpackNestedCollection({
   required String outerFileName,
   required String? parentFolderName,
   required String Function(String prefix) nextId,
+  NativePdfBridge? pdfBridge,
 }) async {
   final outerSource = await FileByteSource.open(outerFile);
   try {
@@ -132,6 +157,7 @@ Future<LocalImportBatchResult?> _tryUnpackNestedCollection({
           displayFileName: childName,
           parentFolderName: collectionSeries,
           nextId: nextId,
+          pdfBridge: pdfBridge,
           allowNestedUnpack: false,
         );
         seriesIds.addAll(sub.importedSeriesIds);
@@ -161,5 +187,17 @@ Future<LocalImportBatchResult?> _tryUnpackNestedCollection({
     );
   } finally {
     await outerSource.close();
+  }
+}
+
+Future<Uint8List> _peekFileHead(File file, int maxBytes) async {
+  final raf = await file.open();
+  try {
+    final len = await raf.length();
+    final toRead = len < maxBytes ? len : maxBytes;
+    if (toRead <= 0) return Uint8List(0);
+    return await raf.read(toRead);
+  } finally {
+    await raf.close();
   }
 }

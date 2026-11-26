@@ -1,4 +1,5 @@
 import Flutter
+import PDFKit
 import UIKit
 import UniformTypeIdentifiers
 
@@ -245,5 +246,163 @@ final class ExternalRootsBridgePlugin: NSObject, UIDocumentPickerDelegate {
       top = presented
     }
     return top
+  }
+}
+
+/// iOS 原生 `PDFKit` 按需光栅化、大纲解析与密码解锁插件（LMB-11）。
+final class NativePdfBridgePlugin: NSObject {
+  private let queue = DispatchQueue(label: "dev.yomu.native_pdf", qos: .userInitiated)
+  private var cache: [String: PDFDocument] = [:]
+
+  func register(with messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(
+      name: "yomu/native_pdf",
+      binaryMessenger: messenger
+    )
+    channel.setMethodCallHandler { [weak self] call, result in
+      self?.handle(call: call, result: result)
+    }
+  }
+
+  private func handle(call: FlutterMethodCall, result: @escaping FlutterResult) {
+    let args = call.arguments as? [String: Any]
+    switch call.method {
+    case "inspect":
+      guard let filePath = args?["filePath"] as? String, !filePath.isEmpty else {
+        result(FlutterError(code: "IO_ERROR", message: "Missing filePath", details: nil))
+        return
+      }
+      let password = args?["password"] as? String
+      queue.async { [weak self] in
+        guard let self = self else { return }
+        switch self.openDocument(path: filePath, password: password) {
+        case .failure(let err):
+          DispatchQueue.main.async { result(err) }
+        case .success(let doc):
+          var pages: [[String: Any]] = []
+          for idx in 0..<doc.pageCount {
+            let bounds = doc.page(at: idx)?.bounds(for: .mediaBox) ?? CGRect(x: 0, y: 0, width: 800, height: 1200)
+            pages.append([
+              "pageNumber": idx + 1,
+              "width": max(1, Int(bounds.width.rounded())),
+              "height": max(1, Int(bounds.height.rounded())),
+            ])
+          }
+          var outline: [[String: Any]] = []
+          if let root = doc.outlineRoot {
+            Self.collectOutline(node: root, in: doc, into: &outline)
+          }
+          let attrs = doc.documentAttributes
+          let title = attrs?[PDFDocumentAttribute.titleAttribute] as? String
+          let author = attrs?[PDFDocumentAttribute.authorAttribute] as? String
+          var payload: [String: Any] = [
+            "pageCount": doc.pageCount,
+            "pages": pages,
+            "outline": outline,
+          ]
+          if let title = title, !title.isEmpty { payload["title"] = title }
+          if let author = author, !author.isEmpty { payload["author"] = author }
+          DispatchQueue.main.async { result(payload) }
+        }
+      }
+    case "renderPage":
+      guard let filePath = args?["filePath"] as? String, !filePath.isEmpty else {
+        result(FlutterError(code: "IO_ERROR", message: "Missing filePath", details: nil))
+        return
+      }
+      let pageNumber = (args?["pageNumber"] as? Int) ?? 1
+      let targetWidth = max(240, min(3200, (args?["targetWidthPx"] as? Int) ?? 1600))
+      let password = args?["password"] as? String
+      queue.async { [weak self] in
+        guard let self = self else { return }
+        switch self.openDocument(path: filePath, password: password) {
+        case .failure(let err):
+          DispatchQueue.main.async { result(err) }
+        case .success(let doc):
+          let idx = max(0, min(doc.pageCount - 1, pageNumber - 1))
+          guard let page = doc.page(at: idx) else {
+            DispatchQueue.main.async {
+              result(FlutterError(code: "IO_ERROR", message: "Page out of range", details: nil))
+            }
+            return
+          }
+          let bounds = page.bounds(for: .mediaBox)
+          let safeW = max(1.0, bounds.width)
+          let safeH = max(1.0, bounds.height)
+          let scale = CGFloat(targetWidth) / safeW
+          let size = CGSize(width: CGFloat(targetWidth), height: max(1.0, min(6400.0, safeH * scale)))
+          let format = UIGraphicsImageRendererFormat()
+          format.scale = 1.0
+          format.opaque = true
+          let renderer = UIGraphicsImageRenderer(size: size, format: format)
+          let image = renderer.image { ctx in
+            UIColor.white.setFill()
+            ctx.fill(CGRect(origin: .zero, size: size))
+            ctx.cgContext.translateBy(x: 0, y: size.height)
+            ctx.cgContext.scaleBy(x: scale, y: -scale)
+            page.draw(with: .mediaBox, to: ctx.cgContext)
+          }
+          guard let data = image.pngData() else {
+            DispatchQueue.main.async {
+              result(FlutterError(code: "IO_ERROR", message: "Failed to encode PNG", details: nil))
+            }
+            return
+          }
+          DispatchQueue.main.async { result(FlutterStandardTypedData(bytes: data)) }
+        }
+      }
+    case "closeDocument":
+      if let filePath = args?["filePath"] as? String {
+        queue.async { [weak self] in
+          self?.cache.removeValue(forKey: filePath)
+        }
+      }
+      result(nil)
+    default:
+      result(FlutterMethodNotImplemented)
+    }
+  }
+
+  private enum OpenOutcome {
+    case success(PDFDocument)
+    case failure(FlutterError)
+  }
+
+  private func openDocument(path: String, password: String?) -> OpenOutcome {
+    if let existing = cache[path], !existing.isLocked {
+      return .success(existing)
+    }
+    guard let doc = PDFDocument(url: URL(fileURLWithPath: path)) else {
+      return .failure(FlutterError(code: "CORRUPTED", message: "Unable to open PDF", details: nil))
+    }
+    if doc.isLocked {
+      guard let pwd = password, !pwd.isEmpty, doc.unlock(withPassword: pwd) else {
+        return .failure(FlutterError(code: "INVALID_PASSWORD", message: "Password required", details: nil))
+      }
+    }
+    if cache.count >= 2, let firstKey = cache.keys.first {
+      cache.removeValue(forKey: firstKey)
+    }
+    cache[path] = doc
+    return .success(doc)
+  }
+
+  private static func collectOutline(
+    node: PDFOutline,
+    in doc: PDFDocument,
+    into out: inout [[String: Any]]
+  ) {
+    for i in 0..<node.numberOfChildren {
+      guard let child = node.child(at: i) else { continue }
+      if let label = child.label?.trimmingCharacters(in: .whitespacesAndNewlines),
+         !label.isEmpty,
+         let page = child.destination?.page {
+        let idx = doc.index(for: page)
+        if idx != NSNotFound {
+          out.append(["title": label, "startPage": idx + 1])
+        }
+      }
+      collectOutline(node: child, in: doc, into: &out)
+    }
   }
 }

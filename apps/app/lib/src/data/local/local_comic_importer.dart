@@ -7,22 +7,26 @@ import 'package:yomu/src/data/local/local_comic_importer_models.dart';
 import 'package:yomu/src/data/local/local_comics_storage.dart';
 import 'package:yomu/src/data/progress/progress_database.dart';
 import 'package:yomu_local_archive/yomu_local_archive.dart';
+import 'package:yomu_platform/yomu_platform.dart';
 
 export 'package:yomu/src/data/local/local_comic_importer_models.dart';
 
-/// 受管沙盒本地漫画导入管线（支持 CBZ/ZIP 多选、图片页多选与文件夹导入，ADR 0009）。
+/// 受管沙盒本地漫画导入管线（支持 CBZ/ZIP/EPUB/CBT/PDF 多选、图片页多选与文件夹导入，ADR 0009）。
 final class LocalComicImporter {
   LocalComicImporter({
     required ProgressDatabase db,
     required LocalComicsStorage storage,
     CoverThumbnailEncoder coverEncoder = encodeDefaultCoverThumbnail,
+    NativePdfBridge? pdfBridge,
   }) : _db = db,
        _storage = storage,
-       _coverEncoder = coverEncoder;
+       _coverEncoder = coverEncoder,
+       _pdfBridge = pdfBridge;
 
   final ProgressDatabase _db;
   final LocalComicsStorage _storage;
   final CoverThumbnailEncoder _coverEncoder;
+  final NativePdfBridge? _pdfBridge;
   int _idSeq = 0;
 
   String _nextId(String prefix) {
@@ -53,6 +57,7 @@ final class LocalComicImporter {
           displayFileName: item.name,
           parentFolderName: parentFolderName,
           nextId: _nextId,
+          pdfBridge: _pdfBridge,
         );
         seriesIds.addAll(imported.importedSeriesIds);
         bookIds.addAll(imported.importedBookIds);
@@ -187,7 +192,8 @@ final class LocalComicImporter {
     await for (final entity in sourceDir.list(followLinks: false)) {
       if (entity is! File) continue;
       final name = importBaseName(entity.path);
-      if (isNestedComicArchivePath(name)) {
+      if (isNestedComicArchivePath(name) ||
+          name.toLowerCase().endsWith('.pdf')) {
         childArchives.add(PickedComicFile.fromFile(entity, name: name));
       }
     }

@@ -96,6 +96,7 @@
 				<string>public.zip-archive</string>
 				<string>com.pkware.zip-archive</string>
 				<string>org.idpf.epub-container</string>
+				<string>com.adobe.pdf</string>
 			</array>
 		</dict>
 	</array>

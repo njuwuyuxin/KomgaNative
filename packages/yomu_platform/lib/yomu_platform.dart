@@ -9,5 +9,6 @@ export 'src/external_roots.dart';
 export 'src/hardware_keys.dart';
 export 'src/image_saver.dart';
 export 'src/incoming_files.dart';
+export 'src/native_pdf.dart';
 export 'src/network_probe.dart';
 export 'src/wakelock.dart';
