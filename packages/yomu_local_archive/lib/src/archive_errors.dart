@@ -26,6 +26,9 @@ enum ArchiveErrorKind {
   /// 归档合法，但内部没有任何受支持的漫画图片页。
   noImages,
 
+  /// 检测到纯文字流式电子书 EPUB（非漫画/画集），按产品边界明确提示用户。
+  textOnlyEpub,
+
   /// 请求的 1 基页码越界。
   pageOutOfRange,
 

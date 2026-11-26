@@ -4,9 +4,31 @@ import 'dart:typed_data';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu_local_archive/src/archive_errors.dart';
 import 'package:yomu_local_archive/src/byte_source.dart';
+import 'package:yomu_local_archive/src/comic_info_parser.dart';
 import 'package:yomu_local_archive/src/image_dimensions.dart';
 import 'package:yomu_local_archive/src/natural_sort.dart';
 import 'package:yomu_local_archive/src/zip_directory.dart';
+
+/// 归档/漫画书内部的单条章节锚点（1 基起始页码）。
+final class ArchiveChapter {
+  const ArchiveChapter({required this.title, required this.startPage});
+
+  final String title;
+  final int startPage;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ArchiveChapter &&
+          other.title == title &&
+          other.startPage == startPage);
+
+  @override
+  int get hashCode => Object.hash(title, startPage);
+
+  @override
+  String toString() => 'ArchiveChapter($title -> p.$startPage)';
+}
 
 /// 本地归档或文件夹中的单页索引信息（1 基页码，可直接持久化至本地页索引表）。
 final class ArchivePageEntry {
@@ -42,12 +64,18 @@ final class ArchivePageEntry {
   );
 }
 
-/// 统一的本地漫画容器读取接口（屏蔽 ZIP/CBZ 与图片文件夹差异）。
+/// 统一的本地漫画容器读取接口（屏蔽 ZIP/CBZ、漫画 EPUB 与图片文件夹差异）。
 abstract interface class ComicArchiveReader {
   List<ArchivePageEntry> get pages;
 
   /// 若归档根目录或子目录存在 `ComicInfo.xml`，返回其原始字节；否则为 `null`。
   Uint8List? get comicInfoBytes;
+
+  /// 容器自携带的结构化元数据（如 EPUB `content.opf` 解析结果）；未提供时返回 `null`。
+  ComicInfoMetadata? get embeddedMetadata;
+
+  /// 单本书内部章节目录（如 EPUB TOC、子文件夹起始页、`ComicInfo.xml` 书签）。
+  List<ArchiveChapter> get chapters;
 
   /// 按 1 基页码按需读取并解压单页图片字节。
   Future<Uint8List> readPage(int pageNumber);
@@ -76,19 +104,24 @@ final class ZipComicReader implements ComicArchiveReader {
     bool sniffDimensions = true,
   }) async {
     try {
-      return await _openInternal(source, sniffDimensions: sniffDimensions);
+      final entries = await readZipCentralDirectory(source);
+      return await openWithEntries(
+        source,
+        entries,
+        sniffDimensions: sniffDimensions,
+      );
     } on Object {
       await source.close();
       rethrow;
     }
   }
 
-  static Future<ZipComicReader> _openInternal(
-    RandomAccessByteSource source, {
-    required bool sniffDimensions,
+  /// 复用已读取的中央目录条目构造 ZIP 读取器（供统一容器探测入口避免二次读 EOCD）。
+  static Future<ZipComicReader> openWithEntries(
+    RandomAccessByteSource source,
+    List<ZipEntryInfo> entries, {
+    bool sniffDimensions = true,
   }) async {
-    final entries = await readZipCentralDirectory(source);
-
     ZipEntryInfo? comicInfoEntry;
     final imageEntries = <ZipEntryInfo>[];
 
@@ -178,6 +211,12 @@ final class ZipComicReader implements ComicArchiveReader {
   final Uint8List? comicInfoBytes;
 
   @override
+  ComicInfoMetadata? get embeddedMetadata => null;
+
+  @override
+  List<ArchiveChapter> get chapters => const <ArchiveChapter>[];
+
+  @override
   Future<Uint8List> readPage(int pageNumber) {
     if (pageNumber < 1 || pageNumber > pages.length) {
       return Future<Uint8List>.error(
@@ -203,6 +242,16 @@ final class ZipComicReader implements ComicArchiveReader {
 
   @override
   Future<void> close() => _source.close();
+
+  static Future<ImageSize?> sniffEntryDimensions(
+    RandomAccessByteSource source,
+    ZipEntryInfo entry,
+  ) => _sniffEntryDimensions(source, entry);
+
+  static Future<Uint8List> extractEntry(
+    RandomAccessByteSource source,
+    ZipEntryInfo entry,
+  ) => _extractEntry(source, entry);
 
   static Future<ImageSize?> _sniffEntryDimensions(
     RandomAccessByteSource source,

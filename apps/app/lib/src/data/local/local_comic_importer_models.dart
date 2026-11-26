@@ -13,6 +13,7 @@ enum ImportFailureReason {
   encrypted,
   corrupted,
   noImages,
+  textOnlyEpub,
   ioError,
 }
 
@@ -53,6 +54,7 @@ ImportFailureReason mapArchiveImportFailure(ArchiveErrorKind kind) =>
       ArchiveErrorKind.encryptedArchive => ImportFailureReason.encrypted,
       ArchiveErrorKind.corruptedArchive => ImportFailureReason.corrupted,
       ArchiveErrorKind.noImages => ImportFailureReason.noImages,
+      ArchiveErrorKind.textOnlyEpub => ImportFailureReason.textOnlyEpub,
       ArchiveErrorKind.ioError ||
       ArchiveErrorKind.pageOutOfRange => ImportFailureReason.ioError,
     };
@@ -75,7 +77,7 @@ Future<({String seriesId, String bookId})> commitComicReaderToDatabase({
   final xmlBytes = reader.comicInfoBytes;
   final meta = xmlBytes != null
       ? parseComicInfoXml(xmlBytes)
-      : const ComicInfoMetadata();
+      : (reader.embeddedMetadata ?? const ComicInfoMetadata());
   final inferred = inferTitlesFromFileName(
     displayName,
     parentFolderName: parentFolderName,

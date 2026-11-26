@@ -184,6 +184,6 @@ final class LocalReaderRepository implements ReaderRepository {
     final source = await FileByteSource.open(file);
     return entries.isNotEmpty
         ? ZipComicReader.fromIndexedPages(source, entries)
-        : ZipComicReader.open(source);
+        : openComicArchive(source);
   }
 }

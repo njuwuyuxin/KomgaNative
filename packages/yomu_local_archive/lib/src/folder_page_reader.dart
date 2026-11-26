@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:yomu_local_archive/src/archive_errors.dart';
+import 'package:yomu_local_archive/src/comic_info_parser.dart';
 import 'package:yomu_local_archive/src/image_dimensions.dart';
 import 'package:yomu_local_archive/src/natural_sort.dart';
 import 'package:yomu_local_archive/src/zip_page_reader.dart';
@@ -130,6 +131,12 @@ final class FolderComicReader implements ComicArchiveReader {
 
   @override
   final Uint8List? comicInfoBytes;
+
+  @override
+  ComicInfoMetadata? get embeddedMetadata => null;
+
+  @override
+  List<ArchiveChapter> get chapters => const <ArchiveChapter>[];
 
   @override
   Future<Uint8List> readPage(int pageNumber) async {

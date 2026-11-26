@@ -8,6 +8,7 @@ import 'package:yomu/src/data/local/comic_file_picker.dart';
 import 'package:yomu/src/data/local/local_catalog_query_dao.dart';
 import 'package:yomu/src/data/local/local_comic_importer.dart';
 import 'package:yomu/src/data/local/local_comics_storage.dart';
+import 'package:yomu/src/data/local/local_reader_repository.dart';
 import 'package:yomu/src/data/progress/progress_database.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 
@@ -192,6 +193,118 @@ void main() {
       ]);
       expect(result.importedCount, 1);
       expect(result.failures, isEmpty);
+    });
+
+    test('支持导入漫画型 EPUB（按 spine 顺序索引 + OPF 元数据/RTL + 正常读页）', () async {
+      final png1 = _fakePng(800, 1200);
+      final png2 = _fakePng(800, 1200);
+      final epubBytes = _buildCbz(
+        entries: <String, List<int>>{
+          'mimetype': utf8.encode('application/epub+zip'),
+          'META-INF/container.xml': utf8.encode('''
+<?xml version="1.0"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
+  </rootfiles>
+</container>'''),
+          'OEBPS/content.opf': utf8.encode('''
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title>Dungeon Meshi Vol.1</dc:title>
+    <meta property="belongs-to-collection">Dungeon Meshi</meta>
+    <meta property="group-position">1</meta>
+  </metadata>
+  <manifest>
+    <item id="p1" href="text/p1.xhtml" media-type="application/xhtml+xml"/>
+    <item id="p2" href="text/p2.xhtml" media-type="application/xhtml+xml"/>
+    <item id="i1" href="images/001.png" media-type="image/png"/>
+    <item id="i2" href="images/002.png" media-type="image/png"/>
+  </manifest>
+  <spine page-progression-direction="rtl">
+    <itemref idref="p1"/>
+    <itemref idref="p2"/>
+  </spine>
+</package>'''),
+          'OEBPS/text/p1.xhtml': utf8.encode(
+            '<html><body><img src="../images/001.png"/></body></html>',
+          ),
+          'OEBPS/text/p2.xhtml': utf8.encode(
+            '<html><body><img src="../images/002.png"/></body></html>',
+          ),
+          'OEBPS/images/001.png': png1,
+          'OEBPS/images/002.png': png2,
+        },
+      );
+      final epubFile = File('${srcTemp.path}/dungeon_meshi.epub')
+        ..writeAsBytesSync(epubBytes);
+
+      final result = await importer.importArchiveFiles(<PickedComicFile>[
+        PickedComicFile.fromFile(epubFile, name: 'dungeon_meshi.epub'),
+      ]);
+      expect(result.importedCount, 1);
+      expect(result.failures, isEmpty);
+
+      final series = (await db.queryLocalSeries()).items.single;
+      expect(series.title, 'Dungeon Meshi');
+      expect(series.readingDirection, ReadingDirection.rightToLeft);
+
+      final bookId = result.importedBookIds.single;
+      final readerRepo = LocalReaderRepository(
+        db,
+        LocalComicsStorage(rootResolver: () async => sandboxTemp),
+      );
+      addTearDown(readerRepo.dispose);
+      final pages = await readerRepo.pages(bookId);
+      expect(pages, hasLength(2));
+      expect(await readerRepo.pageImage(bookId, 1), png1);
+      expect(await readerRepo.pageImage(bookId, 2), png2);
+    });
+
+    test('纯文字小说 EPUB 拒绝入库并返回 textOnlyEpub 原因且清理沙盒', () async {
+      final prose = List<String>.filled(40, '这是一段足够长的纯文字轻小说正文内容。').join();
+      final novelBytes = _buildCbz(
+        entries: <String, List<int>>{
+          'mimetype': utf8.encode('application/epub+zip'),
+          'META-INF/container.xml': utf8.encode('''
+<?xml version="1.0"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="content.opf" media-type="application/oebps-package+xml"/>
+  </rootfiles>
+</container>'''),
+          'content.opf': utf8.encode('''
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title>Text Novel</dc:title>
+  </metadata>
+  <manifest>
+    <item id="c1" href="ch1.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine><itemref idref="c1"/></spine>
+</package>'''),
+          'ch1.xhtml': utf8.encode('<html><body><p>$prose</p></body></html>'),
+        },
+      );
+      final novelFile = File('${srcTemp.path}/novel.epub')
+        ..writeAsBytesSync(novelBytes);
+
+      final result = await importer.importArchiveFiles(<PickedComicFile>[
+        PickedComicFile.fromFile(novelFile, name: 'novel.epub'),
+      ]);
+      expect(result.importedCount, 0);
+      expect(result.failures, hasLength(1));
+      expect(result.failures.single.reason, ImportFailureReason.textOnlyEpub);
+
+      final booksDir = Directory('${sandboxTemp.path}/books');
+      expect(
+        booksDir.existsSync()
+            ? booksDir.listSync()
+            : const <FileSystemEntity>[],
+        isEmpty,
+      );
     });
   });
 }

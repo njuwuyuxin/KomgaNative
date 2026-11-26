@@ -505,7 +505,7 @@
   "localLibrary": "本机",
   "localLibraryFull": "本机书库",
   "importComics": "导入漫画",
-  "importArchiveFiles": "导入 CBZ / ZIP 压缩包",
+  "importArchiveFiles": "导入 CBZ / ZIP / 漫画 EPUB",
   "importComicFolder": "导入漫画文件夹",
   "importingProgress": "正在导入（{done}/{total}）",
   "@importingProgress": {
@@ -529,6 +529,12 @@
   },
   "importFailedUnsupported": "不支持或已加密的压缩包（{name}）",
   "@importFailedUnsupported": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "importFailedTextOnlyEpub": "《{name}》为纯文字电子书，Yomu 专注于漫画与画集阅读。",
+  "@importFailedTextOnlyEpub": {
     "placeholders": {
       "name": {"type": "String"}
     }

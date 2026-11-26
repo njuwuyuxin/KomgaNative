@@ -14,7 +14,7 @@
 | **Phase A** | `LMB-01` | 宽幅合扫页自动切分（Split Wide Pages，RTL/LTR）+ 竖屏「临时合页」查看跨页 | P1 | M-L | [x] |
 | **Phase A** | `LMB-02` | 超高条漫长图（> 4096px）自动分片解码渲染（防 GPU 纹理越界与 OOM） | P1 | M | [x] |
 | **Phase A** | `LMB-03` | 漫画图像增强滤镜（对比度 / 去底灰漂白 White Threshold / 去黄 / 灰阶，含墨水屏预设） | P1 | M | [x] |
-| **Phase A** | `LMB-04` | 漫画型 `EPUB`（固定版式 / 纯图）支持：`OPF` 元数据、`RTL` 方向、内嵌目录与纯文字拦截 | P1 | M | [ ] |
+| **Phase A** | `LMB-04` | 漫画型 `EPUB`（固定版式 / 纯图）支持：`OPF` 元数据、`RTL` 方向、内嵌目录与纯文字拦截 | P1 | M | [x] |
 | **Phase A** | `LMB-05` | 单本书内部多章节目录（EPUB TOC / 子目录 / `ComicInfo` 书签）+ 通用页级书签 | P1 | M | [ ] |
 | **Phase A** | `LMB-06` | 老压缩包文件名 `Shift-JIS / GBK` 真转码 + `CBT/TAR` + 嵌套合集包自动拆包 | P1 | M | [ ] |
 | **Phase B** | `LMB-07` | 内置局域网 HTTP Wi-Fi 传书服务（浏览器拖拽文件/文件夹 + 进度 + 可选 PIN） | P1 | M-L | [ ] |

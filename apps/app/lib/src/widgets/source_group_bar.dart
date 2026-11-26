@@ -217,7 +217,10 @@ void _showImportOutcome(
       result.failures.length,
     );
   } else if (result.hasFailures) {
-    text = l10n.importFailedUnsupported(result.failures.first.fileName);
+    final first = result.failures.first;
+    text = first.reason == ImportFailureReason.textOnlyEpub
+        ? l10n.importFailedTextOnlyEpub(first.fileName)
+        : l10n.importFailedUnsupported(first.fileName);
   } else {
     return;
   }

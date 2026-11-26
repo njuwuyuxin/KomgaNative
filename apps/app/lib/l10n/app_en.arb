@@ -656,7 +656,7 @@
   "localLibrary": "On Device",
   "localLibraryFull": "Local library",
   "importComics": "Import comics",
-  "importArchiveFiles": "Import CBZ / ZIP files",
+  "importArchiveFiles": "Import CBZ / ZIP / EPUB",
   "importComicFolder": "Import comic folder",
   "importingProgress": "Importing ({done}/{total})",
   "@importingProgress": {
@@ -680,6 +680,12 @@
   },
   "importFailedUnsupported": "Unsupported or encrypted archive ({name})",
   "@importFailedUnsupported": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "importFailedTextOnlyEpub": "{name} is a text-only EPUB; Yomu is designed for comics and artbooks.",
+  "@importFailedTextOnlyEpub": {
     "placeholders": {
       "name": {"type": "String"}
     }

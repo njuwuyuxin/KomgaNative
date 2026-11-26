@@ -182,7 +182,9 @@ final class LocalComicImporter {
       if (entity is! File) continue;
       final name = importBaseName(entity.path);
       final lower = name.toLowerCase();
-      if (lower.endsWith('.cbz') || lower.endsWith('.zip')) {
+      if (lower.endsWith('.cbz') ||
+          lower.endsWith('.zip') ||
+          lower.endsWith('.epub')) {
         childArchives.add(PickedComicFile.fromFile(entity, name: name));
       }
     }
@@ -270,43 +272,65 @@ final class LocalComicImporter {
     Stream<List<int>> Function() openStream, {
     required String displayFileName,
     String? parentFolderName,
-  }) async {
-    final bookId = _nextId('b');
-    final safeFolder = bookId.replaceAll(':', '_');
-    final archiveRelPath = 'books/$safeFolder/archive.cbz';
-    final destFile = await _storage.resolveFile(archiveRelPath);
+  }) => _importArchiveStreamToSandbox(
+    db: _db,
+    storage: _storage,
+    coverEncoder: _coverEncoder,
+    openStream: openStream,
+    displayFileName: displayFileName,
+    parentFolderName: parentFolderName,
+    nextId: _nextId,
+  );
+}
 
-    FileByteSource? fileSource;
-    ZipComicReader? reader;
-    try {
-      await destFile.parent.create(recursive: true);
-      await writeStreamToFile(openStream(), destFile);
-      final sizeBytes = await destFile.length();
-      fileSource = await FileByteSource.open(destFile);
-      reader = await ZipComicReader.open(fileSource);
-      final result = await commitComicReaderToDatabase(
-        db: _db,
-        storage: _storage,
-        coverEncoder: _coverEncoder,
-        bookId: bookId,
-        safeFolder: safeFolder,
-        storageKind: 'zip',
-        relativePath: archiveRelPath,
-        sizeBytes: sizeBytes,
-        displayName: displayFileName,
-        parentFolderName: parentFolderName,
-        reader: reader,
-        generateSeriesId: () => _nextId('s'),
-      );
-      await reader.close();
-      reader = null;
-      fileSource = null;
-      return result;
-    } on Object {
-      await reader?.close();
-      await fileSource?.close();
-      await tryDeleteImportDir(destFile.parent);
-      rethrow;
-    }
+Future<({String seriesId, String bookId})> _importArchiveStreamToSandbox({
+  required ProgressDatabase db,
+  required LocalComicsStorage storage,
+  required CoverThumbnailEncoder coverEncoder,
+  required Stream<List<int>> Function() openStream,
+  required String displayFileName,
+  required String? parentFolderName,
+  required String Function(String prefix) nextId,
+}) async {
+  final bookId = nextId('b');
+  final safeFolder = bookId.replaceAll(':', '_');
+  final isEpub = displayFileName.toLowerCase().endsWith('.epub');
+  final archiveRelPath = isEpub
+      ? 'books/$safeFolder/archive.epub'
+      : 'books/$safeFolder/archive.cbz';
+  final destFile = await storage.resolveFile(archiveRelPath);
+
+  FileByteSource? fileSource;
+  ComicArchiveReader? reader;
+  try {
+    await destFile.parent.create(recursive: true);
+    await writeStreamToFile(openStream(), destFile);
+    final sizeBytes = await destFile.length();
+    fileSource = await FileByteSource.open(destFile);
+    reader = await openComicArchive(fileSource);
+    final storageKind = reader is EpubComicReader ? 'epub' : 'zip';
+    final result = await commitComicReaderToDatabase(
+      db: db,
+      storage: storage,
+      coverEncoder: coverEncoder,
+      bookId: bookId,
+      safeFolder: safeFolder,
+      storageKind: storageKind,
+      relativePath: archiveRelPath,
+      sizeBytes: sizeBytes,
+      displayName: displayFileName,
+      parentFolderName: parentFolderName,
+      reader: reader,
+      generateSeriesId: () => nextId('s'),
+    );
+    await reader.close();
+    reader = null;
+    fileSource = null;
+    return result;
+  } on Object {
+    await reader?.close();
+    await fileSource?.close();
+    await tryDeleteImportDir(destFile.parent);
+    rethrow;
   }
 }

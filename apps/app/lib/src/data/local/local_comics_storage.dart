@@ -68,6 +68,7 @@ ShelfFailure shelfFailureFromArchive(ArchiveException error) {
     ArchiveErrorKind.corruptedArchive ||
     ArchiveErrorKind.encryptedArchive ||
     ArchiveErrorKind.unsupportedCompression ||
-    ArchiveErrorKind.noImages => UnexpectedFailure(error.toString()),
+    ArchiveErrorKind.noImages ||
+    ArchiveErrorKind.textOnlyEpub => UnexpectedFailure(error.toString()),
   };
 }

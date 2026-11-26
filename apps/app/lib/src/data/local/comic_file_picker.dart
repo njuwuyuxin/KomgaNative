@@ -52,7 +52,7 @@ final class PlatformComicFilePicker implements ComicFilePicker {
         ? await FilePicker.pickFiles()
         : await FilePicker.pickFiles(
             type: FileType.custom,
-            allowedExtensions: const <String>['cbz', 'zip'],
+            allowedExtensions: const <String>['cbz', 'zip', 'epub'],
           );
     return _mapPlatformFiles(files);
   }
