@@ -3,17 +3,21 @@ import 'dart:io';
 import 'package:drift/drift.dart' show driftRuntimeOptions;
 import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yomu/src/data/app_settings.dart';
 import 'package:yomu/src/data/local/local_catalog_write_dao.dart';
 import 'package:yomu/src/data/local/local_comics_storage.dart';
+import 'package:yomu/src/data/missing_source_repository.dart';
 import 'package:yomu/src/data/progress/progress_database.dart';
 import 'package:yomu/src/data/settings_store.dart';
+import 'package:yomu/src/data/shelf_failure.dart';
 import 'package:yomu/src/providers/active_source_provider.dart';
 import 'package:yomu/src/providers/cross_source_reading_provider.dart';
 import 'package:yomu/src/providers/progress_providers.dart';
 import 'package:yomu/src/providers/settings_provider.dart';
 import 'package:yomu/src/providers/source_registry_provider.dart';
+import 'package:yomu/src/providers/source_scoped_providers.dart';
 import 'package:yomu/src/session/server_store.dart';
 import 'package:yomu/src/session/session_controller.dart';
 import 'package:yomu_domain/yomu_domain.dart';
@@ -178,6 +182,78 @@ void main() {
       ]);
       expect(merged.first.isCloud, isTrue);
       expect(merged[1].isCloud, isFalse);
+    });
+
+    test('SourceRegistry 懒加载且增删其他服务器时不销毁已访问服务器的 Bundle 缓存（P1-3）', () async {
+      final serverA = StoredServer(
+        address: ServerAddress.parse('https://alpha.komga.test'),
+        apiKey: 'key-a',
+        accountEmail: 'a@test.com',
+      );
+      final serverB = StoredServer(
+        address: ServerAddress.parse('https://beta.komga.test'),
+        apiKey: 'key-b',
+        accountEmail: 'b@test.com',
+      );
+      final serverC = StoredServer(
+        address: ServerAddress.parse('https://gamma.komga.test'),
+        apiKey: 'key-c',
+        accountEmail: 'c@test.com',
+      );
+      final serverStore = InMemoryServerStore.withAll(<StoredServer>[
+        serverA,
+        serverB,
+      ]);
+      final db = ProgressDatabase(NativeDatabase.memory());
+      final container = ProviderContainer(
+        overrides: <Override>[
+          progressDatabaseProvider.overrideWithValue(db),
+          localComicsStorageProvider.overrideWithValue(
+            LocalComicsStorage(rootResolver: () async => tempDir),
+          ),
+          serverStoreProvider.overrideWithValue(serverStore),
+          settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
+        ],
+      );
+      addTearDown(() async {
+        container.dispose();
+        await db.close();
+      });
+
+      await container.read(serverListProvider.future);
+      final registry1 = container.read(sourceRegistryProvider);
+      expect(registry1.sources, hasLength(3));
+
+      final bundleA1 = registry1.bundleFor(serverA.id);
+      expect(bundleA1.source.sourceKey, serverA.id);
+
+      // 新增服务器 C 并刷新列表：服务器 A 的 SourceBundle 与仓库实例必须保持 identical，不被销毁重建。
+      await serverStore.save(serverC);
+      container.invalidate(serverListProvider);
+      await container.read(serverListProvider.future);
+
+      final registry2 = container.read(sourceRegistryProvider);
+      expect(registry2.sources, hasLength(4));
+      final bundleA2 = registry2.bundleFor(serverA.id);
+      expect(identical(bundleA1, bundleA2), isTrue);
+      expect(identical(bundleA1.library, bundleA2.library), isTrue);
+    });
+
+    test('未知 sourceKey 绝不静默回退本机书库：bundleFor 抛 StateError，scoped provider 返回 MissingSourceRepository（P1-3）', () async {
+      const missingKey = 'https://deleted.komga.test';
+      final container = buildContainer();
+      await container.read(serverListProvider.future);
+
+      final registry = container.read(sourceRegistryProvider);
+      expect(registry.bundleOrNull(missingKey), isNull);
+      expect(() => registry.bundleFor(missingKey), throwsStateError);
+
+      final repo = container.read(
+        libraryRepositoryForSourceProvider(missingKey),
+      );
+      expect(repo, isA<MissingSourceRepository>());
+      expect(await repo.bookCover('any-book'), isNull);
+      await expectLater(repo.series(), throwsA(isA<ServerFailure>()));
     });
   });
 }

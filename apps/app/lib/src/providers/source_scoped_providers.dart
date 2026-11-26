@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/src/data/collections_repository.dart';
 import 'package:yomu/src/data/library_repository.dart';
+import 'package:yomu/src/data/missing_source_repository.dart';
 import 'package:yomu/src/data/read_status_repository.dart';
 import 'package:yomu/src/data/reader_repository.dart';
 import 'package:yomu/src/providers/active_source_provider.dart';
@@ -78,7 +79,11 @@ final libraryRepositoryForSourceProvider =
       final activeBundle = ref.watch(activeSourceBundleProvider);
       if (!identical(primary, activeBundle.library)) return primary;
       if (sourceKey == activeBundle.source.sourceKey) return primary;
-      return ref.watch(sourceRegistryProvider).bundleFor(sourceKey).library;
+      return ref
+              .watch(sourceRegistryProvider)
+              .bundleOrNull(sourceKey)
+              ?.library ??
+          MissingSourceRepository(sourceKey);
     });
 
 /// 按显式 `sourceKey` 解析 [ReaderRepository]。
@@ -89,7 +94,11 @@ final readerRepositoryForSourceProvider =
       final activeBundle = ref.watch(activeSourceBundleProvider);
       if (!identical(primary, activeBundle.reader)) return primary;
       if (sourceKey == activeBundle.source.sourceKey) return primary;
-      return ref.watch(sourceRegistryProvider).bundleFor(sourceKey).reader;
+      return ref
+              .watch(sourceRegistryProvider)
+              .bundleOrNull(sourceKey)
+              ?.reader ??
+          MissingSourceRepository(sourceKey);
     });
 
 /// 按显式 `sourceKey` 解析 [CollectionsRepository]。
@@ -103,7 +112,11 @@ final collectionsRepositoryForSourceProvider =
       final activeBundle = ref.watch(activeSourceBundleProvider);
       if (!identical(primary, activeBundle.collections)) return primary;
       if (sourceKey == activeBundle.source.sourceKey) return primary;
-      return ref.watch(sourceRegistryProvider).bundleFor(sourceKey).collections;
+      return ref
+              .watch(sourceRegistryProvider)
+              .bundleOrNull(sourceKey)
+              ?.collections ??
+          MissingSourceRepository(sourceKey);
     });
 
 /// 按显式 `sourceKey` 解析 [ReadStatusRepository]。
@@ -117,5 +130,9 @@ final readStatusRepositoryForSourceProvider =
       final activeBundle = ref.watch(activeSourceBundleProvider);
       if (!identical(primary, activeBundle.readStatus)) return primary;
       if (sourceKey == activeBundle.source.sourceKey) return primary;
-      return ref.watch(sourceRegistryProvider).bundleFor(sourceKey).readStatus;
+      return ref
+              .watch(sourceRegistryProvider)
+              .bundleOrNull(sourceKey)
+              ?.readStatus ??
+          MissingSourceRepository(sourceKey);
     });

@@ -57,6 +57,24 @@ class StoredServer {
       'certificateFingerprint': certificateFingerprint,
   };
 
+  @override
+  bool operator ==(Object other) =>
+      other is StoredServer &&
+      other.address == address &&
+      other.apiKey == apiKey &&
+      other.accountEmail == accountEmail &&
+      other.accountId == accountId &&
+      other.certificateFingerprint == certificateFingerprint;
+
+  @override
+  int get hashCode => Object.hash(
+    address,
+    apiKey,
+    accountEmail,
+    accountId,
+    certificateFingerprint,
+  );
+
   static StoredServer fromJson(Map<String, Object?> json) {
     // 存档可能被任何人写过（旧版本/手工改过），字段类型一律先判再取，
     // 不能因为一个脏字段就把整个会话读崩。

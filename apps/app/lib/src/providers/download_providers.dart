@@ -74,7 +74,11 @@ final downloadServiceForSourceProvider =
       // 单测显式 override 了 downloadServiceProvider 时保留被测替身。
       if (!identical(primary, defaultBundleService)) return primary;
       if (sourceKey == defaultScope) return primary;
-      return ref.watch(sourceRegistryProvider).bundleFor(sourceKey).download;
+      return ref
+              .watch(sourceRegistryProvider)
+              .bundleOrNull(sourceKey)
+              ?.download ??
+          const NoopDownloadService();
     });
 
 /// 当前服务器已下载书籍的合计占用（设置页，ARC-07 / ARC-10 Drift 表更新流驱动）。

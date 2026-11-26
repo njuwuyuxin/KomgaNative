@@ -17,8 +17,11 @@ final scopedBookCoverProvider =
     FutureProvider.family<Uint8List?, ScopedBookRef>((
       Ref ref,
       ScopedBookRef req,
-    ) {
-      final bundle = ref.watch(sourceRegistryProvider).bundleFor(req.sourceKey);
+    ) async {
+      final bundle = ref
+          .watch(sourceRegistryProvider)
+          .bundleOrNull(req.sourceKey);
+      if (bundle == null) return null;
       return bundle.library.bookCover(req.bookId);
     });
 
@@ -27,8 +30,11 @@ final scopedSeriesCoverProvider =
     FutureProvider.family<Uint8List?, ScopedSeriesRef>((
       Ref ref,
       ScopedSeriesRef req,
-    ) {
-      final bundle = ref.watch(sourceRegistryProvider).bundleFor(req.sourceKey);
+    ) async {
+      final bundle = ref
+          .watch(sourceRegistryProvider)
+          .bundleOrNull(req.sourceKey);
+      if (bundle == null) return null;
       return bundle.library.seriesCover(req.seriesId);
     });
 
