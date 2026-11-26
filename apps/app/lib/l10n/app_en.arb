@@ -697,6 +697,7 @@
   "wifiTransferMenu": "Wi-Fi Transfer",
   "wifiTransferTitle": "Wi-Fi Transfer",
   "wifiTransferHint": "Open the address below in a browser on the same Wi-Fi network, then drag and drop CBZ/ZIP/EPUB/CBT files or comic folders.",
+  "wifiTransferTrustedNetworkNotice": "Transfers and PIN use unencrypted HTTP — use only on trusted local networks.",
   "wifiTransferUrlLabel": "Browser address",
   "wifiTransferCopyUrl": "Copy address",
   "wifiTransferCopied": "Address copied to clipboard",

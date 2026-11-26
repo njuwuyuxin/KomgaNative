@@ -541,6 +541,7 @@
   "wifiTransferMenu": "Wi-Fi 传书",
   "wifiTransferTitle": "局域网 Wi-Fi 传书",
   "wifiTransferHint": "在同一 Wi-Fi 下的电脑或平板浏览器中打开下方地址，即可拖拽上传 CBZ / ZIP / EPUB / CBT 压缩包或整本漫画文件夹。",
+  "wifiTransferTrustedNetworkNotice": "传书与 PIN 均走明文 HTTP，请仅在可信局域网中使用。",
   "wifiTransferUrlLabel": "浏览器访问地址",
   "wifiTransferCopyUrl": "复制地址",
   "wifiTransferCopied": "已复制传书地址",

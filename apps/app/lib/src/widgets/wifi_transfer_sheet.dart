@@ -105,6 +105,27 @@ class _WifiTransferSheetState extends ConsumerState<WifiTransferSheet> {
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
+              const SizedBox(height: AppSpacing.xs),
+              Row(
+                key: const Key('wifi-transfer-trusted-network-notice'),
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Icon(
+                    Icons.info_outline,
+                    size: AppSizes.iconSm,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                  Expanded(
+                    child: Text(
+                      l10n.wifiTransferTrustedNetworkNotice,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: AppSpacing.md),
               _AddressCard(state: state, l10n: l10n),
               const SizedBox(height: AppSpacing.sm),

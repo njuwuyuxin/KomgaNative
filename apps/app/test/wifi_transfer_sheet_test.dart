@@ -59,8 +59,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 自动启动并展示局域网 URL，默认启用 6 位安全 PIN（P2-1）
+    // 自动启动并展示局域网 URL，默认启用 6 位安全 PIN（P2-1）与明文 HTTP 可信网络提示
     expect(find.byKey(const Key('wifi-transfer-url')), findsOneWidget);
+    expect(
+      find.byKey(const Key('wifi-transfer-trusted-network-notice')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('trusted local networks'), findsOneWidget);
     expect(find.textContaining('http://192.168.1.42:'), findsOneWidget);
     expect(server.isRunning, isTrue);
     expect(server.pin, isNotNull);
