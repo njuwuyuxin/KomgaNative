@@ -103,6 +103,12 @@ class ShelfController extends Notifier<ShelfState> {
     return _load(reset: true, keepItems: true);
   }
 
+  /// 仅当书架当前正在展示目标 [sourceKey] 时原地刷新（避免业务层直接窥探激活源）。
+  Future<void> refreshForSource(String sourceKey) {
+    if (_serverKey != sourceKey) return Future<void>.value();
+    return refreshInPlace();
+  }
+
   Future<void> loadMore() async {
     if (state.loading || state.loadingMore || !state.hasMore) return;
     await _load(reset: false);

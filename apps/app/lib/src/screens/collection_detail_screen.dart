@@ -37,21 +37,15 @@ class _CollectionDetailScreenState
     extends ConsumerState<CollectionDetailScreen> {
   final Set<String> _hiddenIds = <String>{};
 
-  String _displayTitle(AppLocalizations l10n, KomgaCollection? detail) =>
+  String _displayTitle(AppLocalizations l10n, Collection? detail) =>
       detail?.name ?? widget.title ?? l10n.collectionFallback;
 
-  List<String> _currentSeriesIds(
-    KomgaCollection? detail,
-    PageResult<Series>? page,
-  ) {
+  List<String> _currentSeriesIds(Collection? detail, PageResult<Series>? page) {
     if (detail != null && detail.seriesIds.isNotEmpty) return detail.seriesIds;
     return <String>[for (final s in page?.items ?? const <Series>[]) s.id];
   }
 
-  Future<void> _addSeries(
-    KomgaCollection? detail,
-    PageResult<Series>? page,
-  ) async {
+  Future<void> _addSeries(Collection? detail, PageResult<Series>? page) async {
     final existing = _currentSeriesIds(detail, page).toSet();
     final picked = await showSeriesPickerSheet(context, existingIds: existing);
     if (picked == null || picked.isEmpty || !mounted) return;
@@ -125,7 +119,7 @@ class _CollectionDetailScreenState
   Future<bool> _removeSeries(
     Series series, {
     required String displayName,
-    required KomgaCollection? detail,
+    required Collection? detail,
     required PageResult<Series>? page,
     bool fromSwipe = false,
   }) async {

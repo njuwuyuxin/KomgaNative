@@ -6,17 +6,14 @@ import 'package:yomu/src/data/shelf_failure.dart';
 
 /// 收藏集与阅读列表限界上下文仓库（UI-P3-8 / SER-04 / ARC-09）。
 abstract interface class CollectionsRepository {
-  Future<PageResult<KomgaCollection>> collections({
-    int page = 0,
-    int size = 20,
-  });
+  Future<PageResult<Collection>> collections({int page = 0, int size = 20});
 
-  Future<KomgaCollection?> collectionById(String collectionId);
+  Future<Collection?> collectionById(String collectionId);
 
-  Future<List<KomgaCollection>> seriesCollections(String seriesId);
+  Future<List<Collection>> seriesCollections(String seriesId);
 
   /// 新建收藏集：必须至少带一个系列（Komga 实测拒绝空集合）。
-  Future<KomgaCollection> createCollection({
+  Future<Collection> createCollection({
     required String name,
     required List<String> seriesIds,
     bool ordered = false,
@@ -81,14 +78,14 @@ class KomgaCollectionsRepository implements CollectionsRepository {
   String get _sourceKey => _session.address.baseUrl;
 
   @override
-  Future<PageResult<KomgaCollection>> collections({
+  Future<PageResult<Collection>> collections({
     int page = 0,
     int size = 20,
   }) async {
     try {
       final result = await _session.fetchCollections(page: page, size: size);
-      return PageResult<KomgaCollection>(
-        items: <KomgaCollection>[
+      return PageResult<Collection>(
+        items: <Collection>[
           for (final c in result.items) c.withSource(_sourceKey),
         ],
         totalElements: result.totalElements,
@@ -101,7 +98,7 @@ class KomgaCollectionsRepository implements CollectionsRepository {
   }
 
   @override
-  Future<KomgaCollection?> collectionById(String collectionId) async {
+  Future<Collection?> collectionById(String collectionId) async {
     try {
       final c = await _session.fetchCollection(collectionId);
       return c.withSource(_sourceKey);
@@ -113,17 +110,17 @@ class KomgaCollectionsRepository implements CollectionsRepository {
   }
 
   @override
-  Future<List<KomgaCollection>> seriesCollections(String seriesId) async {
+  Future<List<Collection>> seriesCollections(String seriesId) async {
     try {
       final items = await _session.fetchSeriesCollections(seriesId);
-      return <KomgaCollection>[for (final c in items) c.withSource(_sourceKey)];
+      return <Collection>[for (final c in items) c.withSource(_sourceKey)];
     } on KomgaError catch (error) {
       throw shelfFailureOf(error);
     }
   }
 
   @override
-  Future<KomgaCollection> createCollection({
+  Future<Collection> createCollection({
     required String name,
     required List<String> seriesIds,
     bool ordered = false,

@@ -148,9 +148,9 @@ class _PagedRepository extends FakeLibraryRepository {
 
   static const int _total = 45;
 
-  List<KomgaCollection> get _collections => <KomgaCollection>[
+  List<Collection> get _collections => <Collection>[
     for (var i = 1; i <= _total; i++)
-      KomgaCollection(
+      Collection(
         id: 'c$i',
         name: 'Collection $i',
         ordered: false,
@@ -193,7 +193,7 @@ class _PagedRepository extends FakeLibraryRepository {
   }
 
   @override
-  Future<PageResult<KomgaCollection>> collections({
+  Future<PageResult<Collection>> collections({
     int page = 0,
     int size = 20,
   }) async => _page(_collections, page, size);

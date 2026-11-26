@@ -26,7 +26,7 @@ class FakeLibraryRepository
     this.ondeckFailure,
     this.coverDirectory = 'test/fixtures/covers',
     this.coverNames = const <String>['c1', 'c2', 'c3', 'c4', 'c5', 'c6'],
-    List<KomgaCollection>? collections,
+    List<Collection>? collections,
     List<ReadList>? readLists,
   }) : librariesData = libraries ?? const <Library>[],
        seriesData = series ?? const <Series>[],
@@ -35,15 +35,15 @@ class FakeLibraryRepository
       _coverBySeries[seriesData[i].id] = coverNames[i % coverNames.length];
     }
     collectionsData = collections != null
-        ? List<KomgaCollection>.of(collections)
-        : <KomgaCollection>[
-            KomgaCollection(
+        ? List<Collection>.of(collections)
+        : <Collection>[
+            Collection(
               id: 'c1',
               name: 'Reading order',
               ordered: true,
               seriesIds: seriesData.take(2).map((Series s) => s.id).toList(),
             ),
-            const KomgaCollection(
+            const Collection(
               id: 'c2',
               name: 'Empty shelf',
               ordered: false,
@@ -63,7 +63,7 @@ class FakeLibraryRepository
           ];
   }
 
-  late List<KomgaCollection> collectionsData;
+  late List<Collection> collectionsData;
   late List<ReadList> readListsData;
 
   final List<Library> librariesData;
@@ -271,7 +271,7 @@ class FakeLibraryRepository
   }
 
   /// 新建/改名/更新/删除的记录，测试里断言用。
-  final List<KomgaCollection> createdCollections = <KomgaCollection>[];
+  final List<Collection> createdCollections = <Collection>[];
   final Map<String, String> renamedCollections = <String, String>{};
   final Map<String, List<String>> updatedCollectionSeries =
       <String, List<String>>{};
@@ -287,18 +287,18 @@ class FakeLibraryRepository
   ShelfFailure? collectionFailure;
 
   @override
-  Future<PageResult<KomgaCollection>> collections({
+  Future<PageResult<Collection>> collections({
     int page = 0,
     int size = 20,
   }) async {
     final start = page * size;
     final items = start >= collectionsData.length
-        ? const <KomgaCollection>[]
+        ? const <Collection>[]
         : collectionsData.sublist(
             start,
             math.min(start + size, collectionsData.length),
           );
-    return PageResult<KomgaCollection>(
+    return PageResult<Collection>(
       items: items,
       totalElements: collectionsData.length,
       page: page,
@@ -307,7 +307,7 @@ class FakeLibraryRepository
   }
 
   @override
-  Future<KomgaCollection?> collectionById(String collectionId) async {
+  Future<Collection?> collectionById(String collectionId) async {
     for (final c in collectionsData) {
       if (c.id == collectionId) return c;
     }
@@ -315,13 +315,13 @@ class FakeLibraryRepository
   }
 
   @override
-  Future<List<KomgaCollection>> seriesCollections(String seriesId) async =>
+  Future<List<Collection>> seriesCollections(String seriesId) async =>
       collectionsData
-          .where((KomgaCollection c) => c.seriesIds.contains(seriesId))
+          .where((Collection c) => c.seriesIds.contains(seriesId))
           .toList(growable: false);
 
   @override
-  Future<KomgaCollection> createCollection({
+  Future<Collection> createCollection({
     required String name,
     required List<String> seriesIds,
     bool ordered = false,
@@ -330,7 +330,7 @@ class FakeLibraryRepository
     if (name.trim().isEmpty || seriesIds.isEmpty) {
       throw const ProtocolFailure();
     }
-    final created = KomgaCollection(
+    final created = Collection(
       id: 'c${createdCollections.length + 10}',
       name: name,
       ordered: ordered,
@@ -361,11 +361,11 @@ class FakeLibraryRepository
       updatedCollectionSeries[collectionId] = List<String>.of(seriesIds);
     }
     final idx = collectionsData.indexWhere(
-      (KomgaCollection c) => c.id == collectionId,
+      (Collection c) => c.id == collectionId,
     );
     if (idx != -1) {
       final old = collectionsData[idx];
-      collectionsData[idx] = KomgaCollection(
+      collectionsData[idx] = Collection(
         id: old.id,
         name: name ?? old.name,
         ordered: ordered ?? old.ordered,
@@ -380,7 +380,7 @@ class FakeLibraryRepository
   Future<void> deleteCollection(String collectionId) async {
     if (collectionFailure != null) throw collectionFailure!;
     deletedCollections.add(collectionId);
-    collectionsData.removeWhere((KomgaCollection c) => c.id == collectionId);
+    collectionsData.removeWhere((Collection c) => c.id == collectionId);
   }
 
   @override

@@ -1,8 +1,8 @@
 # ADR 0008：「编目按源分组 + 阅读跨源无感」的多源双栖架构（面向 Local / Komga / 未来 Kavita & OPDS）
 
-- 状态：已采纳（2026-11-26 终审定稿）
+- 状态：已采纳（2026-11-26 终审定稿；2026-11 架构审查与 P0~P3 演进后修订）
 - 日期：2026-11-26
-- 相关：`apps/app/lib/src/router.dart`、`apps/app/lib/src/data/`、`apps/app/lib/src/providers/`、`packages/yomu_domain`、`packages/yomu_design_system`、`docs/local-manga-plan-2026-11.md`
+- 相关：`apps/app/lib/src/router.dart`、`apps/app/lib/src/data/`、`apps/app/lib/src/providers/`、`packages/yomu_domain`、`packages/yomu_design_system`、`docs/local-manga-plan-2026-11.md`、`docs/architecture-review-multi-source-2026-11.md`
 
 ## 背景
 
@@ -25,9 +25,9 @@
 
 - 摒弃无法扩展第 3 种协议的二元布尔判断，统一使用字符串分区标识 `sourceKey` 表征内容归属源：
   - **本机内置源**：固定常量 `kLocalSourceKey = 'local://device'`；
-  - **Komga 服务器源**：沿用规范化 `server.address.baseUrl`（与 `ARC-07` 既有 `komga_native.sqlite` / `komga_cache.sqlite` 的 `scope` 列 **100% 零迁移兼容**）；
+  - **Komga 服务器源**：沿用规范化 `server.address.baseUrl`（复用 `ARC-07` 既有 `komga_native.sqlite` / `komga_cache.sqlite` 的 `scope` 列分区模型，老版本数据库经由 `ProgressDatabase` 全链路版本迁移平滑升级）；
   - **未来异构远程源预留**：采用显式协议前缀（如 `'kavita|<baseUrl>'`、`'opds|<baseUrl>'`），彻底杜绝 Kavita 整数 ID 与多台服务器之间的主键碰撞。
-- 领域实体 `Series`、`Book`、`KomgaCollection`、`ReadList` 携带 `sourceKey`（默认 `kLocalSourceKey`，派生只读属性 `bool get isCloud => sourceKey != kLocalSourceKey`）。
+- 领域实体 `Series`、`Book`、`Collection`、`ReadList` 携带 `sourceKey`（默认 `kLocalSourceKey`，派生只读属性 `bool get isCloud => sourceKey != kLocalSourceKey`）。
 
 ### 2. 编目流（书架 / 收藏集 / 搜索）：单源时隐形，多源时按源清晰分组
 
@@ -42,7 +42,7 @@
   - **严格同源归属**：每个分组内部 100% 调用该源独立的 `LibraryRepository` 与 `CollectionsRepository`：
     - 「本机」分组：2ms 纯本地 SQLite 分页，支持本地物理删除、合并系列、修改元数据、创建本地收藏集，永远不受远程断网或慢网拖累；
     - 「☁ Komga」分组：纯 Komga 原生流式分页、标签筛选与 **100% 服务端双向同步收藏集**（只选该服书籍，零跨源外键 400 错误，零多端同步分裂）；
-    - **\(O(1)\) 协议扩展性**：未来接入 Kavita 或 OPDS 时，只需新增独立的 `SourceBackend` 实现挂入 `SourceRegistry`，对本地引擎与 Komga 仓库代码 **0 侵入**。
+    - **低耦合协议扩展性**：未来接入 Kavita 或 OPDS 时，新增独立的 `SourceBundle` 后端实现并挂载到懒加载 `SourceRegistry`（含 `Library` / `Reader` / `Collections` / `ReadStatus` / `Download` 五类能力与 `SourceCapabilities` 能力位），核心路由、书架、阅读器与本地/Komga 仓库主体无需侵入修改（详见 `docs/architecture-review-multi-source-2026-11.md` 中对边界收敛的审查与演进记录）。
 
 ### 3. 阅读与回访流（正在读 / 阅读器 / 历史统计）：跨源无感汇聚 + 低调小云标
 

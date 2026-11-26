@@ -8,7 +8,7 @@ import 'package:yomu_domain/yomu_domain.dart';
 
 /// [ProgressDatabase] 的本地收藏集（Collection）与阅读列表（ReadList）CRUD 扩展。
 extension LocalCurationDao on ProgressDatabase {
-  Future<PageResult<KomgaCollection>> queryLocalCollections({
+  Future<PageResult<Collection>> queryLocalCollections({
     int page = 0,
     int size = 20,
   }) async {
@@ -19,7 +19,7 @@ extension LocalCurationDao on ProgressDatabase {
               ]))
             .get();
     final all = rows.map(_mapCollection).toList(growable: false);
-    return PageResult<KomgaCollection>(
+    return PageResult<Collection>(
       items: _slice(all, page, size),
       totalElements: all.length,
       page: page,
@@ -27,16 +27,16 @@ extension LocalCurationDao on ProgressDatabase {
     );
   }
 
-  Future<KomgaCollection?> localCollectionById(String collectionId) async {
+  Future<Collection?> localCollectionById(String collectionId) async {
     final row = await (select(
       localCollectionsRows,
     )..where((t) => t.id.equals(collectionId))).getSingleOrNull();
     return row == null ? null : _mapCollection(row);
   }
 
-  Future<List<KomgaCollection>> localSeriesCollections(String seriesId) async {
+  Future<List<Collection>> localSeriesCollections(String seriesId) async {
     final rows = await select(localCollectionsRows).get();
-    final result = <KomgaCollection>[];
+    final result = <Collection>[];
     for (final row in rows) {
       final col = _mapCollection(row);
       if (col.seriesIds.contains(seriesId)) {
@@ -46,7 +46,7 @@ extension LocalCurationDao on ProgressDatabase {
     return result;
   }
 
-  Future<KomgaCollection> insertLocalCollection({
+  Future<Collection> insertLocalCollection({
     required String id,
     required String name,
     required List<String> seriesIds,
@@ -64,7 +64,7 @@ extension LocalCurationDao on ProgressDatabase {
         updatedAt: now,
       ),
     );
-    return KomgaCollection(
+    return Collection(
       id: id,
       name: name.trim(),
       ordered: ordered,
@@ -259,7 +259,7 @@ extension LocalCurationDao on ProgressDatabase {
   }
 }
 
-KomgaCollection _mapCollection(LocalCollectionsRow row) => KomgaCollection(
+Collection _mapCollection(LocalCollectionsRow row) => Collection(
   id: row.id,
   name: row.name,
   ordered: row.ordered,

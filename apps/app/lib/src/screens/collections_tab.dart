@@ -156,7 +156,7 @@ class _CollectionsTabState extends ConsumerState<CollectionsTab> {
 
   Future<void> _manageCollection(
     BuildContext context,
-    KomgaCollection collection,
+    Collection collection,
   ) async {
     final l10n = AppLocalizations.of(context);
     final action = await _promptManageAction(context, l10n);
@@ -231,16 +231,16 @@ class _CollectionsTabState extends ConsumerState<CollectionsTab> {
   }
 }
 
-List<KomgaCollection> _filterAndSort(
-  List<KomgaCollection> items,
+List<Collection> _filterAndSort(
+  List<Collection> items,
   String rawQuery,
   CollectionSort sort,
 ) {
   final query = rawQuery.trim().toLowerCase();
-  return <KomgaCollection>[
+  return <Collection>[
     for (final item in items)
       if (query.isEmpty || item.name.toLowerCase().contains(query)) item,
-  ]..sort((KomgaCollection a, KomgaCollection b) {
+  ]..sort((Collection a, Collection b) {
     switch (sort) {
       case CollectionSort.name:
         return a.name.toLowerCase().compareTo(b.name.toLowerCase());

@@ -21,50 +21,48 @@ final Provider<CollectionsRepository> collectionsRepositoryProvider =
     });
 
 /// 收藏集增量分页控制器（ARC-12）。
-class CollectionsListController extends PagedListController<KomgaCollection> {
+class CollectionsListController extends PagedListController<Collection> {
   @override
   int get pageSize => kListPageSize;
 
   @override
-  Future<PageResult<KomgaCollection>> fetchPage(int page, int size) => ref
+  Future<PageResult<Collection>> fetchPage(int page, int size) => ref
       .watch(collectionsRepositoryProvider)
       .collections(page: page, size: size);
 }
 
 final collectionsProvider =
-    AsyncNotifierProvider<
-      CollectionsListController,
-      PageResult<KomgaCollection>
-    >(CollectionsListController.new);
+    AsyncNotifierProvider<CollectionsListController, PageResult<Collection>>(
+      CollectionsListController.new,
+    );
 
 /// 按源寻址的全量收藏集（供跨源系列详情页的收藏选择器使用）。
 final allCollectionsForSourceProvider =
-    FutureProvider.family<List<KomgaCollection>, String?>((
+    FutureProvider.family<List<Collection>, String?>((
       Ref ref,
       String? sourceKey,
     ) async {
       final repo = ref.watch(collectionsRepositoryForSourceProvider(sourceKey));
-      return _fetchAllPages<KomgaCollection>(
+      return _fetchAllPages<Collection>(
         (int page) => repo.collections(page: page, size: _kAllPageSize),
       );
     });
 
 /// 选择器用的全量收藏集（当前激活源，自动翻页拉全，不截断）。
-final FutureProvider<List<KomgaCollection>> allCollectionsProvider =
-    FutureProvider<List<KomgaCollection>>((Ref ref) {
+final FutureProvider<List<Collection>> allCollectionsProvider =
+    FutureProvider<List<Collection>>((Ref ref) {
       return ref.watch(allCollectionsForSourceProvider(null).future);
     });
 
 /// 单个收藏集元信息（含当前 `seriesIds`）。
-final collectionDetailProvider =
-    FutureProvider.family<KomgaCollection?, String>(
-      (Ref ref, String collectionId) =>
-          ref.watch(collectionsRepositoryProvider).collectionById(collectionId),
-    );
+final collectionDetailProvider = FutureProvider.family<Collection?, String>(
+  (Ref ref, String collectionId) =>
+      ref.watch(collectionsRepositoryProvider).collectionById(collectionId),
+);
 
 /// 某系列所属的收藏集列表（系列详情页收藏图标高亮状态用，按 `sourceKey` 路由）。
 final seriesCollectionsProvider =
-    FutureProvider.family<List<KomgaCollection>, SeriesQuery>(
+    FutureProvider.family<List<Collection>, SeriesQuery>(
       (Ref ref, SeriesQuery query) => ref
           .watch(collectionsRepositoryForSourceProvider(query.sourceKey))
           .seriesCollections(query.seriesId),

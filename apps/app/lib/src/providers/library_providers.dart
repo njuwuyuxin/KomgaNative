@@ -176,7 +176,5 @@ void invalidateLocalCatalogProviders(Ref ref, {bool includeCuration = false}) {
     ref.invalidate(collectionsProvider);
     ref.invalidate(readListsProvider);
   }
-  if (!ref.read(activeSourceProvider).isCloud) {
-    unawaited(ref.read(shelfProvider.notifier).refreshInPlace());
-  }
+  unawaited(ref.read(shelfProvider.notifier).refreshForSource(kLocalSourceKey));
 }

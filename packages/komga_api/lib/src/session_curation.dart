@@ -3,7 +3,7 @@ part of 'session.dart';
 /// [KomgaSession] 的收藏集、阅读列表与阅读进度写操作扩展（ARC-12）。
 extension KomgaSessionCuration on KomgaSession {
   /// 新建收藏集（SER-04）。
-  Future<KomgaCollection> createCollection({
+  Future<Collection> createCollection({
     required String name,
     required List<String> seriesIds,
     bool ordered = false,
@@ -20,7 +20,7 @@ extension KomgaSessionCuration on KomgaSession {
   }
 
   /// 收藏集详情（`GET /api/v1/collections/{id}`）。
-  Future<KomgaCollection> fetchCollection(String collectionId) async {
+  Future<Collection> fetchCollection(String collectionId) async {
     final data = _requireMap(
       await _getJson(_urls.collection(collectionId)),
       '收藏集',
@@ -29,7 +29,7 @@ extension KomgaSessionCuration on KomgaSession {
   }
 
   /// 系列所属的收藏集（`GET /api/v1/series/{seriesId}/collections`，实测返回裸数组）。
-  Future<List<KomgaCollection>> fetchSeriesCollections(String seriesId) async {
+  Future<List<Collection>> fetchSeriesCollections(String seriesId) async {
     final data = await _getJson(_urls.seriesCollections(seriesId));
     if (data is! List<Object?>) {
       throw const KomgaProtocolError('服务器返回的系列收藏集不是数组');
@@ -82,7 +82,7 @@ extension KomgaSessionCuration on KomgaSession {
   }
 
   /// 收藏集列表（UI-P3-8）。
-  Future<PageResult<KomgaCollection>> fetchCollections({
+  Future<PageResult<Collection>> fetchCollections({
     int page = 0,
     int size = 20,
   }) async {

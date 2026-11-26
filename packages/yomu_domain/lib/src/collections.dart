@@ -8,8 +8,8 @@ library;
 import 'package:yomu_domain/src/content_source.dart';
 
 /// 收藏集：一组系列。
-class KomgaCollection {
-  const KomgaCollection({
+class Collection {
+  const Collection({
     required this.id,
     required this.name,
     required this.ordered,
@@ -31,7 +31,7 @@ class KomgaCollection {
 
   int get seriesCount => seriesIds.length;
 
-  KomgaCollection withSource(String nextSourceKey) => KomgaCollection(
+  Collection withSource(String nextSourceKey) => Collection(
     id: id,
     name: name,
     ordered: ordered,
@@ -42,8 +42,7 @@ class KomgaCollection {
   );
 
   @override
-  String toString() =>
-      'KomgaCollection($id, $name, ${seriesIds.length} series)';
+  String toString() => 'Collection($id, $name, ${seriesIds.length} series)';
 }
 
 /// 阅读列表：一组书。

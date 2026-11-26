@@ -33,7 +33,7 @@ void main() {
       expect(kavita.kind, SourceKind.kavita);
     });
 
-    test('Series / Book / KomgaCollection / ReadList 默认本机，withSource 切换云端并由 withProgress 保留', () {
+    test('Series / Book / Collection / ReadList 默认本机，withSource 切换云端并由 withProgress 保留', () {
       const series = Series(id: 's1', libraryId: 'l1', title: 'Frieren');
       expect(series.sourceKey, kLocalSourceKey);
       expect(series.isCloud, isFalse);
@@ -60,7 +60,7 @@ void main() {
       expect(progressed.sourceKey, 'https://komga.example.com');
       expect(progressed.isCloud, isTrue);
 
-      final col = const KomgaCollection(
+      final col = const Collection(
         id: 'c1',
         name: 'Top',
         ordered: false,

@@ -18,23 +18,20 @@ final class LocalCollectionsRepository implements CollectionsRepository {
   }
 
   @override
-  Future<PageResult<KomgaCollection>> collections({
-    int page = 0,
-    int size = 20,
-  }) {
+  Future<PageResult<Collection>> collections({int page = 0, int size = 20}) {
     return _db.queryLocalCollections(page: page, size: size);
   }
 
   @override
-  Future<KomgaCollection?> collectionById(String collectionId) =>
+  Future<Collection?> collectionById(String collectionId) =>
       _db.localCollectionById(collectionId);
 
   @override
-  Future<List<KomgaCollection>> seriesCollections(String seriesId) =>
+  Future<List<Collection>> seriesCollections(String seriesId) =>
       _db.localSeriesCollections(seriesId);
 
   @override
-  Future<KomgaCollection> createCollection({
+  Future<Collection> createCollection({
     required String name,
     required List<String> seriesIds,
     bool ordered = false,

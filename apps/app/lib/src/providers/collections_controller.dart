@@ -11,7 +11,7 @@ class CollectionsController extends Notifier<void> {
 
   // ── 收藏集（系列维度） ──────────────────────────────────────────
 
-  Future<KomgaCollection> create({
+  Future<Collection> create({
     required String name,
     required List<String> seriesIds,
     bool ordered = false,

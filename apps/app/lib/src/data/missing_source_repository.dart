@@ -84,20 +84,19 @@ class MissingSourceRepository
   Uint8List? cachedPageThumbnail(String bookId, int page) => null;
 
   @override
-  Future<PageResult<KomgaCollection>> collections({
+  Future<PageResult<Collection>> collections({
     int page = 0,
     int size = 20,
   }) async => _fail();
 
   @override
-  Future<KomgaCollection?> collectionById(String collectionId) async => _fail();
+  Future<Collection?> collectionById(String collectionId) async => _fail();
 
   @override
-  Future<List<KomgaCollection>> seriesCollections(String seriesId) async =>
-      _fail();
+  Future<List<Collection>> seriesCollections(String seriesId) async => _fail();
 
   @override
-  Future<KomgaCollection> createCollection({
+  Future<Collection> createCollection({
     required String name,
     required List<String> seriesIds,
     bool ordered = false,

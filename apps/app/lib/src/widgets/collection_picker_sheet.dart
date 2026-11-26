@@ -59,7 +59,7 @@ class _CollectionPickerSheetState
 
   bool get _isBatch => widget.seriesIds.length > 1;
 
-  MembershipChangePlan _planFor(List<KomgaCollection> collections) =>
+  MembershipChangePlan _planFor(List<Collection> collections) =>
       planMembershipChanges(
         containers: <({String id, String name, List<String> memberIds})>[
           for (final c in collections)
@@ -69,7 +69,7 @@ class _CollectionPickerSheetState
         desiredStates: _desired,
       );
 
-  void _toggle(KomgaCollection collection) {
+  void _toggle(Collection collection) {
     unawaited(AppHaptics.selection());
     final initial = membershipOf(collection.seriesIds, widget.seriesIds);
     final current = _desired[collection.id] ?? initial;
@@ -85,7 +85,7 @@ class _CollectionPickerSheetState
     });
   }
 
-  Future<void> _createNew(List<KomgaCollection> current) async {
+  Future<void> _createNew(List<Collection> current) async {
     final l10n = AppLocalizations.of(context);
     final name = await promptCollectionName(
       context,
@@ -128,7 +128,7 @@ class _CollectionPickerSheetState
     }
   }
 
-  Future<void> _save(List<KomgaCollection> collections) async {
+  Future<void> _save(List<Collection> collections) async {
     final plan = _planFor(collections);
     if (plan.isEmpty) {
       Navigator.of(context).pop(false);
@@ -213,7 +213,7 @@ class _CollectionPickerSheetState
                     onPressed: _saving
                         ? null
                         : () => unawaited(
-                            _createNew(items ?? const <KomgaCollection>[]),
+                            _createNew(items ?? const <Collection>[]),
                           ),
                     icon: const Icon(Icons.add, size: AppSizes.iconSm),
                     label: Text(l10n.collectionCreate),
@@ -269,7 +269,7 @@ class _CollectionPickerSheetState
   Widget _buildBody(
     BuildContext context,
     AppLocalizations l10n,
-    AsyncValue<List<KomgaCollection>> async,
+    AsyncValue<List<Collection>> async,
   ) {
     if (async.hasError && !async.hasValue) {
       return Padding(
@@ -300,7 +300,7 @@ class _CollectionPickerSheetState
       );
     }
     final q = _query.trim().toLowerCase();
-    final visible = <KomgaCollection>[
+    final visible = <Collection>[
       for (final c in items)
         if (q.isEmpty || c.name.toLowerCase().contains(q)) c,
     ];

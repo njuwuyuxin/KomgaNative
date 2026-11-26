@@ -98,8 +98,8 @@ List<String> _stringList(Object? raw) {
 }
 
 /// 收藏集（`CollectionDto`）。
-KomgaCollection collectionFromJson(Map<Object?, Object?> json) {
-  return KomgaCollection(
+Collection collectionFromJson(Map<Object?, Object?> json) {
+  return Collection(
     id: _str(json['id']),
     name: _str(json['name']),
     ordered: json['ordered'] == true,
