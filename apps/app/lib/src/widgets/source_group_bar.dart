@@ -255,7 +255,21 @@ Future<void> runLocalFolderImport(BuildContext context, WidgetRef ref) async {
   final l10n = AppLocalizations.of(context);
   final result = await ref
       .read(localImportProvider.notifier)
-      .pickAndImportDirectory();
+      .pickAndImportDirectory(
+        onPasswordPrompt: (String fileName, {bool wrongAttempt = false}) async {
+          if (!context.mounted) return null;
+          final sub = await showArchivePasswordDialog(
+            context,
+            fileName: fileName,
+            wrongAttempt: wrongAttempt,
+          );
+          if (sub == null) return null;
+          return (
+            password: sub.password,
+            saveToDictionary: sub.saveToDictionary,
+          );
+        },
+      );
   if (result == null) return;
   _showImportOutcome(messenger, l10n, result);
 }

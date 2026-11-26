@@ -227,3 +227,83 @@ String importBaseName(String path) {
   final idx = stripped.lastIndexOf('/');
   return idx < 0 ? stripped : stripped.substring(idx + 1);
 }
+
+Future<LocalImportBatchResult> importLocalImageFolderToSandbox({
+  required ProgressDatabase db,
+  required LocalComicsStorage storage,
+  required CoverThumbnailEncoder coverEncoder,
+  required Directory sourceDir,
+  required String folderName,
+  required String Function(String prefix) nextId,
+  ImportProgressCallback? onProgress,
+}) async {
+  onProgress?.call(0, 1, folderName);
+  final bookId = nextId('b');
+  final safeFolder = bookId.replaceAll(':', '_');
+  final folderRelPath = 'books/$safeFolder/pages';
+  final destDir = await storage.resolveDirectory(folderRelPath);
+  FolderComicReader? probeReader;
+
+  try {
+    probeReader = await FolderComicReader.open(sourceDir);
+    await destDir.create(recursive: true);
+    var totalBytes = 0;
+    for (final page in probeReader.pages) {
+      final srcBytes = await probeReader.readPage(page.number);
+      totalBytes += srcBytes.length;
+      final pageFile = File('${destDir.path}/${page.entryName}');
+      await pageFile.parent.create(recursive: true);
+      await pageFile.writeAsBytes(srcBytes, flush: true);
+    }
+    final xmlBytes = probeReader.comicInfoBytes;
+    if (xmlBytes != null) {
+      await File('${destDir.path}/ComicInfo.xml').writeAsBytes(xmlBytes);
+    }
+    await probeReader.close();
+    probeReader = null;
+
+    final managedReader = await FolderComicReader.open(destDir);
+    final imported = await commitComicReaderToDatabase(
+      db: db,
+      storage: storage,
+      coverEncoder: coverEncoder,
+      bookId: bookId,
+      safeFolder: safeFolder,
+      storageKind: 'folder',
+      relativePath: folderRelPath,
+      sizeBytes: totalBytes,
+      displayName: folderName,
+      parentFolderName: null,
+      reader: managedReader,
+      generateSeriesId: () => nextId('s'),
+    );
+    await managedReader.close();
+    onProgress?.call(1, 1, '');
+    return LocalImportBatchResult(
+      importedSeriesIds: <String>[imported.seriesId],
+      importedBookIds: <String>[imported.bookId],
+    );
+  } on ArchiveException catch (e) {
+    await probeReader?.close();
+    await tryDeleteImportDir(destDir.parent);
+    return LocalImportBatchResult(
+      failures: <ImportFailureItem>[
+        ImportFailureItem(
+          fileName: folderName,
+          reason: mapArchiveImportFailure(e.kind),
+        ),
+      ],
+    );
+  } on FileSystemException {
+    await probeReader?.close();
+    await tryDeleteImportDir(destDir.parent);
+    return LocalImportBatchResult(
+      failures: <ImportFailureItem>[
+        ImportFailureItem(
+          fileName: folderName,
+          reason: ImportFailureReason.ioError,
+        ),
+      ],
+    );
+  }
+}

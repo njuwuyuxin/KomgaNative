@@ -7,6 +7,7 @@ import 'package:yomu/src/data/local/cover_thumbnail_generator.dart';
 import 'package:yomu/src/data/local/local_archive_import_stream.dart';
 import 'package:yomu/src/data/local/local_comic_importer_models.dart';
 import 'package:yomu/src/data/local/local_comics_storage.dart';
+import 'package:yomu/src/data/local/local_external_directory_import.dart';
 import 'package:yomu/src/data/progress/progress_database.dart';
 import 'package:yomu_local_archive/yomu_local_archive.dart';
 import 'package:yomu_platform/yomu_platform.dart';
@@ -198,10 +199,29 @@ final class LocalComicImporter {
     overwriteExisting: overwriteExisting,
   );
 
+  /// 导入外部挂载或 SAF / iOS Bookmark 选中的文件夹至受管沙盒。
+  Future<LocalImportBatchResult> importExternalDirectory(
+    MountedExternalRoot root,
+    ExternalRootsBridge bridge, {
+    ImportProgressCallback? onProgress,
+    ArchivePasswordPromptCallback? onPasswordPrompt,
+  }) => importExternalDirectoryToSandbox(
+    db: _db,
+    storage: _storage,
+    coverEncoder: _coverEncoder,
+    bridge: bridge,
+    root: root,
+    importer: this,
+    nextId: _nextId,
+    onProgress: onProgress,
+    onPasswordPrompt: onPasswordPrompt,
+  );
+
   /// 导入本地文件夹（支持文件夹内含多卷归档及同级侧车封面，或文件夹内直接放漫画图片页）。
   Future<LocalImportBatchResult> importDirectory(
     String directoryPath, {
     ImportProgressCallback? onProgress,
+    ArchivePasswordPromptCallback? onPasswordPrompt,
   }) async {
     final sourceDir = Directory(directoryPath);
     final folderName = importBaseName(directoryPath);
@@ -216,12 +236,13 @@ final class LocalComicImporter {
       );
     }
 
-    final scanned = await _scanDirectoryForArchivesAndCover(sourceDir);
+    final scanned = await scanLocalDirectoryForArchivesAndCover(sourceDir);
     if (scanned.archives.isNotEmpty) {
       final result = await importArchiveFiles(
         scanned.archives,
         parentFolderName: folderName,
         onProgress: onProgress,
+        onPasswordPrompt: onPasswordPrompt,
       );
       final sidecarCover = scanned.sidecarCover;
       if (sidecarCover != null && result.importedSeriesIds.length == 1) {
@@ -238,102 +259,14 @@ final class LocalComicImporter {
       return result;
     }
 
-    onProgress?.call(0, 1, folderName);
-    final bookId = _nextId('b');
-    final safeFolder = bookId.replaceAll(':', '_');
-    final folderRelPath = 'books/$safeFolder/pages';
-    final destDir = await _storage.resolveDirectory(folderRelPath);
-    FolderComicReader? probeReader;
-
-    try {
-      probeReader = await FolderComicReader.open(sourceDir);
-      await destDir.create(recursive: true);
-      var totalBytes = 0;
-      for (final page in probeReader.pages) {
-        final srcBytes = await probeReader.readPage(page.number);
-        totalBytes += srcBytes.length;
-        final pageFile = File('${destDir.path}/${page.entryName}');
-        await pageFile.parent.create(recursive: true);
-        await pageFile.writeAsBytes(srcBytes, flush: true);
-      }
-      final xmlBytes = probeReader.comicInfoBytes;
-      if (xmlBytes != null) {
-        await File('${destDir.path}/ComicInfo.xml').writeAsBytes(xmlBytes);
-      }
-      await probeReader.close();
-      probeReader = null;
-
-      final managedReader = await FolderComicReader.open(destDir);
-      final imported = await commitComicReaderToDatabase(
-        db: _db,
-        storage: _storage,
-        coverEncoder: _coverEncoder,
-        bookId: bookId,
-        safeFolder: safeFolder,
-        storageKind: 'folder',
-        relativePath: folderRelPath,
-        sizeBytes: totalBytes,
-        displayName: folderName,
-        parentFolderName: null,
-        reader: managedReader,
-        generateSeriesId: () => _nextId('s'),
-      );
-      await managedReader.close();
-      onProgress?.call(1, 1, '');
-      return LocalImportBatchResult(
-        importedSeriesIds: <String>[imported.seriesId],
-        importedBookIds: <String>[imported.bookId],
-      );
-    } on ArchiveException catch (e) {
-      await probeReader?.close();
-      await tryDeleteImportDir(destDir.parent);
-      return LocalImportBatchResult(
-        failures: <ImportFailureItem>[
-          ImportFailureItem(
-            fileName: folderName,
-            reason: mapArchiveImportFailure(e.kind),
-          ),
-        ],
-      );
-    } on FileSystemException {
-      await probeReader?.close();
-      await tryDeleteImportDir(destDir.parent);
-      return LocalImportBatchResult(
-        failures: <ImportFailureItem>[
-          ImportFailureItem(
-            fileName: folderName,
-            reason: ImportFailureReason.ioError,
-          ),
-        ],
-      );
-    }
+    return importLocalImageFolderToSandbox(
+      db: _db,
+      storage: _storage,
+      coverEncoder: _coverEncoder,
+      sourceDir: sourceDir,
+      folderName: folderName,
+      nextId: _nextId,
+      onProgress: onProgress,
+    );
   }
-}
-
-Future<({List<PickedComicFile> archives, File? sidecarCover})>
-_scanDirectoryForArchivesAndCover(Directory sourceDir) async {
-  final archives = <PickedComicFile>[];
-  File? sidecarCover;
-  int? sidecarPrio;
-  await for (final entity in sourceDir.list(followLinks: false)) {
-    if (entity is! File) continue;
-    final name = importBaseName(entity.path);
-    final lower = name.toLowerCase();
-    if (isNestedComicArchivePath(name) ||
-        lower.endsWith('.pdf') ||
-        lower.endsWith('.cbr') ||
-        lower.endsWith('.rar') ||
-        lower.endsWith('.cb7') ||
-        lower.endsWith('.7z')) {
-      archives.add(PickedComicFile.fromFile(entity, name: name));
-      continue;
-    }
-    final prio = sidecarCoverPriority(name);
-    if (prio != null && (sidecarPrio == null || prio < sidecarPrio)) {
-      sidecarCover = entity;
-      sidecarPrio = prio;
-    }
-  }
-  archives.sort((a, b) => naturalCompare(a.name, b.name));
-  return (archives: archives, sidecarCover: sidecarCover);
 }

@@ -9,9 +9,11 @@ import 'package:yomu/src/data/local/local_comic_importer.dart';
 import 'package:yomu/src/providers/active_source_provider.dart';
 import 'package:yomu/src/providers/archive_password_provider.dart';
 import 'package:yomu/src/providers/library_providers.dart';
+import 'package:yomu/src/providers/local_library_center_provider.dart';
 import 'package:yomu/src/providers/progress_providers.dart';
 import 'package:yomu/src/providers/source_registry_provider.dart';
 import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu_platform/yomu_platform.dart';
 
 export 'package:yomu/src/data/local/comic_file_picker.dart';
 export 'package:yomu/src/data/local/local_comic_importer.dart';
@@ -106,46 +108,97 @@ class LocalImportController extends Notifier<LocalImportState> {
     }
   }
 
-  Future<LocalImportBatchResult?> pickAndImportDirectory() async {
+  Future<LocalImportBatchResult?> pickAndImportDirectory({
+    ArchivePasswordPromptCallback? onPasswordPrompt,
+  }) async {
     if (state.busy) return null;
-    final dirPath = await _picker.pickComicDirectory();
-    if (dirPath != null && dirPath.isNotEmpty) {
-      state = const LocalImportState(busy: true, completed: 0, total: 1);
-      try {
-        final result = await _importer.importDirectory(
-          dirPath,
-          onProgress: _onProgress,
-        );
-        await _finishImport(result);
-        return result;
-      } on Object {
-        state = state.copyWith(busy: false, currentName: '');
-        rethrow;
-      }
+
+    // Android / iOS 通过原生 SAF / Security-Scoped Bookmark 目录选择器直接读取整目录，
+    // 避免退化到系统相册选择器触发“仅能访问所选照片”提示与 100 张上限。
+    if (Platform.isAndroid || Platform.isIOS) {
+      final bridge = ref.read(externalRootsBridgeProvider);
+      final pickedRoot = await bridge.pickDirectory();
+      if (pickedRoot == null) return null;
+      return _importPickedExternalRoot(
+        pickedRoot,
+        bridge,
+        onPasswordPrompt: onPasswordPrompt,
+      );
     }
 
-    // Android SAF 目录选择返回 content:// 时回退引导多选漫画图片页合成为单册。
-    final pages = await _picker.pickImagePages();
-    if (pages.isEmpty) return null;
-    final defaultTitle = pages.first.name.split('.').first;
-    state = LocalImportState(
-      busy: true,
-      completed: 0,
-      total: pages.length,
-      currentName: pages.first.name,
-    );
+    final dirPath = await _picker.pickComicDirectory();
+    if (dirPath == null || dirPath.isEmpty) return null;
+
+    state = const LocalImportState(busy: true, completed: 0, total: 1);
     try {
-      final result = await _importer.importImageFilesAsBook(
-        pages,
-        bookTitle: defaultTitle.isEmpty ? 'Imported Comic' : defaultTitle,
+      final result = await _importer.importDirectory(
+        dirPath,
         onProgress: _onProgress,
+        onPasswordPrompt: onPasswordPrompt,
       );
-      await _picker.clearTemporaryCache();
       await _finishImport(result);
       return result;
     } on Object {
       state = state.copyWith(busy: false, currentName: '');
       rethrow;
+    }
+  }
+
+  /// 将通过外部目录桥接选中的目录快照导入受管沙盒并在未挂载时自动释放临时权限。
+  Future<LocalImportBatchResult?> importExternalDirectoryRoot(
+    MountedExternalRoot pickedRoot, {
+    ArchivePasswordPromptCallback? onPasswordPrompt,
+  }) async {
+    if (state.busy) return null;
+    final bridge = ref.read(externalRootsBridgeProvider);
+    return _importPickedExternalRoot(
+      pickedRoot,
+      bridge,
+      onPasswordPrompt: onPasswordPrompt,
+    );
+  }
+
+  Future<LocalImportBatchResult> _importPickedExternalRoot(
+    MountedExternalRoot pickedRoot,
+    ExternalRootsBridge bridge, {
+    ArchivePasswordPromptCallback? onPasswordPrompt,
+  }) async {
+    state = LocalImportState(
+      busy: true,
+      completed: 0,
+      total: 1,
+      currentName: pickedRoot.displayName,
+    );
+    try {
+      final result = pickedRoot.kind == ExternalRootKind.localDirectory
+          ? await _importer.importDirectory(
+              pickedRoot.uriOrBookmark,
+              onProgress: _onProgress,
+              onPasswordPrompt: onPasswordPrompt,
+            )
+          : await _importer.importExternalDirectory(
+              pickedRoot,
+              bridge,
+              onProgress: _onProgress,
+              onPasswordPrompt: onPasswordPrompt,
+            );
+      await _finishImport(result);
+      return result;
+    } on Object {
+      state = state.copyWith(busy: false, currentName: '');
+      rethrow;
+    } finally {
+      if (pickedRoot.kind != ExternalRootKind.localDirectory && ref.mounted) {
+        final mounted = await ref
+            .read(progressDatabaseProvider)
+            .allMountedRoots();
+        final alreadyMounted = mounted.any(
+          (r) => r.uriOrBookmark == pickedRoot.uriOrBookmark,
+        );
+        if (!alreadyMounted) {
+          await bridge.releasePermission(pickedRoot);
+        }
+      }
     }
   }
 
