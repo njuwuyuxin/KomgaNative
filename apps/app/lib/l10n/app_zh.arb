@@ -562,6 +562,51 @@
       "count": {"type": "int"}
     }
   },
+  "localLibraryCenterTitle": "本地书库管理中心",
+  "localCenterQuickActions": "导入与同步",
+  "localCenterMountFolder": "挂载外部漫画目录",
+  "localCenterMountFolderHint": "零拷贝原位读取 SD 卡或系统文件目录",
+  "localCenterScanAll": "增量扫描全部挂载目录",
+  "localCenterScanAllHint": "自动跳过未修改文件，仅索引新增与变更漫画",
+  "localCenterWifiHint": "同局域网浏览器拖拽上传压缩包或漫画文件夹",
+  "localCenterMountedRoots": "已挂载外部目录",
+  "localCenterNoMountedRoots": "暂未挂载外部目录",
+  "localCenterNoMountedRootsHint": "挂载目录后可直接在原位索引漫画，不占用双倍存储空间。",
+  "localCenterKindFolder": "本地目录",
+  "localCenterRootSubtitle": "{kind} · {count} 册",
+  "@localCenterRootSubtitle": {
+    "placeholders": {
+      "kind": {"type": "String"},
+      "count": {"type": "int"}
+    }
+  },
+  "localCenterCreateNomedia": "创建 .nomedia 防止系统相册扫描",
+  "localCenterRescanRoot": "重新增量扫描",
+  "localCenterUnmountRoot": "卸载目录",
+  "localCenterUnmountTitle": "卸载外部目录？",
+  "localCenterUnmountBody": "仅从 Yomu 移除「{name}」的书架索引，不会删除你的外部原始文件。",
+  "@localCenterUnmountBody": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "localCenterScanning": "正在扫描 {name}（{done}/{total}）…",
+  "@localCenterScanning": {
+    "placeholders": {
+      "name": {"type": "String"},
+      "done": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
+  "localCenterScanResult": "扫描完成：新增 {added}、更新 {updated}、跳过未变 {skipped}、清理失效 {removed}",
+  "@localCenterScanResult": {
+    "placeholders": {
+      "added": {"type": "int"},
+      "updated": {"type": "int"},
+      "skipped": {"type": "int"},
+      "removed": {"type": "int"}
+    }
+  },
   "importingProgress": "正在导入（{done}/{total}）",
   "@importingProgress": {
     "placeholders": {

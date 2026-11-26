@@ -73,6 +73,11 @@ Future<({String seriesId, String bookId})> commitComicReaderToDatabase({
   required String? parentFolderName,
   required ComicArchiveReader reader,
   required String Function() generateSeriesId,
+  String? seriesIdOverride,
+  String? mountRootId,
+  String? sourceRelativePath,
+  int? sourceModifiedMs,
+  DateTime? nowOverride,
 }) async {
   final xmlBytes = reader.comicInfoBytes;
   final meta = xmlBytes != null
@@ -113,6 +118,7 @@ Future<({String seriesId, String bookId})> commitComicReaderToDatabase({
   return db.insertImportedLocalBook(
     LocalBookImportDraft(
       bookId: bookId,
+      seriesIdOverride: seriesIdOverride,
       seriesTitle: seriesTitle,
       bookName: bookName,
       number: number,
@@ -129,8 +135,12 @@ Future<({String seriesId, String bookId})> commitComicReaderToDatabase({
       coverThumbPath: coverRelPath,
       pages: reader.pages,
       chapters: reader.chapters,
+      mountRootId: mountRootId,
+      sourceRelativePath: sourceRelativePath,
+      sourceModifiedMs: sourceModifiedMs,
     ),
     generateSeriesId: generateSeriesId,
+    nowOverride: nowOverride,
   );
 }
 

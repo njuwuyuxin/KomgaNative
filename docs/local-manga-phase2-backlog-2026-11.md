@@ -19,7 +19,7 @@
 | **Phase A** | `LMB-06` | 老压缩包文件名 `Shift-JIS / GBK` 真转码 + `CBT/TAR` + 嵌套合集包自动拆包 | P1 | M | [x] |
 | **Phase B** | `LMB-07` | 内置局域网 HTTP Wi-Fi 传书服务（浏览器拖拽文件/文件夹 + 进度 + 可选 PIN） | P1 | M-L | [x] |
 | **Phase B** | `LMB-08` | 外部目录原位挂载：Android SAF 持久化树 & iOS Security-Scoped Bookmark（含 `.nomedia` & iCloud 感知） | P1 | L | [x] |
-| **Phase B** | `LMB-09` | 后台增量目录扫描器、iOS `Files.app` 目录自发现与「本地书库管理中心」 | P1 | M-L | [ ] |
+| **Phase B** | `LMB-09` | 后台增量目录扫描器、iOS `Files.app` 目录自发现与「本地书库管理中心」 | P1 | M-L | [x] |
 | **Phase B** | `LMB-10` | 本地书架「按文件夹树浏览」双模视图 | P1 | M | [ ] |
 | **Phase C** | `LMB-11` | 原生 `PDF` 阅读支持（Android `PdfRenderer` + iOS `PDFKit` 按需光栅化 + 缩放高清重绘 + 大纲） | P1 | M-L | [ ] |
 | **Phase C** | `LMB-12` | `CBR (RAR4 / RAR5)` 与 `CB7 (7z)` 原生 FFI 解码（含固实包滑动窗口优化） | P1 | L | [ ] |

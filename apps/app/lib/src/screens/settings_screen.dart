@@ -196,6 +196,7 @@ class SettingsScreen extends ConsumerWidget {
                                     localUsage.humanSize,
                                   ),
                           ),
+                          onTap: () => context.push('/local-library'),
                         ),
                         ListTile(
                           title: Text(l10n.offlineContent),

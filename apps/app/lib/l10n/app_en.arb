@@ -713,6 +713,51 @@
       "count": {"type": "int"}
     }
   },
+  "localLibraryCenterTitle": "Local Library",
+  "localCenterQuickActions": "Import & Sync",
+  "localCenterMountFolder": "Mount external folder",
+  "localCenterMountFolderHint": "Read comics in-place from SD card or Files without copying",
+  "localCenterScanAll": "Scan all mounted folders",
+  "localCenterScanAllHint": "Incremental scan skips unchanged files",
+  "localCenterWifiHint": "Drag and drop files or folders from any desktop browser",
+  "localCenterMountedRoots": "Mounted folders",
+  "localCenterNoMountedRoots": "No external folders mounted",
+  "localCenterNoMountedRootsHint": "Mount a folder to index comics in-place without duplicating storage.",
+  "localCenterKindFolder": "Folder",
+  "localCenterRootSubtitle": "{kind} · {count} book(s)",
+  "@localCenterRootSubtitle": {
+    "placeholders": {
+      "kind": {"type": "String"},
+      "count": {"type": "int"}
+    }
+  },
+  "localCenterCreateNomedia": "Create .nomedia to hide from Gallery",
+  "localCenterRescanRoot": "Rescan folder",
+  "localCenterUnmountRoot": "Unmount",
+  "localCenterUnmountTitle": "Unmount external folder?",
+  "localCenterUnmountBody": "Removes indexed entries for \"{name}\" from Yomu. Your original files will not be deleted.",
+  "@localCenterUnmountBody": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "localCenterScanning": "Scanning {name} ({done}/{total})…",
+  "@localCenterScanning": {
+    "placeholders": {
+      "name": {"type": "String"},
+      "done": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
+  "localCenterScanResult": "Scan complete: +{added} added, {updated} updated, {skipped} unchanged, -{removed} removed",
+  "@localCenterScanResult": {
+    "placeholders": {
+      "added": {"type": "int"},
+      "updated": {"type": "int"},
+      "skipped": {"type": "int"},
+      "removed": {"type": "int"}
+    }
+  },
   "importingProgress": "Importing ({done}/{total})",
   "@importingProgress": {
     "placeholders": {

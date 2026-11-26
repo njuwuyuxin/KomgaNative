@@ -5,6 +5,7 @@ import 'package:yomu/src/screens/collection_detail_screen.dart';
 import 'package:yomu/src/screens/collections_screen.dart';
 import 'package:yomu/src/screens/connection_screen.dart';
 import 'package:yomu/src/screens/downloads_screen.dart';
+import 'package:yomu/src/screens/local_library_center_screen.dart';
 import 'package:yomu/src/screens/readlist_detail_screen.dart';
 import 'package:yomu/src/screens/search_screen.dart';
 import 'package:yomu/src/screens/history_screen.dart';
@@ -145,6 +146,11 @@ GoRouter createRouter({
         path: '/downloads',
         builder: (BuildContext context, GoRouterState state) =>
             const DownloadsScreen(),
+      ),
+      GoRoute(
+        path: '/local-library',
+        builder: (BuildContext context, GoRouterState state) =>
+            const LocalLibraryCenterScreen(),
       ),
       GoRoute(
         path: '/collections/:collectionId',
