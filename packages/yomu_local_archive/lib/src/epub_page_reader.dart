@@ -9,6 +9,7 @@ import 'package:yomu_local_archive/src/epub_opf_parser.dart';
 import 'package:yomu_local_archive/src/epub_toc_parser.dart';
 import 'package:yomu_local_archive/src/image_dimensions.dart';
 import 'package:yomu_local_archive/src/natural_sort.dart';
+import 'package:yomu_local_archive/src/tar_page_reader.dart';
 import 'package:yomu_local_archive/src/zip_directory.dart';
 import 'package:yomu_local_archive/src/zip_page_reader.dart';
 
@@ -23,12 +24,25 @@ bool isEpubZipEntries(List<ZipEntryInfo> entries) {
   return false;
 }
 
-/// 统一归档探测打开入口：自动识别标准 CBZ/ZIP 与固定版式/纯图漫画 EPUB。
+/// 统一归档探测打开入口：自动识别标准 CBZ/ZIP、固定版式漫画 EPUB 与 CBT/TAR。
 Future<ComicArchiveReader> openComicArchive(
   RandomAccessByteSource source, {
   bool sniffDimensions = true,
 }) async {
   try {
+    final totalLength = await source.length();
+    if (totalLength <= 0) {
+      throw const ArchiveException(ArchiveErrorKind.emptyFile);
+    }
+    final peekLen = totalLength < 265 ? totalLength : 265;
+    final head = await source.readRange(0, peekLen);
+    if (sniffContainerMagic(head) == ContainerMagic.tar) {
+      return await TarComicReader.open(
+        source,
+        sniffDimensions: sniffDimensions,
+      );
+    }
+
     final entries = await readZipCentralDirectory(source);
     if (isEpubZipEntries(entries)) {
       return await EpubComicReader.openWithEntries(

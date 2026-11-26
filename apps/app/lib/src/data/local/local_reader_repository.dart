@@ -182,6 +182,11 @@ final class LocalReaderRepository implements ReaderRepository {
 
     final file = await _storage.resolveFile(row.relativePath);
     final source = await FileByteSource.open(file);
+    if (row.storageKind == 'tar') {
+      return entries.isNotEmpty
+          ? TarComicReader.fromIndexedPages(source, entries)
+          : TarComicReader.open(source);
+    }
     return entries.isNotEmpty
         ? ZipComicReader.fromIndexedPages(source, entries)
         : openComicArchive(source);

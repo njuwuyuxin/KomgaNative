@@ -306,5 +306,106 @@ void main() {
         isEmpty,
       );
     });
+
+    test('支持导入 CBT/TAR 归档并经 LocalReaderRepository 随机读页', () async {
+      Uint8List buildTar(Map<String, List<int>> entries) {
+        final out = BytesBuilder();
+        for (final e in entries.entries) {
+          final header = Uint8List(512);
+          final nameBytes = utf8.encode(e.key);
+          header.setRange(0, nameBytes.length, nameBytes);
+          void writeOctal(int offset, int len, int value) {
+            final str = value.toRadixString(8).padLeft(len - 1, '0');
+            for (var i = 0; i < str.length; i++) {
+              header[offset + i] = str.codeUnitAt(i);
+            }
+            header[offset + len - 1] = 0;
+          }
+
+          writeOctal(100, 8, 0x1A4);
+          writeOctal(108, 8, 0);
+          writeOctal(116, 8, 0);
+          writeOctal(124, 12, e.value.length);
+          writeOctal(136, 12, 0);
+          for (var i = 148; i < 156; i++) {
+            header[i] = 0x20;
+          }
+          header[156] = 0x30;
+          header.setRange(257, 262, ascii.encode('ustar'));
+          header[263] = 0x30;
+          header[264] = 0x30;
+          var sum = 0;
+          for (final b in header) {
+            sum += b;
+          }
+          writeOctal(148, 7, sum);
+          header[155] = 0x20;
+          out.add(header);
+          out.add(e.value);
+          final pad = (512 - (e.value.length % 512)) % 512;
+          if (pad > 0) out.add(Uint8List(pad));
+        }
+        out.add(Uint8List(1024));
+        return out.takeBytes();
+      }
+
+      final p1 = _fakePng(700, 1000);
+      final p2 = _fakePng(700, 1000);
+      final cbtFile = File('${srcTemp.path}/TarComic Vol.1.cbt')
+        ..writeAsBytesSync(
+          buildTar(<String, List<int>>{'01.png': p1, '02.png': p2}),
+        );
+
+      final result = await importer.importArchiveFiles(<PickedComicFile>[
+        PickedComicFile.fromFile(cbtFile, name: 'TarComic Vol.1.cbt'),
+      ]);
+      expect(result.importedCount, 1);
+      expect(result.failures, isEmpty);
+
+      final bookId = result.importedBookIds.single;
+      final readerRepo = LocalReaderRepository(
+        db,
+        LocalComicsStorage(rootResolver: () async => sandboxTemp),
+      );
+      addTearDown(readerRepo.dispose);
+      expect(await readerRepo.pages(bookId), hasLength(2));
+      expect(await readerRepo.pageImage(bookId, 2), p2);
+    });
+
+    test('嵌套 3 卷合集 ZIP 自动拆包归入同一本地系列并清理外层临时包', () async {
+      final vol1 = _buildCbz(
+        entries: <String, List<int>>{'01.png': _fakePng(800, 1200)},
+      );
+      final vol2 = _buildCbz(
+        entries: <String, List<int>>{'01.png': _fakePng(800, 1200)},
+      );
+      final vol3 = _buildCbz(
+        entries: <String, List<int>>{'01.png': _fakePng(800, 1200)},
+      );
+      final collectionZip = _buildCbz(
+        entries: <String, List<int>>{
+          'Vol.3.cbz': vol3,
+          'Vol.1.cbz': vol1,
+          'Vol.2.cbz': vol2,
+        },
+      );
+      final bundleFile = File('${srcTemp.path}/迷宫饭合集.zip')
+        ..writeAsBytesSync(collectionZip);
+
+      final result = await importer.importArchiveFiles(<PickedComicFile>[
+        PickedComicFile.fromFile(bundleFile, name: '迷宫饭合集.zip'),
+      ]);
+      expect(result.importedCount, 3);
+      expect(result.importedSeriesIds, hasLength(1));
+      expect(result.failures, isEmpty);
+
+      final series = (await db.queryLocalSeries()).items.single;
+      expect(series.title, '迷宫饭合集');
+      expect(series.booksCount, 3);
+
+      // 沙盒 books/ 下只保留拆出的 3 个子卷目录，外层临时合集包已清理
+      final booksDir = Directory('${sandboxTemp.path}/books');
+      expect(booksDir.listSync(), hasLength(3));
+    });
   });
 }

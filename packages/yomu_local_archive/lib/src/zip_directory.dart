@@ -1,8 +1,8 @@
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:yomu_local_archive/src/archive_errors.dart';
 import 'package:yomu_local_archive/src/byte_source.dart';
+import 'package:yomu_local_archive/src/legacy_charset.dart';
 
 /// ZIP 中央目录中的单条文件索引元数据。
 final class ZipEntryInfo {
@@ -107,7 +107,7 @@ void _checkMagicNotOtherFormat(Uint8List head) {
         ContainerMagic.sevenZip ||
         ContainerMagic.pdf:
       throw ArchiveException.unsupportedContainer(magic);
-    case ContainerMagic.zip || ContainerMagic.unknown:
+    case ContainerMagic.zip || ContainerMagic.tar || ContainerMagic.unknown:
       return;
   }
 }
@@ -243,18 +243,8 @@ List<ZipEntryInfo> _parseCentralDirectoryEntries(Uint8List cdBytes) {
   return entries;
 }
 
-String _decodeEntryName(Uint8List bytes, {required bool isUtf8}) {
-  if (isUtf8) {
-    return utf8.decode(bytes, allowMalformed: true);
-  }
-  try {
-    return utf8.decode(bytes);
-  } on FormatException {
-    // 非 UTF-8 老压缩包（如 Shift-JIS / GBK / CP437 原始字节）：保留单字节一一映射，
-    // 绝不因文件名编码异常中断整包解析，排序仍基于字节码序与数字段正常运作。
-    return latin1.decode(bytes);
-  }
-}
+String _decodeEntryName(Uint8List bytes, {required bool isUtf8}) =>
+    decodeArchiveEntryName(bytes, isUtf8: isUtf8);
 
 ({int? uncompSize, int? compSize, int? localOffset}) _parseZip64Extra(
   Uint8List extra, {

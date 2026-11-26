@@ -4,7 +4,7 @@ import 'dart:typed_data';
 ///
 /// 民间漫画资源常出现伪后缀（例如把 ZIP 压缩包命名为 `.cbr`），
 /// 读取前先嗅探前 16 字节以真实二进制签名判定。
-enum ContainerMagic { zip, rar4, rar5, sevenZip, pdf, unknown }
+enum ContainerMagic { zip, tar, rar4, rar5, sevenZip, pdf, unknown }
 
 /// 本地归档解析失败的结构化原因。
 enum ArchiveErrorKind {
@@ -95,6 +95,16 @@ ContainerMagic sniffContainerMagic(Uint8List header) {
       header[2] == 0x44 &&
       header[3] == 0x46) {
     return ContainerMagic.pdf;
+  }
+
+  // POSIX ustar TAR 签名位于偏移 257 处的 ASCII "ustar"
+  if (header.length >= 262 &&
+      header[257] == 0x75 &&
+      header[258] == 0x73 &&
+      header[259] == 0x74 &&
+      header[260] == 0x61 &&
+      header[261] == 0x72) {
+    return ContainerMagic.tar;
   }
 
   return ContainerMagic.unknown;

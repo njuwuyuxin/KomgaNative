@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:yomu/src/data/local/comic_file_picker.dart';
 import 'package:yomu/src/data/local/cover_thumbnail_generator.dart';
+import 'package:yomu/src/data/local/local_archive_import_stream.dart';
 import 'package:yomu/src/data/local/local_comic_importer_models.dart';
 import 'package:yomu/src/data/local/local_comics_storage.dart';
 import 'package:yomu/src/data/progress/progress_database.dart';
@@ -44,13 +45,18 @@ final class LocalComicImporter {
       final item = files[i];
       onProgress?.call(i, files.length, item.name);
       try {
-        final imported = await _importSingleStream(
-          item.openRead,
+        final imported = await importArchiveOrCollectionStream(
+          db: _db,
+          storage: _storage,
+          coverEncoder: _coverEncoder,
+          openStream: item.openRead,
           displayFileName: item.name,
           parentFolderName: parentFolderName,
+          nextId: _nextId,
         );
-        seriesIds.add(imported.seriesId);
-        bookIds.add(imported.bookId);
+        seriesIds.addAll(imported.importedSeriesIds);
+        bookIds.addAll(imported.importedBookIds);
+        failures.addAll(imported.failures);
       } on ArchiveException catch (e) {
         failures.add(
           ImportFailureItem(
@@ -181,10 +187,7 @@ final class LocalComicImporter {
     await for (final entity in sourceDir.list(followLinks: false)) {
       if (entity is! File) continue;
       final name = importBaseName(entity.path);
-      final lower = name.toLowerCase();
-      if (lower.endsWith('.cbz') ||
-          lower.endsWith('.zip') ||
-          lower.endsWith('.epub')) {
+      if (isNestedComicArchivePath(name)) {
         childArchives.add(PickedComicFile.fromFile(entity, name: name));
       }
     }
@@ -266,71 +269,5 @@ final class LocalComicImporter {
         ],
       );
     }
-  }
-
-  Future<({String seriesId, String bookId})> _importSingleStream(
-    Stream<List<int>> Function() openStream, {
-    required String displayFileName,
-    String? parentFolderName,
-  }) => _importArchiveStreamToSandbox(
-    db: _db,
-    storage: _storage,
-    coverEncoder: _coverEncoder,
-    openStream: openStream,
-    displayFileName: displayFileName,
-    parentFolderName: parentFolderName,
-    nextId: _nextId,
-  );
-}
-
-Future<({String seriesId, String bookId})> _importArchiveStreamToSandbox({
-  required ProgressDatabase db,
-  required LocalComicsStorage storage,
-  required CoverThumbnailEncoder coverEncoder,
-  required Stream<List<int>> Function() openStream,
-  required String displayFileName,
-  required String? parentFolderName,
-  required String Function(String prefix) nextId,
-}) async {
-  final bookId = nextId('b');
-  final safeFolder = bookId.replaceAll(':', '_');
-  final isEpub = displayFileName.toLowerCase().endsWith('.epub');
-  final archiveRelPath = isEpub
-      ? 'books/$safeFolder/archive.epub'
-      : 'books/$safeFolder/archive.cbz';
-  final destFile = await storage.resolveFile(archiveRelPath);
-
-  FileByteSource? fileSource;
-  ComicArchiveReader? reader;
-  try {
-    await destFile.parent.create(recursive: true);
-    await writeStreamToFile(openStream(), destFile);
-    final sizeBytes = await destFile.length();
-    fileSource = await FileByteSource.open(destFile);
-    reader = await openComicArchive(fileSource);
-    final storageKind = reader is EpubComicReader ? 'epub' : 'zip';
-    final result = await commitComicReaderToDatabase(
-      db: db,
-      storage: storage,
-      coverEncoder: coverEncoder,
-      bookId: bookId,
-      safeFolder: safeFolder,
-      storageKind: storageKind,
-      relativePath: archiveRelPath,
-      sizeBytes: sizeBytes,
-      displayName: displayFileName,
-      parentFolderName: parentFolderName,
-      reader: reader,
-      generateSeriesId: () => nextId('s'),
-    );
-    await reader.close();
-    reader = null;
-    fileSource = null;
-    return result;
-  } on Object {
-    await reader?.close();
-    await fileSource?.close();
-    await tryDeleteImportDir(destFile.parent);
-    rethrow;
   }
 }
