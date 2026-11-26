@@ -72,10 +72,7 @@ class ProgressSyncService {
     final effectiveScope = (scope != null && scope.isNotEmpty)
         ? scope
         : _activeScope();
-    final isLocalTarget =
-        effectiveScope == kLocalSourceKey ||
-        (effectiveScope.isEmpty && bookId.startsWith('local:'));
-    if (isLocalTarget) {
+    if (effectiveScope == kLocalSourceKey) {
       await _store.forceAdopt(
         bookId,
         ReadProgress(

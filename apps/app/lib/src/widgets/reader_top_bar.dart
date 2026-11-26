@@ -7,6 +7,7 @@ import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/src/providers/cache_providers.dart';
 import 'package:yomu/src/providers/local_catalog_mutator_provider.dart';
 import 'package:yomu/src/providers/reader_toc_providers.dart';
+import 'package:yomu/src/providers/source_scoped_providers.dart';
 import 'package:yomu/src/widgets/page_navigator_sheet.dart';
 import 'package:yomu/src/widgets/reader_bar.dart';
 import 'package:yomu/src/widgets/reader_palette.dart';
@@ -75,7 +76,8 @@ class ReaderTopBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final sourceKey = ScopedSourceScope.maybeOf(context);
-    final isLocalBook = bookId.startsWith('local:') && seriesId != null;
+    final caps = ref.watch(sourceCapabilitiesForKeyProvider(sourceKey));
+    final canSetAsCover = caps.canMutateCatalog && seriesId != null;
     final tocQuery = (sourceKey: sourceKey, bookId: bookId);
     final bookmarks =
         ref.watch(bookBookmarksProvider(tocQuery)).value ??
@@ -94,7 +96,7 @@ class ReaderTopBar extends ConsumerWidget {
         pageLabel: pageLabel,
         palette: palette,
         mode: mode,
-        offline: !isLocalBook && offline,
+        offline: caps.showsNetworkOfflineBanner && offline,
         incognito: incognito,
         onToggleIncognito: onToggleIncognito,
         isBookmarked: isBookmarked,
@@ -103,7 +105,7 @@ class ReaderTopBar extends ConsumerWidget {
             : null,
         onSavePage: onSavePage,
         onSharePage: onSharePage,
-        onSetAsCover: isLocalBook
+        onSetAsCover: canSetAsCover
             ? () => unawaited(_setAsCover(context, ref))
             : null,
         // AA：只放读的时候真的会改的五项，改完立刻回到画面（RDR-03）。

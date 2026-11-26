@@ -4,6 +4,7 @@ import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/src/data/local/cover_thumbnail_generator.dart';
 import 'package:yomu/src/data/local/local_catalog_delete_dao.dart';
 import 'package:yomu/src/data/local/local_catalog_edit_dao.dart';
+import 'package:yomu/src/data/local/local_catalog_ids.dart';
 import 'package:yomu/src/data/local/local_catalog_query_dao.dart';
 import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/progress_providers.dart';
@@ -18,13 +19,8 @@ class LocalCatalogMutator {
   LocalCatalogMutator(this._ref);
 
   final Ref _ref;
-  int _idSeq = 0;
 
-  String _nextSeriesId() {
-    final micros = DateTime.now().microsecondsSinceEpoch;
-    _idSeq = (_idSeq + 1) & 0xFFFF;
-    return 'local:s_${micros}_$_idSeq';
-  }
+  String _nextSeriesId() => generateLocalEntityId('s');
 
   /// 修改本地系列元数据并立即刷新详情与书架。
   Future<void> editSeries(
@@ -100,10 +96,10 @@ class LocalCatalogMutator {
     required String seriesId,
     required int pageNumber,
   }) async {
-    if (!bookId.startsWith('local:')) return false;
+    final db = _ref.read(progressDatabaseProvider);
+    if (await db.localBookRowById(bookId) == null) return false;
     final readerRepo = _ref.read(localReaderRepositoryProvider);
     final storage = _ref.read(localComicsStorageProvider);
-    final db = _ref.read(progressDatabaseProvider);
 
     final rawBytes = await readerRepo.pageImage(bookId, pageNumber);
     final encoded = await encodeDefaultCoverThumbnail(
@@ -154,7 +150,6 @@ class LocalCatalogMutator {
     var removedCount = 0;
 
     for (final sid in seriesIds) {
-      if (!sid.startsWith('local:')) continue;
       final books = await db.queryLocalSeriesBooks(sid, size: 10000);
       for (final b in books.items) {
         await readerRepo.closeBookHandle(b.id);

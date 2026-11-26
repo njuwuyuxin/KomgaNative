@@ -60,8 +60,10 @@ Future<int> layerCheck() async {
     violations.addAll(_scanSizeAndBareCatch(root));
   }
 
+  violations.addAll(_scanLocalPrefixLeak('apps/app/lib/src'));
+
   if (violations.isEmpty) {
-    stdout.writeln('分层与规范规则通过（含 ≤350 行文件、≤300 行类、零裸 catch (_)）');
+    stdout.writeln('分层与规范规则通过（含 ≤350 行文件、≤300 行类、零裸 catch (_)、零 local: 前缀泄漏）');
     return 0;
   }
   for (final v in violations) {
@@ -197,6 +199,33 @@ List<String> _scanCode(
       for (final f in forbidden) {
         if (line.contains(f)) {
           violations.add('${entity.path}:${i + 1} 禁止直接使用 $f（$reason）');
+        }
+      }
+    }
+  }
+  return violations;
+}
+
+/// 禁止 `data/local/` 以外的业务与 UI 代码嗅探 `'local:'` ID 前缀（P1-1）。
+List<String> _scanLocalPrefixLeak(String dir) {
+  final directory = Directory(dir);
+  if (!directory.existsSync()) return <String>[];
+  final violations = <String>[];
+  const forbiddenLiterals = <String>["'local:'", '"local:"'];
+  for (final entity in directory.listSync(recursive: true)) {
+    if (entity is! File || !entity.path.endsWith('.dart')) continue;
+    if (_isGeneratedDart(entity.path)) continue;
+    final normalized = entity.path.replaceAll(r'\', '/');
+    if (normalized.contains('/data/local/')) continue;
+    final lines = entity.readAsLinesSync();
+    for (var i = 0; i < lines.length; i++) {
+      final line = lines[i].trimLeft();
+      if (line.startsWith('//')) continue;
+      for (final lit in forbiddenLiterals) {
+        if (line.contains(lit)) {
+          violations.add(
+            '${entity.path}:${i + 1} 禁止在 data/local/ 之外使用 $lit（请改用 SourceCapabilities）',
+          );
         }
       }
     }

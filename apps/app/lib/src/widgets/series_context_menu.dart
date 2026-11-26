@@ -10,10 +10,12 @@ import 'package:yomu/src/l10n/failure_text.dart';
 import 'package:yomu/src/providers/local_catalog_mutator_provider.dart';
 import 'package:yomu/src/providers/pinned_series_provider.dart';
 import 'package:yomu/src/providers/series_read_provider.dart';
+import 'package:yomu/src/providers/source_scoped_providers.dart';
 import 'package:yomu/src/screens/series_detail_args.dart';
 import 'package:yomu/src/widgets/collection_picker_sheet.dart';
 import 'package:yomu/src/widgets/context_menu.dart';
 import 'package:yomu/src/widgets/local_metadata_sheets.dart';
+import 'package:yomu/src/widgets/scoped_source_scope.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 长按系列卡片能做的事（UI-P2-5）。
@@ -39,6 +41,12 @@ Future<void> showSeriesMenu(
   Future<void> Function()? onRemoveFromCollection,
 }) async {
   final l10n = AppLocalizations.of(context);
+  final caps = ref.read(
+    sourceCapabilitiesForItemProvider((
+      scopedSourceKey: ScopedSourceScope.readOf(context),
+      entitySourceKey: series.sourceKey,
+    )),
+  );
   unawaited(AppHaptics.light());
   final action = await showContextMenu<SeriesMenuAction>(
     context: context,
@@ -82,9 +90,7 @@ Future<void> showSeriesMenu(
         label: l10n.viewDetails,
         icon: Icons.info_outline,
       ),
-      if (series.id.startsWith(
-        'local:',
-      )) ...<ContextMenuEntry<SeriesMenuAction>>[
+      if (caps.canMutateCatalog) ...<ContextMenuEntry<SeriesMenuAction>>[
         ContextMenuEntry(
           value: SeriesMenuAction.editMetadata,
           label: l10n.editMetadata,

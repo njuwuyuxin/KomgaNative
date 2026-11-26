@@ -157,7 +157,12 @@ void main() {
       expect(unreadShelf.items.single.isCloud, isFalse);
 
       // 本地翻到第 1 页：直接落盘，pending 队列为空，绝不触发网络上传
-      await sync.save('local:b_1', page: 1, completed: false);
+      await sync.save(
+        'local:b_1',
+        page: 1,
+        completed: false,
+        scope: kLocalSourceKey,
+      );
       expect(remoteUploads, 0);
       expect(await db.pending(scope: kLocalSourceKey), isEmpty);
 
@@ -166,7 +171,12 @@ void main() {
       expect(inProgressOndeck.items.single.readProgress?.page, 1);
 
       // 读完第 1 卷后：ondeck 自动推导第 2 卷未读（Up Next）
-      await sync.save('local:b_1', page: 2, completed: true);
+      await sync.save(
+        'local:b_1',
+        page: 2,
+        completed: true,
+        scope: kLocalSourceKey,
+      );
       final upNextOndeck = await db.localOndeck();
       expect(upNextOndeck.items.map((b) => b.id), <String>['local:b_2']);
       expect((await db.localSeriesById(r1.seriesId))?.booksReadCount, 1);

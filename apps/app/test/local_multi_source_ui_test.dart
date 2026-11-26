@@ -181,16 +181,20 @@ void main() {
       expect(find.byKey(const Key('series-cloud-local:s1')), findsNothing);
     });
 
-    testWidgets('本地书籍书行隐藏下载按钮，云端书籍书行保留下载按钮', (WidgetTester tester) async {
+    testWidgets('本地书籍书行按 SourceCapabilities 隐藏下载按钮，云端书行保留下载按钮（与 ID 前缀无关）', (
+      WidgetTester tester,
+    ) async {
+      // 故意不用 `local:` 前缀，验证 UI 依赖 SourceCapabilities 而非 ID 前缀。
       const localBook = Book(
-        id: 'local:b_1',
-        seriesId: 'local:s_1',
+        id: 'arbitrary-local-id-1',
+        seriesId: 'arbitrary-local-series-1',
         name: 'Vol. 1',
         pagesCount: 20,
       );
+      // 故意用 `local:` 前缀但标记为云端源，验证绝不被误判为本机书。
       final cloudBook = const Book(
-        id: '0H8CLOUD1',
-        seriesId: '0H8SERIES',
+        id: 'local:remote-id-2',
+        seriesId: 'local:remote-series-2',
         name: 'Vol. 2',
         pagesCount: 20,
       ).withSource('https://komga.example.com');
@@ -198,9 +202,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: <Override>[
-            libraryRepositoryProvider.overrideWithValue(
-              FakeLibraryRepository(),
-            ),
+            bookCoverProvider.overrideWith((Ref _, CoverQuery _) async => null),
           ],
           child: MaterialApp(
             locale: const Locale('en'),
@@ -221,6 +223,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(BookDownloadButton), findsOneWidget);
+      expect(
+        find.byKey(const Key('book-download-local:remote-id-2')),
+        findsOneWidget,
+      );
     });
   });
 }

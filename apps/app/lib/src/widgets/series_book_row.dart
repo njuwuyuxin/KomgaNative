@@ -11,6 +11,7 @@ import 'package:yomu/src/providers/book_read_provider.dart';
 import 'package:yomu/src/providers/download_policy_gate.dart';
 import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/local_catalog_mutator_provider.dart';
+import 'package:yomu/src/providers/source_scoped_providers.dart';
 import 'package:yomu/src/widgets/book_download_button.dart';
 import 'package:yomu/src/widgets/context_menu.dart';
 import 'package:yomu/src/widgets/cover_image.dart';
@@ -61,7 +62,14 @@ class SeriesBookRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final sourceKey = ScopedSourceScope.maybeOf(context) ?? book.sourceKey;
+    final scopedSourceKey = ScopedSourceScope.maybeOf(context);
+    final sourceKey = scopedSourceKey ?? book.sourceKey;
+    final caps = ref.watch(
+      sourceCapabilitiesForItemProvider((
+        scopedSourceKey: scopedSourceKey,
+        entitySourceKey: book.sourceKey,
+      )),
+    );
     final cover = ref.watch(
       bookCoverProvider((sourceKey: sourceKey, id: book.id)),
     );
@@ -124,7 +132,7 @@ class SeriesBookRow extends ConsumerWidget {
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              if (!book.id.startsWith('local:')) BookDownloadButton(book: book),
+              if (caps.canDownloadOffline) BookDownloadButton(book: book),
               if (trailingAction != null) trailingAction!,
               Icon(
                 completed ? Icons.check_circle : Icons.chevron_right,
@@ -144,6 +152,12 @@ class SeriesBookRow extends ConsumerWidget {
   /// 长按一本书：加入/移出阅读列表、标记已读/未读；在系列页还可以"标记之前所有"。
   Future<void> _showMenu(BuildContext context, WidgetRef ref) async {
     final l10n = AppLocalizations.of(context);
+    final caps = ref.read(
+      sourceCapabilitiesForItemProvider((
+        scopedSourceKey: ScopedSourceScope.readOf(context),
+        entitySourceKey: book.sourceKey,
+      )),
+    );
     unawaited(AppHaptics.light());
     // 用枚举而不是 bool：单本和"之前所有"是两组不同的动作，
     // 以前两组共用一个 true/false，点"之前所有"会被当成"标记这一本"（踩过）。
@@ -184,7 +198,7 @@ class SeriesBookRow extends ConsumerWidget {
             icon: Icons.remove_done,
           ),
         ],
-        if (book.id.startsWith('local:')) ...<ContextMenuEntry<BookMenuAction>>[
+        if (caps.canMutateCatalog) ...<ContextMenuEntry<BookMenuAction>>[
           ContextMenuEntry(
             value: BookMenuAction.editMetadata,
             label: l10n.editMetadata,

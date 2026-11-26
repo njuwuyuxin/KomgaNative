@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/providers/source_scoped_providers.dart';
 import 'package:yomu/src/widgets/local_metadata_sheets.dart';
+import 'package:yomu/src/widgets/scoped_source_scope.dart';
 import 'package:yomu/src/widgets/series_download_menu.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu_domain/yomu_domain.dart';
@@ -21,6 +23,15 @@ PreferredSizeWidget buildSeriesDetailAppBar(
   required Future<void> Function({required bool read}) onMarkSeriesRead,
 }) {
   final l10n = AppLocalizations.of(context);
+  final scopedSourceKey = ScopedSourceScope.maybeOf(context);
+  final caps = series != null
+      ? ref.watch(
+          sourceCapabilitiesForItemProvider((
+            scopedSourceKey: scopedSourceKey,
+            entitySourceKey: series.sourceKey,
+          )),
+        )
+      : ref.watch(sourceCapabilitiesForKeyProvider(scopedSourceKey));
   return GlassTopBar(
     header: GlassHeader(
       leading: GlassIconButton(
@@ -39,7 +50,7 @@ PreferredSizeWidget buildSeriesDetailAppBar(
             label: l10n.addToCollection,
             onPressed: () => unawaited(onOpenCollectionsPicker()),
           ),
-          if (!seriesId.startsWith('local:')) ...<Widget>[
+          if (caps.canDownloadOffline) ...<Widget>[
             const SizedBox(width: AppSpacing.sm),
             SeriesDownloadMenu(seriesId: seriesId, books: books),
           ],
@@ -50,7 +61,7 @@ PreferredSizeWidget buildSeriesDetailAppBar(
             icon: Icons.more_horiz,
             label: l10n.moreActions,
             menuChildren: <Widget>[
-              if (series != null && seriesId.startsWith('local:'))
+              if (series != null && caps.canMutateCatalog)
                 GlassMenuItemButton(
                   key: const Key('series-edit-metadata'),
                   label: l10n.editMetadata,
