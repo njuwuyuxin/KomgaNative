@@ -758,6 +758,17 @@
       "removed": {"type": "int"}
     }
   },
+  "folderTreeSwitchFolders": "Browse by folders",
+  "folderTreeSwitchSeries": "Browse by series",
+  "folderTreeRoot": "All folders",
+  "folderTreeImportedGroup": "Imported",
+  "folderTreeBookCount": "{count} book(s)",
+  "@folderTreeBookCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "folderTreeCloudPlaceholder": "In iCloud · tap to download",
   "importingProgress": "Importing ({done}/{total})",
   "@importingProgress": {
     "placeholders": {

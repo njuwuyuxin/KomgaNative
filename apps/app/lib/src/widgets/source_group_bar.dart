@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/src/providers/active_source_provider.dart';
+import 'package:yomu/src/providers/local_folder_tree_provider.dart';
 import 'package:yomu/src/providers/local_import_provider.dart';
 import 'package:yomu/src/widgets/wifi_transfer_sheet.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
@@ -87,11 +88,38 @@ class SourceGroupBar extends ConsumerWidget {
               const Spacer(),
             if (showLocalImport) ...<Widget>[
               if (showSourceChips) const SizedBox(width: AppSpacing.xs),
+              const _LocalBrowseModeToggle(),
+              const SizedBox(width: AppSpacing.xs),
               const LocalImportMenuOrb(),
             ],
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 本机书架「按系列 / 按文件夹树」双模切换按钮（LMB-10）。
+class _LocalBrowseModeToggle extends ConsumerWidget {
+  const _LocalBrowseModeToggle();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final mode = ref.watch(localShelfBrowseModeProvider);
+    final isFolderMode = mode == LocalShelfBrowseMode.folders;
+    return GlassIconButton(
+      key: const Key('local-shelf-folder-toggle'),
+      label: isFolderMode
+          ? l10n.folderTreeSwitchSeries
+          : l10n.folderTreeSwitchFolders,
+      icon: isFolderMode
+          ? Icons.grid_view_outlined
+          : Icons.account_tree_outlined,
+      onPressed: () {
+        unawaited(AppHaptics.selection());
+        ref.read(localShelfBrowseModeProvider.notifier).toggle();
+      },
     );
   }
 }

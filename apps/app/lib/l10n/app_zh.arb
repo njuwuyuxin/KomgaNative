@@ -607,6 +607,17 @@
       "removed": {"type": "int"}
     }
   },
+  "folderTreeSwitchFolders": "按文件夹树浏览",
+  "folderTreeSwitchSeries": "按系列视图浏览",
+  "folderTreeRoot": "根目录",
+  "folderTreeImportedGroup": "本机导入",
+  "folderTreeBookCount": "{count} 册",
+  "@folderTreeBookCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "folderTreeCloudPlaceholder": "位于 iCloud · 点击下载",
   "importingProgress": "正在导入（{done}/{total}）",
   "@importingProgress": {
     "placeholders": {

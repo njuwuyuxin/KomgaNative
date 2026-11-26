@@ -11,10 +11,12 @@ import 'package:yomu/src/l10n/failure_text.dart';
 import 'package:yomu/src/providers/active_source_provider.dart';
 import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/local_catalog_mutator_provider.dart';
+import 'package:yomu/src/providers/local_folder_tree_provider.dart';
 import 'package:yomu/src/providers/pinned_series_provider.dart';
 import 'package:yomu/src/providers/shelf_selection_provider.dart';
 import 'package:yomu/src/session/session_controller.dart';
 import 'package:yomu/src/widgets/collection_picker_sheet.dart';
+import 'package:yomu/src/widgets/local_folder_tree_sliver.dart';
 import 'package:yomu/src/widgets/local_metadata_sheets.dart';
 import 'package:yomu/src/widgets/offline_banner.dart';
 import 'package:yomu/src/widgets/phase_fade.dart';
@@ -98,6 +100,14 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     final isRealLocalShelf =
         activeSource.capabilities.canImportLocalFiles &&
         identical(currentRepo, activeBundle.library);
+    final browseMode = isRealLocalShelf
+        ? ref.watch(localShelfBrowseModeProvider)
+        : LocalShelfBrowseMode.series;
+    final showFolderTree =
+        isRealLocalShelf &&
+        !selection.active &&
+        browseMode == LocalShelfBrowseMode.folders &&
+        state.series.isNotEmpty;
     final allSelected =
         state.series.isNotEmpty && selection.ids.length == state.series.length;
 
@@ -200,14 +210,19 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                               child: SizedBox(height: AppSpacing.sm),
                             ),
                             PhaseFade(
-                              phase: _phaseOf(state),
+                              phase: showFolderTree
+                                  ? 'folders'
+                                  : _phaseOf(state),
                               slivers: <Widget>[
-                                ..._shelfSlivers(
-                                  l10n,
-                                  state,
-                                  controller,
-                                  isRealLocalShelf: isRealLocalShelf,
-                                ),
+                                if (showFolderTree)
+                                  LocalFolderTreeSliver(query: state.query)
+                                else
+                                  ..._shelfSlivers(
+                                    l10n,
+                                    state,
+                                    controller,
+                                    isRealLocalShelf: isRealLocalShelf,
+                                  ),
                                 const SliverToBoxAdapter(
                                   child: SizedBox(
                                     height: AppSizes.navBarClearance,
@@ -229,115 +244,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
           ),
         ],
       ),
-    );
-  }
-}
-
-/// 多选态紧凑信息行：常态不占高度，进入管理模式后展开已选数量与全选动作。
-class _SelectionInfoRow extends StatelessWidget {
-  const _SelectionInfoRow({
-    required this.active,
-    required this.selectedCount,
-    required this.allSelected,
-    required this.motion,
-    required this.onSelectAll,
-    this.onMergeSelected,
-    this.onDeleteSelected,
-  });
-
-  final bool active;
-  final int selectedCount;
-  final bool allSelected;
-  final AppMotion motion;
-  final VoidCallback onSelectAll;
-  final VoidCallback? onMergeSelected;
-  final VoidCallback? onDeleteSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    final content = active
-        ? Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.md,
-              AppSpacing.xs,
-              AppSpacing.md,
-              AppSpacing.xs,
-            ),
-            child: Row(
-              children: <Widget>[
-                Expanded(
-                  child: Text(
-                    l10n.selectedCount(selectedCount),
-                    key: const Key('shelf-selection-count'),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.w600,
-                      fontFeatures: AppTypography.tabularFigures,
-                    ),
-                  ),
-                ),
-                if (onMergeSelected != null)
-                  TextButton.icon(
-                    key: const Key('shelf-selection-merge'),
-                    style: TextButton.styleFrom(
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      minimumSize: Size.zero,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.sm,
-                        vertical: AppSpacing.xs,
-                      ),
-                    ),
-                    onPressed: onMergeSelected,
-                    icon: const Icon(Icons.merge_type, size: AppSizes.iconXs),
-                    label: Text(l10n.mergeIntoSeries),
-                  ),
-                if (onDeleteSelected != null)
-                  TextButton.icon(
-                    key: const Key('shelf-selection-delete'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: theme.colorScheme.error,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      minimumSize: Size.zero,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.sm,
-                        vertical: AppSpacing.xs,
-                      ),
-                    ),
-                    onPressed: onDeleteSelected,
-                    icon: const Icon(
-                      Icons.delete_outline,
-                      size: AppSizes.iconXs,
-                    ),
-                    label: Text(l10n.deleteFromDevice),
-                  ),
-                TextButton(
-                  key: const Key('shelf-selection-all'),
-                  style: TextButton.styleFrom(
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    minimumSize: Size.zero,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.sm,
-                      vertical: AppSpacing.xs,
-                    ),
-                  ),
-                  onPressed: allSelected ? null : onSelectAll,
-                  child: Text(l10n.selectAll),
-                ),
-              ],
-            ),
-          )
-        : const SizedBox.shrink();
-
-    // 墨水屏（motion.enabled == false）下直接瞬切，避免 AnimatedSize(Duration.zero)
-    // 在 performLayout 中同步触发 markNeedsLayout 断言。
-    if (!motion.enabled) return content;
-    return AnimatedSize(
-      duration: motion.quick,
-      curve: motion.standardCurve,
-      alignment: Alignment.topCenter,
-      child: content,
     );
   }
 }
