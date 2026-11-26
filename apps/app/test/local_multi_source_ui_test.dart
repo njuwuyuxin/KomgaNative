@@ -42,9 +42,7 @@ void main() {
       if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
     });
 
-    testWidgets('纯本地未配服务器时：隐藏源分组栏，展示本机空态导入引导与顶栏 + 按钮', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('纯本地未配服务器时：隐藏源分组栏，展示本机空态导入引导', (WidgetTester tester) async {
       final db = ProgressDatabase(NativeDatabase.memory());
       final cacheDb = HttpCacheDatabase(NativeDatabase.memory());
       addTearDown(() async {
@@ -74,12 +72,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // 单源隐形：不出现 source-group-bar
+      // 单源隐形：不出现 source-group-bar，展示干净的中心空书架引导与主导入按钮
       expect(find.byKey(const Key('source-group-bar')), findsNothing);
-      // 展示本机导入圆球与空书架引导
-      expect(find.byKey(const Key('shelf-import-orb')), findsOneWidget);
       expect(find.byKey(const Key('shelf-local-onboarding')), findsOneWidget);
       expect(find.text('Your shelf is ready'), findsOneWidget);
+      expect(find.text('Import comics'), findsOneWidget);
     });
 
     testWidgets('同时存在本机与 Komga 服务器时：展示源分组胶囊并按分组切换，云端系列显示小云标', (

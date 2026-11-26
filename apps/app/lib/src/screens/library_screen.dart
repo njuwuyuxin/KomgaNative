@@ -149,13 +149,16 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                                       _markSelected(read: false),
                                   onAddToCollection: _addSelectedToCollection,
                                 ),
-                                trailing: isRealLocalShelf && !selection.active
-                                    ? const LocalImportMenuOrb()
-                                    : null,
                               ),
                             ),
-                            if (sizeClass != WindowSizeClass.expanded)
-                              const SliverToBoxAdapter(child: SourceGroupBar()),
+                            SliverToBoxAdapter(
+                              child: SourceGroupBar(
+                                showLocalImport:
+                                    isRealLocalShelf &&
+                                    !selection.active &&
+                                    state.series.isNotEmpty,
+                              ),
+                            ),
                             const SliverToBoxAdapter(
                               child: LocalImportProgressBanner(),
                             ),

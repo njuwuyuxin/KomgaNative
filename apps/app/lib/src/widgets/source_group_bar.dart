@@ -8,67 +8,93 @@ import 'package:yomu/src/providers/local_import_provider.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 
-/// 多源书架/收藏分组切换条（ADR 0008 不变量 2）：
-/// - **单源隐形**：当系统仅存在「本机」单一源（未添加任何服务器）时，返回 `SizedBox.shrink()` 零占位；
-/// - **多源清晰分组**：当已配置远程服务器时，渲染 `[ 本机 ]` 与各台 `[ ☁ 服务器 ]` 分组胶囊。
+/// 多源书架分组与本机导入工具行：
+/// - 单源且本机书架为空时隐藏（中心空态引导卡已有主导入按钮，顶栏不重复堆叠，保留完整搜索框宽度）；
+/// - 多源时展示 `[ 本机 ]` / `[ ☁ 服务器 ]` 胶囊；处于本机分组且已有书籍时右侧提供 `+ 导入` 菜单。
 class SourceGroupBar extends ConsumerWidget {
-  const SourceGroupBar({super.key});
+  const SourceGroupBar({this.showLocalImport = false, super.key});
+
+  final bool showLocalImport;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final sources = ref.watch(availableSourcesProvider);
-    if (sources.length <= 1) return const SizedBox.shrink();
+    final isWide =
+        WindowSizeClass.of(MediaQuery.sizeOf(context).width) ==
+        WindowSizeClass.expanded;
+    final showSourceChips = sources.length > 1 && !isWide;
+    if (!showSourceChips && !showLocalImport) {
+      return const SizedBox.shrink();
+    }
 
     final active = ref.watch(activeSourceProvider);
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
 
     return SizedBox(
-      key: const Key('source-group-bar'),
+      key: showSourceChips ? const Key('source-group-bar') : null,
       height: AppSizes.minTouch - AppSpacing.xs,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
+      child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-        itemCount: sources.length,
-        separatorBuilder: (BuildContext _, int _) =>
-            const SizedBox(width: AppSpacing.xs),
-        itemBuilder: (BuildContext context, int index) {
-          final item = sources[index];
-          final selected = item.sourceKey == active.sourceKey;
-          final label = switch (item) {
-            LocalContentSource() => l10n.localLibrary,
-            RemoteContentSource(:final displayName) => displayName,
-          };
-          return ChoiceChip(
-            key: Key('source-chip-${item.sourceKey}'),
-            avatar: item.isCloud
-                ? Icon(
-                    Icons.cloud_outlined,
-                    size: AppSizes.iconXs,
-                    color: selected
-                        ? theme.colorScheme.onSecondaryContainer
-                        : theme.colorScheme.onSurfaceVariant,
-                  )
-                : const Icon(Icons.smartphone_outlined, size: AppSizes.iconXs),
-            label: Text(label),
-            selected: selected,
-            onSelected: (bool value) {
-              if (!value || selected) return;
-              unawaited(AppHaptics.selection());
-              unawaited(
-                ref
-                    .read(activeSourceProvider.notifier)
-                    .selectSource(item.sourceKey),
-              );
-            },
-          );
-        },
+        child: Row(
+          children: <Widget>[
+            if (showSourceChips)
+              Expanded(
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: sources.length,
+                  separatorBuilder: (BuildContext _, int _) =>
+                      const SizedBox(width: AppSpacing.xs),
+                  itemBuilder: (BuildContext context, int index) {
+                    final item = sources[index];
+                    final selected = item.sourceKey == active.sourceKey;
+                    final label = switch (item) {
+                      LocalContentSource() => l10n.localLibrary,
+                      RemoteContentSource(:final displayName) => displayName,
+                    };
+                    return ChoiceChip(
+                      key: Key('source-chip-${item.sourceKey}'),
+                      avatar: item.isCloud
+                          ? Icon(
+                              Icons.cloud_outlined,
+                              size: AppSizes.iconXs,
+                              color: selected
+                                  ? theme.colorScheme.onSecondaryContainer
+                                  : theme.colorScheme.onSurfaceVariant,
+                            )
+                          : const Icon(
+                              Icons.smartphone_outlined,
+                              size: AppSizes.iconXs,
+                            ),
+                      label: Text(label),
+                      selected: selected,
+                      onSelected: (bool value) {
+                        if (!value || selected) return;
+                        unawaited(AppHaptics.selection());
+                        unawaited(
+                          ref
+                              .read(activeSourceProvider.notifier)
+                              .selectSource(item.sourceKey),
+                        );
+                      },
+                    );
+                  },
+                ),
+              )
+            else
+              const Spacer(),
+            if (showLocalImport) ...<Widget>[
+              if (showSourceChips) const SizedBox(width: AppSpacing.xs),
+              const LocalImportMenuOrb(),
+            ],
+          ],
+        ),
       ),
     );
   }
 }
 
-/// 本机书库顶栏「+ 导入漫画」玻璃圆球菜单按钮。
+/// 本机书库「+ 导入漫画」紧凑玻璃菜单按钮。
 class LocalImportMenuOrb extends ConsumerWidget {
   const LocalImportMenuOrb({super.key});
 
@@ -79,7 +105,6 @@ class LocalImportMenuOrb extends ConsumerWidget {
 
     return GlassMenuButton(
       key: const Key('shelf-import-orb'),
-      orb: true,
       icon: busy ? Icons.hourglass_top : Icons.add,
       label: l10n.importComics,
       menuChildren: <Widget>[
