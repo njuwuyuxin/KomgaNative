@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu_local_archive/src/archive_errors.dart';
+import 'package:yomu_local_archive/src/archive_isolate.dart';
 import 'package:yomu_local_archive/src/byte_source.dart';
 import 'package:yomu_local_archive/src/chapter_extractor.dart';
 import 'package:yomu_local_archive/src/comic_info_parser.dart';
@@ -162,7 +163,16 @@ final class ZipComicReader implements ComicArchiveReader {
         dataOffset,
         firstEnc.compressedSize,
       );
-      final probed = probeZipCryptoPassword(rawEnc, firstEnc, password!);
+      final targetPassword = password!;
+      final probed =
+          await offloadBytesParse<
+            ({Uint8List passwordBytes, Uint8List plainBytes})?
+          >(
+            rawEnc,
+            (Uint8List bytes) =>
+                probeZipCryptoPassword(bytes, firstEnc, targetPassword),
+            thresholdBytes: kZipCryptoIsolateThreshold,
+          );
       if (probed == null) {
         throw const ArchiveException(
           ArchiveErrorKind.encryptedArchive,

@@ -62,13 +62,13 @@ final class MemoryByteSource implements RandomAccessByteSource {
 /// `RandomAccessFile` 共享单一底层偏移指针；阅读器预取窗口会并发发起多页读取，
 /// 因此通过 [_serial] 串行化每次 `setPosition + readInto`，杜绝并发游标串位。
 final class FileByteSource implements RandomAccessByteSource {
-  FileByteSource._(this._raf, this._length);
+  FileByteSource._(this._raf, this._length, this.filePath);
 
   static Future<FileByteSource> open(File file) async {
     try {
       final raf = await file.open();
       final len = await raf.length();
-      return FileByteSource._(raf, len);
+      return FileByteSource._(raf, len, file.path);
     } on FileSystemException catch (e) {
       throw ArchiveException(ArchiveErrorKind.ioError, e.message);
     }
@@ -76,6 +76,9 @@ final class FileByteSource implements RandomAccessByteSource {
 
   final RandomAccessFile _raf;
   final int _length;
+
+  /// 底层磁盘文件路径（供大型归档扫描卸载至后台 Isolate 独立读取，不占 UI 线程）。
+  final String filePath;
   Future<void> _serial = Future<void>.value();
   bool _closed = false;
 

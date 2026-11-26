@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:yomu_local_archive/src/archive_errors.dart';
+import 'package:yomu_local_archive/src/archive_isolate.dart';
 import 'package:yomu_local_archive/src/byte_source.dart';
 import 'package:yomu_local_archive/src/legacy_charset.dart';
 
@@ -103,7 +104,11 @@ Future<List<ZipEntryInfo>> readZipCentralDirectory(
       'Truncated central directory',
     );
   }
-  return _parseCentralDirectoryEntries(cdBytes);
+  return offloadBytesParse<List<ZipEntryInfo>>(
+    cdBytes,
+    _parseCentralDirectoryEntries,
+    thresholdBytes: kCentralDirectoryIsolateThreshold,
+  );
 }
 
 void _checkMagicNotOtherFormat(Uint8List head) {

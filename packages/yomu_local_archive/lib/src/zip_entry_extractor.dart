@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:yomu_local_archive/src/archive_errors.dart';
+import 'package:yomu_local_archive/src/archive_isolate.dart';
 import 'package:yomu_local_archive/src/byte_source.dart';
 import 'package:yomu_local_archive/src/image_dimensions.dart';
 import 'package:yomu_local_archive/src/zip_crypto.dart';
@@ -61,7 +62,12 @@ Future<Uint8List> extractZipEntryBytes(
     if (passwordBytes == null) {
       throw ArchiveException(ArchiveErrorKind.encryptedArchive, entry.name);
     }
-    final plain = tryDecryptAndInflateZipEntry(raw, entry, passwordBytes);
+    final pwdCopy = Uint8List.fromList(passwordBytes);
+    final plain = await offloadBytesParse<Uint8List?>(
+      raw,
+      (Uint8List bytes) => tryDecryptAndInflateZipEntry(bytes, entry, pwdCopy),
+      thresholdBytes: kZipCryptoIsolateThreshold,
+    );
     if (plain == null) {
       throw ArchiveException(ArchiveErrorKind.encryptedArchive, entry.name);
     }
@@ -71,19 +77,27 @@ Future<Uint8List> extractZipEntryBytes(
     case 0:
       return Uint8List.fromList(raw);
     case 8:
-      try {
-        final inflated = ZLibCodec(raw: true).decode(raw);
-        return inflated is Uint8List ? inflated : Uint8List.fromList(inflated);
-      } on FormatException catch (e) {
-        throw ArchiveException(ArchiveErrorKind.corruptedArchive, e.message);
-      } on IOException catch (e) {
-        throw ArchiveException(ArchiveErrorKind.corruptedArchive, e.toString());
-      }
+      return offloadBytesTransform(
+        raw,
+        _inflateRawDeflate,
+        thresholdBytes: kZipInflateIsolateThreshold,
+      );
     default:
       throw ArchiveException(
         ArchiveErrorKind.unsupportedCompression,
         'Unsupported compression method ${entry.compressionMethod}',
       );
+  }
+}
+
+Uint8List _inflateRawDeflate(Uint8List raw) {
+  try {
+    final inflated = ZLibCodec(raw: true).decode(raw);
+    return inflated is Uint8List ? inflated : Uint8List.fromList(inflated);
+  } on FormatException catch (e) {
+    throw ArchiveException(ArchiveErrorKind.corruptedArchive, e.message);
+  } on IOException catch (e) {
+    throw ArchiveException(ArchiveErrorKind.corruptedArchive, e.toString());
   }
 }
 

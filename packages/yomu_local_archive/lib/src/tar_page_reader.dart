@@ -1,7 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:yomu_local_archive/src/archive_errors.dart';
+import 'package:yomu_local_archive/src/archive_isolate.dart';
 import 'package:yomu_local_archive/src/byte_source.dart';
 import 'package:yomu_local_archive/src/chapter_extractor.dart';
 import 'package:yomu_local_archive/src/comic_info_parser.dart';
@@ -44,133 +47,158 @@ final class TarComicReader implements ComicArchiveReader {
         );
       }
 
-      final imageEntries = <({String name, int dataOffset, int size})>[];
-      ({int dataOffset, int size})? comicInfoLoc;
-
-      var offset = 0;
-      String? pendingLongName;
-      String? pendingPaxPath;
-      var parsedAnyHeader = false;
-
-      while (offset + _tarBlockSize <= totalLength) {
-        final header = await source.readRange(offset, _tarBlockSize);
-        if (_isAllZero(header)) break;
-
-        if (!_verifyTarChecksum(header)) {
-          if (!parsedAnyHeader) {
-            throw const ArchiveException(
-              ArchiveErrorKind.corruptedArchive,
-              'Invalid TAR header checksum',
+      final ({List<ArchivePageEntry> pages, Uint8List? comicInfoBytes}) scanned;
+      if (source is FileByteSource && totalLength >= kTarScanIsolateThreshold) {
+        final path = source.filePath;
+        scanned = await Isolate.run(() async {
+          final bgSource = await FileByteSource.open(File(path));
+          try {
+            return await _scanTarArchive(
+              bgSource,
+              totalLength: totalLength,
+              sniffDimensions: sniffDimensions,
             );
+          } finally {
+            await bgSource.close();
           }
-          break;
-        }
-        parsedAnyHeader = true;
-
-        final size = _parseTarSize(header);
-        final typeFlag = header[156];
-        final dataOffset = offset + _tarBlockSize;
-        final paddedSize = (size + _tarBlockSize - 1) & ~(_tarBlockSize - 1);
-        final nextOffset = dataOffset + paddedSize;
-
-        if (size < 0 || dataOffset + size > totalLength) {
-          throw const ArchiveException(
-            ArchiveErrorKind.corruptedArchive,
-            'TAR entry payload exceeds archive length',
-          );
-        }
-
-        // GNU LongName ('L')
-        if (typeFlag == 0x4C) {
-          final rawName = await source.readRange(dataOffset, size);
-          pendingLongName = _decodeTarRawString(rawName);
-          offset = nextOffset;
-          continue;
-        }
-
-        // PAX extended header ('x')
-        if (typeFlag == 0x78) {
-          final paxBytes = await source.readRange(dataOffset, size);
-          pendingPaxPath = _parsePaxPath(paxBytes);
-          offset = nextOffset;
-          continue;
-        }
-
-        final name =
-            pendingPaxPath ?? pendingLongName ?? _readUstarName(header);
-        pendingLongName = null;
-        pendingPaxPath = null;
-
-        // 普通文件：0x00 或 '0' (0x30)
-        final isRegularFile = typeFlag == 0 || typeFlag == 0x30;
-        if (isRegularFile && name.isNotEmpty) {
-          final norm = name.replaceAll(r'\', '/');
-          final lowerBase = norm.split('/').last.toLowerCase();
-          if (lowerBase == 'comicinfo.xml' &&
-              !norm.startsWith('__MACOSX/') &&
-              comicInfoLoc == null) {
-            comicInfoLoc = (dataOffset: dataOffset, size: size);
-          } else if (isSupportedComicImagePath(norm)) {
-            imageEntries.add((name: norm, dataOffset: dataOffset, size: size));
-          }
-        }
-
-        offset = nextOffset;
-      }
-
-      if (imageEntries.isEmpty) {
-        throw const ArchiveException(ArchiveErrorKind.noImages);
-      }
-
-      imageEntries.sort((a, b) => naturalCompare(a.name, b.name));
-
-      Uint8List? comicInfoBytes;
-      if (comicInfoLoc != null && comicInfoLoc.size > 0) {
-        comicInfoBytes = await source.readRange(
-          comicInfoLoc.dataOffset,
-          comicInfoLoc.size,
-        );
-      }
-
-      final pages = <ArchivePageEntry>[];
-      for (var i = 0; i < imageEntries.length; i++) {
-        final item = imageEntries[i];
-        ImageSize? dims;
-        if (sniffDimensions && item.size > 0) {
-          final toRead = item.size < _tarHeaderSniffBytes
-              ? item.size
-              : _tarHeaderSniffBytes;
-          final slice = await source.readRange(item.dataOffset, toRead);
-          dims = sniffImageDimensions(slice);
-        }
-        pages.add(
-          ArchivePageEntry(
-            number: i + 1,
-            entryName: item.name,
-            uncompressedSize: item.size,
-            compressedSize: item.size,
-            localHeaderOffset: item.dataOffset,
-            compressionMethod: 0,
-            width: dims?.width,
-            height: dims?.height,
-            mediaType: mediaTypeForPath(item.name),
-          ),
+        });
+      } else {
+        scanned = await _scanTarArchive(
+          source,
+          totalLength: totalLength,
+          sniffDimensions: sniffDimensions,
         );
       }
 
       return TarComicReader._(
         source: source,
-        pages: pages,
-        comicInfoBytes: comicInfoBytes,
+        pages: scanned.pages,
+        comicInfoBytes: scanned.comicInfoBytes,
         chapters: resolveArchiveChapters(
-          pages: pages,
-          comicInfoBytes: comicInfoBytes,
+          pages: scanned.pages,
+          comicInfoBytes: scanned.comicInfoBytes,
         ),
       );
     } on Object {
       await source.close();
       rethrow;
     }
+  }
+
+  static Future<({List<ArchivePageEntry> pages, Uint8List? comicInfoBytes})>
+  _scanTarArchive(
+    RandomAccessByteSource source, {
+    required int totalLength,
+    required bool sniffDimensions,
+  }) async {
+    final imageEntries = <({String name, int dataOffset, int size})>[];
+    ({int dataOffset, int size})? comicInfoLoc;
+
+    var offset = 0;
+    String? pendingLongName;
+    String? pendingPaxPath;
+    var parsedAnyHeader = false;
+
+    while (offset + _tarBlockSize <= totalLength) {
+      final header = await source.readRange(offset, _tarBlockSize);
+      if (_isAllZero(header)) break;
+
+      if (!_verifyTarChecksum(header)) {
+        if (!parsedAnyHeader) {
+          throw const ArchiveException(
+            ArchiveErrorKind.corruptedArchive,
+            'Invalid TAR header checksum',
+          );
+        }
+        break;
+      }
+      parsedAnyHeader = true;
+
+      final size = _parseTarSize(header);
+      final typeFlag = header[156];
+      final dataOffset = offset + _tarBlockSize;
+      final paddedSize = (size + _tarBlockSize - 1) & ~(_tarBlockSize - 1);
+      final nextOffset = dataOffset + paddedSize;
+
+      if (size < 0 || dataOffset + size > totalLength) {
+        throw const ArchiveException(
+          ArchiveErrorKind.corruptedArchive,
+          'TAR entry payload exceeds archive length',
+        );
+      }
+
+      if (typeFlag == 0x4C) {
+        final rawName = await source.readRange(dataOffset, size);
+        pendingLongName = _decodeTarRawString(rawName);
+        offset = nextOffset;
+        continue;
+      }
+      if (typeFlag == 0x78) {
+        final paxBytes = await source.readRange(dataOffset, size);
+        pendingPaxPath = _parsePaxPath(paxBytes);
+        offset = nextOffset;
+        continue;
+      }
+
+      final name = pendingPaxPath ?? pendingLongName ?? _readUstarName(header);
+      pendingLongName = null;
+      pendingPaxPath = null;
+
+      final isRegularFile = typeFlag == 0 || typeFlag == 0x30;
+      if (isRegularFile && name.isNotEmpty) {
+        final norm = name.replaceAll(r'\', '/');
+        final lowerBase = norm.split('/').last.toLowerCase();
+        if (lowerBase == 'comicinfo.xml' &&
+            !norm.startsWith('__MACOSX/') &&
+            comicInfoLoc == null) {
+          comicInfoLoc = (dataOffset: dataOffset, size: size);
+        } else if (isSupportedComicImagePath(norm)) {
+          imageEntries.add((name: norm, dataOffset: dataOffset, size: size));
+        }
+      }
+      offset = nextOffset;
+    }
+
+    if (imageEntries.isEmpty) {
+      throw const ArchiveException(ArchiveErrorKind.noImages);
+    }
+
+    imageEntries.sort((a, b) => naturalCompare(a.name, b.name));
+
+    Uint8List? comicInfoBytes;
+    if (comicInfoLoc != null && comicInfoLoc.size > 0) {
+      comicInfoBytes = await source.readRange(
+        comicInfoLoc.dataOffset,
+        comicInfoLoc.size,
+      );
+    }
+
+    final pages = <ArchivePageEntry>[];
+    for (var i = 0; i < imageEntries.length; i++) {
+      final item = imageEntries[i];
+      ImageSize? dims;
+      if (sniffDimensions && item.size > 0) {
+        final toRead = item.size < _tarHeaderSniffBytes
+            ? item.size
+            : _tarHeaderSniffBytes;
+        final slice = await source.readRange(item.dataOffset, toRead);
+        dims = sniffImageDimensions(slice);
+      }
+      pages.add(
+        ArchivePageEntry(
+          number: i + 1,
+          entryName: item.name,
+          uncompressedSize: item.size,
+          compressedSize: item.size,
+          localHeaderOffset: item.dataOffset,
+          compressionMethod: 0,
+          width: dims?.width,
+          height: dims?.height,
+          mediaType: mediaTypeForPath(item.name),
+        ),
+      );
+    }
+    return (pages: pages, comicInfoBytes: comicInfoBytes);
   }
 
   /// 利用数据库已缓存的页偏移索引直接构造（O(1) 零扫描直开）。
