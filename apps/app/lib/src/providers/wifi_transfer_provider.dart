@@ -3,11 +3,8 @@ import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yomu/src/data/local/wifi_transfer_server.dart';
-import 'package:yomu/src/providers/active_source_provider.dart';
-import 'package:yomu/src/providers/cross_source_reading_provider.dart';
 import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/local_import_provider.dart';
-import 'package:yomu/src/providers/source_registry_provider.dart';
 
 export 'package:yomu/src/data/local/wifi_transfer_server.dart';
 
@@ -156,15 +153,7 @@ class WifiTransferController extends Notifier<WifiTransferState> {
   }
 
   void _refreshLocalShelf() {
-    ref.read(localLibraryRepositoryProvider).evictCoverCache();
-    ref.invalidate(seriesCoverProvider);
-    ref.invalidate(seriesDetailProvider);
-    ref.invalidate(seriesBooksProvider);
-    ref.invalidate(crossSourceOndeckProvider);
-    ref.invalidate(recentSeriesProvider);
-    if (!ref.read(activeSourceProvider).isCloud) {
-      unawaited(ref.read(shelfProvider.notifier).refreshInPlace());
-    }
+    invalidateLocalCatalogProviders(ref);
   }
 }
 

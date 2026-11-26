@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,7 +8,6 @@ import 'package:yomu/src/data/local/local_catalog_write_dao.dart';
 import 'package:yomu/src/data/local/local_comic_importer.dart';
 import 'package:yomu/src/providers/active_source_provider.dart';
 import 'package:yomu/src/providers/archive_password_provider.dart';
-import 'package:yomu/src/providers/cross_source_reading_provider.dart';
 import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/progress_providers.dart';
 import 'package:yomu/src/providers/source_registry_provider.dart';
@@ -194,17 +192,12 @@ class LocalImportController extends Notifier<LocalImportState> {
     state = LocalImportState(busy: false, lastResult: result);
     if (result.importedCount <= 0) return;
 
-    ref.read(localLibraryRepositoryProvider).evictCoverCache();
     if (switchToLocal) {
       await ref
           .read(activeSourceProvider.notifier)
           .selectSource(kLocalSourceKey);
     }
-    ref.invalidate(crossSourceOndeckProvider);
-    ref.invalidate(recentSeriesProvider);
-    if (!ref.read(activeSourceProvider).isCloud) {
-      unawaited(ref.read(shelfProvider.notifier).refreshInPlace());
-    }
+    invalidateLocalCatalogProviders(ref);
   }
 }
 

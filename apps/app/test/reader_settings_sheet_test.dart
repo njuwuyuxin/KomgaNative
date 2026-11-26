@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yomu/src/data/reader_prefs.dart';
 import 'package:yomu/src/widgets/reader_fit_preview.dart';
+import 'package:yomu/src/widgets/reader_settings_sheet.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'support/fake_reader.dart';
@@ -139,5 +140,56 @@ void main() {
       isTrue,
     );
     expect(find.byKey(const Key('reader-background-black')), findsNothing);
+  });
+
+  testWidgets('阅读设置面板占据屏幕下 2/3，不撑满整屏', (WidgetTester tester) async {
+    await pumpReader(tester, book: demoReaderBook());
+    await openSettings(tester);
+
+    const screenHeight = 844.0;
+    final sheetRect = tester.getRect(find.byType(ReaderSettingsSheet));
+    expect(sheetRect.bottom, closeTo(screenHeight, 1.0));
+    expect(
+      sheetRect.height,
+      closeTo(screenHeight * 2 / 3, 1.0),
+      reason: '阅读设置面板应只占据屏幕下 2/3',
+    );
+  });
+
+  testWidgets('从顶部横条下拉可直接关闭阅读设置面板（含滚动后）', (WidgetTester tester) async {
+    await pumpReader(tester, book: demoReaderBook());
+    await openSettings(tester);
+    expect(find.byType(ReaderSettingsSheet), findsOneWidget);
+
+    // 先向下滚动设置项，确认顶部横条仍在且下拉可以直接关闭。
+    await tester.ensureVisible(
+      find.byKey(const Key('reader-background-white')),
+    );
+    await tester.pumpAndSettle();
+
+    final grabber = find.byKey(const Key('reader-settings-grabber'));
+    expect(grabber, findsOneWidget);
+    await tester.fling(grabber, const Offset(0, 320), 1200);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byType(ReaderSettingsSheet),
+      findsNothing,
+      reason: '从顶部横条下拉应直接关闭阅读设置面板',
+    );
+  });
+
+  testWidgets('从顶部横条慢速拖过半也可关闭阅读设置面板', (WidgetTester tester) async {
+    await pumpReader(tester, book: demoReaderBook());
+    await openSettings(tester);
+    expect(find.byType(ReaderSettingsSheet), findsOneWidget);
+
+    await tester.drag(
+      find.byKey(const Key('reader-settings-grabber')),
+      const Offset(0, 420),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ReaderSettingsSheet), findsNothing);
   });
 }

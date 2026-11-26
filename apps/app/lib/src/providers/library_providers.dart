@@ -1,11 +1,14 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yomu/src/data/library_repository.dart';
 import 'package:yomu/src/data/read_status_repository.dart';
 import 'package:yomu/src/providers/active_source_provider.dart';
+import 'package:yomu/src/providers/collections_providers.dart';
 import 'package:yomu/src/providers/cross_source_reading_provider.dart';
 import 'package:yomu/src/providers/paged_list_controller.dart';
+import 'package:yomu/src/providers/shelf_controller.dart';
 import 'package:yomu/src/providers/source_registry_provider.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 
@@ -151,3 +154,22 @@ final bookCoverForEntityProvider = FutureProvider.family<Uint8List?, Book>((
       .library
       .bookCover(book.id);
 });
+
+/// 本机书库发生导入、扫描、传书或元数据/分卷增删改后，统一失效相关缓存并原地刷新本机书架，
+/// 确保已缓存的系列详情与分卷列表立即反映新卷而无需手动下拉刷新。
+void invalidateLocalCatalogProviders(Ref ref, {bool includeCuration = false}) {
+  ref.read(localLibraryRepositoryProvider).evictCoverCache();
+  ref.invalidate(seriesCoverProvider);
+  ref.invalidate(bookCoverProvider);
+  ref.invalidate(seriesDetailProvider);
+  ref.invalidate(seriesBooksProvider);
+  ref.invalidate(crossSourceOndeckProvider);
+  ref.invalidate(recentSeriesProvider);
+  if (includeCuration) {
+    ref.invalidate(collectionsProvider);
+    ref.invalidate(readListsProvider);
+  }
+  if (!ref.read(activeSourceProvider).isCloud) {
+    unawaited(ref.read(shelfProvider.notifier).refreshInPlace());
+  }
+}

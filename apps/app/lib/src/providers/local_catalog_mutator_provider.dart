@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:yomu/l10n/app_localizations.dart';
@@ -7,7 +5,6 @@ import 'package:yomu/src/data/local/cover_thumbnail_generator.dart';
 import 'package:yomu/src/data/local/local_catalog_delete_dao.dart';
 import 'package:yomu/src/data/local/local_catalog_edit_dao.dart';
 import 'package:yomu/src/data/local/local_catalog_query_dao.dart';
-import 'package:yomu/src/providers/cross_source_reading_provider.dart';
 import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/progress_providers.dart';
 import 'package:yomu/src/providers/source_registry_provider.dart';
@@ -48,7 +45,7 @@ class LocalCatalogMutator {
           tags: tags,
           readingDirection: readingDirection,
         );
-    _invalidateAfterMutation(seriesId: seriesId);
+    _invalidateAfterMutation();
   }
 
   /// 修改本地单本书籍标题与卷号。
@@ -61,7 +58,7 @@ class LocalCatalogMutator {
     await _ref
         .read(progressDatabaseProvider)
         .updateLocalBookMetadata(bookId, name: name, number: number);
-    _invalidateAfterMutation(seriesId: seriesId);
+    _invalidateAfterMutation();
   }
 
   /// 将多个本地散装单卷系列合并为一个系列。
@@ -77,7 +74,7 @@ class LocalCatalogMutator {
           targetSeriesId: targetSeriesId,
           mergedTitle: mergedTitle,
         );
-    _invalidateAfterMutation(seriesId: targetSeriesId);
+    _invalidateAfterMutation();
   }
 
   /// 将多卷系列中的单册拆分为独立系列。
@@ -92,7 +89,7 @@ class LocalCatalogMutator {
           generateSeriesId: _nextSeriesId,
         );
     if (newSeriesId != null && newSeriesId != currentSeriesId) {
-      _invalidateAfterMutation(seriesId: currentSeriesId);
+      _invalidateAfterMutation();
     }
     return newSeriesId;
   }
@@ -131,7 +128,7 @@ class LocalCatalogMutator {
     );
     _ref.invalidate(bookCoverProvider(bookId));
     _ref.invalidate(seriesCoverProvider(seriesId));
-    _invalidateAfterMutation(seriesId: seriesId);
+    _invalidateAfterMutation();
     return true;
   }
 
@@ -142,7 +139,7 @@ class LocalCatalogMutator {
     final deleted = await db.deleteLocalBookFromDb(bookId);
     if (deleted == null) return false;
     await _purgePhysicalFiles(deleted);
-    _invalidateAfterMutation(seriesId: seriesId);
+    _invalidateAfterMutation();
     return deleted.seriesDeleted;
   }
 
@@ -205,17 +202,8 @@ class LocalCatalogMutator {
     }
   }
 
-  void _invalidateAfterMutation({String? seriesId}) {
-    _ref.read(localLibraryRepositoryProvider).evictCoverCache();
-    _ref.invalidate(crossSourceOndeckProvider);
-    _ref.invalidate(recentSeriesProvider);
-    _ref.invalidate(collectionsProvider);
-    _ref.invalidate(readListsProvider);
-    _ref.invalidate(seriesBooksProvider);
-    if (seriesId != null) {
-      _ref.invalidate(seriesDetailProvider(seriesId));
-    }
-    unawaited(_ref.read(shelfProvider.notifier).refreshInPlace());
+  void _invalidateAfterMutation() {
+    invalidateLocalCatalogProviders(_ref, includeCuration: true);
   }
 }
 

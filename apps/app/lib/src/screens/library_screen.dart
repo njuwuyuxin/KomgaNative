@@ -62,8 +62,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
   }
 
   Future<void> _refresh() {
-    // "正在读"页也读 ondeck：刷新书架时顺手让它重新取（两页共享同一份数据）。
+    // "正在读"页也读 ondeck：刷新书架时顺手让它重新取（两页共享同一份数据）；
+    // 同时失效已缓存的系列详情与分卷列表，避免服务端新增卷后进详情页还看到旧缓存。
     ref.invalidate(ondeckProvider);
+    ref.invalidate(seriesDetailProvider);
+    ref.invalidate(seriesBooksProvider);
     return ref.read(shelfProvider.notifier).refresh();
   }
 

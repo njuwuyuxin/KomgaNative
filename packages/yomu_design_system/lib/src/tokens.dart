@@ -142,8 +142,8 @@ abstract final class AppSizes {
   /// 登录/连接表单卡片的最大宽度（ARC-11）。
   static const double formMaxWidth = 440;
 
-  /// 底部设置弹窗占屏幕高度的最大比例（ARC-11）。
-  static const double modalHeightFraction = 0.85;
+  /// 底部设置弹窗占屏幕高度的最大比例（占屏幕下 2/3，ARC-11）。
+  static const double modalHeightFraction = 2 / 3;
 }
 
 /// 布局断点，与 `komga_platform` 的形态判断保持同一套数值。
