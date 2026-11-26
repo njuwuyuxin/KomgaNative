@@ -54,6 +54,27 @@ mixin _ShelfBatch on ConsumerState<LibraryScreen> {
     }
   }
 
+  Future<void> _mergeSelectedLocal(List<Series> shelfSeries) async {
+    final ids = ref.read(shelfSelectionProvider).ids.toList();
+    if (ids.length < 2 || _batchBusy) return;
+    String defaultTitle = '';
+    for (final s in shelfSeries) {
+      if (s.id == ids.first) {
+        defaultTitle = s.title;
+        break;
+      }
+    }
+    final merged = await showMergeLocalSeriesDialog(
+      context,
+      ref,
+      selectedIds: ids,
+      defaultTitle: defaultTitle,
+    );
+    if (merged && mounted) {
+      ref.read(shelfSelectionProvider.notifier).exit();
+    }
+  }
+
   Future<void> _deleteSelectedLocal() async {
     final ids = ref.read(shelfSelectionProvider).ids.toList();
     if (ids.isEmpty || _batchBusy) return;

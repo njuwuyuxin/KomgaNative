@@ -3,12 +3,15 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:yomu/l10n/app_localizations.dart';
+import 'package:yomu/src/data/local/cover_thumbnail_generator.dart';
 import 'package:yomu/src/data/local/local_catalog_delete_dao.dart';
+import 'package:yomu/src/data/local/local_catalog_edit_dao.dart';
 import 'package:yomu/src/data/local/local_catalog_query_dao.dart';
 import 'package:yomu/src/providers/cross_source_reading_provider.dart';
 import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/progress_providers.dart';
 import 'package:yomu/src/providers/source_registry_provider.dart';
+import 'package:yomu_domain/yomu_domain.dart';
 
 /// 本地书库删除与变更控制器（协调句柄释放、SQLite 事务、沙盒物理文件清理与 UI 刷新）。
 final Provider<LocalCatalogMutator> localCatalogMutatorProvider =
@@ -18,6 +21,119 @@ class LocalCatalogMutator {
   LocalCatalogMutator(this._ref);
 
   final Ref _ref;
+  int _idSeq = 0;
+
+  String _nextSeriesId() {
+    final micros = DateTime.now().microsecondsSinceEpoch;
+    _idSeq = (_idSeq + 1) & 0xFFFF;
+    return 'local:s_${micros}_$_idSeq';
+  }
+
+  /// 修改本地系列元数据并立即刷新详情与书架。
+  Future<void> editSeries(
+    String seriesId, {
+    required String title,
+    String? summary,
+    List<String>? authors,
+    List<String>? tags,
+    ReadingDirection? readingDirection,
+  }) async {
+    await _ref
+        .read(progressDatabaseProvider)
+        .updateLocalSeriesMetadata(
+          seriesId,
+          title: title,
+          summary: summary,
+          authors: authors,
+          tags: tags,
+          readingDirection: readingDirection,
+        );
+    _invalidateAfterMutation(seriesId: seriesId);
+  }
+
+  /// 修改本地单本书籍标题与卷号。
+  Future<void> editBook(
+    String bookId, {
+    required String seriesId,
+    required String name,
+    required String number,
+  }) async {
+    await _ref
+        .read(progressDatabaseProvider)
+        .updateLocalBookMetadata(bookId, name: name, number: number);
+    _invalidateAfterMutation(seriesId: seriesId);
+  }
+
+  /// 将多个本地散装单卷系列合并为一个系列。
+  Future<void> mergeSeries({
+    required List<String> sourceSeriesIds,
+    required String targetSeriesId,
+    String? mergedTitle,
+  }) async {
+    await _ref
+        .read(progressDatabaseProvider)
+        .mergeLocalSeriesInto(
+          sourceSeriesIds: sourceSeriesIds,
+          targetSeriesId: targetSeriesId,
+          mergedTitle: mergedTitle,
+        );
+    _invalidateAfterMutation(seriesId: targetSeriesId);
+  }
+
+  /// 将多卷系列中的单册拆分为独立系列。
+  Future<String?> splitBookToOwnSeries(
+    String bookId, {
+    required String currentSeriesId,
+  }) async {
+    final newSeriesId = await _ref
+        .read(progressDatabaseProvider)
+        .splitLocalBookToStandaloneSeries(
+          bookId,
+          generateSeriesId: _nextSeriesId,
+        );
+    if (newSeriesId != null && newSeriesId != currentSeriesId) {
+      _invalidateAfterMutation(seriesId: currentSeriesId);
+    }
+    return newSeriesId;
+  }
+
+  /// 将阅读器当前页图像字节设为本地书籍及所属系列的封面（LMA-11）。
+  Future<bool> setCustomCoverFromPageBytes({
+    required String bookId,
+    required String seriesId,
+    required int pageNumber,
+  }) async {
+    if (!bookId.startsWith('local:')) return false;
+    final readerRepo = _ref.read(localReaderRepositoryProvider);
+    final storage = _ref.read(localComicsStorageProvider);
+    final db = _ref.read(progressDatabaseProvider);
+
+    final rawBytes = await readerRepo.pageImage(bookId, pageNumber);
+    final encoded = await encodeDefaultCoverThumbnail(
+      rawBytes,
+      direction: ReadingDirection.unknown,
+    );
+    final payload = (encoded != null && encoded.isNotEmpty)
+        ? encoded
+        : rawBytes;
+
+    final safeBook = bookId.replaceAll(':', '_');
+    final relPath =
+        'covers/custom_${safeBook}_${DateTime.now().microsecondsSinceEpoch}.png';
+    final file = await storage.resolveFile(relPath);
+    await file.parent.create(recursive: true);
+    await file.writeAsBytes(payload, flush: true);
+
+    await db.setLocalCoverPaths(
+      bookId: bookId,
+      seriesId: seriesId,
+      coverRelativePath: relPath,
+    );
+    _ref.invalidate(bookCoverProvider(bookId));
+    _ref.invalidate(seriesCoverProvider(seriesId));
+    _invalidateAfterMutation(seriesId: seriesId);
+    return true;
+  }
 
   /// 删除单本本地书籍并回收其沙盒存储空间。返回所属系列是否已变空被一并移除。
   Future<bool> deleteBook(String bookId, {String? seriesId}) async {

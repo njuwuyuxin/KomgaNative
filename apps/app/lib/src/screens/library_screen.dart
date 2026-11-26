@@ -15,6 +15,7 @@ import 'package:yomu/src/providers/pinned_series_provider.dart';
 import 'package:yomu/src/providers/shelf_selection_provider.dart';
 import 'package:yomu/src/session/session_controller.dart';
 import 'package:yomu/src/widgets/collection_picker_sheet.dart';
+import 'package:yomu/src/widgets/local_metadata_sheets.dart';
 import 'package:yomu/src/widgets/offline_banner.dart';
 import 'package:yomu/src/widgets/phase_fade.dart';
 import 'package:yomu/src/widgets/shelf_active_filters.dart';
@@ -174,6 +175,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                                 onSelectAll: () => selecting.selectAll(
                                   state.series.map((Series s) => s.id),
                                 ),
+                                onMergeSelected:
+                                    isRealLocalShelf &&
+                                        selection.ids.length >= 2
+                                    ? () => _mergeSelectedLocal(state.series)
+                                    : null,
                                 onDeleteSelected:
                                     isRealLocalShelf && selection.ids.isNotEmpty
                                     ? _deleteSelectedLocal
@@ -235,6 +241,7 @@ class _SelectionInfoRow extends StatelessWidget {
     required this.allSelected,
     required this.motion,
     required this.onSelectAll,
+    this.onMergeSelected,
     this.onDeleteSelected,
   });
 
@@ -243,6 +250,7 @@ class _SelectionInfoRow extends StatelessWidget {
   final bool allSelected;
   final AppMotion motion;
   final VoidCallback onSelectAll;
+  final VoidCallback? onMergeSelected;
   final VoidCallback? onDeleteSelected;
 
   @override
@@ -270,6 +278,21 @@ class _SelectionInfoRow extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (onMergeSelected != null)
+                  TextButton.icon(
+                    key: const Key('shelf-selection-merge'),
+                    style: TextButton.styleFrom(
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      minimumSize: Size.zero,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm,
+                        vertical: AppSpacing.xs,
+                      ),
+                    ),
+                    onPressed: onMergeSelected,
+                    icon: const Icon(Icons.merge_type, size: AppSizes.iconXs),
+                    label: Text(l10n.mergeIntoSeries),
+                  ),
                 if (onDeleteSelected != null)
                   TextButton.icon(
                     key: const Key('shelf-selection-delete'),

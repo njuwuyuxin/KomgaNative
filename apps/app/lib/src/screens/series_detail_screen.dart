@@ -14,6 +14,7 @@ import 'package:yomu/src/providers/series_read_provider.dart';
 import 'package:yomu/src/screens/reader_screen.dart';
 import 'package:yomu/src/widgets/collection_picker_sheet.dart';
 import 'package:yomu/src/widgets/edge_swipe_back.dart';
+import 'package:yomu/src/widgets/local_metadata_sheets.dart';
 import 'package:yomu/src/widgets/offline_banner.dart';
 import 'package:yomu/src/widgets/readlist_picker_sheet.dart';
 import 'package:yomu/src/widgets/series_books_toolbar.dart';
@@ -256,6 +257,14 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
                     icon: Icons.more_horiz,
                     label: l10n.moreActions,
                     menuChildren: <Widget>[
+                      if (series != null && seriesId.startsWith('local:'))
+                        GlassMenuItemButton(
+                          key: const Key('series-edit-metadata'),
+                          label: l10n.editMetadata,
+                          onPressed: () => unawaited(
+                            showEditLocalSeriesSheet(context, ref, series),
+                          ),
+                        ),
                       GlassMenuItemButton(
                         key: const Key('series-add-to-collection'),
                         label: l10n.addToCollection,

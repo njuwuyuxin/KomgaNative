@@ -14,6 +14,7 @@ import 'package:yomu/src/providers/local_catalog_mutator_provider.dart';
 import 'package:yomu/src/widgets/book_download_button.dart';
 import 'package:yomu/src/widgets/context_menu.dart';
 import 'package:yomu/src/widgets/cover_image.dart';
+import 'package:yomu/src/widgets/local_metadata_sheets.dart';
 import 'package:yomu/src/widgets/readlist_picker_sheet.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -179,12 +180,23 @@ class SeriesBookRow extends ConsumerWidget {
             icon: Icons.remove_done,
           ),
         ],
-        if (book.id.startsWith('local:'))
+        if (book.id.startsWith('local:')) ...<ContextMenuEntry<BookMenuAction>>[
+          ContextMenuEntry(
+            value: BookMenuAction.editMetadata,
+            label: l10n.editMetadata,
+            icon: Icons.edit_outlined,
+          ),
+          ContextMenuEntry(
+            value: BookMenuAction.splitSeries,
+            label: l10n.splitIntoOwnSeries,
+            icon: Icons.call_split,
+          ),
           ContextMenuEntry(
             value: BookMenuAction.deleteFromDevice,
             label: l10n.deleteFromDevice,
             icon: Icons.delete_outline,
           ),
+        ],
       ],
     );
     if (action == null || !context.mounted) return;
@@ -198,6 +210,12 @@ class SeriesBookRow extends ConsumerWidget {
         await onMarkPrevious?.call(read: true);
       case BookMenuAction.markPreviousUnread:
         await onMarkPrevious?.call(read: false);
+      case BookMenuAction.editMetadata:
+        await showEditLocalBookDialog(context, ref, book);
+      case BookMenuAction.splitSeries:
+        await ref
+            .read(localCatalogMutatorProvider)
+            .splitBookToOwnSeries(book.id, currentSeriesId: book.seriesId);
       case BookMenuAction.deleteFromDevice:
         final confirmed = await confirmDeleteLocalItems(context, count: 1);
         if (!confirmed) return;
@@ -240,5 +258,7 @@ enum BookMenuAction {
   markUnread,
   markPreviousRead,
   markPreviousUnread,
+  editMetadata,
+  splitSeries,
   deleteFromDevice,
 }

@@ -13,6 +13,7 @@ import 'package:yomu/src/providers/series_read_provider.dart';
 import 'package:yomu/src/screens/series_detail_args.dart';
 import 'package:yomu/src/widgets/collection_picker_sheet.dart';
 import 'package:yomu/src/widgets/context_menu.dart';
+import 'package:yomu/src/widgets/local_metadata_sheets.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 长按系列卡片能做的事（UI-P2-5）。
@@ -24,6 +25,7 @@ enum SeriesMenuAction {
   viewDetails,
   pin,
   unpin,
+  editMetadata,
   deleteFromDevice,
 }
 
@@ -80,12 +82,20 @@ Future<void> showSeriesMenu(
         label: l10n.viewDetails,
         icon: Icons.info_outline,
       ),
-      if (series.id.startsWith('local:'))
+      if (series.id.startsWith(
+        'local:',
+      )) ...<ContextMenuEntry<SeriesMenuAction>>[
+        ContextMenuEntry(
+          value: SeriesMenuAction.editMetadata,
+          label: l10n.editMetadata,
+          icon: Icons.edit_outlined,
+        ),
         ContextMenuEntry(
           value: SeriesMenuAction.deleteFromDevice,
           label: l10n.deleteFromDevice,
           icon: Icons.delete_outline,
         ),
+      ],
     ],
   );
   if (action == null || !context.mounted) return;
@@ -119,6 +129,8 @@ Future<void> showSeriesMenu(
       await ref
           .read(pinnedSeriesControllerProvider)
           .toggle(series.id, pinned: false);
+    case SeriesMenuAction.editMetadata:
+      await showEditLocalSeriesSheet(context, ref, series);
     case SeriesMenuAction.deleteFromDevice:
       final confirmed = await confirmDeleteLocalItems(context, count: 1);
       if (!confirmed) return;
