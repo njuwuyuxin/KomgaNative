@@ -58,6 +58,12 @@ final class SourceRegistry {
        _resolveRemote = ((String key) => remoteBundles[key]);
 
   /// 懒加载构造：仅注册轻量 [RemoteContentSource] 列表，按需解析具体 [SourceBundle]。
+  ///
+  /// 生命周期约束：本注册表不会订阅每台远程源 [SourceBundle] 的内部变更。
+  /// 当单台服务器的会话或凭据重建（如更换 API Key）导致底层 bundle 重建时，
+  /// 已持有本 `SourceRegistry` 引用的调用方**不会**自动刷新，需等待
+  /// `serverListProvider` / `sessionProvider` 变化触发注册表整体重建，或直接监听
+  /// `remoteSourceBundleProvider(sourceKey)`。
   SourceRegistry.lazy({
     required this.localBundle,
     required List<RemoteContentSource> remoteSources,
@@ -181,6 +187,12 @@ final remoteSourceBundleProvider = Provider.family<SourceBundle?, String>((
 
 /// 全局多源注册表：自动汇聚常驻本机源 + 已保存/已连接的远程源描述符，
 /// 远程 `SourceBundle` 经 [remoteSourceBundleProvider] 按需懒创建并长驻缓存。
+///
+/// 刷新约束：`resolveRemote` 内部使用 `ref.read(remoteSourceBundleProvider(sourceKey))`，
+/// 刻意不建立对单台远程 bundle 的依赖，以免单服访问/失效拖累整张注册表重建。
+/// 因此仅当 `serverListProvider` 或 `sessionProvider` 变更时才会重建注册表并通知下游；
+/// 若调用方需响应单台服务器的凭据/会话热更新，应直接 `ref.watch(remoteSourceBundleProvider(key))`
+/// 并确保凭据更新路径同步刷新 `serverListProvider`。
 final Provider<SourceRegistry> sourceRegistryProvider =
     Provider<SourceRegistry>((Ref ref) {
       final local = ref.watch(localSourceBundleProvider);
