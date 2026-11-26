@@ -576,5 +576,19 @@
   "readerSplitWideAlways": "始终切分",
   "readerSplitWideAlwaysHint": "单页阅读模式下，无论横竖屏都将宽图拆分为连续两页。",
   "readerTempMergeSpread": "合页查看",
-  "readerTempSplitSpread": "恢复切分"
+  "readerTempSplitSpread": "恢复切分",
+  "readerImageFilter": "画面增强",
+  "readerFilterNone": "原图",
+  "readerFilterNoneHint": "按原始扫描效果显示，不做色彩处理。",
+  "readerFilterEinkCrisp": "墨水屏清晰增强",
+  "readerFilterEinkCrispHint": "漂白发灰纸底为纯白并加深黑线，消除墨水屏灰底抖动噪点。",
+  "readerFilterVintage": "老漫去黄增黑",
+  "readerFilterVintageHint": "中和老扫描本的泛黄纸底并压实墨线，同时保留彩页色彩。",
+  "readerFilterGrayscale": "黑白灰阶",
+  "readerFilterGrayscaleHint": "将彩漫转换为干净的黑白灰阶层次。",
+  "readerFilterCustom": "自定义",
+  "readerFilterCustomHint": "微调对比度、纸底去灰漂白阈值与灰阶开关。",
+  "readerFilterContrast": "对比度",
+  "readerFilterWhitePoint": "纸底去灰",
+  "readerFilterGrayscaleToggle": "转为黑白灰阶"
 }

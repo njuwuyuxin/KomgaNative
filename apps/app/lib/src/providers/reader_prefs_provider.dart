@@ -6,7 +6,7 @@ import 'package:yomu/src/data/reader_prefs_store.dart';
 import 'package:yomu/src/providers/pinned_series_provider.dart';
 import 'package:yomu_platform/yomu_platform.dart';
 import 'package:yomu_reader/yomu_reader.dart'
-    show TapZonePreset, WidePageSplitMode;
+    show ReaderImageFilter, TapZonePreset, WidePageSplitMode;
 
 /// 阅读偏好：模式 / 亮度 / 常亮 / 预设 / 系列覆盖。
 ///
@@ -61,6 +61,12 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
       _updateConfig(
         seriesId,
         (ReaderConfig c) => c.copyWith(background: background),
+      );
+
+  void setImageFilter(ReaderImageFilter filter, {String? seriesId}) =>
+      _updateConfig(
+        seriesId,
+        (ReaderConfig c) => c.copyWith(imageFilter: filter),
       );
 
   void setLockZoom(bool enabled, {String? seriesId}) => _updateConfig(

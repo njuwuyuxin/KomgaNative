@@ -33,3 +33,26 @@ String readerSplitWideHint(AppLocalizations l10n, WidePageSplitMode mode) =>
       WidePageSplitMode.autoPortrait => l10n.readerSplitWideAutoHint,
       WidePageSplitMode.always => l10n.readerSplitWideAlwaysHint,
     };
+
+/// 画面增强滤镜预设的界面文案（LMB-03）。
+String readerFilterPresetLabel(
+  AppLocalizations l10n,
+  ReaderImageFilterPreset preset,
+) => switch (preset) {
+  ReaderImageFilterPreset.none => l10n.readerFilterNone,
+  ReaderImageFilterPreset.einkCrisp => l10n.readerFilterEinkCrisp,
+  ReaderImageFilterPreset.vintageDeYellow => l10n.readerFilterVintage,
+  ReaderImageFilterPreset.grayscale => l10n.readerFilterGrayscale,
+  ReaderImageFilterPreset.custom => l10n.readerFilterCustom,
+};
+
+String readerFilterPresetHint(
+  AppLocalizations l10n,
+  ReaderImageFilterPreset preset,
+) => switch (preset) {
+  ReaderImageFilterPreset.none => l10n.readerFilterNoneHint,
+  ReaderImageFilterPreset.einkCrisp => l10n.readerFilterEinkCrispHint,
+  ReaderImageFilterPreset.vintageDeYellow => l10n.readerFilterVintageHint,
+  ReaderImageFilterPreset.grayscale => l10n.readerFilterGrayscaleHint,
+  ReaderImageFilterPreset.custom => l10n.readerFilterCustomHint,
+};

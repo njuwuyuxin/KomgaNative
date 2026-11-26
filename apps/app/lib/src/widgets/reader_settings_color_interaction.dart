@@ -2,9 +2,11 @@ import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/src/data/reader_prefs.dart';
 import 'package:yomu/src/providers/reader_prefs_provider.dart';
+import 'package:yomu/src/widgets/reader_mode_text.dart';
 import 'package:yomu/src/widgets/reader_palette.dart';
 import 'package:yomu/src/widgets/reader_settings_group.dart';
 import 'package:yomu/src/widgets/reader_settings_rows.dart';
+import 'package:yomu_reader/yomu_reader.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 阅读设置面板的「颜色」与「交互」两组（ARC-12 拆分独立组件）。
@@ -84,6 +86,71 @@ class ReaderSettingsColorInteraction extends StatelessWidget {
             ),
           ],
         ),
+        const SizedBox(height: AppSpacing.sm),
+        ReaderOptionSection<ReaderImageFilterPreset>(
+          title: l10n.readerImageFilter,
+          values: ReaderImageFilterPreset.values,
+          selected: prefs.imageFilter.preset,
+          label: readerFilterPresetLabel,
+          hint: readerFilterPresetHint,
+          keyPrefix: 'reader-filter',
+          palette: palette,
+          onSelect: (ReaderImageFilterPreset preset) {
+            final next = switch (preset) {
+              ReaderImageFilterPreset.none => ReaderImageFilter.none,
+              ReaderImageFilterPreset.einkCrisp => ReaderImageFilter.einkCrisp,
+              ReaderImageFilterPreset.vintageDeYellow =>
+                ReaderImageFilter.vintageDeYellow,
+              ReaderImageFilterPreset.grayscale =>
+                ReaderImageFilter.grayscaleOnly,
+              ReaderImageFilterPreset.custom =>
+                prefs.imageFilter.resolved().copyWith(
+                  preset: ReaderImageFilterPreset.custom,
+                ),
+            };
+            controller.setImageFilter(next, seriesId: writeSeriesId);
+          },
+        ),
+        if (prefs.imageFilter.preset ==
+            ReaderImageFilterPreset.custom) ...<Widget>[
+          _FilterSliderRow(
+            sliderKey: const Key('reader-filter-contrast-slider'),
+            label: l10n.readerFilterContrast,
+            valueLabel: '${prefs.imageFilter.contrast.toStringAsFixed(2)}×',
+            value: prefs.imageFilter.contrast,
+            min: ReaderImageFilter.minContrast,
+            max: ReaderImageFilter.maxContrast,
+            palette: palette,
+            onChanged: (double v) => controller.setImageFilter(
+              prefs.imageFilter.copyWith(contrast: v),
+              seriesId: writeSeriesId,
+            ),
+          ),
+          _FilterSliderRow(
+            sliderKey: const Key('reader-filter-white-slider'),
+            label: l10n.readerFilterWhitePoint,
+            valueLabel: '${prefs.imageFilter.whiteThreshold}',
+            value: prefs.imageFilter.whiteThreshold.toDouble(),
+            min: ReaderImageFilter.minWhiteThreshold.toDouble(),
+            max: ReaderImageFilter.maxWhiteThreshold.toDouble(),
+            palette: palette,
+            onChanged: (double v) => controller.setImageFilter(
+              prefs.imageFilter.copyWith(whiteThreshold: v.round()),
+              seriesId: writeSeriesId,
+            ),
+          ),
+          ReaderSettingsSwitch(
+            switchKey: const Key('reader-filter-grayscale'),
+            value: prefs.imageFilter.grayscale,
+            title: l10n.readerFilterGrayscaleToggle,
+            hint: l10n.readerFilterGrayscaleHint,
+            palette: palette,
+            onChanged: (bool value) => controller.setImageFilter(
+              prefs.imageFilter.copyWith(grayscale: value),
+              seriesId: writeSeriesId,
+            ),
+          ),
+        ],
         const SizedBox(height: AppSpacing.md),
         ReaderSettingsGroupHeader(
           group: 'interaction',
@@ -124,6 +191,59 @@ class ReaderSettingsColorInteraction extends StatelessWidget {
           palette: palette,
           onChanged: (bool value) =>
               controller.setKeepAwake(value, seriesId: writeSeriesId),
+        ),
+      ],
+    );
+  }
+}
+
+class _FilterSliderRow extends StatelessWidget {
+  const _FilterSliderRow({
+    required this.sliderKey,
+    required this.label,
+    required this.valueLabel,
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.palette,
+    required this.onChanged,
+  });
+
+  final Key sliderKey;
+  final String label;
+  final String valueLabel;
+  final double value;
+  final double min;
+  final double max;
+  final ReaderPalette palette;
+  final ValueChanged<double> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.bodySmall
+        ?.copyWith(color: palette.muted);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(label, style: style),
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: Slider(
+                key: sliderKey,
+                value: value.clamp(min, max),
+                min: min,
+                max: max,
+                activeColor: palette.foreground,
+                inactiveColor: palette.outline,
+                onChanged: onChanged,
+              ),
+            ),
+            SizedBox(
+              width: AppSizes.valueColumn,
+              child: Text(valueLabel, textAlign: TextAlign.end, style: style),
+            ),
+          ],
         ),
       ],
     );

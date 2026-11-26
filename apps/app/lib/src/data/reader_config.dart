@@ -15,6 +15,7 @@ class ReaderConfig {
     this.fit = ReaderFitChoice.contain,
     this.direction = ReaderDirectionChoice.auto,
     this.background = ReaderBackgroundChoice.black,
+    this.imageFilter = ReaderImageFilter.none,
     this.lockZoom = false,
     this.trimBorders = false,
     this.splitWidePages = WidePageSplitMode.off,
@@ -35,6 +36,7 @@ class ReaderConfig {
   final ReaderFitChoice fit;
   final ReaderDirectionChoice direction;
   final ReaderBackgroundChoice background;
+  final ReaderImageFilter imageFilter;
   final bool lockZoom;
   final bool trimBorders;
   final WidePageSplitMode splitWidePages;
@@ -60,6 +62,7 @@ class ReaderConfig {
     ReaderSettingsGroup.color => copyWith(
       background: ReaderBackgroundChoice.black,
       brightness: 1,
+      imageFilter: ReaderImageFilter.none,
     ),
     ReaderSettingsGroup.interaction => copyWith(
       lockZoom: false,
@@ -77,7 +80,9 @@ class ReaderConfig {
           !trimBorders &&
           splitWidePages == WidePageSplitMode.off,
     ReaderSettingsGroup.color =>
-      background == ReaderBackgroundChoice.black && brightness == 1,
+      background == ReaderBackgroundChoice.black &&
+          brightness == 1 &&
+          imageFilter.isIdentity,
     ReaderSettingsGroup.interaction =>
       !lockZoom && !keepAwake && pageTurn == ReaderPageTurnChoice.curl,
   };
@@ -89,6 +94,7 @@ class ReaderConfig {
     ReaderFitChoice? fit,
     ReaderDirectionChoice? direction,
     ReaderBackgroundChoice? background,
+    ReaderImageFilter? imageFilter,
     bool? lockZoom,
     bool? trimBorders,
     WidePageSplitMode? splitWidePages,
@@ -105,6 +111,7 @@ class ReaderConfig {
     fit: fit ?? this.fit,
     direction: direction ?? this.direction,
     background: background ?? this.background,
+    imageFilter: imageFilter ?? this.imageFilter,
     lockZoom: lockZoom ?? this.lockZoom,
     trimBorders: trimBorders ?? this.trimBorders,
     splitWidePages: splitWidePages ?? this.splitWidePages,
@@ -123,6 +130,7 @@ class ReaderConfig {
     'fit': fit.name,
     'direction': direction.name,
     'background': background.name,
+    'imageFilter': imageFilter.toJson(),
     'lockZoom': lockZoom,
     'trimBorders': trimBorders,
     'splitWidePages': splitWidePages.name,
@@ -162,6 +170,7 @@ class ReaderConfig {
         ReaderBackgroundChoice.values,
         ReaderBackgroundChoice.black,
       ),
+      imageFilter: ReaderImageFilter.fromJson(json['imageFilter']),
       lockZoom: json['lockZoom'] == true,
       trimBorders: json['trimBorders'] == true,
       splitWidePages: parseReaderEnum(
@@ -195,6 +204,7 @@ class ReaderConfig {
     fit,
     direction,
     background,
+    imageFilter,
     lockZoom,
     trimBorders,
     splitWidePages,

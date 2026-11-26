@@ -8,6 +8,7 @@ import 'package:yomu/src/providers/pinned_series_provider.dart';
 import 'package:yomu/src/providers/reader_prefs_provider.dart';
 import 'package:yomu/src/widgets/reader_palette.dart';
 import 'package:yomu/src/widgets/reader_settings_rows.dart';
+import 'package:yomu_reader/yomu_reader.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// 顶栏 `AA` 打开的快捷设置（RDR-03）。
@@ -134,7 +135,7 @@ class ReaderQuickSettingsSheet extends ConsumerWidget {
                   ),
                 ],
               ),
-              // 墨水屏固定白底黑字，给背景选项只会误导。
+              // 墨水屏固定白底黑字，不给背景选项，改为提供一键「墨水屏清晰增强」去底灰开关。
               if (!palette.isEink) ...<Widget>[
                 const SizedBox(height: AppSpacing.sm),
                 ReaderSectionLabel(l10n.readerBackground, palette: palette),
@@ -146,6 +147,27 @@ class ReaderQuickSettingsSheet extends ConsumerWidget {
                   label: readerBackgroundLabel,
                   onSelect: (value) =>
                       controller.setBackground(value, seriesId: writeSeriesId),
+                ),
+              ] else ...<Widget>[
+                const SizedBox(height: AppSpacing.sm),
+                SwitchListTile(
+                  key: const Key('quick-eink-crisp'),
+                  contentPadding: EdgeInsets.zero,
+                  value:
+                      prefs.imageFilter.preset ==
+                      ReaderImageFilterPreset.einkCrisp,
+                  onChanged: (bool value) => controller.setImageFilter(
+                    value
+                        ? ReaderImageFilter.einkCrisp
+                        : ReaderImageFilter.none,
+                    seriesId: writeSeriesId,
+                  ),
+                  activeThumbColor: palette.foreground,
+                  title: Text(
+                    l10n.readerFilterEinkCrisp,
+                    style: AppTypography.of(context).body
+                        .copyWith(color: palette.foreground),
+                  ),
                 ),
               ],
               const SizedBox(height: AppSpacing.sm),

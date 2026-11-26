@@ -727,5 +727,19 @@
   "readerSplitWideAlways": "Always",
   "readerSplitWideAlwaysHint": "Always split wide scans into two sequential halves in single-page mode.",
   "readerTempMergeSpread": "Full spread",
-  "readerTempSplitSpread": "Split view"
+  "readerTempSplitSpread": "Split view",
+  "readerImageFilter": "Image enhancement",
+  "readerFilterNone": "Original",
+  "readerFilterNoneHint": "Display pages as scanned without color processing.",
+  "readerFilterEinkCrisp": "E-ink crisp",
+  "readerFilterEinkCrispHint": "Bleach gray paper background to pure white and sharpen ink in grayscale.",
+  "readerFilterVintage": "De-yellow scans",
+  "readerFilterVintageHint": "Whiten aged yellow paper while preserving color artwork.",
+  "readerFilterGrayscale": "Grayscale",
+  "readerFilterGrayscaleHint": "Convert color comics to clean monochrome tones.",
+  "readerFilterCustom": "Custom",
+  "readerFilterCustomHint": "Fine-tune contrast, white-point bleaching, and grayscale.",
+  "readerFilterContrast": "Contrast",
+  "readerFilterWhitePoint": "Paper bleach",
+  "readerFilterGrayscaleToggle": "Grayscale"
 }

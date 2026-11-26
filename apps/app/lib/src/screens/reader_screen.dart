@@ -308,7 +308,15 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                   )
                 : null,
             topBar: readerBar,
-            content: content,
+            content: config.imageFilter.isIdentity
+                ? content
+                : ColorFiltered(
+                    key: const Key('reader-image-filter'),
+                    colorFilter: ColorFilter.matrix(
+                      buildImageFilterMatrix(config.imageFilter),
+                    ),
+                    child: content,
+                  ),
             bottomBar: ReaderBottomChrome(
               bookId: widget.bookId,
               layout: layout,

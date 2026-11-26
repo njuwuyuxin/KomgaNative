@@ -8,6 +8,7 @@ export 'src/borders.dart';
 export 'src/curl_motion.dart';
 export 'src/edges.dart';
 export 'src/geometry.dart';
+export 'src/image_filter.dart';
 export 'src/layout.dart';
 export 'src/page_turn.dart';
 export 'src/preload.dart';
