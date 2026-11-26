@@ -23,7 +23,7 @@
 | **Phase B** | `LMB-10` | 本地书架「按文件夹树浏览」双模视图 | P1 | M | [x] |
 | **Phase C** | `LMB-11` | 原生 `PDF` 阅读支持（Android `PdfRenderer` + iOS `PDFKit` 按需光栅化 + 缩放高清重绘 + 大纲） | P1 | M-L | [x] |
 | **Phase C** | `LMB-12` | `CBR (RAR4 / RAR5)` 与 `CB7 (7z)` 原生 FFI 解码（含固实包滑动窗口优化） | P1 | L | [x] |
-| **Phase C** | `LMB-13` | 加密压缩包与加密 PDF 密码弹窗、中文密码双编码尝试与钥匙串/常用词典记忆 | P1 | M | [ ] |
+| **Phase C** | `LMB-13` | 加密压缩包与加密 PDF 密码弹窗、中文密码双编码尝试与钥匙串/常用词典记忆 | P1 | M | [x] |
 | **Phase D** | `LMB-14` | `ComicInfo.xml` 页级指令完善（`DoublePage` / `Delete` / `Translator`）+ 手动屏蔽插播广告页 | P2 | S-M | [ ] |
 | **Phase D** | `LMB-15` | 墨水屏每 N 页全刷防残影控制 | P2 | S-M | [ ] |
 | **Phase D** | `LMB-16` | 编辑面板相册选图换封面 + 宽封裁半开关 + SQLite FTS5 大库搜索 + AVIF/HEIC/JXL 嗅探 | P2 | M | [ ] |

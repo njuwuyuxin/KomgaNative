@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:yomu/src/data/local/archive_password_store.dart';
 import 'package:yomu/src/data/local/comic_file_picker.dart';
 import 'package:yomu/src/data/local/cover_thumbnail_generator.dart';
 import 'package:yomu/src/data/local/local_archive_import_stream.dart';
@@ -19,17 +20,20 @@ final class LocalComicImporter {
     CoverThumbnailEncoder coverEncoder = encodeDefaultCoverThumbnail,
     NativePdfBridge? pdfBridge,
     NativeArchiveBridge? archiveBridge,
+    ArchivePasswordStore? passwordStore,
   }) : _db = db,
        _storage = storage,
        _coverEncoder = coverEncoder,
        _pdfBridge = pdfBridge,
-       _archiveBridge = archiveBridge;
+       _archiveBridge = archiveBridge,
+       _passwordStore = passwordStore;
 
   final ProgressDatabase _db;
   final LocalComicsStorage _storage;
   final CoverThumbnailEncoder _coverEncoder;
   final NativePdfBridge? _pdfBridge;
   final NativeArchiveBridge? _archiveBridge;
+  final ArchivePasswordStore? _passwordStore;
   int _idSeq = 0;
 
   String _nextId(String prefix) {
@@ -38,11 +42,12 @@ final class LocalComicImporter {
     return 'local:${prefix}_${micros}_$_idSeq';
   }
 
-  /// 批量导入选中的压缩包文件流（兼容 Android `content://` 流与本地文件流）。
+  /// 批量导入选中的压缩包文件流（兼容 Android `content://` 流、本地文件流与加密包密码解锁）。
   Future<LocalImportBatchResult> importArchiveFiles(
     List<PickedComicFile> files, {
     String? parentFolderName,
     ImportProgressCallback? onProgress,
+    ArchivePasswordPromptCallback? onPasswordPrompt,
   }) async {
     final seriesIds = <String>{};
     final bookIds = <String>[];
@@ -62,6 +67,8 @@ final class LocalComicImporter {
           nextId: _nextId,
           pdfBridge: _pdfBridge,
           archiveBridge: _archiveBridge,
+          passwordStore: _passwordStore,
+          onPasswordPrompt: onPasswordPrompt,
         );
         seriesIds.addAll(imported.importedSeriesIds);
         bookIds.addAll(imported.importedBookIds);

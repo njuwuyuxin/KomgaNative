@@ -1,11 +1,10 @@
 import 'dart:async';
 import 'dart:collection';
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:yomu/src/data/byte_cache.dart';
+import 'package:yomu/src/data/local/archive_password_store.dart';
 import 'package:yomu/src/data/local/external_byte_source.dart';
-import 'package:yomu/src/data/local/external_roots_dao.dart';
 import 'package:yomu/src/data/local/local_catalog_query_dao.dart';
 import 'package:yomu/src/data/local/local_comics_storage.dart';
 import 'package:yomu/src/data/local/native_archive_reader.dart';
@@ -29,16 +28,19 @@ final class LocalReaderRepository implements ReaderRepository {
     ExternalRootsBridge? externalRoots,
     NativePdfBridge? pdfBridge,
     NativeArchiveBridge? archiveBridge,
+    ArchivePasswordStore? passwordStore,
   }) : _pages = ByteLruCache(capacity: pageCacheCapacity),
        _externalRoots = externalRoots ?? ChannelExternalRootsBridge(),
        _pdfBridge = pdfBridge ?? ChannelNativePdfBridge(),
-       _archiveBridge = archiveBridge ?? ChannelNativeArchiveBridge();
+       _archiveBridge = archiveBridge ?? ChannelNativeArchiveBridge(),
+       _passwordStore = passwordStore;
 
   final ProgressDatabase _db;
   final LocalComicsStorage _storage;
   final ExternalRootsBridge _externalRoots;
   final NativePdfBridge _pdfBridge;
   final NativeArchiveBridge _archiveBridge;
+  final ArchivePasswordStore? _passwordStore;
   final ByteLruCache _pages;
   final Map<String, Future<Uint8List>> _inFlight =
       <String, Future<Uint8List>>{};
@@ -213,12 +215,14 @@ final class LocalReaderRepository implements ReaderRepository {
     ];
 
     if (row.mountRootId != null) {
-      return _openExternalComicReader(
+      final savedPassword = await _passwordStore?.getBookPassword(bookId);
+      return openExternalComicReader(
         db: _db,
         externalRoots: _externalRoots,
         pdfBridge: _pdfBridge,
         row: row,
         entries: entries,
+        password: savedPassword,
       );
     }
 
@@ -236,14 +240,20 @@ final class LocalReaderRepository implements ReaderRepository {
     }
 
     final file = await _storage.resolveFile(row.relativePath);
+    final savedPassword = await _passwordStore?.getBookPassword(bookId);
     if (row.storageKind == 'pdf') {
       return entries.isNotEmpty
           ? NativePdfComicReader.fromIndexedPages(
               _pdfBridge,
               file.path,
               entries,
+              password: savedPassword,
             )
-          : NativePdfComicReader.open(_pdfBridge, file.path);
+          : NativePdfComicReader.open(
+              _pdfBridge,
+              file.path,
+              password: savedPassword,
+            );
     }
     if (row.storageKind == 'cb7' || row.storageKind == 'cbr') {
       final fmt = row.storageKind == 'cb7'
@@ -256,8 +266,13 @@ final class LocalReaderRepository implements ReaderRepository {
               entries,
               format: fmt,
               isSolid: true,
+              password: savedPassword,
             )
-          : NativeArchiveComicReader.open(_archiveBridge, file.path);
+          : NativeArchiveComicReader.open(
+              _archiveBridge,
+              file.path,
+              password: savedPassword,
+            );
     }
     final source = await FileByteSource.open(file);
     if (row.storageKind == 'tar') {
@@ -265,66 +280,15 @@ final class LocalReaderRepository implements ReaderRepository {
           ? TarComicReader.fromIndexedPages(source, entries)
           : TarComicReader.open(source);
     }
+    if (savedPassword != null && savedPassword.isNotEmpty) {
+      return ZipComicReader.open(
+        source,
+        sniffDimensions: false,
+        password: savedPassword,
+      );
+    }
     return entries.isNotEmpty
         ? ZipComicReader.fromIndexedPages(source, entries)
         : openComicArchive(source);
   }
-}
-
-Future<ComicArchiveReader> _openExternalComicReader({
-  required ProgressDatabase db,
-  required ExternalRootsBridge externalRoots,
-  required NativePdfBridge pdfBridge,
-  required LocalBooksRow row,
-  required List<ArchivePageEntry> entries,
-}) async {
-  final rootRow = await db.mountedRootById(row.mountRootId!);
-  final root = rootRow == null ? null : mountedRootFromRow(rootRow);
-
-  if (row.isCloudPlaceholder) {
-    await externalRoots.triggerCloudDownload(row.relativePath, root: root);
-    throw const ArchiveException(
-      ArchiveErrorKind.ioError,
-      'Cloud placeholder is downloading; please retry shortly',
-    );
-  }
-
-  if (row.storageKind == 'ext_folder') {
-    final dir = Directory(row.relativePath);
-    return entries.isNotEmpty
-        ? FolderComicReader.fromIndexedPages(dir, entries)
-        : FolderComicReader.open(dir);
-  }
-
-  if (row.storageKind == 'ext_pdf') {
-    return entries.isNotEmpty
-        ? NativePdfComicReader.fromIndexedPages(
-            pdfBridge,
-            row.relativePath,
-            entries,
-          )
-        : NativePdfComicReader.open(pdfBridge, row.relativePath);
-  }
-
-  final useBridge =
-      row.storageKind.startsWith('saf_') ||
-      root?.kind == ExternalRootKind.androidSaf ||
-      root?.kind == ExternalRootKind.iosBookmark;
-  final RandomAccessByteSource source = useBridge
-      ? ExternalRangeByteSource(
-          bridge: externalRoots,
-          uri: row.relativePath,
-          root: root,
-          knownLength: row.sizeBytes > 0 ? row.sizeBytes : null,
-        )
-      : await FileByteSource.open(File(row.relativePath));
-
-  if (row.storageKind.endsWith('_tar')) {
-    return entries.isNotEmpty
-        ? TarComicReader.fromIndexedPages(source, entries)
-        : TarComicReader.open(source);
-  }
-  return entries.isNotEmpty
-      ? ZipComicReader.fromIndexedPages(source, entries)
-      : openComicArchive(source);
 }

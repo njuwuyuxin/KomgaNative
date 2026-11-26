@@ -769,6 +769,23 @@
     }
   },
   "folderTreeCloudPlaceholder": "In iCloud · tap to download",
+  "archivePasswordTitle": "Password required",
+  "archivePasswordPrompt": "Enter the password to unlock \"{name}\".",
+  "@archivePasswordPrompt": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "archivePasswordLabel": "Password",
+  "archivePasswordWrong": "Incorrect password. Please try again.",
+  "archivePasswordSaveToDict": "Remember in common password list",
+  "archivePasswordUnlock": "Unlock",
+  "passwordDictionaryTitle": "Saved archive passwords",
+  "passwordDictionarySubtitle": "Auto-try common passwords for encrypted archives & PDFs",
+  "passwordDictionaryHint": "Stored securely in system Keychain / Keystore and tried automatically when importing encrypted files.",
+  "passwordDictionaryAddHint": "Add common password",
+  "passwordDictionaryAddButton": "Add",
+  "passwordDictionaryEmpty": "No saved passwords yet.",
   "importingProgress": "Importing ({done}/{total})",
   "@importingProgress": {
     "placeholders": {

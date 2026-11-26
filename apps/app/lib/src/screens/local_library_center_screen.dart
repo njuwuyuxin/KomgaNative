@@ -6,6 +6,7 @@ import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/src/data/progress/progress_database.dart';
 import 'package:yomu/src/providers/local_import_provider.dart';
 import 'package:yomu/src/providers/local_library_center_provider.dart';
+import 'package:yomu/src/widgets/archive_password_dialog.dart';
 import 'package:yomu/src/widgets/local_mounted_root_tile.dart';
 import 'package:yomu/src/widgets/source_group_bar.dart';
 import 'package:yomu/src/widgets/wifi_transfer_sheet.dart';
@@ -108,6 +109,15 @@ class LocalLibraryCenterScreen extends ConsumerWidget {
                         trailing: const Icon(Icons.chevron_right),
                         onTap: () =>
                             unawaited(runLocalArchiveImport(context, ref)),
+                      ),
+                      ListTile(
+                        key: const Key('local-center-password-dict'),
+                        leading: const Icon(Icons.vpn_key_outlined),
+                        title: Text(l10n.passwordDictionaryTitle),
+                        subtitle: Text(l10n.passwordDictionarySubtitle),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () =>
+                            unawaited(showPasswordDictionarySheet(context)),
                       ),
                     ],
                   ),

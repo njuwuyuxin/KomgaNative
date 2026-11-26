@@ -618,6 +618,23 @@
     }
   },
   "folderTreeCloudPlaceholder": "位于 iCloud · 点击下载",
+  "archivePasswordTitle": "需要解压密码",
+  "archivePasswordPrompt": "请输入用于解锁《{name}》的密码。",
+  "@archivePasswordPrompt": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "archivePasswordLabel": "密码",
+  "archivePasswordWrong": "密码错误，请重试。",
+  "archivePasswordSaveToDict": "加入常用解压密码词典",
+  "archivePasswordUnlock": "解锁",
+  "passwordDictionaryTitle": "常用解压密码词典",
+  "passwordDictionarySubtitle": "自动尝试解锁加密压缩包与加密 PDF",
+  "passwordDictionaryHint": "加密保存于系统钥匙串 / Keystore，导入或打开加密漫画时优先自动静默尝试。",
+  "passwordDictionaryAddHint": "添加常用解压密码",
+  "passwordDictionaryAddButton": "添加",
+  "passwordDictionaryEmpty": "暂未添加常用解压密码。",
   "importingProgress": "正在导入（{done}/{total}）",
   "@importingProgress": {
     "placeholders": {

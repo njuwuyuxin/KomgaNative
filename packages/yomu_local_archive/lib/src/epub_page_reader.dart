@@ -28,6 +28,7 @@ bool isEpubZipEntries(List<ZipEntryInfo> entries) {
 Future<ComicArchiveReader> openComicArchive(
   RandomAccessByteSource source, {
   bool sniffDimensions = true,
+  String? password,
 }) async {
   try {
     final totalLength = await source.length();
@@ -55,6 +56,7 @@ Future<ComicArchiveReader> openComicArchive(
       source,
       entries,
       sniffDimensions: sniffDimensions,
+      password: password,
     );
   } on Object {
     await source.close();

@@ -13,6 +13,8 @@ final class ZipEntryInfo {
     required this.localHeaderOffset,
     required this.compressionMethod,
     required this.generalPurposeBitFlag,
+    this.crc32 = 0,
+    this.lastModTime = 0,
   });
 
   final String name;
@@ -21,9 +23,14 @@ final class ZipEntryInfo {
   final int localHeaderOffset;
   final int compressionMethod;
   final int generalPurposeBitFlag;
+  final int crc32;
+  final int lastModTime;
 
   /// General Purpose Bit 0 表示条目启用了传统 PKWARE 或强加密。
   bool get isEncrypted => (generalPurposeBitFlag & 0x0001) != 0;
+
+  /// Bit 3 表示校验字节取 `lastModTime >> 8`。
+  bool get hasDataDescriptor => (generalPurposeBitFlag & 0x0008) != 0;
 
   bool get isDirectory => name.endsWith('/');
 }
@@ -185,6 +192,8 @@ List<ZipEntryInfo> _parseCentralDirectoryEntries(Uint8List cdBytes) {
 
     final gpFlag = view.getUint16(pos + 8, Endian.little);
     final method = view.getUint16(pos + 10, Endian.little);
+    final lastModTime = view.getUint16(pos + 12, Endian.little);
+    final crc32 = view.getUint32(pos + 16, Endian.little);
     var compSize = view.getUint32(pos + 20, Endian.little);
     var uncompSize = view.getUint32(pos + 24, Endian.little);
     final nameLen = view.getUint16(pos + 28, Endian.little);
@@ -235,6 +244,8 @@ List<ZipEntryInfo> _parseCentralDirectoryEntries(Uint8List cdBytes) {
         localHeaderOffset: localOffset,
         compressionMethod: method,
         generalPurposeBitFlag: gpFlag,
+        crc32: crc32,
+        lastModTime: lastModTime,
       ),
     );
     pos = headerEnd;

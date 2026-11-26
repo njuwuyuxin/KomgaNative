@@ -1,5 +1,9 @@
+import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:yomu/src/data/local/external_roots_dao.dart';
+import 'package:yomu/src/data/local/native_pdf_reader.dart';
+import 'package:yomu/src/data/progress/progress_database.dart';
 import 'package:yomu_local_archive/yomu_local_archive.dart';
 import 'package:yomu_platform/yomu_platform.dart';
 
@@ -58,4 +62,76 @@ final class ExternalRangeByteSource implements RandomAccessByteSource {
 
   @override
   Future<void> close() async {}
+}
+
+/// 打开外部原位挂载书对应的零拷贝读取器（LMB-08 / LMB-11）。
+Future<ComicArchiveReader> openExternalComicReader({
+  required ProgressDatabase db,
+  required ExternalRootsBridge externalRoots,
+  required NativePdfBridge pdfBridge,
+  required LocalBooksRow row,
+  required List<ArchivePageEntry> entries,
+  String? password,
+}) async {
+  final rootRow = await db.mountedRootById(row.mountRootId!);
+  final root = rootRow == null ? null : mountedRootFromRow(rootRow);
+
+  if (row.isCloudPlaceholder) {
+    await externalRoots.triggerCloudDownload(row.relativePath, root: root);
+    throw const ArchiveException(
+      ArchiveErrorKind.ioError,
+      'Cloud placeholder is downloading; please retry shortly',
+    );
+  }
+
+  if (row.storageKind == 'ext_folder') {
+    final dir = Directory(row.relativePath);
+    return entries.isNotEmpty
+        ? FolderComicReader.fromIndexedPages(dir, entries)
+        : FolderComicReader.open(dir);
+  }
+
+  if (row.storageKind == 'ext_pdf') {
+    return entries.isNotEmpty
+        ? NativePdfComicReader.fromIndexedPages(
+            pdfBridge,
+            row.relativePath,
+            entries,
+            password: password,
+          )
+        : NativePdfComicReader.open(
+            pdfBridge,
+            row.relativePath,
+            password: password,
+          );
+  }
+
+  final useBridge =
+      row.storageKind.startsWith('saf_') ||
+      root?.kind == ExternalRootKind.androidSaf ||
+      root?.kind == ExternalRootKind.iosBookmark;
+  final RandomAccessByteSource source = useBridge
+      ? ExternalRangeByteSource(
+          bridge: externalRoots,
+          uri: row.relativePath,
+          root: root,
+          knownLength: row.sizeBytes > 0 ? row.sizeBytes : null,
+        )
+      : await FileByteSource.open(File(row.relativePath));
+
+  if (row.storageKind.endsWith('_tar')) {
+    return entries.isNotEmpty
+        ? TarComicReader.fromIndexedPages(source, entries)
+        : TarComicReader.open(source);
+  }
+  if (password != null && password.isNotEmpty) {
+    return ZipComicReader.open(
+      source,
+      sniffDimensions: false,
+      password: password,
+    );
+  }
+  return entries.isNotEmpty
+      ? ZipComicReader.fromIndexedPages(source, entries)
+      : openComicArchive(source);
 }

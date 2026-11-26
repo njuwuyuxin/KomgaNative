@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:yomu/src/data/local/archive_password_store.dart';
 import 'package:yomu/src/data/local/cover_thumbnail_generator.dart';
 import 'package:yomu/src/data/local/local_comic_importer_models.dart';
 import 'package:yomu/src/data/local/local_comics_storage.dart';
@@ -10,8 +11,17 @@ import 'package:yomu/src/data/progress/progress_database.dart';
 import 'package:yomu_local_archive/yomu_local_archive.dart';
 import 'package:yomu_platform/yomu_platform.dart';
 
-/// 导入单个归档文件流；若检测到为「嵌套合集包」（内部无直接图片但含多个子归档），
-/// 自动拆包入库并归入同一系列，同时清理外层临时文件（LMB-06 / LMB-11 / LMB-12）。
+/// 加密归档/PDF 导入时的交互式密码输入回调（LMB-13）。
+typedef ArchivePasswordPromptCallback =
+    Future<({String password, bool saveToDictionary})?> Function(
+      String fileName, {
+      bool wrongAttempt,
+    });
+
+/// 导入单个归档文件流；支持：
+/// - 嵌套合集包自动拆包（LMB-06）；
+/// - 原生 PDF（LMB-11）与 CBR/CB7（LMB-12）；
+/// - 加密包自动尝试常用密码词典 + 交互弹窗 + 钥匙串按 `bookId` 记忆（LMB-13）。
 Future<LocalImportBatchResult> importArchiveOrCollectionStream({
   required ProgressDatabase db,
   required LocalComicsStorage storage,
@@ -22,6 +32,8 @@ Future<LocalImportBatchResult> importArchiveOrCollectionStream({
   required String Function(String prefix) nextId,
   NativePdfBridge? pdfBridge,
   NativeArchiveBridge? archiveBridge,
+  ArchivePasswordStore? passwordStore,
+  ArchivePasswordPromptCallback? onPasswordPrompt,
   String? password,
   bool allowNestedUnpack = true,
 }) async {
@@ -42,7 +54,6 @@ Future<LocalImportBatchResult> importArchiveOrCollectionStream({
   final archiveRelPath = 'books/$safeFolder/archive.$archiveExt';
   final destFile = await storage.resolveFile(archiveRelPath);
 
-  FileByteSource? fileSource;
   ComicArchiveReader? reader;
   try {
     await destFile.parent.create(recursive: true);
@@ -60,41 +71,62 @@ Future<LocalImportBatchResult> importArchiveOrCollectionStream({
         magic == ContainerMagic.rar5 ||
         magic == ContainerMagic.sevenZip;
 
-    if (isPdf) {
-      reader = await NativePdfComicReader.open(
-        pdfBridge ?? ChannelNativePdfBridge(),
-        destFile.path,
-        password: password,
-      );
-    } else if (isNativeArchive) {
-      reader = await NativeArchiveComicReader.open(
-        archiveBridge ?? ChannelNativeArchiveBridge(),
-        destFile.path,
-        password: password,
-      );
-    } else {
-      fileSource = await FileByteSource.open(destFile);
-      try {
-        reader = await openComicArchive(fileSource);
-      } on ArchiveException catch (e) {
-        fileSource = null; // openComicArchive 失败时已关闭句柄
-        if (allowNestedUnpack && e.kind == ArchiveErrorKind.noImages) {
-          final unpacked = await _tryUnpackNestedCollection(
-            db: db,
-            storage: storage,
-            coverEncoder: coverEncoder,
-            outerFile: destFile,
-            outerFileName: displayFileName,
-            parentFolderName: parentFolderName,
-            nextId: nextId,
-            pdfBridge: pdfBridge,
-            archiveBridge: archiveBridge,
-          );
-          if (unpacked != null) {
-            await tryDeleteImportDir(destFile.parent);
-            return unpacked;
-          }
+    Future<ComicArchiveReader> openWithPassword(String? pwd) async {
+      if (isPdf) {
+        return NativePdfComicReader.open(
+          pdfBridge ?? ChannelNativePdfBridge(),
+          destFile.path,
+          password: pwd,
+        );
+      }
+      if (isNativeArchive) {
+        return NativeArchiveComicReader.open(
+          archiveBridge ?? ChannelNativeArchiveBridge(),
+          destFile.path,
+          password: pwd,
+        );
+      }
+      final source = await FileByteSource.open(destFile);
+      return openComicArchive(source, password: pwd);
+    }
+
+    String? unlockedPassword = password;
+    try {
+      reader = await openWithPassword(password);
+    } on ArchiveException catch (e) {
+      if (e.kind == ArchiveErrorKind.encryptedArchive &&
+          (password == null || password.isEmpty)) {
+        final resolved = await _unlockEncryptedArchive(
+          fileName: displayFileName,
+          openWithPassword: openWithPassword,
+          passwordStore: passwordStore,
+          onPasswordPrompt: onPasswordPrompt,
+        );
+        reader = resolved.reader;
+        unlockedPassword = resolved.password;
+      } else if (allowNestedUnpack &&
+          !isPdf &&
+          !isNativeArchive &&
+          e.kind == ArchiveErrorKind.noImages) {
+        final unpacked = await _tryUnpackNestedCollection(
+          db: db,
+          storage: storage,
+          coverEncoder: coverEncoder,
+          outerFile: destFile,
+          outerFileName: displayFileName,
+          parentFolderName: parentFolderName,
+          nextId: nextId,
+          pdfBridge: pdfBridge,
+          archiveBridge: archiveBridge,
+          passwordStore: passwordStore,
+          onPasswordPrompt: onPasswordPrompt,
+        );
+        if (unpacked != null) {
+          await tryDeleteImportDir(destFile.parent);
+          return unpacked;
         }
+        rethrow;
+      } else {
         rethrow;
       }
     }
@@ -121,19 +153,62 @@ Future<LocalImportBatchResult> importArchiveOrCollectionStream({
       reader: reader,
       generateSeriesId: () => nextId('s'),
     );
+    if (unlockedPassword != null && unlockedPassword.isNotEmpty) {
+      await passwordStore?.saveBookPassword(bookId, unlockedPassword);
+    }
     await reader.close();
     reader = null;
-    fileSource = null;
     return LocalImportBatchResult(
       importedSeriesIds: <String>[result.seriesId],
       importedBookIds: <String>[result.bookId],
     );
   } on Object {
     await reader?.close();
-    await fileSource?.close();
     await tryDeleteImportDir(destFile.parent);
     rethrow;
   }
+}
+
+Future<({ComicArchiveReader reader, String password})> _unlockEncryptedArchive({
+  required String fileName,
+  required Future<ComicArchiveReader> Function(String? pwd) openWithPassword,
+  required ArchivePasswordStore? passwordStore,
+  required ArchivePasswordPromptCallback? onPasswordPrompt,
+}) async {
+  // 1) 优先静音尝试常用解压密码词典
+  final dict = await passwordStore?.loadCommonPasswords() ?? const <String>[];
+  for (final candidate in dict) {
+    try {
+      final reader = await openWithPassword(candidate);
+      return (reader: reader, password: candidate);
+    } on ArchiveException catch (e) {
+      if (e.kind != ArchiveErrorKind.encryptedArchive) rethrow;
+    }
+  }
+
+  // 2) 词典未命中时弹出交互式密码输入框（最多重试 3 次）
+  if (onPasswordPrompt != null) {
+    for (var attempt = 0; attempt < 3; attempt++) {
+      final submission = await onPasswordPrompt(
+        fileName,
+        wrongAttempt: attempt > 0,
+      );
+      if (submission == null || submission.password.isEmpty) {
+        break;
+      }
+      try {
+        final reader = await openWithPassword(submission.password);
+        if (submission.saveToDictionary) {
+          await passwordStore?.addCommonPassword(submission.password);
+        }
+        return (reader: reader, password: submission.password);
+      } on ArchiveException catch (e) {
+        if (e.kind != ArchiveErrorKind.encryptedArchive) rethrow;
+      }
+    }
+  }
+
+  throw ArchiveException(ArchiveErrorKind.encryptedArchive, fileName);
 }
 
 Future<LocalImportBatchResult?> _tryUnpackNestedCollection({
@@ -146,6 +221,8 @@ Future<LocalImportBatchResult?> _tryUnpackNestedCollection({
   required String Function(String prefix) nextId,
   NativePdfBridge? pdfBridge,
   NativeArchiveBridge? archiveBridge,
+  ArchivePasswordStore? passwordStore,
+  ArchivePasswordPromptCallback? onPasswordPrompt,
 }) async {
   final outerSource = await FileByteSource.open(outerFile);
   try {
@@ -178,6 +255,8 @@ Future<LocalImportBatchResult?> _tryUnpackNestedCollection({
           nextId: nextId,
           pdfBridge: pdfBridge,
           archiveBridge: archiveBridge,
+          passwordStore: passwordStore,
+          onPasswordPrompt: onPasswordPrompt,
           allowNestedUnpack: false,
         );
         seriesIds.addAll(sub.importedSeriesIds);

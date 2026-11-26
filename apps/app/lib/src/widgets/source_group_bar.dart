@@ -7,6 +7,7 @@ import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/src/providers/active_source_provider.dart';
 import 'package:yomu/src/providers/local_folder_tree_provider.dart';
 import 'package:yomu/src/providers/local_import_provider.dart';
+import 'package:yomu/src/widgets/archive_password_dialog.dart';
 import 'package:yomu/src/widgets/wifi_transfer_sheet.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu_domain/yomu_domain.dart';
@@ -230,7 +231,21 @@ Future<void> runLocalArchiveImport(BuildContext context, WidgetRef ref) async {
   final l10n = AppLocalizations.of(context);
   final result = await ref
       .read(localImportProvider.notifier)
-      .pickAndImportArchives();
+      .pickAndImportArchives(
+        onPasswordPrompt: (String fileName, {bool wrongAttempt = false}) async {
+          if (!context.mounted) return null;
+          final sub = await showArchivePasswordDialog(
+            context,
+            fileName: fileName,
+            wrongAttempt: wrongAttempt,
+          );
+          if (sub == null) return null;
+          return (
+            password: sub.password,
+            saveToDictionary: sub.saveToDictionary,
+          );
+        },
+      );
   if (result == null) return;
   _showImportOutcome(messenger, l10n, result);
 }

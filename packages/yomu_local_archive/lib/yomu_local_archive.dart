@@ -18,5 +18,6 @@ export 'src/nested_archive_inspector.dart';
 export 'src/rar_header_parser.dart';
 export 'src/solid_window_cache.dart';
 export 'src/tar_page_reader.dart';
+export 'src/zip_crypto.dart';
 export 'src/zip_directory.dart';
 export 'src/zip_page_reader.dart';

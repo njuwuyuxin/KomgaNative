@@ -9,6 +9,7 @@ import 'package:yomu/src/data/local/local_read_status_repository.dart';
 import 'package:yomu/src/data/local/local_reader_repository.dart';
 import 'package:yomu/src/data/read_status_repository.dart';
 import 'package:yomu/src/data/reader_repository.dart';
+import 'package:yomu/src/providers/archive_password_provider.dart';
 import 'package:yomu/src/providers/cache_providers.dart';
 import 'package:yomu/src/providers/komga_session_provider.dart';
 import 'package:yomu/src/providers/progress_providers.dart';
@@ -82,6 +83,7 @@ final Provider<LocalReaderRepository> localReaderRepositoryProvider =
       final repo = LocalReaderRepository(
         ref.watch(progressDatabaseProvider),
         ref.watch(localComicsStorageProvider),
+        passwordStore: ref.watch(archivePasswordStoreProvider),
       );
       ref.onDispose(repo.dispose);
       return repo;

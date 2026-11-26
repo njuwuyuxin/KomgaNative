@@ -4,9 +4,11 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yomu/src/data/cache/http_cache_tables.dart';
 import 'package:yomu/src/data/local/comic_file_picker.dart';
+import 'package:yomu/src/data/local/local_archive_import_stream.dart';
 import 'package:yomu/src/data/local/local_catalog_write_dao.dart';
 import 'package:yomu/src/data/local/local_comic_importer.dart';
 import 'package:yomu/src/providers/active_source_provider.dart';
+import 'package:yomu/src/providers/archive_password_provider.dart';
 import 'package:yomu/src/providers/cross_source_reading_provider.dart';
 import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/progress_providers.dart';
@@ -56,6 +58,7 @@ final Provider<LocalComicImporter> localComicImporterProvider =
       return LocalComicImporter(
         db: ref.watch(progressDatabaseProvider),
         storage: ref.watch(localComicsStorageProvider),
+        passwordStore: ref.watch(archivePasswordStoreProvider),
       );
     });
 
@@ -77,7 +80,9 @@ class LocalImportController extends Notifier<LocalImportState> {
   ComicFilePicker get _picker => ref.read(comicFilePickerProvider);
   LocalComicImporter get _importer => ref.read(localComicImporterProvider);
 
-  Future<LocalImportBatchResult?> pickAndImportArchives() async {
+  Future<LocalImportBatchResult?> pickAndImportArchives({
+    ArchivePasswordPromptCallback? onPasswordPrompt,
+  }) async {
     if (state.busy) return null;
     final picked = await _picker.pickArchiveFiles();
     if (picked.isEmpty) return null;
@@ -92,6 +97,7 @@ class LocalImportController extends Notifier<LocalImportState> {
       final result = await _importer.importArchiveFiles(
         picked,
         onProgress: _onProgress,
+        onPasswordPrompt: onPasswordPrompt,
       );
       await _picker.clearTemporaryCache();
       await _finishImport(result);
