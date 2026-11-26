@@ -9,7 +9,7 @@ import 'package:material_ui/material_ui.dart';
 ///
 /// 顶栏常驻槽位为：返回 / 标题+页码 / 保存图片 / AA / ⋯。目录、隐身、页面缩略图、
 /// 阅读设置、分享收进这个菜单，保证每颗顶栏按钮都有完整的 48pt 点击区。
-enum ReaderBarAction { toc, incognito, pages, settings, share }
+enum ReaderBarAction { toc, incognito, pages, settings, share, setAsCover }
 
 /// 阅读器顶栏。
 ///
@@ -30,6 +30,7 @@ class ReaderBar extends StatelessWidget {
     this.onOpenToc,
     this.onSavePage,
     this.onSharePage,
+    this.onSetAsCover,
     this.offline = false,
     super.key,
   });
@@ -58,6 +59,9 @@ class ReaderBar extends StatelessWidget {
   /// 分享当前页（UI-P3-6）。
   final VoidCallback? onSharePage;
 
+  /// 将当前页设为本地书籍与系列的封面（LMA-11，仅本地书籍非空）。
+  final VoidCallback? onSetAsCover;
+
   /// 本次阅读是否不回写进度（UI-P3-12）。
   final bool incognito;
   final VoidCallback onToggleIncognito;
@@ -73,6 +77,7 @@ class ReaderBar extends StatelessWidget {
       ReaderBarAction.incognito,
       ReaderBarAction.pages,
       ReaderBarAction.settings,
+      if (onSetAsCover != null) ReaderBarAction.setAsCover,
       if (onSharePage != null) ReaderBarAction.share,
     ];
     return Padding(
@@ -178,6 +183,8 @@ class ReaderBar extends StatelessWidget {
         onOpenPages();
       case ReaderBarAction.settings:
         onOpenSettings();
+      case ReaderBarAction.setAsCover:
+        onSetAsCover?.call();
       case ReaderBarAction.share:
         onSharePage?.call();
     }
@@ -190,6 +197,7 @@ class ReaderBar extends StatelessWidget {
     ReaderBarAction.incognito => 'reader-incognito-button',
     ReaderBarAction.pages => 'reader-pages-button',
     ReaderBarAction.settings => 'reader-settings-button',
+    ReaderBarAction.setAsCover => 'reader-set-cover-button',
     ReaderBarAction.share => 'reader-share-button',
   };
 
@@ -199,6 +207,7 @@ class ReaderBar extends StatelessWidget {
       incognito ? Icons.visibility_off_outlined : Icons.visibility_outlined,
     ReaderBarAction.pages => Icons.grid_view_outlined,
     ReaderBarAction.settings => iconForMode(mode),
+    ReaderBarAction.setAsCover => Icons.photo_library_outlined,
     ReaderBarAction.share => Icons.ios_share,
   };
 
@@ -209,6 +218,7 @@ class ReaderBar extends StatelessWidget {
           incognito ? l10n.incognitoOn : l10n.incognitoOff,
         ReaderBarAction.pages => l10n.pageThumbnailsTooltip,
         ReaderBarAction.settings => l10n.readingSettingsTooltip,
+        ReaderBarAction.setAsCover => l10n.setPageAsCover,
         ReaderBarAction.share => l10n.sharePage,
       };
 }

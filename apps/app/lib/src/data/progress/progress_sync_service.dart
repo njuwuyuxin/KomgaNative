@@ -61,7 +61,7 @@ class ProgressSyncService {
   }) => _store.forceAdopt(bookId, remote, scope: scope ?? _activeScope());
 
   /// 记一页进度：
-  /// - 本机书籍（`scope == kLocalSourceKey`）直接落盘（`pendingSeq = null`），不入远程队列；
+  /// - 本机书籍（`bookId` 以 `'local:'` 开头）直接落盘至 `kLocalSourceKey`（`pendingSeq = null`），不入远程队列；
   /// - 远程服务器书籍先落入对应服务器分区，再尽力提交（不阻塞调用方）。
   Future<void> save(
     String bookId, {
@@ -69,8 +69,7 @@ class ProgressSyncService {
     required bool completed,
     String? scope,
   }) async {
-    final effectiveScope = scope ?? _activeScope();
-    if (effectiveScope == kLocalSourceKey) {
+    if (bookId.startsWith('local:')) {
       await _store.forceAdopt(
         bookId,
         ReadProgress(
@@ -82,6 +81,9 @@ class ProgressSyncService {
       );
       return;
     }
+    final effectiveScope = (scope != null && !isLocalSourceKey(scope))
+        ? scope
+        : _activeScope();
     await _store.enqueue(
       ProgressTarget(bookId: bookId, page: page, completed: completed),
       scope: effectiveScope,

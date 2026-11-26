@@ -2,16 +2,18 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:yomu_domain/yomu_domain.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/src/providers/cache_providers.dart';
+import 'package:yomu/src/providers/local_catalog_mutator_provider.dart';
 import 'package:yomu/src/widgets/page_navigator_sheet.dart';
 import 'package:yomu/src/widgets/reader_bar.dart';
-import 'package:yomu/src/widgets/reader_quick_settings_sheet.dart';
 import 'package:yomu/src/widgets/reader_palette.dart';
+import 'package:yomu/src/widgets/reader_quick_settings_sheet.dart';
 import 'package:yomu/src/widgets/reader_settings_sheet.dart';
 import 'package:yomu/src/widgets/reader_toc_sheet.dart';
+import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu_reader/yomu_reader.dart';
-import 'package:material_ui/material_ui.dart';
 
 /// 阅读器顶栏的接线：离线状态、缩略图面板、设置面板、返回。
 ///
@@ -70,6 +72,7 @@ class ReaderTopBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isLocalBook = bookId.startsWith('local:') && seriesId != null;
     return ValueListenableBuilder<bool>(
       valueListenable: ref.watch(offlineProvider),
       builder: (BuildContext context, bool offline, Widget? _) => ReaderBar(
@@ -77,11 +80,14 @@ class ReaderTopBar extends ConsumerWidget {
         pageLabel: pageLabel,
         palette: palette,
         mode: mode,
-        offline: offline,
+        offline: !isLocalBook && offline,
         incognito: incognito,
         onToggleIncognito: onToggleIncognito,
         onSavePage: onSavePage,
         onSharePage: onSharePage,
+        onSetAsCover: isLocalBook
+            ? () => unawaited(_setAsCover(context, ref))
+            : null,
         // AA：只放读的时候真的会改的五项，改完立刻回到画面（RDR-03）。
         onOpenQuickSettings: () => showReaderQuickSettingsSheet(
           context,
@@ -120,5 +126,26 @@ class ReaderTopBar extends ConsumerWidget {
         onClose: () => context.pop(),
       ),
     );
+  }
+
+  Future<void> _setAsCover(BuildContext context, WidgetRef ref) async {
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    try {
+      final ok = await ref
+          .read(localCatalogMutatorProvider)
+          .setCustomCoverFromPageBytes(
+            bookId: bookId,
+            seriesId: seriesId!,
+            pageNumber: page,
+          );
+      if (ok && messenger != null) {
+        messenger
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(l10n.coverUpdated)));
+      }
+    } on Object {
+      // 设封面失败不阻断当前阅读会话。
+    }
   }
 }

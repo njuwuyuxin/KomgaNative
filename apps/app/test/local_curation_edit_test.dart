@@ -142,5 +142,72 @@ void main() {
       expect((await db.localSeriesById(splitSeriesId!))?.booksCount, 1);
       expect((await db.localSeriesById(splitSeriesId))?.title, '番外篇');
     });
+
+    test('LMA-11 将阅读器指定页设为自定义封面后，书籍与系列封面即时更新', () async {
+      final pagesDir = Directory('${tempDir.path}/books/b_cov/pages')
+        ..createSync(recursive: true);
+      await File('${pagesDir.path}/01.png').writeAsBytes(const <int>[
+        0x89,
+        0x50,
+        0x4E,
+        0x47,
+        0x0D,
+        0x0A,
+        0x1A,
+        0x0A,
+        1,
+      ]);
+      await File('${pagesDir.path}/02.png').writeAsBytes(const <int>[
+        0x89,
+        0x50,
+        0x4E,
+        0x47,
+        0x0D,
+        0x0A,
+        0x1A,
+        0x0A,
+        99,
+      ]);
+
+      await db.insertImportedLocalBook(
+        const LocalBookImportDraft(
+          bookId: 'local:b_cov',
+          seriesIdOverride: 'local:s_cov',
+          seriesTitle: 'Cover Test',
+          bookName: 'Vol. 1',
+          storageKind: 'folder',
+          relativePath: 'books/b_cov/pages',
+          sizeBytes: 18,
+          pages: <ArchivePageEntry>[
+            ArchivePageEntry(
+              number: 1,
+              entryName: '01.png',
+              uncompressedSize: 9,
+            ),
+            ArchivePageEntry(
+              number: 2,
+              entryName: '02.png',
+              uncompressedSize: 9,
+            ),
+          ],
+        ),
+        generateSeriesId: () => 'local:s_cov',
+      );
+
+      final libRepo = container.read(localLibraryRepositoryProvider);
+      expect((await libRepo.seriesCover('local:s_cov'))?.last, 1);
+
+      final ok = await container
+          .read(localCatalogMutatorProvider)
+          .setCustomCoverFromPageBytes(
+            bookId: 'local:b_cov',
+            seriesId: 'local:s_cov',
+            pageNumber: 2,
+          );
+      expect(ok, isTrue);
+
+      final updatedCover = await libRepo.seriesCover('local:s_cov');
+      expect(updatedCover?.last, 99, reason: '系列封面应已替换为第 2 页');
+    });
   });
 }
