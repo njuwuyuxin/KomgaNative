@@ -5,10 +5,8 @@ mixin _PageTurn
     on
         ConsumerState<ReaderPagedView>,
         TickerProviderStateMixin<ReaderPagedView> {
-  static const Duration _kFaceFadeDuration = Duration(milliseconds: 160);
-
   late final AnimationController _turnController;
-  late final AnimationController _faceController;
+  late final _CurlFaceFade _faceFade;
   _TurnPhase _phase = _TurnPhase.idle;
   bool _forward = true;
   bool _commit = false;
@@ -22,12 +20,8 @@ mixin _PageTurn
   /// 本次翻动的卷页计划；null = 平移（开始时定下来，途中位图到了也不切换模式）。
   _CurlPlan? _plan;
 
-  /// 纸面与纸背的图像混合权重（0..1）：起手就绪时直接为 1；
-  /// 冷页在卷动途中加载完成时从 0 平滑淡入到 1，避免纯白背面在落地瞬间突变成图片。
-  double _sheetMix = 1;
-  double _backMix = 1;
-  bool _fadingSheet = false;
-  bool _fadingBack = false;
+  double get _sheetMix => _faceFade.sheetMix;
+  double get _backMix => _faceFade.backMix;
 
   /// 卷页时被捏住的角所在位置（标准形纸面坐标，见 `curl_motion.dart`）。
   ({double x, double y}) _finger = (x: 0, y: 0);
@@ -62,17 +56,19 @@ mixin _PageTurn
       duration: widget.style.duration,
     )..addListener(_onTurnTick);
     _turnController.addStatusListener(_onTurnStatus);
-    _faceController =
-        AnimationController(vsync: this, duration: _kFaceFadeDuration)
-          ..addListener(_onFaceTick)
-          ..addStatusListener(_onFaceStatus);
+    _faceFade = _CurlFaceFade(
+      vsync: this,
+      onTick: () {
+        if (mounted && _phase != _TurnPhase.idle) setState(() {});
+      },
+    );
     unawaited(PageCurlProgram.ensureLoaded());
     _scheduleSheets();
   }
 
   @override
   void dispose() {
-    _faceController.dispose();
+    _faceFade.dispose();
     _turnController.dispose();
     _sheets.dispose();
     super.dispose();
@@ -122,20 +118,19 @@ mixin _PageTurn
     _plan = ready ? plan : null;
     _finger = _plan?.motion.fingerAt(0) ?? (x: 0, y: 0);
 
-    _faceController.stop();
-    _fadingSheet = false;
-    _fadingBack = false;
     final active = _plan;
     if (active != null) {
-      _sheetMix = _sheets.imageFor(active.sheetPage) != null ? 1 : 0;
+      final sheetReady = _sheets.imageFor(active.sheetPage) != null;
       final backPage = active.backPage;
-      _backMix = backPage != null && _sheets.imageFor(backPage) != null ? 1 : 0;
-      if (_sheetMix < 1 || (backPage != null && _backMix < 1)) {
-        _scheduleSheets();
-      }
+      final backReady = backPage == null || _sheets.imageFor(backPage) != null;
+      _faceFade.begin(
+        sheetReady: sheetReady,
+        hasBack: backPage != null,
+        backReady: backReady,
+      );
+      if (!sheetReady || !backReady) _scheduleSheets();
     } else {
-      _sheetMix = 1;
-      _backMix = 1;
+      _faceFade.resetOpaque();
     }
   }
 
@@ -148,45 +143,12 @@ mixin _PageTurn
   }
 
   void _checkLateFaces(_CurlPlan plan) {
-    var shouldAnimate = false;
-    if (_sheetMix == 0 &&
-        !_fadingSheet &&
-        _imageOrAdoptSync(plan.sheetPage) != null) {
-      _fadingSheet = true;
-      shouldAnimate = true;
-    }
-    final backPage = plan.backPage;
-    if (backPage != null &&
-        _backMix == 0 &&
-        !_fadingBack &&
-        _imageOrAdoptSync(backPage) != null) {
-      _fadingBack = true;
-      shouldAnimate = true;
-    }
-    if (shouldAnimate && !_faceController.isAnimating) {
-      unawaited(_faceController.forward(from: 0));
-    }
-  }
-
-  void _onFaceTick() {
-    if (!mounted || _phase == _TurnPhase.idle) return;
-    final v = Curves.easeOut.transform(_faceController.value);
-    setState(() {
-      if (_fadingSheet) _sheetMix = v;
-      if (_fadingBack) _backMix = v;
-    });
-  }
-
-  void _onFaceStatus(AnimationStatus status) {
-    if (status != AnimationStatus.completed) return;
-    if (_fadingSheet) {
-      _sheetMix = 1;
-      _fadingSheet = false;
-    }
-    if (_fadingBack) {
-      _backMix = 1;
-      _fadingBack = false;
-    }
+    _faceFade.checkLate(
+      hasSheetImage: () => _imageOrAdoptSync(plan.sheetPage) != null,
+      hasBackPage: plan.backPage != null,
+      hasBackImage: () =>
+          plan.backPage != null && _imageOrAdoptSync(plan.backPage!) != null,
+    );
   }
 
   void _onTurnTick() {
@@ -217,9 +179,7 @@ mixin _PageTurn
     _commit = false;
     _plan = null;
     _progress = 0;
-    _faceController.stop();
-    _fadingSheet = false;
-    _fadingBack = false;
+    _faceFade.stop();
     _turnController.reset();
     setState(() {});
     if (commit) widget.onTurn(_forward ? 1 : -1);
@@ -304,9 +264,7 @@ mixin _PageTurn
     _progress = 0;
     _commit = false;
     _plan = null;
-    _faceController.stop();
-    _fadingSheet = false;
-    _fadingBack = false;
+    _faceFade.stop();
     setState(() {});
     _scheduleSheets();
   }

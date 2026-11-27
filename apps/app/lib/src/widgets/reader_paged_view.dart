@@ -18,8 +18,10 @@ import 'package:yomu/src/widgets/scoped_source_scope.dart';
 import 'package:yomu_reader/yomu_reader.dart';
 import 'package:material_ui/material_ui.dart';
 
+part 'reader_curl_face_fade.dart';
 part 'reader_curl_plan.dart';
 part 'reader_page_turn.dart';
+part 'reader_tap_dispatch.dart';
 part 'reader_turn_layers.dart';
 part 'reader_zoom.dart';
 
@@ -112,7 +114,7 @@ class ReaderPagedView extends ConsumerStatefulWidget {
 }
 
 class ReaderPagedViewState extends ConsumerState<ReaderPagedView>
-    with TickerProviderStateMixin, _PageTurn, _Zoom {
+    with TickerProviderStateMixin, _PageTurn, _TapDispatch, _Zoom {
   // 手势回调里拿不到 LayoutBuilder 的 constraints，所以 build 时缓存一份：
   // 缩放要以焦点为基准，需要"缩放前的有效比例 + 内容左上角"。
   int _pageWidth = kFallbackPageWidth;

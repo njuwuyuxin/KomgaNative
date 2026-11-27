@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'ci_dart_scanner.dart';
+
 const int kMaxFileLines = 350;
 const int kMaxClassLines = 300;
 
@@ -14,11 +16,11 @@ const List<String> _productionRoots = <String>[
   'apps/app/lib',
 ];
 
-/// 分层与代码规范规则（ADR-0001 + ARC-12 门禁加固）：
-/// - `yomu_domain` / `yomu_reader` / `yomu_sync` / `yomu_local_archive` 不得依赖 Flutter、HTTP、数据库；
-/// - UI 层（screens/widgets）不得直接依赖 `komga_api`，只能经 Repository；
-/// - 非生成生产 `.dart` 文件严格 ≤ 350 行，单类 ≤ 300 行；
-/// - 非注释生产代码中禁止裸 `catch (_)`。
+/// 分层与代码规范规则（ADR-0001 + ARC-12 + P2-5 门禁加固）：
+/// - `yomu_domain` / `yomu_reader` / `yomu_sync` / `yomu_local_archive` 不得 import 或 export Flutter、HTTP、数据库；
+/// - UI 层（screens/widgets）不得 import 或 export `komga_api` 与数据库/DAO 层；
+/// - 非生成生产 `.dart` 文件严格 ≤ 350 行，单 class / mixin / extension / extension type ≤ 300 行（支持多行头部，忽略字符串与注释内的大括号）；
+/// - 非注释、非字符串字面量的生产代码中禁止裸 `catch (_)` 与静默空 `on Object`。
 Future<int> layerCheck() async {
   final violations = <String>[];
 
@@ -35,7 +37,7 @@ Future<int> layerCheck() async {
     'packages/yomu_local_archive',
   ]) {
     violations.addAll(
-      _scanImports(pkg, pureForbidden, reason: '纯逻辑包不得依赖 UI / 网络 / 数据库'),
+      _scanDirectives(pkg, pureForbidden, reason: '纯逻辑包不得依赖或转出 UI / 网络 / 数据库'),
     );
   }
 
@@ -44,12 +46,12 @@ Future<int> layerCheck() async {
     'apps/app/lib/src/widgets',
   ]) {
     violations.addAll(
-      _scanImports(dir, <String>[
+      _scanDirectives(dir, <String>[
         'package:komga_api/',
-      ], reason: 'UI 不得直接访问 API 层'),
+      ], reason: 'UI 不得直接访问或转出 API 层'),
     );
     violations.addAll(
-      _scanImports(
+      _scanDirectives(
         dir,
         <String>[
           'package:drift/',
@@ -61,7 +63,7 @@ Future<int> layerCheck() async {
           // 仅放行不含数据库/DAO/IO 副作用的纯视图模型文件；严禁放行 *_tables.dart / *_dao.dart / *_database.dart / *_repository.dart。
           'package:yomu/src/data/local/mounted_root_summary.dart',
         ],
-        reason: 'UI 不得直接依赖 Drift、缓存/进度/本地编目数据库或 DAO，请经由 Provider 暴露纯领域/视图模型',
+        reason: 'UI 不得直接依赖或转出 Drift、缓存/进度/本地编目数据库或 DAO，请经由 Provider 暴露纯领域/视图模型',
       ),
     );
     violations.addAll(
@@ -81,7 +83,7 @@ Future<int> layerCheck() async {
 
   if (violations.isEmpty) {
     stdout.writeln(
-      '分层与规范规则通过（含 ≤350 行文件、≤300 行类、零裸 catch (_)、零静默空 on Object、零 local: 前缀泄漏）',
+      '分层与规范规则通过（含 ≤350 行文件、≤300 行类/mixin/extension、import/export 分层、零裸 catch (_)、零静默空 on Object、零 local: 前缀泄漏）',
     );
     return 0;
   }
@@ -115,9 +117,6 @@ bool _isGeneratedDart(String path) {
 }
 
 final RegExp _bareCatchPattern = RegExp(r'(^|[\s\}])catch\s*\(\s*_\s*\)');
-final RegExp _classHeaderPattern = RegExp(
-  r'^\s*(abstract\s+|sealed\s+|final\s+|base\s+|interface\s+|mixin\s+)*class\s+(\w+)',
-);
 
 List<String> _scanSizeAndBareCatch(String dir) {
   final directory = Directory(dir);
@@ -127,57 +126,36 @@ List<String> _scanSizeAndBareCatch(String dir) {
     if (entity is! File || !entity.path.endsWith('.dart')) continue;
     if (_isGeneratedDart(entity.path)) continue;
 
-    final lines = entity.readAsLinesSync();
-    if (lines.length > kMaxFileLines) {
-      violations.add(
-        '${entity.path} 共 ${lines.length} 行，超过单文件 $kMaxFileLines 行上限',
-      );
+    final source = entity.readAsStringSync();
+    final rawLines = source.split('\n');
+    final lineCount = rawLines.isNotEmpty && rawLines.last.isEmpty
+        ? rawLines.length - 1
+        : rawLines.length;
+    if (lineCount > kMaxFileLines) {
+      violations.add('${entity.path} 共 $lineCount 行，超过单文件 $kMaxFileLines 行上限');
     }
 
-    var inClass = false;
-    var className = '';
-    var classStart = 0;
-    var braceDepth = 0;
+    final stripped = stripDartCommentsAndStrings(source);
+    final strippedLines = stripped.split('\n');
+    for (var i = 0; i < strippedLines.length; i++) {
+      if (_bareCatchPattern.hasMatch(strippedLines[i])) {
+        violations.add('${entity.path}:${i + 1} 禁止裸 catch (_)（会吞掉 Error）');
+      }
+    }
 
-    for (var i = 0; i < lines.length; i++) {
-      final raw = lines[i];
-      final trimmed = raw.trimLeft();
-      if (!trimmed.startsWith('//')) {
-        if (_bareCatchPattern.hasMatch(raw)) {
-          violations.add('${entity.path}:${i + 1} 禁止裸 catch (_)（会吞掉 Error）');
-        }
-        if (!inClass) {
-          final match = _classHeaderPattern.firstMatch(raw);
-          if (match != null && raw.contains('{')) {
-            inClass = true;
-            className = match.group(2)!;
-            classStart = i + 1;
-            braceDepth = 0;
-          }
-        }
-        if (inClass) {
-          for (var c = 0; c < raw.length; c++) {
-            final ch = raw[c];
-            if (ch == '{') braceDepth++;
-            if (ch == '}') braceDepth--;
-          }
-          if (braceDepth <= 0) {
-            final classLen = (i + 1) - classStart + 1;
-            if (classLen > kMaxClassLines) {
-              violations.add(
-                '${entity.path}:$classStart 类 $className 共 $classLen 行，超过单类 $kMaxClassLines 行上限',
-              );
-            }
-            inClass = false;
-          }
-        }
+    for (final block in scanDartTypeBlocks(source)) {
+      if (block.lineCount > kMaxClassLines) {
+        violations.add(
+          '${entity.path}:${block.startLine} ${block.kind} ${block.name} '
+          '共 ${block.lineCount} 行，超过单类型 $kMaxClassLines 行上限',
+        );
       }
     }
   }
   return violations;
 }
 
-List<String> _scanImports(
+List<String> _scanDirectives(
   String dir,
   List<String> forbidden, {
   List<String> allowed = const <String>[],
@@ -188,14 +166,16 @@ List<String> _scanImports(
   final violations = <String>[];
   for (final entity in directory.listSync(recursive: true)) {
     if (entity is! File || !entity.path.endsWith('.dart')) continue;
-    final lines = entity.readAsLinesSync();
-    for (var i = 0; i < lines.length; i++) {
-      final line = lines[i];
-      if (!line.contains('import ')) continue;
-      if (allowed.any(line.contains)) continue;
+    final directives = scanDartDirectives(entity.readAsStringSync());
+    for (final d in directives) {
+      if (allowed.any((String ok) => d.uri == ok || d.uri.contains(ok))) {
+        continue;
+      }
       for (final f in forbidden) {
-        if (line.contains(f)) {
-          violations.add('${entity.path}:${i + 1} 禁止 import $f（$reason）');
+        if (d.uri.contains(f)) {
+          violations.add(
+            '${entity.path}:${d.line} 禁止 ${d.keyword} ${d.uri}（$reason）',
+          );
         }
       }
     }
@@ -213,10 +193,10 @@ List<String> _scanCode(
   final violations = <String>[];
   for (final entity in directory.listSync(recursive: true)) {
     if (entity is! File || !entity.path.endsWith('.dart')) continue;
-    final lines = entity.readAsLinesSync();
+    final stripped = stripDartCommentsAndStrings(entity.readAsStringSync());
+    final lines = stripped.split('\n');
     for (var i = 0; i < lines.length; i++) {
-      final line = lines[i].trimLeft();
-      if (line.startsWith('//')) continue;
+      final line = lines[i];
       for (final f in forbidden) {
         if (line.contains(f)) {
           violations.add('${entity.path}:${i + 1} 禁止直接使用 $f（$reason）');
@@ -266,10 +246,9 @@ List<String> _scanSilentObjectCatch(String dir) {
   for (final entity in directory.listSync(recursive: true)) {
     if (entity is! File || !entity.path.endsWith('.dart')) continue;
     if (_isGeneratedDart(entity.path)) continue;
-    final lines = entity.readAsLinesSync();
+    final stripped = stripDartCommentsAndStrings(entity.readAsStringSync());
+    final lines = stripped.split('\n');
     for (var i = 0; i < lines.length; i++) {
-      final trimmed = lines[i].trimLeft();
-      if (trimmed.startsWith('//')) continue;
       final match = _onObjectCatchHeader.firstMatch(lines[i]);
       if (match == null) continue;
 
@@ -280,9 +259,6 @@ List<String> _scanSilentObjectCatch(String dir) {
       void consume(String text) {
         for (var c = 0; c < text.length && depth > 0; c++) {
           final ch = text[c];
-          if (ch == '/' && c + 1 < text.length && text[c + 1] == '/') {
-            break;
-          }
           if (ch == '{') {
             depth++;
             bodyCode.write(ch);

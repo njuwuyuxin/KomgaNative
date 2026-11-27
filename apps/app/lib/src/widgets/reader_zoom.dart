@@ -1,16 +1,12 @@
 part of 'reader_paged_view.dart';
 
-/// 缩放 / 平移 / 点击与双击缩放（UI-P1-6）。
+/// 缩放与平移（UI-P1-6 / P2-5）。
 ///
-/// 从 `ReaderPagedViewState` 拆出来：手势状态机本身就有十来项状态（起手焦点、
-/// 起手比例、溢出方向、平移夹紧区间、双击判定窗口），和翻页动画混在一个类里
-/// 两边都读不懂。分工：
+/// 分工：
 /// - `_PageTurn`：翻页动画（跟手、卷页、补完、换页）；
-/// - 本 mixin：缩放与点击，跨屏的交接点是 `_PageTurn` 的拖拽状态。
-mixin _Zoom on _PageTurn {
-  /// 指针移动超过这个距离就不算点击（拖拽/缩放）。
-  static const double _tapSlop = 12;
-
+/// - `_TapDispatch`：指针点击区与双击缩放窗口判定；
+/// - 本 mixin：双指缩放、溢出平移与弹簧缩放动画。
+mixin _Zoom on _TapDispatch {
   /// 超过这个横向位移才开始跟手翻页（太小会误吃点击）。
   static const double _dragStartSlop = 14;
 
@@ -26,9 +22,9 @@ mixin _Zoom on _PageTurn {
   // 宿主（布局）在 build 时写、手势回调里读：
   int get _pageWidth;
   int get _pageHeight;
-  SizeD get _viewport;
   ReadingMode get _engineMode;
 
+  @override
   double _zoom = 1;
   Offset _pan = Offset.zero;
   Offset _startFocal = Offset.zero;
@@ -52,14 +48,6 @@ mixin _Zoom on _PageTurn {
   double _panMinX = 0;
   double _panMinY = 0;
 
-  /// 点击判定用自己的指针记账：`onTapUp` 与 `onScaleStart/Update` 在同一个
-  /// gesture arena 里会互相抢，实测 tap 会被 scale 吃掉，翻页完全不响应。
-  int _activePointers = 0;
-  Offset? _downAt;
-
-  /// 中间区域的单击要等这么久才切 chrome：等不到第二下才算单击。
-  Timer? _singleTapTimer;
-
   late final AnimationController _zoomAnimation =
       AnimationController.unbounded(vsync: this, value: 1)
         ..addListener(_onZoomTick)
@@ -70,7 +58,6 @@ mixin _Zoom on _PageTurn {
 
   @override
   void dispose() {
-    _singleTapTimer?.cancel();
     _zoomAnimation.dispose();
     super.dispose();
   }
@@ -84,74 +71,6 @@ mixin _Zoom on _PageTurn {
     _pan = Offset.zero;
   }
 
-  // ---- 指针与点击 ----
-
-  void _onPointerDown(PointerDownEvent event) {
-    _activePointers++;
-    _downAt = _activePointers == 1 ? event.localPosition : null;
-  }
-
-  void _onPointerUp(PointerUpEvent event) {
-    if (_activePointers > 0) _activePointers--;
-    final down = _downAt;
-    _downAt = null;
-    if (down == null || _activePointers > 0) return;
-    // 移动超过阈值视为拖拽/缩放，不当作点击。
-    if ((event.localPosition - down).distance > _tapSlop) return;
-    _handleTap(down, _viewport.width);
-  }
-
-  void _onPointerCancel(PointerCancelEvent event) {
-    _activePointers = 0;
-    _downAt = null;
-  }
-
-  /// 点击分派：左右三分之一立即翻页，中间等双击窗口。
-  ///
-  /// 中间区域既要能切 chrome、又要能双击缩放，所以单击必须等
-  /// [kDoubleTapTimeout] 过去才生效——否则双击的第一下就把 chrome 切掉了。
-  /// 左右翻页区**不等**：为了双击把翻页拖慢 300ms 是不可接受的。
-  /// 点击分派（RDR-07）：按用户选的点击区预设决定翻页/切 chrome。
-  ///
-  /// 翻页区**不等**双击窗口（为了双击把翻页拖慢 300ms 不可接受）；
-  /// 中间区既要切 chrome、又要能双击缩放，所以单击必须等窗口过去——
-  /// 除非用户关掉了双击缩放，那时中间区也立即生效。
-  void _handleTap(Offset position, double width) {
-    if (_phase != _TurnPhase.idle) return;
-    final zone = resolveTapZone(
-      preset: widget.tapZone,
-      dx: position.dx,
-      dy: position.dy,
-      width: width,
-      height: _viewport.height,
-      rightToLeft: widget.rightToLeft,
-      inverted: widget.invertTapZones,
-    );
-    if (zone == TapZoneAction.previous) {
-      turn(-1);
-      return;
-    }
-    if (zone == TapZoneAction.next) {
-      turn(1);
-      return;
-    }
-    if (!widget.doubleTapZoom) {
-      widget.onToggleChrome();
-      return;
-    }
-    final pending = _singleTapTimer;
-    if (pending != null && pending.isActive) {
-      pending.cancel();
-      _singleTapTimer = null;
-      _toggleZoomAt(position);
-      return;
-    }
-    _singleTapTimer = Timer(kDoubleTapTimeout, () {
-      _singleTapTimer = null;
-      if (!mounted) return;
-      widget.onToggleChrome();
-    });
-  }
   // ---- 缩放 ----
 
   void _onScaleStart(ScaleStartDetails details) {
