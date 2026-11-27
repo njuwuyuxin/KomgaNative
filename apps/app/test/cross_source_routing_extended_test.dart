@@ -48,6 +48,10 @@ void main() {
     testWidgets('多服务器隔离：激活服务器 A 时打开服务器 B 的书，仅命中 B 且进度写入 B 分区', (
       WidgetTester tester,
     ) async {
+      tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+
       const bookB = Book(
         id: 'book-b-1',
         seriesId: 'series-b-1',
@@ -118,9 +122,12 @@ void main() {
       );
       addTearDown(cache.dispose);
       final store = InMemoryProgressStore();
+      final uploadedScopes = <String>[];
       final sync = ProgressSyncService(
         store: store,
-        upload: (ProgressTarget _) async {},
+        scopedUpload: (String scope, ProgressTarget _) async {
+          uploadedScopes.add(scope);
+        },
       );
 
       await tester.pumpWidget(
@@ -163,9 +170,20 @@ void main() {
       expect(readerA.pageImageCalls, 0);
       expect(localReader.pageImageCalls, 0);
 
-      // 翻到下一页后进度必须落在 Server B 分区，不污染 Server A 或本机。
-      await tester.tapAt(const Offset(50, 300));
+      // 翻到下一页并越过 600ms 防抖后，进度必须真实写进 Server B，且绝不污染 Server A 或本机（N7）。
+      final tapRect = tester.getRect(find.byKey(const Key('reader-tap-layer')));
+      await tester.tapAt(
+        Offset(tapRect.right - tapRect.width * 0.05, tapRect.center.dy),
+      );
       await tester.pumpAndSettle();
+      expect(find.text('2 / 3'), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 700));
+      await tester.pumpAndSettle();
+
+      final savedB = await store.record(bookB.id, scope: _kServerB);
+      expect(savedB, isNotNull);
+      expect(savedB!.page, 2);
+      expect(uploadedScopes, <String>[_kServerB]);
       expect(await store.record(bookB.id, scope: _kServerA), isNull);
       expect(await store.record(bookB.id, scope: kLocalSourceKey), isNull);
     });
