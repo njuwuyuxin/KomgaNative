@@ -19,7 +19,7 @@ class AppInfo {
 ///
 /// 只用于"平台通道不可用"这种情况（测试环境、异常系统镜像）：
 /// 界面上宁可显示一个略旧的版本号，也不能显示空白。
-const String kFallbackAppVersion = '0.2.0';
+const String kFallbackAppVersion = '0.2.1';
 
 /// 版本信息。读失败不抛错——"关于"页不该因为读不到版本号就整块报错。
 final FutureProvider<AppInfo> appInfoProvider = FutureProvider<AppInfo>((

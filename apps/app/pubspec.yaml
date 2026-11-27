@@ -1,7 +1,7 @@
 name: yomu
 description: Yomu — 跨平台漫画阅读器（支持本地导入与 Komga，iOS / Android / 墨水屏）。
 publish_to: none
-version: 0.2.0+2
+version: 0.2.1+3
 
 environment:
   sdk: ^3.14.0
