@@ -66,20 +66,25 @@ final Provider<ProgressSyncService> progressSyncProvider =
             .where((ContentSource s) => s.capabilities.syncsProgressRemotely)
             .map((ContentSource s) => s.sourceKey),
         syncsRemotely: (String scope) {
+          if (isLocalSourceKey(scope)) return false;
           final source = ref.read(contentSourceDescriptorsProvider)[scope];
-          return source?.capabilities.syncsProgressRemotely ?? false;
+          // 冷启动服务器列表尚未加载完成时，不认识的非本地 scope 一律先入队，待上传时再按能力位决定上传或丢弃（N2）。
+          return source?.capabilities.syncsProgressRemotely ?? true;
         },
         scopedUpload: (String scope, ProgressTarget target) =>
             _uploadProgress(ref, scope, target),
       );
-      ref.listen<AsyncValue<List<StoredServer>>>(serverListProvider, (
+      ref.listen<Map<String, ContentSource>>(contentSourceDescriptorsProvider, (
         _,
-        AsyncValue<List<StoredServer>> next,
+        Map<String, ContentSource> next,
       ) {
-        final servers = next.value;
-        if (servers == null || servers.isEmpty) return;
-        for (final server in servers) {
-          service.resetAuthBlock(server.id);
+        final remoteKeys = next.values
+            .where((ContentSource s) => s.capabilities.syncsProgressRemotely)
+            .map((ContentSource s) => s.sourceKey)
+            .toList(growable: false);
+        if (remoteKeys.isEmpty) return;
+        for (final key in remoteKeys) {
+          service.resetAuthBlock(key);
         }
         unawaited(service.flush());
       });

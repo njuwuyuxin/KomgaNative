@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -139,4 +140,58 @@ void main() {
       );
     });
   }
+
+  test('N2: 冷启动服务器列表未就绪时保存云端书进度，必须先入队并在列表就绪后补传', () async {
+    final receivedPaths = <String>[];
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+    server.listen((HttpRequest req) async {
+      await req.drain<void>();
+      receivedPaths.add(req.uri.path);
+      req.response.statusCode = 204;
+      await req.response.close();
+    });
+
+    final baseUrl = 'http://127.0.0.1:${server.port}';
+    final stored = StoredServer(
+      address: ServerAddress.parse(baseUrl),
+      apiKey: 'KEY',
+      accountEmail: 'me@example.com',
+    );
+    final listCompleter = Completer<List<StoredServer>>();
+    final store = InMemoryProgressStore();
+
+    final container = ProviderContainer(
+      overrides: <Override>[
+        serverStoreProvider.overrideWithValue(InMemoryServerStore()),
+        serverListProvider.overrideWith((Ref ref) => listCompleter.future),
+        progressStoreProvider.overrideWithValue(store),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    // 保持 progressSyncProvider 活跃（等同真实应用挂载）。
+    final sub = container.listen(progressSyncProvider, (_, _) {});
+    addTearDown(sub.close);
+
+    // 冷启动期间 serverListProvider 尚未完成，此时翻页保存云端书进度。
+    await container
+        .read(progressSyncProvider)
+        .save('b-cold', page: 7, completed: false, scope: baseUrl);
+
+    // 必须保留在上传队列里，绝不能被误判为"本地/不支持同步"直接丢弃。
+    final queued = await store.pending(scope: baseUrl);
+    expect(queued, hasLength(1));
+    expect(queued.single.target.page, 7);
+
+    // 服务器列表加载完毕后自动冲洗并上传到真实服务器。
+    listCompleter.complete(<StoredServer>[stored]);
+    await container.read(serverListProvider.future);
+    final deadline = DateTime.now().add(const Duration(seconds: 3));
+    while (receivedPaths.isEmpty && DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    }
+    expect(receivedPaths, <String>['/api/v1/books/b-cold/read-progress']);
+    expect(await store.pending(scope: baseUrl), isEmpty);
+  });
 }
