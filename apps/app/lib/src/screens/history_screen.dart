@@ -7,7 +7,6 @@ import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/src/providers/reading_history_provider.dart';
 import 'package:yomu/src/widgets/history_list.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
-import 'package:yomu_domain/yomu_domain.dart';
 
 /// 阅读历史页（HIS-02）：按天分组、可搜索、可删单条、可清理已移除条目、可清空。
 ///
@@ -33,18 +32,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final async = ref.watch(readingSessionsProvider);
-    final all = async.value ?? const <ReadingSession>[];
-    final hasLocal = all.any(
-      (ReadingSession session) => isLocalSourceKey(session.scope),
-    );
-    final existingLocalIds = hasLocal
-        ? ref.watch(existingLocalBookIdsProvider).value
-        : null;
-    final removedIds = <int>[
-      for (final session in all)
-        if (isRemovedLocalSession(session, existingLocalIds)) session.id,
-    ];
+    final snapshot = ref.watch(readingHistorySnapshotProvider);
+    final all = snapshot.sessions;
+    final existingLocalIds = snapshot.existingLocalIds;
+    final removedIds = snapshot.removedIds;
     final query = _query.trim().toLowerCase();
     final rows = <ReadingSession>[
       for (final session in all)

@@ -5,7 +5,7 @@ import 'package:flutter/physics.dart' show SpringSimulation;
 import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/src/widgets/page_thumbnail.dart';
-import 'package:yomu/src/widgets/reader_layout.dart';
+import 'package:yomu/src/features/reader/reader_layout.dart';
 import 'package:yomu/src/widgets/reader_palette.dart';
 import 'package:material_ui/material_ui.dart';
 

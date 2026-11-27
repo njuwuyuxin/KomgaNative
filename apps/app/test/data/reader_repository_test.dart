@@ -9,7 +9,7 @@ import 'package:yomu/src/data/progress/progress_store.dart';
 import 'package:yomu/src/data/progress/progress_sync_service.dart';
 import 'package:yomu/src/data/reader_repository.dart';
 import 'package:yomu/src/data/shelf_failure.dart';
-import 'package:yomu/src/widgets/reader_preloader.dart';
+import 'package:yomu/src/features/reader/reader_preloader.dart';
 import 'package:yomu_sync/yomu_sync.dart';
 
 class _Adapter implements HttpClientAdapter {

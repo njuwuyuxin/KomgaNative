@@ -6,7 +6,7 @@ import 'package:yomu/src/data/reading_session_tracker.dart';
 import 'package:yomu/src/features/reader/reader_progress_writer.dart';
 import 'package:yomu/src/providers/reading_history_provider.dart';
 import 'package:yomu/src/providers/series_read_provider.dart';
-import 'package:yomu/src/widgets/reader_layout.dart';
+import 'package:yomu/src/features/reader/reader_layout.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 
 /// 阅读器会话计时、防抖进度落盘、隐身状态与退出/后台结算协作者（P3-1）。

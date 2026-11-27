@@ -6,7 +6,6 @@ import 'package:yomu/src/data/reading_stats.dart';
 import 'package:yomu/src/providers/reading_history_provider.dart';
 import 'package:yomu/src/widgets/reading_heatmap_card.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
-import 'package:yomu_domain/yomu_domain.dart';
 
 /// Insights（HIS-03）：连续天数、最长连续、GitHub 样式热力图、周/月汇总。
 ///
@@ -34,18 +33,11 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final today = ReadingStats.dateOnly(widget.now ?? DateTime.now());
-    final sessions = ref.watch(readingSessionsProvider).value;
-    final stats = sessions == null
+    final snapshot = ref.watch(readingHistorySnapshotProvider);
+    final stats = snapshot.sessions.isEmpty
         ? ReadingStats.empty
-        : ReadingStats.fromSessions(sessions, now: widget.now);
-    final hasLocal =
-        sessions?.any(
-          (ReadingSession session) => isLocalSourceKey(session.scope),
-        ) ??
-        false;
-    final existingLocalIds = hasLocal
-        ? ref.watch(existingLocalBookIdsProvider).value
-        : null;
+        : ReadingStats.fromSessions(snapshot.sessions, now: widget.now);
+    final existingLocalIds = snapshot.existingLocalIds;
 
     return Scaffold(
       body: GlassPageBackground(

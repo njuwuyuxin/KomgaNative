@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yomu/src/data/reader_prefs.dart';
 import 'package:yomu/src/providers/reader_providers.dart';
-import 'package:yomu/src/widgets/reader_layout.dart';
+import 'package:yomu/src/features/reader/reader_layout.dart';
 import 'package:yomu/src/widgets/reader_palette.dart';
 import 'package:yomu_reader/yomu_reader.dart';
 

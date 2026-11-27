@@ -2,7 +2,7 @@ import 'package:flutter/services.dart' show KeyDownEvent, LogicalKeyboardKey;
 import 'package:material_ui/material_ui.dart';
 import 'package:yomu/src/data/reader_prefs.dart';
 import 'package:yomu/src/widgets/page_curl.dart';
-import 'package:yomu/src/widgets/reader_layout.dart';
+import 'package:yomu/src/features/reader/reader_layout.dart';
 import 'package:yomu/src/widgets/reader_paged_view.dart';
 import 'package:yomu/src/widgets/reader_palette.dart';
 import 'package:yomu/src/widgets/reader_vertical_view.dart';

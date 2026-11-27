@@ -284,20 +284,28 @@ extension _TurnImages on _PageTurn {
         ref.read(activeSourceProvider).sourceKey;
     final repository = ref.read(readerRepositoryForSourceProvider(sourceKey));
     final page = pageIndex + 1;
-    Uint8List? bytes = repository.cachedPageImage(bookId, page);
-    if (bytes != null) {
-      final sync = trySyncImageFromCache(bytes);
+    final cached = repository.cachedPageImage(bookId, page);
+    final Uint8List resolvedBytes;
+    if (cached != null) {
+      final sync = trySyncImageFromCache(cached);
       if (sync != null) return sync;
+      resolvedBytes = cached;
     } else {
       try {
-        bytes = await repository.pageImage(bookId, page);
+        resolvedBytes = await ref.read(
+          readerPageImageProvider((
+            sourceKey: sourceKey,
+            bookId: bookId,
+            page: page,
+          )).future,
+        );
       } on ShelfFailure {
         return null;
       }
     }
     if (!mounted || widget.bookId != bookId) return null;
     return decodeThroughImageCache(
-      bytes,
+      resolvedBytes,
       onRegisterCancel: (VoidCallback cancel) =>
           _sheets.registerCancel(pageIndex, cancel),
     );

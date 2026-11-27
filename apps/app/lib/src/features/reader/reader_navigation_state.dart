@@ -1,7 +1,7 @@
 import 'package:flutter/services.dart' show KeyEvent;
 import 'package:yomu/src/data/reader_prefs.dart';
 import 'package:yomu/src/widgets/reader_content_viewport.dart';
-import 'package:yomu/src/widgets/reader_layout.dart';
+import 'package:yomu/src/features/reader/reader_layout.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu_reader/yomu_reader.dart';
 

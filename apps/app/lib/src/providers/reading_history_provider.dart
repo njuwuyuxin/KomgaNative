@@ -10,6 +10,19 @@ import 'package:yomu_domain/yomu_domain.dart';
 export 'package:yomu/src/data/progress/progress_database.dart'
     show ReadingSession;
 
+/// 阅读历史视图快照（将「是否含本机记录 / 已移除条目识别」留在 Provider 层，UI 不碰源类型判断，P1-5）。
+final class ReadingHistorySnapshot {
+  const ReadingHistorySnapshot({
+    required this.sessions,
+    required this.existingLocalIds,
+    required this.removedIds,
+  });
+
+  final List<ReadingSession> sessions;
+  final Set<String>? existingLocalIds;
+  final List<int> removedIds;
+}
+
 Set<String> _readingSessionScopes(SourceRegistry registry) => <String>{
   kLocalSourceKey,
   for (final source in registry.sources)
@@ -44,7 +57,7 @@ final FutureProvider<Set<String>> existingLocalBookIdsProvider =
 /// 判断一条阅读会话是否指向已从本机书库移除的书籍。
 ///
 /// 仅当 `session.scope` 明确为本机源且 [existingLocalBookIds] 已加载完毕时才判定为已移除；
-/// 加载中（`null`）或远程服务器/旧版空 scope 记录一律视为可用，避免误标。
+/// 加载中（`null`）或远程服务器记录一律视为可用，避免误标。
 bool isRemovedLocalSession(
   ReadingSession session,
   Set<String>? existingLocalBookIds,
@@ -53,6 +66,55 @@ bool isRemovedLocalSession(
   if (!isLocalSourceKey(session.scope)) return false;
   return !existingLocalBookIds.contains(session.bookId);
 }
+
+/// 供历史页与统计页消费的已解析阅读历史快照（隐藏本机书 ID 懒查询与源类型判断）。
+final Provider<ReadingHistorySnapshot> readingHistorySnapshotProvider =
+    Provider<ReadingHistorySnapshot>((Ref ref) {
+      final sessions =
+          ref.watch(readingSessionsProvider).value ?? const <ReadingSession>[];
+      final hasLocal = sessions.any(
+        (ReadingSession session) => isLocalSourceKey(session.scope),
+      );
+      final existingLocalIds = hasLocal
+          ? ref.watch(existingLocalBookIdsProvider).value
+          : null;
+      final removedIds = <int>[
+        for (final session in sessions)
+          if (isRemovedLocalSession(session, existingLocalIds)) session.id,
+      ];
+      return ReadingHistorySnapshot(
+        sessions: sessions,
+        existingLocalIds: existingLocalIds,
+        removedIds: removedIds,
+      );
+    });
+
+/// 「最近阅读」横滑条去重列表（最多 8 本；自动过滤已删本机书与等待本机索引就绪的瞬态帧）。
+final Provider<List<ReadingSession>>
+recentHistoryBooksProvider = Provider<List<ReadingSession>>((Ref ref) {
+  final sessions = ref.watch(readingSessionsProvider).value;
+  if (sessions == null || sessions.isEmpty) {
+    return const <ReadingSession>[];
+  }
+  final hasLocal = sessions.any(
+    (ReadingSession session) => isLocalSourceKey(session.scope),
+  );
+  final localAsync = hasLocal ? ref.watch(existingLocalBookIdsProvider) : null;
+  final existingLocalIds = localAsync?.value;
+  final waitingLocalIds =
+      hasLocal && existingLocalIds == null && !(localAsync?.hasError ?? true);
+
+  final seen = <String>{};
+  final books = <ReadingSession>[];
+  for (final session in sessions) {
+    if (isLocalSourceKey(session.scope) && waitingLocalIds) continue;
+    if (isRemovedLocalSession(session, existingLocalIds)) continue;
+    if (!seen.add('${session.scope}|${session.bookId}')) continue;
+    books.add(session);
+    if (books.length >= 8) break;
+  }
+  return books;
+});
 
 /// 写入一次阅读会话（HIS-01；写入/删除后由 Drift 流自动通知所有监听页）。
 final Provider<ReadingSessionRecorder> readingSessionRecorderProvider =

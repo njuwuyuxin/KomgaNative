@@ -11,7 +11,7 @@ import 'package:yomu/src/data/shelf_failure.dart';
 import 'package:yomu/src/l10n/failure_text.dart';
 import 'package:yomu/src/providers/reader_prefs_provider.dart';
 import 'package:yomu/src/screens/reader_args.dart';
-import 'package:yomu/src/widgets/reader_layout.dart';
+import 'package:yomu/src/features/reader/reader_layout.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu_platform/yomu_platform.dart';

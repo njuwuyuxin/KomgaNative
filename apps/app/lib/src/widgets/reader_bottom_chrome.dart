@@ -2,7 +2,7 @@ import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/src/widgets/reader_chrome.dart';
 import 'package:yomu/src/widgets/reader_finished_card.dart';
-import 'package:yomu/src/widgets/reader_layout.dart';
+import 'package:yomu/src/features/reader/reader_layout.dart';
 import 'package:yomu/src/widgets/reader_page_slider.dart';
 import 'package:yomu/src/widgets/reader_palette.dart';
 import 'package:yomu/src/widgets/reader_thumbnail_strip.dart';

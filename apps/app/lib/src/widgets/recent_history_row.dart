@@ -19,28 +19,7 @@ class RecentHistoryRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    final sessions = ref.watch(readingSessionsProvider).value;
-    if (sessions == null || sessions.isEmpty) return const SizedBox.shrink();
-
-    final hasLocal = sessions.any(
-      (ReadingSession session) => isLocalSourceKey(session.scope),
-    );
-    final localAsync = hasLocal
-        ? ref.watch(existingLocalBookIdsProvider)
-        : null;
-    final existingLocalIds = localAsync?.value;
-    final waitingLocalIds =
-        hasLocal && existingLocalIds == null && !(localAsync?.hasError ?? true);
-
-    final seen = <String>{};
-    final books = <ReadingSession>[];
-    for (final session in sessions) {
-      if (isLocalSourceKey(session.scope) && waitingLocalIds) continue;
-      if (isRemovedLocalSession(session, existingLocalIds)) continue;
-      if (!seen.add('${session.scope}|${session.bookId}')) continue;
-      books.add(session);
-      if (books.length >= 8) break;
-    }
+    final books = ref.watch(recentHistoryBooksProvider);
     if (books.isEmpty) return const SizedBox.shrink();
 
     return Column(

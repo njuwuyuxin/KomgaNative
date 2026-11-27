@@ -2,21 +2,15 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/src/data/prefs_backup.dart';
-import 'package:yomu/src/providers/download_providers.dart';
-import 'package:yomu/src/providers/pinned_series_provider.dart';
-import 'package:yomu/src/providers/reader_prefs_provider.dart';
-import 'package:yomu/src/providers/settings_provider.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:yomu/src/providers/settings_backup_controller.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
 
 /// 设置页的"备份"分组（SET-02）：导出到剪贴板 / 从剪贴板导入。
 ///
-/// 为什么用剪贴板而不是文件：
-/// - 不引入 `share_plus` / `file_picker` 这类新依赖（AGENTS.md：新增依赖先写 ADR）；
-/// - 手机上一份几千字节的 JSON，复制粘贴比"找文件"更快；
-/// - 导出内容里**没有任何凭据**，贴到聊天窗口里也不怕。
+/// 编排与原子回滚交由 [SettingsBackupController] 承担，本 Widget 只负责弹窗、剪贴板与提示。
 class SettingsBackupSection extends ConsumerWidget {
   const SettingsBackupSection({super.key});
 
@@ -49,13 +43,10 @@ class SettingsBackupSection extends ConsumerWidget {
     WidgetRef ref,
     AppLocalizations l10n,
   ) async {
-    final backup = PrefsBackup.of(
-      reader: ref.read(readerPrefsProvider),
-      // AppSettings 是**持久化快照**，由控制器读取，UI 不直接碰 Store。
-      settings: await ref.read(settingsProvider.notifier).loadSnapshot(),
-      pinnedSeries: await ref.read(pinnedSeriesControllerProvider).currentIds(),
-    );
-    await Clipboard.setData(ClipboardData(text: backup.encode()));
+    final encoded = await ref
+        .read(settingsBackupControllerProvider)
+        .exportJson();
+    await Clipboard.setData(ClipboardData(text: encoded));
     if (!context.mounted) return;
     _toast(context, l10n.settingsExportDone);
   }
@@ -94,18 +85,7 @@ class SettingsBackupSection extends ConsumerWidget {
     }
     if (!context.mounted) return;
     try {
-      final backup = PrefsBackup.decode(text);
-      // 先全部解析成功再落盘：坏文件绝不能把现有设置改成半截。
-      final prefs = backup.toReaderPrefs();
-      final settings = backup.toAppSettings();
-      await ref.read(readerPrefsProvider.notifier).replaceAll(prefs);
-      await ref.read(settingsProvider.notifier).replaceAll(settings);
-      if (backup.pinnedSeries != null) {
-        await ref
-            .read(pinnedSeriesControllerProvider)
-            .replaceAll(backup.pinnedSeries!);
-      }
-      ref.invalidate(downloadPolicyProvider);
+      await ref.read(settingsBackupControllerProvider).importJson(text);
       if (context.mounted) _toast(context, l10n.settingsImportDone);
     } on PrefsBackupException catch (error) {
       if (context.mounted) _toast(context, _backupErrorText(l10n, error));
