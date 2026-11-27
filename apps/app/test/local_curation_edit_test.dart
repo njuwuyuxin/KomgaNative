@@ -19,6 +19,7 @@ import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu_local_archive/yomu_local_archive.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   group('LMA-10 本地元数据编辑、散装单卷合并与拆分系列', () {
     late Directory tempDir;
     late ProgressDatabase db;

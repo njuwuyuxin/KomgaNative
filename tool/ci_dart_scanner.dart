@@ -223,11 +223,11 @@ int _skipInterpolation(String source, int start, StringBuffer out) {
 
 final RegExp _typeDeclPattern = RegExp(
   r'^\s*(?:(?:abstract|sealed|final|base|interface)\s+)*'
-  r'(?:(mixin\s+class|class|mixin|extension\s+type|extension)\b)'
+  r'(?:(mixin\s+class|class|mixin|enum|extension\s+type|extension)\b)'
   r'(?:\s+(?:const\s+)?(\w+))?',
 );
 
-/// 扫描所有顶层 `class` / `mixin` / `extension` / `extension type` 块及其精确起止行号。
+/// 扫描所有顶层 `class` / `mixin` / `enum` / `extension` / `extension type` 块及其精确起止行号。
 List<DartTypeBlock> scanDartTypeBlocks(String source) {
   final stripped = stripDartCommentsAndStrings(source);
   final lines = stripped.split('\n');
@@ -300,20 +300,39 @@ List<DartTypeBlock> scanDartTypeBlocks(String source) {
   return blocks;
 }
 
-final RegExp _directivePattern = RegExp(
-  r'''\b(import|export)\s+(?:deferred\s+)?['"]([^'"]+)['"]''',
+final RegExp _directiveHeadPattern = RegExp(
+  r'''\b(import|export|part)\s+(?!of\b)(?:deferred\s+)?['"]([^'"]+)['"]''',
+);
+final RegExp _conditionalUriPattern = RegExp(
+  r'''\bif\s*\([^)]*\)\s*['"]([^'"]+)['"]''',
 );
 
-/// 扫描源码中的全部 `import` 与 `export` 指令（自动忽略注释、字符串内部文本与多行换行格式）。
+/// 扫描源码中的全部 `import` / `export`（含全部 `if (...)` 条件导入 URI）与 `part` 指令
+/// （自动忽略注释、字符串内部文本与多行换行格式）。
 List<DartDirective> scanDartDirectives(String source) {
   final stripped = stripDartCommentsAndStrings(source);
   final out = <DartDirective>[];
-  for (final match in _directivePattern.allMatches(source)) {
+  for (final match in _directiveHeadPattern.allMatches(source)) {
     final keyword = match.group(1)!;
     if (!stripped.startsWith(keyword, match.start)) continue;
     final prefix = source.substring(0, match.start);
     final line = '\n'.allMatches(prefix).length + 1;
     out.add(DartDirective(keyword: keyword, uri: match.group(2)!, line: line));
+
+    if (keyword == 'part') continue;
+    // 向后扫描到该指令的分号 `;`（基于 stripped 跳过注释与字符串中的分号），收集所有条件导入 URI。
+    final semiIndex = stripped.indexOf(';', match.end);
+    final endIndex = semiIndex < 0 ? source.length : semiIndex;
+    final tail = source.substring(match.end, endIndex);
+    final strippedTail = stripped.substring(match.end, endIndex);
+    for (final cond in _conditionalUriPattern.allMatches(tail)) {
+      if (!strippedTail.startsWith('if', cond.start)) continue;
+      final condPrefix = source.substring(0, match.end + cond.start);
+      final condLine = '\n'.allMatches(condPrefix).length + 1;
+      out.add(
+        DartDirective(keyword: keyword, uri: cond.group(1)!, line: condLine),
+      );
+    }
   }
   return out;
 }

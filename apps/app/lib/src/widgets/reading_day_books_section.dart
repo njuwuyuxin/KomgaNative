@@ -99,9 +99,7 @@ class _DayBookTile extends ConsumerWidget {
     final cover = removed
         ? null
         : ref
-              .watch(
-                bookCoverProvider((sourceKey: scope, id: book.bookId)),
-              )
+              .watch(bookCoverProvider((sourceKey: scope, id: book.bookId)))
               .value;
 
     return SizedBox(

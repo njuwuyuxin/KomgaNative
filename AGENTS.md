@@ -122,7 +122,7 @@ Komga 的真实行为记录在 `docs/komga-api-verification.md`，已知与 Open
 
 三条 workflow 在 `.github/workflows/`，说明见 `docs/ci.md`：
 
-- `ci.yml`（Windows）：每次 push/PR 跑全量门禁。**本地绿 ≠ CI 绿**（平台 / Flutter 版本差异只会在 CI 暴露），
+- `ci.yml`（Ubuntu + Windows 并行）：每次 push/PR 自动运行，`gate`（`ubuntu-latest`）跑格式 / 静态分析 / 分层规则 / 全量非黄金测试，`goldens`（`windows-latest`）专跑黄金图基线比对。**本地绿 ≠ CI 绿**（平台 / Flutter 版本差异只会在 CI 暴露），
   但它**不阻塞交付**：本地检查 + 设备验证通过就提交推送，**不必等结果**；CI 红了再单独修。
 - `build-android.yml`（Ubuntu）：main 分支 / 手动，产出 release APK；
 - `build-ios.yml`（macOS）：push / PR / tag / 手动，编译验证（public 仓库 macOS 免费；转私有需去掉 push/PR 触发）。

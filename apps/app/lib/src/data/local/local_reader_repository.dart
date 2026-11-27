@@ -188,7 +188,13 @@ final class LocalReaderRepository implements ReaderRepository {
       final oldestKey = _openReaders.keys.first;
       final evicted = _openReaders.remove(oldestKey);
       if (evicted != null) {
-        unawaited(evicted.then((r) => r.close()).catchError((Object _) {}));
+        unawaited(
+          evicted.then((r) => r.close()).catchError((Object error) {
+            debugPrint(
+              'LocalReaderRepository: close($oldestKey) failed: $error',
+            );
+          }),
+        );
       }
     }
 

@@ -99,5 +99,45 @@ final s = "export 'package:komga_api/in_string.dart';";
       expect(directives[1].uri, 'package:komga_api/src/errors.dart');
       expect(directives[1].line, 2);
     });
+
+    test(
+      'scans enum blocks, conditional import/export URIs, and part directives',
+      () {
+        const source = '''
+import 'stub.dart'
+    if (dart.library.io) 'package:drift/native.dart'
+    if (dart.library.js_interop) 'web.dart';
+export 'base.dart' if (dart.library.io) 'package:komga_api/komga_api.dart';
+part 'sub_part.dart';
+part of 'parent.dart';
+
+enum EnhancedMode {
+  a,
+  b;
+
+  bool get isA => this == a;
+}
+''';
+        final directives = scanDartDirectives(source);
+        expect(
+          directives.map((d) => '${d.keyword}:${d.uri}@${d.line}'),
+          <String>[
+            'import:stub.dart@1',
+            'import:package:drift/native.dart@2',
+            'import:web.dart@3',
+            'export:base.dart@4',
+            'export:package:komga_api/komga_api.dart@4',
+            'part:sub_part.dart@5',
+          ],
+        );
+
+        final blocks = scanDartTypeBlocks(source);
+        expect(blocks, hasLength(1));
+        expect(blocks.single.kind, 'enum');
+        expect(blocks.single.name, 'EnhancedMode');
+        expect(blocks.single.startLine, 8);
+        expect(blocks.single.lineCount, 6);
+      },
+    );
   });
 }

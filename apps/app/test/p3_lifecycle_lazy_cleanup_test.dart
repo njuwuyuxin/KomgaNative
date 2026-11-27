@@ -219,10 +219,7 @@ void main() {
         const ProgressTarget(bookId: 'b1', page: 8, completed: false),
         scope: serverA.id,
       );
-      expect(
-        await sync.pendingInProgressBooks(scope: serverA.id),
-        isEmpty,
-      );
+      expect(await sync.pendingInProgressBooks(scope: serverA.id), isEmpty);
       // 服务器 B 与本机进度必须完好无损。
       expect(await progressStore.pending(scope: serverB.id), hasLength(1));
       expect(

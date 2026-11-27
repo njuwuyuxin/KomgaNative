@@ -237,8 +237,12 @@ List<String> _scanLocalPrefixLeak(String dir) {
 final RegExp _onObjectCatchHeader = RegExp(
   r'\bon\s+Object(?:\s+catch\s*\([^)]*\))?\s*\{',
 );
+final RegExp _silentCatchErrorHeader = RegExp(
+  r'\.catchError\s*\(\s*\([^)]*\)\s*\{',
+);
 
-/// 禁止 `apps/app/lib/src` 中出现完全静默（无可执行语句、未记日志、未抛错、未返回值）的 `on Object` 吞异常块（P3-2）。
+/// 禁止 `apps/app/lib/src` 中出现完全静默（无可执行语句、未记日志、未抛错、未返回值）的
+/// `on Object` 或 `.catchError((...) {})` 吞异常块（P3-2）。
 List<String> _scanSilentObjectCatch(String dir) {
   final directory = Directory(dir);
   if (!directory.existsSync()) return <String>[];
@@ -249,39 +253,44 @@ List<String> _scanSilentObjectCatch(String dir) {
     final stripped = stripDartCommentsAndStrings(entity.readAsStringSync());
     final lines = stripped.split('\n');
     for (var i = 0; i < lines.length; i++) {
-      final match = _onObjectCatchHeader.firstMatch(lines[i]);
-      if (match == null) continue;
+      for (final (pattern, label) in <(RegExp, String)>[
+        (_onObjectCatchHeader, '静默空 on Object 块'),
+        (_silentCatchErrorHeader, '静默空 catchError 回调'),
+      ]) {
+        final match = pattern.firstMatch(lines[i]);
+        if (match == null) continue;
 
-      final afterOpen = lines[i].substring(match.end);
-      final bodyCode = StringBuffer();
-      var depth = 1;
+        final afterOpen = lines[i].substring(match.end);
+        final bodyCode = StringBuffer();
+        var depth = 1;
 
-      void consume(String text) {
-        for (var c = 0; c < text.length && depth > 0; c++) {
-          final ch = text[c];
-          if (ch == '{') {
-            depth++;
-            bodyCode.write(ch);
-          } else if (ch == '}') {
-            depth--;
-            if (depth > 0) bodyCode.write(ch);
-          } else {
-            bodyCode.write(ch);
+        void consume(String text) {
+          for (var c = 0; c < text.length && depth > 0; c++) {
+            final ch = text[c];
+            if (ch == '{') {
+              depth++;
+              bodyCode.write(ch);
+            } else if (ch == '}') {
+              depth--;
+              if (depth > 0) bodyCode.write(ch);
+            } else {
+              bodyCode.write(ch);
+            }
           }
         }
-      }
 
-      consume(afterOpen);
-      var j = i + 1;
-      while (depth > 0 && j < lines.length) {
-        consume(lines[j]);
-        j++;
-      }
+        consume(afterOpen);
+        var j = i + 1;
+        while (depth > 0 && j < lines.length) {
+          consume(lines[j]);
+          j++;
+        }
 
-      if (bodyCode.toString().trim().isEmpty) {
-        violations.add(
-          '${entity.path}:${i + 1} 禁止静默空 on Object 块（请至少记录 debugPrint、更新错误态、返回降级值或 rethrow）',
-        );
+        if (bodyCode.toString().trim().isEmpty) {
+          violations.add(
+            '${entity.path}:${i + 1} 禁止$label（请至少记录 debugPrint、更新错误态、返回降级值或 rethrow）',
+          );
+        }
       }
     }
   }

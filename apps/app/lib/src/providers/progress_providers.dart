@@ -11,7 +11,6 @@ import 'package:yomu/src/data/progress/progress_store.dart';
 import 'package:yomu/src/data/progress/progress_sync_service.dart';
 import 'package:yomu/src/data/shelf_failure.dart';
 import 'package:yomu/src/providers/source_registry_provider.dart';
-import 'package:yomu/src/session/server_store.dart';
 import 'package:yomu/src/session/session_controller.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu_sync/yomu_sync.dart';

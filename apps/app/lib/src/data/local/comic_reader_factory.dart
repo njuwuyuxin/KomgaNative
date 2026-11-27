@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:yomu/src/data/local/archive_password_store.dart';
 import 'package:yomu/src/data/local/external_byte_source.dart';
 import 'package:yomu/src/data/local/external_roots_dao.dart';
@@ -66,7 +67,8 @@ final class ComicReaderFactory {
     if (store == null) return null;
     try {
       return await store.getBookPassword(bookId);
-    } on Object {
+    } on Exception catch (error) {
+      debugPrint('ComicReaderFactory: read password($bookId) failed: $error');
       return null;
     }
   }

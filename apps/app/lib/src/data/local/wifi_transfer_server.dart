@@ -130,7 +130,7 @@ final class WifiTransferServer {
       bound = await HttpServer.bind(addr, 0, shared: false);
     }
     _server = bound;
-    _stagingDir = await _createStagingDir();
+    _stagingDir = await _createWifiStagingDir(_stagingRootResolver);
     _sweepTimer = Timer.periodic(_stagedFolderSweepInterval, (_) {
       unawaited(sweepExpiredStagedFolders());
     });
@@ -160,18 +160,6 @@ final class WifiTransferServer {
   Future<void> dispose() async {
     await stop();
     await _events.close();
-  }
-
-  Future<Directory> _createStagingDir() async {
-    if (_stagingRootResolver != null) {
-      final root = await _stagingRootResolver();
-      final sub = Directory(
-        '${root.path}/wifi_${DateTime.now().microsecondsSinceEpoch}',
-      );
-      await sub.create(recursive: true);
-      return sub;
-    }
-    return Directory.systemTemp.createTemp('yomu_wifi_transfer_');
   }
 
   Future<List<String>> _buildUrls(int boundPort) async {
@@ -337,4 +325,18 @@ final class WifiTransferServer {
       ),
     );
   }
+}
+
+Future<Directory> _createWifiStagingDir(
+  Future<Directory> Function()? rootResolver,
+) async {
+  if (rootResolver != null) {
+    final root = await rootResolver();
+    final sub = Directory(
+      '${root.path}/wifi_${DateTime.now().microsecondsSinceEpoch}',
+    );
+    await sub.create(recursive: true);
+    return sub;
+  }
+  return Directory.systemTemp.createTemp('yomu_wifi_transfer_');
 }
