@@ -46,6 +46,70 @@ void main() {
     });
   });
 
+  group('ProgressOutboxRules（P2-3 唯一真值规则）', () {
+    final t0 = DateTime.utc(2026, 11, 20, 10);
+    final t1 = t0.add(const Duration(minutes: 2));
+
+    test('nextSequence 在时钟回拨或跨重启遇到更大已有 seq 时仍严格递增', () {
+      final seq = ProgressOutboxRules.nextSequence(
+        lastIssuedSeq: 100,
+        existingPendingSeq: 5000,
+        floorHint: 200, // 模拟时钟回拨到小于已持久化的 pendingSeq
+      );
+      expect(seq, 5001);
+    });
+
+    test('applyEnqueue 合并同书更新时保留 serverLastModified 基准', () {
+      final base = ProgressEntryState(
+        bookId: 'b1',
+        page: 3,
+        completed: false,
+        updatedAt: t0,
+        serverLastModified: t0,
+      );
+      final next = ProgressOutboxRules.applyEnqueue(
+        target: target('b1', 8),
+        current: base,
+        seq: 42,
+        now: t1,
+      );
+      expect(next.page, 8);
+      expect(next.pendingSeq, 42);
+      expect(next.serverLastModified, t0);
+    });
+
+    test('planAdoptRemote 非强制有 pending 保留本地，强制模式覆盖并清空 pending', () {
+      final pending = ProgressEntryState(
+        bookId: 'b1',
+        page: 10,
+        completed: false,
+        updatedAt: t0,
+        pendingSeq: 99,
+      );
+      final remote = ReadProgress(page: 4, completed: true, lastModified: t1);
+
+      final guarded = ProgressOutboxRules.planAdoptRemote(
+        bookId: 'b1',
+        current: pending,
+        remote: remote,
+        now: t1,
+      );
+      expect(guarded.action, ProgressAdoptAction.keepLocal);
+
+      final forced = ProgressOutboxRules.planAdoptRemote(
+        bookId: 'b1',
+        current: pending,
+        remote: remote,
+        now: t1,
+        force: true,
+      );
+      expect(forced.action, ProgressAdoptAction.upsert);
+      expect(forced.entry!.page, 4);
+      expect(forced.entry!.completed, isTrue);
+      expect(forced.entry!.pendingSeq, isNull);
+    });
+  });
+
   group('decideSync', () {
     final t0 = DateTime.utc(2026, 11, 17, 10);
     final t1 = t0.add(const Duration(minutes: 5));

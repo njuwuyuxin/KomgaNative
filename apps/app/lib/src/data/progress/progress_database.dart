@@ -97,26 +97,54 @@ class ProgressDatabase extends _$ProgressDatabase {
 
   int _seqSeed = 0;
 
+  static ProgressEntryState _toEntryState(LocalProgressData row) =>
+      ProgressEntryState(
+        bookId: row.bookId,
+        page: row.page,
+        completed: row.completed,
+        updatedAt: row.updatedAt.toUtc(),
+        serverLastModified: row.serverLastModified?.toUtc(),
+        pendingSeq: row.pendingSeq,
+      );
+
+  static LocalProgressCompanion _toCompanion(
+    String scope,
+    ProgressEntryState entry,
+  ) => LocalProgressCompanion.insert(
+    scope: Value<String>(scope),
+    bookId: entry.bookId,
+    page: entry.page,
+    completed: entry.completed,
+    updatedAt: entry.updatedAt.toUtc(),
+    serverLastModified: Value<DateTime?>(entry.serverLastModified?.toUtc()),
+    pendingSeq: Value<int?>(entry.pendingSeq),
+  );
+
   Future<int> enqueue(
     ProgressTarget target, {
     String scope = kLocalSourceKey,
   }) async {
-    final normalizedScope = scope.isEmpty ? kLocalSourceKey : scope;
-    final now = DateTime.now().toUtc();
-    final micros = now.microsecondsSinceEpoch;
-    final seq = micros > _seqSeed ? micros : _seqSeed + 1;
-    _seqSeed = seq;
-    await into(localProgress).insertOnConflictUpdate(
-      LocalProgressCompanion.insert(
-        scope: Value<String>(normalizedScope),
-        bookId: target.bookId,
-        page: target.page,
-        completed: target.completed,
-        updatedAt: now,
-        pendingSeq: Value<int>(seq),
-      ),
-    );
-    return seq;
+    final normalizedScope = ProgressOutboxRules.normalizeScope(scope);
+    return transaction<int>(() async {
+      final currentRow = await record(target.bookId, scope: normalizedScope);
+      final current = currentRow == null ? null : _toEntryState(currentRow);
+      final now = DateTime.now().toUtc();
+      final seq = ProgressOutboxRules.nextSequence(
+        lastIssuedSeq: _seqSeed,
+        existingPendingSeq: current?.pendingSeq,
+        floorHint: now.microsecondsSinceEpoch,
+      );
+      _seqSeed = seq;
+      final next = ProgressOutboxRules.applyEnqueue(
+        target: target,
+        current: current,
+        seq: seq,
+        now: now,
+      );
+      await into(localProgress)
+          .insertOnConflictUpdate(_toCompanion(normalizedScope, next));
+      return seq;
+    });
   }
 
   Future<bool> ack(
@@ -124,51 +152,53 @@ class ProgressDatabase extends _$ProgressDatabase {
     int seq, {
     String scope = kLocalSourceKey,
   }) async {
-    final updated =
-        await (update(localProgress)..where(
-              (LocalProgress t) =>
-                  t.scope.equals(scope) &
-                  t.bookId.equals(bookId) &
-                  t.pendingSeq.equals(seq),
-            ))
-            .write(
-              const LocalProgressCompanion(
-                pendingSeq: Value<int?>(null),
-                serverLastModified: Value<DateTime?>(null),
-              ),
-            );
-    return updated > 0;
+    final normalizedScope = ProgressOutboxRules.normalizeScope(scope);
+    return transaction<bool>(() async {
+      final currentRow = await record(bookId, scope: normalizedScope);
+      final next = ProgressOutboxRules.applyAck(
+        current: currentRow == null ? null : _toEntryState(currentRow),
+        seq: seq,
+      );
+      if (next == null) return false;
+      await into(localProgress)
+          .insertOnConflictUpdate(_toCompanion(normalizedScope, next));
+      return true;
+    });
   }
 
   Future<LocalProgressData?> record(
     String bookId, {
     String scope = kLocalSourceKey,
-  }) =>
-      (select(localProgress)
-            ..where((t) => t.scope.equals(scope) & t.bookId.equals(bookId)))
-          .getSingleOrNull();
+  }) {
+    final normalizedScope = ProgressOutboxRules.normalizeScope(scope);
+    return (select(localProgress)..where(
+          (t) => t.scope.equals(normalizedScope) & t.bookId.equals(bookId),
+        ))
+        .getSingleOrNull();
+  }
 
   Future<List<LocalProgressData>> records(
     List<String> bookIds, {
     String scope = kLocalSourceKey,
   }) async {
     if (bookIds.isEmpty) return const <LocalProgressData>[];
-    return (select(
-      localProgress,
-    )..where((t) => t.scope.equals(scope) & t.bookId.isIn(bookIds))).get();
+    final normalizedScope = ProgressOutboxRules.normalizeScope(scope);
+    return (select(localProgress)..where(
+          (t) => t.scope.equals(normalizedScope) & t.bookId.isIn(bookIds),
+        ))
+        .get();
   }
 
   Future<List<PendingProgress>> pending({
     String scope = kLocalSourceKey,
   }) async {
+    final normalizedScope = ProgressOutboxRules.normalizeScope(scope);
     final rows =
-        await (select(localProgress)
-              ..where((t) => t.scope.equals(scope) & t.pendingSeq.isNotNull())
-              ..orderBy(<OrderClauseGenerator<LocalProgress>>[
-                (t) => OrderingTerm(expression: t.pendingSeq),
-              ]))
+        await (select(localProgress)..where(
+              (t) => t.scope.equals(normalizedScope) & t.pendingSeq.isNotNull(),
+            ))
             .get();
-    return <PendingProgress>[
+    return ProgressOutboxRules.sortPending(<PendingProgress>[
       for (final row in rows)
         PendingProgress(
           ProgressTarget(
@@ -178,60 +208,58 @@ class ProgressDatabase extends _$ProgressDatabase {
           ),
           row.pendingSeq!,
         ),
-    ];
+    ]);
   }
 
   Future<void> adoptRemote(
     String bookId,
     ReadProgress? remote, {
     String scope = kLocalSourceKey,
-  }) async {
-    final normalizedScope = scope.isEmpty ? kLocalSourceKey : scope;
-    final current = await record(bookId, scope: normalizedScope);
-    if (current?.pendingSeq != null) return;
-
-    if (remote == null) {
-      await (delete(localProgress)..where(
-            (t) => t.scope.equals(normalizedScope) & t.bookId.equals(bookId),
-          ))
-          .go();
-      return;
-    }
-    await into(localProgress).insertOnConflictUpdate(
-      LocalProgressCompanion.insert(
-        scope: Value<String>(normalizedScope),
-        bookId: bookId,
-        page: remote.page,
-        completed: remote.completed,
-        updatedAt: DateTime.now().toUtc(),
-        serverLastModified: Value<DateTime?>(remote.lastModified.toUtc()),
-      ),
-    );
-  }
+  }) => _applyAdoptRemote(bookId, remote, scope: scope, force: false);
 
   Future<void> forceAdopt(
     String bookId,
     ReadProgress? remote, {
     String scope = kLocalSourceKey,
+  }) => _applyAdoptRemote(bookId, remote, scope: scope, force: true);
+
+  Future<void> _applyAdoptRemote(
+    String bookId,
+    ReadProgress? remote, {
+    required String scope,
+    required bool force,
   }) async {
-    final normalizedScope = scope.isEmpty ? kLocalSourceKey : scope;
-    if (remote == null) {
-      await (delete(localProgress)..where(
-            (t) => t.scope.equals(normalizedScope) & t.bookId.equals(bookId),
-          ))
-          .go();
-      return;
-    }
-    await into(localProgress).insertOnConflictUpdate(
-      LocalProgressCompanion.insert(
-        scope: Value<String>(normalizedScope),
+    final normalizedScope = ProgressOutboxRules.normalizeScope(scope);
+    await transaction<void>(() async {
+      final currentRow = await record(bookId, scope: normalizedScope);
+      final plan = ProgressOutboxRules.planAdoptRemote(
         bookId: bookId,
-        page: remote.page,
-        completed: remote.completed,
-        updatedAt: DateTime.now().toUtc(),
-        serverLastModified: Value<DateTime?>(remote.lastModified.toUtc()),
-        pendingSeq: const Value<int?>(null),
-      ),
-    );
+        current: currentRow == null ? null : _toEntryState(currentRow),
+        remote: remote,
+        now: DateTime.now().toUtc(),
+        force: force,
+      );
+      switch (plan.action) {
+        case ProgressAdoptAction.keepLocal:
+          return;
+        case ProgressAdoptAction.delete:
+          await (delete(localProgress)..where(
+                (t) =>
+                    t.scope.equals(normalizedScope) & t.bookId.equals(bookId),
+              ))
+              .go();
+        case ProgressAdoptAction.upsert:
+          await into(
+            localProgress,
+          ).insertOnConflictUpdate(_toCompanion(normalizedScope, plan.entry!));
+      }
+    });
+  }
+
+  Future<int> clearProgressScope(String scope) {
+    final normalizedScope = ProgressOutboxRules.normalizeScope(scope);
+    return (delete(
+      localProgress,
+    )..where((t) => t.scope.equals(normalizedScope))).go();
   }
 }
