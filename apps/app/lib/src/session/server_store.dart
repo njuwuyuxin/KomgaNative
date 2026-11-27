@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart' show FlutterError, debugPrint;
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:komga_api/komga_api.dart';
 import 'package:yomu_domain/yomu_domain.dart';
@@ -190,9 +190,6 @@ class SecureServerStore implements ServerStore {
     final String? raw;
     try {
       raw = await _storage.read(key: _key);
-    } on FlutterError {
-      // 无 Flutter 绑定的纯单元测试未覆写 ServerStore 时安全回退空列表。
-      return const _ServerState();
     } on Exception {
       // Android 换机/密钥失效时自动清掉坏条目，避免后续重新登录也跟着报错。
       try {

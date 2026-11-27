@@ -163,6 +163,8 @@ class _StubExternalRootsBridge implements ExternalRootsBridge {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   late Directory srcTemp;
   late Directory sandboxTemp;
   late ProgressDatabase db;

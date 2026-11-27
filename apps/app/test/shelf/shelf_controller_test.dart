@@ -1,10 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/data/settings_store.dart';
 import 'package:yomu/src/data/shelf_failure.dart';
 import 'package:yomu/src/providers/library_providers.dart';
+import 'package:yomu/src/providers/settings_provider.dart';
 
 import '../support/fake_library.dart';
 import '../support/test_source_overrides.dart';
@@ -19,7 +22,10 @@ Future<void> settle() async {
 void main() {
   ProviderContainer containerWith(FakeLibraryRepository repository) {
     final container = ProviderContainer(
-      overrides: testSourceOverrides(library: repository),
+      overrides: <Override>[
+        ...testSourceOverrides(library: repository),
+        settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
+      ],
     );
     addTearDown(container.dispose);
     // 保持订阅：不订阅的话容器里的派生状态可能被回收。

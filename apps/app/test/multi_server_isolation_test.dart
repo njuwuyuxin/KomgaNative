@@ -10,12 +10,14 @@ import 'package:yomu/src/data/progress/progress_database.dart';
 import 'package:yomu/src/data/reader_prefs.dart';
 import 'package:yomu/src/data/reader_prefs_store.dart';
 import 'package:yomu/src/data/reading_session_tracker.dart';
+import 'package:yomu/src/data/settings_store.dart';
 import 'package:yomu/src/providers/cache_providers.dart';
 import 'package:yomu/src/providers/download_providers.dart';
 import 'package:yomu/src/providers/pinned_series_provider.dart';
 import 'package:yomu/src/providers/progress_providers.dart';
 import 'package:yomu/src/providers/reader_prefs_provider.dart';
 import 'package:yomu/src/providers/reading_history_provider.dart';
+import 'package:yomu/src/providers/settings_provider.dart';
 import 'package:yomu/src/session/server_store.dart';
 import 'package:yomu/src/session/session_controller.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -71,6 +73,7 @@ void main() {
         ),
         progressDatabaseProvider.overrideWithValue(userDb),
         httpCacheDatabaseProvider.overrideWithValue(cacheDb),
+        settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
         readerPrefsStoreProvider.overrideWithValue(InMemoryReaderPrefsStore()),
       ],
     );

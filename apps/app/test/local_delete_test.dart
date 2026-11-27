@@ -69,6 +69,8 @@ Uint8List _tinyCbz(int marker) {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('LMA-09 本地书籍与系列删除（SQLite + 沙盒清理 + 存储统计）', () {
     late Directory srcDir;
     late Directory sandboxDir;

@@ -8,9 +8,13 @@ import 'package:yomu/src/data/local/local_catalog_write_dao.dart';
 import 'package:yomu/src/data/local/local_comics_storage.dart';
 import 'package:yomu/src/data/local/local_curation_dao.dart';
 import 'package:yomu/src/data/progress/progress_database.dart';
+import 'package:yomu/src/data/settings_store.dart';
 import 'package:yomu/src/providers/local_catalog_mutator_provider.dart';
 import 'package:yomu/src/providers/progress_providers.dart';
+import 'package:yomu/src/providers/settings_provider.dart';
 import 'package:yomu/src/providers/source_registry_provider.dart';
+import 'package:yomu/src/session/server_store.dart';
+import 'package:yomu/src/session/session_controller.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu_local_archive/yomu_local_archive.dart';
 
@@ -25,6 +29,8 @@ void main() {
       db = ProgressDatabase(NativeDatabase.memory());
       container = ProviderContainer(
         overrides: [
+          serverStoreProvider.overrideWithValue(InMemoryServerStore()),
+          settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
           progressDatabaseProvider.overrideWithValue(db),
           localComicsStorageProvider.overrideWithValue(
             LocalComicsStorage(rootResolver: () async => tempDir),

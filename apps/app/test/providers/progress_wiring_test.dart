@@ -8,10 +8,12 @@ import 'package:yomu/src/data/library_repository.dart';
 import 'package:yomu/src/data/progress/progress_store.dart';
 import 'package:yomu/src/data/read_status_repository.dart';
 import 'package:yomu/src/data/reader_repository.dart';
+import 'package:yomu/src/data/settings_store.dart';
 import 'package:yomu/src/providers/komga_session_provider.dart';
 import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/progress_providers.dart';
 import 'package:yomu/src/providers/reader_providers.dart';
+import 'package:yomu/src/providers/settings_provider.dart';
 import 'package:yomu/src/session/server_store.dart';
 import 'package:yomu/src/session/session_controller.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -45,6 +47,7 @@ void main() {
           ),
         ),
         progressStoreProvider.overrideWithValue(store),
+        settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
       ],
     );
     addTearDown(container.dispose);
@@ -166,6 +169,7 @@ void main() {
         serverStoreProvider.overrideWithValue(InMemoryServerStore()),
         serverListProvider.overrideWith((Ref ref) => listCompleter.future),
         progressStoreProvider.overrideWithValue(store),
+        settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
       ],
     );
     addTearDown(container.dispose);

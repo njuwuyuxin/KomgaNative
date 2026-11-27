@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart' show FlutterError, debugPrint;
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:yomu/src/data/app_settings.dart';
 import 'package:yomu/src/data/secure_storage.dart';
@@ -43,9 +43,6 @@ class SecureSettingsStore implements SettingsStore {
       raw = await _storage.read(key: _key);
     } on Exception {
       return AppSettings.defaults;
-    } on FlutterError {
-      // 无 Flutter 绑定的纯单元测试未覆写 SettingsStore 时安全回退默认值。
-      return AppSettings.defaults;
     }
     if (raw == null || raw.isEmpty) return AppSettings.defaults;
     final Object? decoded;
@@ -67,8 +64,6 @@ class SecureSettingsStore implements SettingsStore {
       } on Exception catch (error) {
         // 偏好写失败只影响下次启动，不该冒泡成 UI 错误。
         debugPrint('SettingsStore: write failed: $error');
-      } on FlutterError {
-        // 无 Flutter 绑定的纯单元测试未覆写 SettingsStore 时安全跳过写入。
       }
     });
     // 队列不能被单次失败掐断：失败已被吞掉，这里只保证顺序。
