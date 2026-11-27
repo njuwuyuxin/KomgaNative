@@ -65,6 +65,7 @@ Future<LocalImportBatchResult> importExternalDirectoryToSandbox({
   required String Function(String prefix) nextId,
   ImportProgressCallback? onProgress,
   ArchivePasswordPromptCallback? onPasswordPrompt,
+  ImportCancellationToken? cancelToken,
 }) async {
   final folderName = root.displayName.trim().isEmpty
       ? 'Imported Comic'
@@ -135,8 +136,11 @@ Future<LocalImportBatchResult> importExternalDirectoryToSandbox({
       parentFolderName: folderName,
       onProgress: onProgress,
       onPasswordPrompt: onPasswordPrompt,
+      cancelToken: cancelToken,
     );
-    if (sidecarCover != null && result.importedSeriesIds.length == 1) {
+    if (!result.cancelled &&
+        sidecarCover != null &&
+        result.importedSeriesIds.length == 1) {
       final coverBytes = await _readSmallExternalBytes(
         bridge: bridge,
         root: root,
@@ -176,6 +180,7 @@ Future<LocalImportBatchResult> importExternalDirectoryToSandbox({
     await destDir.create(recursive: true);
     var totalBytes = 0;
     for (var i = 0; i < imageEntries.length; i++) {
+      cancelToken?.throwIfCancelled();
       final item = imageEntries[i];
       onProgress?.call(i, imageEntries.length, item.name);
       final safeRel = _sanitizeRelativeEntryPath(item.relativePath);
@@ -184,6 +189,7 @@ Future<LocalImportBatchResult> importExternalDirectoryToSandbox({
       await writeStreamToFile(
         _openExternalFileStream(bridge: bridge, root: root, entry: item),
         outFile,
+        cancelToken: cancelToken,
       );
       totalBytes += await outFile.length();
     }
@@ -223,6 +229,17 @@ Future<LocalImportBatchResult> importExternalDirectoryToSandbox({
       importedSeriesIds: <String>[imported.seriesId],
       importedBookIds: <String>[imported.bookId],
     );
+  } on ImportCancelledException {
+    await tryCloseArchiveReader(managedReader);
+    if (committedBookId != null) {
+      await rollbackCommittedLocalBook(
+        db: db,
+        storage: storage,
+        bookId: committedBookId,
+      );
+    }
+    await tryDeleteImportDir(destDir.parent);
+    return const LocalImportBatchResult(cancelled: true);
   } on ArchiveException catch (e) {
     await tryCloseArchiveReader(managedReader);
     if (committedBookId != null) {

@@ -7,6 +7,26 @@ import 'package:yomu/src/data/local/local_comics_storage.dart';
 import 'package:yomu/src/data/progress/progress_database.dart';
 import 'package:yomu_local_archive/yomu_local_archive.dart';
 
+/// 批量导入的可协作取消令牌（P2-8）。
+final class ImportCancellationToken {
+  bool _cancelled = false;
+
+  bool get isCancelled => _cancelled;
+
+  void cancel() {
+    _cancelled = true;
+  }
+
+  void throwIfCancelled() {
+    if (_cancelled) throw const ImportCancelledException();
+  }
+}
+
+/// 批量导入被用户主动取消时抛出的内部控制异常（P2-8）。
+final class ImportCancelledException implements Exception {
+  const ImportCancelledException();
+}
+
 Future<void> tryDeleteImportDir(Directory dir) async {
   try {
     if (await dir.exists()) await dir.delete(recursive: true);

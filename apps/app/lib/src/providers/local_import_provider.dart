@@ -22,6 +22,7 @@ export 'package:yomu/src/data/local/local_comic_importer.dart';
 final class LocalImportState {
   const LocalImportState({
     this.busy = false,
+    this.cancelling = false,
     this.completed = 0,
     this.total = 0,
     this.currentName = '',
@@ -29,6 +30,7 @@ final class LocalImportState {
   });
 
   final bool busy;
+  final bool cancelling;
   final int completed;
   final int total;
   final String currentName;
@@ -36,6 +38,7 @@ final class LocalImportState {
 
   LocalImportState copyWith({
     bool? busy,
+    bool? cancelling,
     int? completed,
     int? total,
     String? currentName,
@@ -43,6 +46,7 @@ final class LocalImportState {
     bool clearLastResult = false,
   }) => LocalImportState(
     busy: busy ?? this.busy,
+    cancelling: cancelling ?? this.cancelling,
     completed: completed ?? this.completed,
     total: total ?? this.total,
     currentName: currentName ?? this.currentName,
@@ -74,11 +78,39 @@ final FutureProvider<CacheUsage> localStorageUsageProvider =
 
 /// 本地导入控制器：编排系统选择器、流式入库、清理临时缓存与刷新书架。
 class LocalImportController extends Notifier<LocalImportState> {
+  ImportCancellationToken? _activeCancelToken;
+
   @override
-  LocalImportState build() => const LocalImportState();
+  LocalImportState build() {
+    ref.onDispose(() => _activeCancelToken?.cancel());
+    return const LocalImportState();
+  }
 
   ComicFilePicker get _picker => ref.read(comicFilePickerProvider);
   LocalComicImporter get _importer => ref.read(localComicImporterProvider);
+
+  /// 取消当前正在进行的批量导入任务，尽快释放 `busy` 状态允许发起新的导入（P2-8）。
+  void cancelImport() {
+    final token = _activeCancelToken;
+    if (token == null || !state.busy) return;
+    token.cancel();
+    state = state.copyWith(cancelling: true);
+  }
+
+  ImportCancellationToken _beginTask({
+    required int total,
+    String currentName = '',
+  }) {
+    final token = ImportCancellationToken();
+    _activeCancelToken = token;
+    state = LocalImportState(
+      busy: true,
+      completed: 0,
+      total: total,
+      currentName: currentName,
+    );
+    return token;
+  }
 
   Future<LocalImportBatchResult?> pickAndImportArchives({
     ArchivePasswordPromptCallback? onPasswordPrompt,
@@ -87,9 +119,7 @@ class LocalImportController extends Notifier<LocalImportState> {
     final picked = await _picker.pickArchiveFiles();
     if (picked.isEmpty) return null;
 
-    state = LocalImportState(
-      busy: true,
-      completed: 0,
+    final token = _beginTask(
       total: picked.length,
       currentName: picked.first.name,
     );
@@ -98,13 +128,16 @@ class LocalImportController extends Notifier<LocalImportState> {
         picked,
         onProgress: _onProgress,
         onPasswordPrompt: onPasswordPrompt,
+        cancelToken: token,
       );
       await _picker.clearTemporaryCache();
       await _finishImport(result);
       return result;
     } on Object {
-      state = state.copyWith(busy: false, currentName: '');
+      state = state.copyWith(busy: false, cancelling: false, currentName: '');
       rethrow;
+    } finally {
+      if (identical(_activeCancelToken, token)) _activeCancelToken = null;
     }
   }
 
@@ -129,18 +162,21 @@ class LocalImportController extends Notifier<LocalImportState> {
     final dirPath = await _picker.pickComicDirectory();
     if (dirPath == null || dirPath.isEmpty) return null;
 
-    state = const LocalImportState(busy: true, completed: 0, total: 1);
+    final token = _beginTask(total: 1);
     try {
       final result = await _importer.importDirectory(
         dirPath,
         onProgress: _onProgress,
         onPasswordPrompt: onPasswordPrompt,
+        cancelToken: token,
       );
       await _finishImport(result);
       return result;
     } on Object {
-      state = state.copyWith(busy: false, currentName: '');
+      state = state.copyWith(busy: false, cancelling: false, currentName: '');
       rethrow;
+    } finally {
+      if (identical(_activeCancelToken, token)) _activeCancelToken = null;
     }
   }
 
@@ -163,31 +199,29 @@ class LocalImportController extends Notifier<LocalImportState> {
     ExternalRootsBridge bridge, {
     ArchivePasswordPromptCallback? onPasswordPrompt,
   }) async {
-    state = LocalImportState(
-      busy: true,
-      completed: 0,
-      total: 1,
-      currentName: pickedRoot.displayName,
-    );
+    final token = _beginTask(total: 1, currentName: pickedRoot.displayName);
     try {
       final result = pickedRoot.kind == ExternalRootKind.localDirectory
           ? await _importer.importDirectory(
               pickedRoot.uriOrBookmark,
               onProgress: _onProgress,
               onPasswordPrompt: onPasswordPrompt,
+              cancelToken: token,
             )
           : await _importer.importExternalDirectory(
               pickedRoot,
               bridge,
               onProgress: _onProgress,
               onPasswordPrompt: onPasswordPrompt,
+              cancelToken: token,
             );
       await _finishImport(result);
       return result;
     } on Object {
-      state = state.copyWith(busy: false, currentName: '');
+      state = state.copyWith(busy: false, cancelling: false, currentName: '');
       rethrow;
     } finally {
+      if (identical(_activeCancelToken, token)) _activeCancelToken = null;
       if (pickedRoot.kind != ExternalRootKind.localDirectory && ref.mounted) {
         final mounted = await ref
             .read(progressDatabaseProvider)
@@ -210,21 +244,22 @@ class LocalImportController extends Notifier<LocalImportState> {
     if (state.busy) return null;
     final resolvedName =
         fileName ?? filePath.replaceAll(r'\', '/').split('/').last;
-    state = LocalImportState(
-      busy: true,
-      completed: 0,
-      total: 1,
-      currentName: resolvedName,
-    );
+    final token = _beginTask(total: 1, currentName: resolvedName);
     try {
-      final result = await _importer.importArchiveFiles(<PickedComicFile>[
-        PickedComicFile.fromFile(File(filePath), name: resolvedName),
-      ], onProgress: _onProgress);
+      final result = await _importer.importArchiveFiles(
+        <PickedComicFile>[
+          PickedComicFile.fromFile(File(filePath), name: resolvedName),
+        ],
+        onProgress: _onProgress,
+        cancelToken: token,
+      );
       await _finishImport(result, switchToLocal: true);
       return result;
     } on Object {
-      state = state.copyWith(busy: false, currentName: '');
+      state = state.copyWith(busy: false, cancelling: false, currentName: '');
       rethrow;
+    } finally {
+      if (identical(_activeCancelToken, token)) _activeCancelToken = null;
     }
   }
 

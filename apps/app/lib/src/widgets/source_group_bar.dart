@@ -218,6 +218,17 @@ class LocalImportProgressBanner extends ConsumerWidget {
                   style: theme.textTheme.labelMedium,
                 ),
               ),
+              IconButton(
+                key: const Key('local-import-cancel'),
+                tooltip: l10n.cancel,
+                visualDensity: VisualDensity.compact,
+                iconSize: AppSizes.iconSm,
+                onPressed: importState.cancelling
+                    ? null
+                    : () =>
+                          ref.read(localImportProvider.notifier).cancelImport(),
+                icon: const Icon(Icons.close),
+              ),
             ],
           ),
         ),

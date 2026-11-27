@@ -264,7 +264,7 @@ class ShelfController extends Notifier<ShelfState> {
         sort: state.sort,
         readStatus: state.readStatus,
       );
-      if (generation != _generation) return;
+      if (!ref.mounted || generation != _generation) return;
 
       state = state.copyWith(
         series: reset
@@ -278,7 +278,7 @@ class ShelfController extends Notifier<ShelfState> {
         clearFailure: true,
       );
     } on ShelfFailure catch (failure) {
-      if (generation != _generation) return;
+      if (!ref.mounted || generation != _generation) return;
       state = reset && state.series.isEmpty
           ? state.copyWith(loading: false, failure: failure)
           : state.copyWith(

@@ -2,14 +2,13 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:yomu/src/data/local/archive_password_store.dart';
-import 'package:yomu/src/data/local/comic_reader_factory.dart';
 import 'package:yomu/src/data/local/comic_file_picker.dart';
 import 'package:yomu/src/data/local/cover_thumbnail_generator.dart';
 import 'package:yomu/src/data/local/local_archive_import_stream.dart';
 import 'package:yomu/src/data/local/local_comic_importer_models.dart';
 import 'package:yomu/src/data/local/local_comics_storage.dart';
-import 'package:yomu/src/data/local/local_import_cleanup.dart';
 import 'package:yomu/src/data/local/local_external_directory_import.dart';
+import 'package:yomu/src/data/local/local_image_folder_import.dart';
 import 'package:yomu/src/data/progress/progress_database.dart';
 import 'package:yomu_local_archive/yomu_local_archive.dart';
 import 'package:yomu_platform/yomu_platform.dart';
@@ -52,12 +51,19 @@ final class LocalComicImporter {
     String? parentFolderName,
     ImportProgressCallback? onProgress,
     ArchivePasswordPromptCallback? onPasswordPrompt,
+    ImportCancellationToken? cancelToken,
   }) async {
     final seriesIds = <String>{};
     final bookIds = <String>[];
     final failures = <ImportFailureItem>[];
+    final preserved = <String>[];
+    var cancelled = false;
 
     for (var i = 0; i < files.length; i++) {
+      if (cancelToken?.isCancelled ?? false) {
+        cancelled = true;
+        break;
+      }
       final item = files[i];
       onProgress?.call(i, files.length, item.name);
       try {
@@ -73,10 +79,19 @@ final class LocalComicImporter {
           archiveBridge: _archiveBridge,
           passwordStore: _passwordStore,
           onPasswordPrompt: onPasswordPrompt,
+          cancelToken: cancelToken,
         );
         seriesIds.addAll(imported.importedSeriesIds);
         bookIds.addAll(imported.importedBookIds);
         failures.addAll(imported.failures);
+        preserved.addAll(imported.preservedArchivePaths);
+        if (imported.cancelled) {
+          cancelled = true;
+          break;
+        }
+      } on ImportCancelledException {
+        cancelled = true;
+        break;
       } on ArchiveException catch (e) {
         failures.add(
           ImportFailureItem(
@@ -99,6 +114,8 @@ final class LocalComicImporter {
       importedSeriesIds: seriesIds.toList(growable: false),
       importedBookIds: bookIds,
       failures: failures,
+      cancelled: cancelled,
+      preservedArchivePaths: preserved,
     );
   }
 
@@ -108,103 +125,18 @@ final class LocalComicImporter {
     required String bookTitle,
     String? seriesTitle,
     ImportProgressCallback? onProgress,
-  }) async {
-    final valid = <PickedComicFile>[
-      for (final f in imageFiles)
-        if (isSupportedComicImagePath(f.name)) f,
-    ];
-    if (valid.isEmpty) {
-      return LocalImportBatchResult(
-        failures: <ImportFailureItem>[
-          ImportFailureItem(
-            fileName: bookTitle,
-            reason: ImportFailureReason.noImages,
-          ),
-        ],
-      );
-    }
-    valid.sort((a, b) => naturalCompare(a.name, b.name));
-
-    final bookId = _nextId('b');
-    final safeFolder = bookId.replaceAll(':', '_');
-    final folderRelPath = 'books/$safeFolder/pages';
-    final destDir = await _storage.resolveDirectory(folderRelPath);
-
-    FolderComicReader? reader;
-    String? committedBookId;
-    try {
-      await destDir.create(recursive: true);
-      var totalBytes = 0;
-      for (var i = 0; i < valid.length; i++) {
-        final item = valid[i];
-        onProgress?.call(i, valid.length, item.name);
-        final safeName = '${(i + 1).toString().padLeft(4, '0')}_${item.name}';
-        final outFile = File('${destDir.path}/$safeName');
-        await writeStreamToFile(item.openRead(), outFile);
-        totalBytes += await outFile.length();
-      }
-      reader = await FolderComicReader.open(destDir);
-      final imported = await commitComicReaderToDatabase(
-        db: _db,
-        storage: _storage,
-        coverEncoder: _coverEncoder,
-        bookId: bookId,
-        safeFolder: safeFolder,
-        storageKind: LocalStorageKind.folder.wireValue,
-        relativePath: folderRelPath,
-        sizeBytes: totalBytes,
-        displayName: bookTitle,
-        parentFolderName: seriesTitle,
-        reader: reader,
-        generateSeriesId: () => _nextId('s'),
-      );
-      committedBookId = imported.bookId;
-      final closing = reader;
-      reader = null;
-      await closing.close();
-      onProgress?.call(valid.length, valid.length, '');
-      return LocalImportBatchResult(
-        importedSeriesIds: <String>[imported.seriesId],
-        importedBookIds: <String>[imported.bookId],
-      );
-    } on ArchiveException catch (e) {
-      await tryCloseArchiveReader(reader);
-      if (committedBookId != null) {
-        await rollbackCommittedLocalBook(
-          db: _db,
-          storage: _storage,
-          bookId: committedBookId,
-        );
-      }
-      await tryDeleteImportDir(destDir.parent);
-      return LocalImportBatchResult(
-        failures: <ImportFailureItem>[
-          ImportFailureItem(
-            fileName: bookTitle,
-            reason: mapArchiveImportFailure(e.kind),
-          ),
-        ],
-      );
-    } on FileSystemException {
-      await tryCloseArchiveReader(reader);
-      if (committedBookId != null) {
-        await rollbackCommittedLocalBook(
-          db: _db,
-          storage: _storage,
-          bookId: committedBookId,
-        );
-      }
-      await tryDeleteImportDir(destDir.parent);
-      return LocalImportBatchResult(
-        failures: <ImportFailureItem>[
-          ImportFailureItem(
-            fileName: bookTitle,
-            reason: ImportFailureReason.ioError,
-          ),
-        ],
-      );
-    }
-  }
+    ImportCancellationToken? cancelToken,
+  }) => importImageFilesAsBookToSandbox(
+    db: _db,
+    storage: _storage,
+    coverEncoder: _coverEncoder,
+    imageFiles: imageFiles,
+    bookTitle: bookTitle,
+    seriesTitle: seriesTitle,
+    nextId: _nextId,
+    onProgress: onProgress,
+    cancelToken: cancelToken,
+  );
 
   /// 将侧车封面字节（如 `cover.jpg` / `folder.png` / `poster.jpg`）绑定为本地系列封面。
   Future<String?> applySeriesCoverImage(
@@ -228,6 +160,7 @@ final class LocalComicImporter {
     ExternalRootsBridge bridge, {
     ImportProgressCallback? onProgress,
     ArchivePasswordPromptCallback? onPasswordPrompt,
+    ImportCancellationToken? cancelToken,
   }) => importExternalDirectoryToSandbox(
     db: _db,
     storage: _storage,
@@ -238,6 +171,7 @@ final class LocalComicImporter {
     nextId: _nextId,
     onProgress: onProgress,
     onPasswordPrompt: onPasswordPrompt,
+    cancelToken: cancelToken,
   );
 
   /// 导入本地文件夹（支持文件夹内含多卷归档及同级侧车封面，或文件夹内直接放漫画图片页）。
@@ -245,6 +179,7 @@ final class LocalComicImporter {
     String directoryPath, {
     ImportProgressCallback? onProgress,
     ArchivePasswordPromptCallback? onPasswordPrompt,
+    ImportCancellationToken? cancelToken,
   }) async {
     final sourceDir = Directory(directoryPath);
     final folderName = importBaseName(directoryPath);
@@ -266,9 +201,12 @@ final class LocalComicImporter {
         parentFolderName: folderName,
         onProgress: onProgress,
         onPasswordPrompt: onPasswordPrompt,
+        cancelToken: cancelToken,
       );
       final sidecarCover = scanned.sidecarCover;
-      if (sidecarCover != null && result.importedSeriesIds.length == 1) {
+      if (!result.cancelled &&
+          sidecarCover != null &&
+          result.importedSeriesIds.length == 1) {
         try {
           final bytes = await sidecarCover.readAsBytes();
           await applySeriesCoverImage(
@@ -290,6 +228,7 @@ final class LocalComicImporter {
       folderName: folderName,
       nextId: _nextId,
       onProgress: onProgress,
+      cancelToken: cancelToken,
     );
   }
 }

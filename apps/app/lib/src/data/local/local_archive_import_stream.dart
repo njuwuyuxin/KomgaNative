@@ -38,7 +38,9 @@ Future<LocalImportBatchResult> importArchiveOrCollectionStream({
   ArchivePasswordPromptCallback? onPasswordPrompt,
   String? password,
   bool allowNestedUnpack = true,
+  ImportCancellationToken? cancelToken,
 }) async {
+  cancelToken?.throwIfCancelled();
   final bookId = nextId('b');
   final safeFolder = bookId.replaceAll(':', '_');
   final lower = displayFileName.toLowerCase();
@@ -60,7 +62,8 @@ Future<LocalImportBatchResult> importArchiveOrCollectionStream({
   String? committedBookId;
   try {
     await destFile.parent.create(recursive: true);
-    await writeStreamToFile(openStream(), destFile);
+    await writeStreamToFile(openStream(), destFile, cancelToken: cancelToken);
+    cancelToken?.throwIfCancelled();
     final sizeBytes = await destFile.length();
     if (sizeBytes <= 0) {
       throw const ArchiveException(ArchiveErrorKind.emptyFile);
@@ -123,10 +126,24 @@ Future<LocalImportBatchResult> importArchiveOrCollectionStream({
           archiveBridge: archiveBridge,
           passwordStore: passwordStore,
           onPasswordPrompt: onPasswordPrompt,
+          cancelToken: cancelToken,
         );
         if (unpacked != null) {
-          await tryDeleteImportDir(destFile.parent);
-          return unpacked;
+          // 仅当至少成功拆出一本子书或用户主动取消时才清理外层合集副本；
+          // 若所有子书均导入失败，保留外层归档避免丢失原包（P2-8）。
+          if (unpacked.importedBookIds.isNotEmpty || unpacked.cancelled) {
+            await tryDeleteImportDir(destFile.parent);
+            return unpacked;
+          }
+          return LocalImportBatchResult(
+            importedSeriesIds: unpacked.importedSeriesIds,
+            importedBookIds: unpacked.importedBookIds,
+            failures: unpacked.failures,
+            preservedArchivePaths: <String>[
+              ...unpacked.preservedArchivePaths,
+              destFile.path,
+            ],
+          );
         }
         rethrow;
       } else {
@@ -229,6 +246,7 @@ Future<LocalImportBatchResult?> _tryUnpackNestedCollection({
   NativeArchiveBridge? archiveBridge,
   ArchivePasswordStore? passwordStore,
   ArchivePasswordPromptCallback? onPasswordPrompt,
+  ImportCancellationToken? cancelToken,
 }) async {
   final outerSource = await FileByteSource.open(outerFile);
   try {
@@ -243,8 +261,13 @@ Future<LocalImportBatchResult?> _tryUnpackNestedCollection({
     final seriesIds = <String>{};
     final bookIds = <String>[];
     final failures = <ImportFailureItem>[];
+    var cancelled = false;
 
     for (final entry in nestedEntries) {
+      if (cancelToken?.isCancelled ?? false) {
+        cancelled = true;
+        break;
+      }
       final childName = importBaseName(entry.name);
       try {
         final childBytes = await ZipComicReader.extractEntry(
@@ -265,10 +288,14 @@ Future<LocalImportBatchResult?> _tryUnpackNestedCollection({
           passwordStore: passwordStore,
           onPasswordPrompt: onPasswordPrompt,
           allowNestedUnpack: false,
+          cancelToken: cancelToken,
         );
         seriesIds.addAll(sub.importedSeriesIds);
         bookIds.addAll(sub.importedBookIds);
         failures.addAll(sub.failures);
+      } on ImportCancelledException {
+        cancelled = true;
+        break;
       } on ArchiveException catch (e) {
         failures.add(
           ImportFailureItem(
@@ -290,6 +317,7 @@ Future<LocalImportBatchResult?> _tryUnpackNestedCollection({
       importedSeriesIds: seriesIds.toList(growable: false),
       importedBookIds: bookIds,
       failures: failures,
+      cancelled: cancelled,
     );
   } finally {
     await outerSource.close();
