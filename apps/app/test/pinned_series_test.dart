@@ -70,8 +70,6 @@ void main() {
               library: FakeLibraryRepository(series: demoShelf()),
             ),
             progressDatabaseProvider.overrideWithValue(db),
-            // 置顶按服务器分区：测试里没有会话，直接给一个固定 key。
-            activeServerKeyProvider.overrideWithValue('server-a'),
           ],
           child: MaterialApp(
             locale: const Locale('en'),

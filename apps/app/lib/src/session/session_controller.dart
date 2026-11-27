@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_api/komga_api.dart';
 import 'package:yomu_domain/yomu_domain.dart';
@@ -286,11 +287,16 @@ class SessionController extends Notifier<SessionState> {
   Future<void> removeServer(StoredServer server) async {
     final current = state;
     await _store.remove(server);
-    // 清理被删除服务器的进度与 outbox 记录，避免永不被消费的孤儿数据滞留数据库（P3）。
-    await ref.read(progressSyncProvider).clearScope(server.id);
     ref.invalidate(serverListProvider);
     if (current is SessionConnected && current.server.id == server.id) {
       await signOut();
+    }
+    // 清理被删除服务器的进度与 outbox 记录，避免永不被消费的孤儿数据滞留数据库（P3）。
+    // 直接读写 progressStoreProvider（不经 progressSyncProvider，避免与后者监听 sessionProvider 形成循环依赖）。
+    try {
+      await ref.read(progressStoreProvider).clearScope(server.id);
+    } on Exception catch (error) {
+      debugPrint('SessionController: clearScope(${server.id}) failed: $error');
     }
   }
 }

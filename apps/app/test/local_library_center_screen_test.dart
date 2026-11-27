@@ -153,10 +153,18 @@ void main() {
     expect(find.byKey(const Key('local-center-roots-empty')), findsOneWidget);
 
     // 1) 点击挂载外部目录 -> 自动创建 .nomedia、增量扫描并显示结果横幅
-    await tester.runAsync(() async {
-      await tester.tap(find.byKey(const Key('local-center-mount-root')));
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-    });
+    await tester.tap(find.byKey(const Key('local-center-mount-root')));
+    final scanDeadline = DateTime.now().add(const Duration(seconds: 5));
+    while (find
+            .byKey(const Key('local-center-scan-summary'))
+            .evaluate()
+            .isEmpty &&
+        DateTime.now().isBefore(scanDeadline)) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
+      await tester.pump();
+    }
     await tester.pumpAndSettle();
 
     expect(File('${extDir.path}/.nomedia').existsSync(), isTrue);
@@ -171,10 +179,18 @@ void main() {
     // 2) 点击卸载并确认 -> 移除索引但外部原始文件完好无损
     await tester.tap(find.byKey(const Key('root-unmount-root_picked')));
     await tester.pumpAndSettle();
-    await tester.runAsync(() async {
-      await tester.tap(find.byKey(const Key('confirm-unmount-root')));
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-    });
+    await tester.tap(find.byKey(const Key('confirm-unmount-root')));
+    final unmountDeadline = DateTime.now().add(const Duration(seconds: 5));
+    while (find
+            .byKey(const Key('mounted-root-root_picked'))
+            .evaluate()
+            .isNotEmpty &&
+        DateTime.now().isBefore(unmountDeadline)) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
+      await tester.pump();
+    }
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('local-center-roots-empty')), findsOneWidget);

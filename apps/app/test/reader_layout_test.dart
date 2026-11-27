@@ -113,7 +113,7 @@ void main() {
       final writer = ReaderProgressWriter(
         write: (int page) async {
           attempts++;
-          if (attempts == 1) throw StateError('disk full');
+          if (attempts == 1) throw Exception('disk full');
         },
       );
       await writer.flush(7);

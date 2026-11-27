@@ -162,10 +162,6 @@ void main() {
         serverB,
       ]);
       final progressStore = InMemoryProgressStore();
-      final sync = ProgressSyncService(
-        store: progressStore,
-        upload: (_) async {},
-      );
       await progressStore.enqueue(
         const ProgressTarget(bookId: 'b1', page: 7, completed: false),
         scope: serverA.id,
@@ -187,11 +183,13 @@ void main() {
       final container = ProviderContainer(
         overrides: <Override>[
           serverStoreProvider.overrideWithValue(serverStore),
-          progressSyncProvider.overrideWithValue(sync),
+          progressStoreProvider.overrideWithValue(progressStore),
         ],
       );
       addTearDown(container.dispose);
 
+      // 同时拉起真实 progressSyncProvider，验证 removeServer 不构成循环依赖。
+      container.read(progressSyncProvider);
       await container.read(sessionProvider.notifier).removeServer(serverA);
 
       expect(await progressStore.pending(scope: serverA.id), isEmpty);

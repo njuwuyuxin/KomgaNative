@@ -4,7 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/src/data/cache/http_cache_database.dart';
+import 'package:yomu/src/data/progress/progress_store.dart';
 import 'package:yomu/src/providers/cache_providers.dart';
+import 'package:yomu/src/providers/progress_providers.dart';
 import 'package:yomu/src/screens/settings_screen.dart';
 import 'package:yomu/src/session/server_store.dart';
 import 'package:yomu/src/session/session_controller.dart';
@@ -31,6 +33,7 @@ void main() {
       ProviderScope(
         overrides: <Override>[
           serverStoreProvider.overrideWithValue(store),
+          progressStoreProvider.overrideWithValue(InMemoryProgressStore()),
           // 设置页会读缓存/下载占用：内存库既不需要平台通道，也不会被本机缓存影响。
           httpCacheDatabaseProvider.overrideWithValue(
             HttpCacheDatabase(NativeDatabase.memory()),
