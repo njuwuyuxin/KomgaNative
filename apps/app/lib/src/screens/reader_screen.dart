@@ -127,10 +127,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         if (mounted) setState(() {});
       },
     );
-    if (widget.book != null) {
-      _session.noteBook(widget.book!);
+    final initialBook =
+        widget.book ?? ref.read(readerBookProvider(_bookQuery)).value;
+    if (initialBook != null) {
+      _lastKnownSeriesId = initialBook.seriesId;
+      _session.noteBook(initialBook);
     }
-    _session.start(initialPage: widget.book?.readProgress?.page ?? 1);
+    _session.start(initialPage: initialBook?.readProgress?.page ?? 1);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _keyboardFocus.requestFocus();
     });
@@ -174,16 +177,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     });
     final book = widget.book ?? ref.watch(readerBookProvider(bookQuery)).value;
     final seriesId = book?.seriesId ?? _seriesId;
-    if (widget.direction == ReadingDirection.unknown && seriesId != null) {
-      ref.listen<AsyncValue<Series?>>(
-        seriesDetailProvider((sourceKey: _sourceKey, seriesId: seriesId)),
-        (_, next) {
-          final dir = next.value?.readingDirection;
-          if (dir != null) _nav.direction = dir;
-        },
-      );
-    }
     final direction = _resolveDirection(book);
+    // 同步解析后的阅读方向，保证已缓存的 seriesDetailProvider 与异步到达路径行为一致（N1）。
+    _nav.direction = direction;
     final allPrefs = ref.watch(readerPrefsProvider);
     final config = allPrefs.forSeries(seriesId, serverKey: _sourceKey);
     final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;

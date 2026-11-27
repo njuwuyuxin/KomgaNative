@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:drift/native.dart';
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
@@ -17,6 +18,7 @@ import 'package:yomu/src/data/settings_store.dart';
 import 'package:yomu/src/providers/active_source_provider.dart';
 import 'package:yomu/src/providers/cache_providers.dart';
 import 'package:yomu/src/providers/cross_source_reading_provider.dart';
+import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/progress_providers.dart';
 import 'package:yomu/src/providers/reader_prefs_provider.dart';
 import 'package:yomu/src/providers/reader_providers.dart';
@@ -319,6 +321,103 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Replaced'), findsOneWidget);
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('N1: 系列详情已在缓存里且入口未传 direction 时，右到左漫画用键盘左键应翻到下一页', (
+      WidgetTester tester,
+    ) async {
+      tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+
+      const rtlSeries = Series(
+        id: 's-rtl-cached',
+        libraryId: 'lib-1',
+        title: 'Cached RTL Manga',
+        booksCount: 1,
+        readingDirection: ReadingDirection.rightToLeft,
+        sourceKey: kLocalSourceKey,
+      );
+      const rtlBook = Book(
+        id: 'b-rtl-cached',
+        seriesId: 's-rtl-cached',
+        name: 'Vol. 1',
+        number: '1',
+        pagesCount: 4,
+        sourceKey: kLocalSourceKey,
+      );
+      final localLib = FakeLibraryRepository(series: <Series>[rtlSeries]);
+      final localReader = FakeReaderRepository(stubBook: rtlBook, pageCount: 4);
+      final registry = SourceRegistry(
+        localBundle: SourceBundle(
+          source: const LocalContentSource(),
+          library: localLib,
+          reader: localReader,
+          collections: localLib,
+          readStatus: localLib,
+        ),
+        remoteBundles: const <String, SourceBundle>{},
+      );
+      final db = ProgressDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      final cache = DriftHttpCache(
+        HttpCacheDatabase(NativeDatabase.memory()),
+        now: () => DateTime.utc(2026, 11, 27, 12),
+      );
+      addTearDown(cache.dispose);
+      final sync = ProgressSyncService(
+        store: InMemoryProgressStore(),
+        upload: (_) async {},
+      );
+      final container = ProviderContainer(
+        overrides: <Override>[
+          sourceRegistryProvider.overrideWithValue(registry),
+          progressDatabaseProvider.overrideWithValue(db),
+          progressSyncProvider.overrideWithValue(sync),
+          httpCacheProvider.overrideWithValue(cache),
+          readerPrefsStoreProvider.overrideWithValue(
+            InMemoryReaderPrefsStore(),
+          ),
+          wakeLockProvider.overrideWithValue(FakeWakeLock()),
+          imageSaverProvider.overrideWithValue(FakeImageSaver()),
+          hardwareKeysProvider.overrideWithValue(FakeHardwareKeys()),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      // 先把系列详情预热进缓存（模拟从搜索/书架/收藏进入阅读器时 seriesDetailProvider 已有缓存）。
+      final preloaded = await container.read(
+        seriesDetailProvider((
+          sourceKey: kLocalSourceKey,
+          seriesId: rtlSeries.id,
+        )).future,
+      );
+      expect(preloaded?.readingDirection, ReadingDirection.rightToLeft);
+
+      // 入口不传 direction（默认 unknown），与搜索/下载/收藏入口一致。
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            locale: const Locale('en'),
+            localizationsDelegates: appLocalizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            theme: AppTheme.dark(),
+            home: const ReaderScreen(
+              bookId: 'b-rtl-cached',
+              book: rtlBook,
+              sourceKey: kLocalSourceKey,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.textContaining('1 / 4'), findsOneWidget);
+
+      // RTL 漫画按键盘左键 = 翻到下一页（第 2 页）；若 _nav.direction 停留在 unknown 会误判成 LTR 而停在第 1 页。
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('2 / 4'), findsOneWidget);
     });
   });
 }
