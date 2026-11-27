@@ -48,6 +48,20 @@ jobs:
         working-directory: apps/app
         run: flutter pub get
 
+      - name: Cache Drift codegen
+        id: drift-cache
+        uses: actions/cache@v6
+        with:
+          path: |
+            apps/app/lib/src/data/progress/progress_database.g.dart
+            apps/app/lib/src/data/cache/http_cache_database.g.dart
+          key: drift-v1-${{ runner.os }}-${{ hashFiles('apps/app/lib/src/data/local/local_tables.dart', 'apps/app/lib/src/data/progress/progress_database.dart', 'apps/app/lib/src/data/progress/progress_user_dao.dart', 'apps/app/lib/src/data/progress/user_tables.dart', 'apps/app/lib/src/data/cache/http_cache_database.dart', 'apps/app/lib/src/data/cache/http_cache_downloads_dao.dart', 'apps/app/lib/src/data/cache/http_cache_tables.dart', 'pubspec.lock') }}
+
+      - name: Refresh cached Drift timestamps
+        if: steps.drift-cache.outputs.cache-hit == 'true'
+        shell: bash
+        run: touch apps/app/lib/src/data/progress/progress_database.g.dart apps/app/lib/src/data/cache/http_cache_database.g.dart
+
       - name: Generate code (drift + l10n)
         # 同 build-android.yml：生成物不入库，全新 clone 必须先跑 codegen，
         # 否则编译期找不到 drift 的 part 文件。

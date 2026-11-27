@@ -21,15 +21,22 @@ const List<String> _flutterPackages = <String>[
 
 Future<void> main(List<String> args) async {
   final command = args.isEmpty ? 'check' : args.first;
+  final rest = args.length > 1 ? args.sublist(1) : const <String>[];
   final code = switch (command) {
-    'check' => await check(),
+    'check' => await check(includeGoldens: !rest.contains('--no-goldens')),
+    'check-golden' => await checkGolden(),
     'codegen' => await codegen(),
     'fix' => await fix(),
     'analyze' => await analyze(),
-    'test' => await test(),
+    'test' => await test(
+      includeGoldens: !rest.contains('--no-goldens'),
+      onlyGoldens: rest.contains('--only-goldens'),
+    ),
     'golden' => await golden(),
     'layers' => await layerCheck(),
-    'install' => await installApp(deviceId: args.length > 1 ? args[1] : null),
+    'install' => await installApp(
+      deviceId: rest.isNotEmpty ? rest.first : null,
+    ),
     'contract' => await contract(),
     'help' || '-h' || '--help' => await help(),
     _ => await help(unknown: command),
@@ -42,48 +49,73 @@ Future<int> help({String? unknown}) async {
   stdout.writeln('''
 KomgaNative CI
 
-  check     生成代码（按需）+ 格式检查 + 静态分析 + 分层与规范规则 + 全部测试（默认）
-  codegen   只跑生成代码（drift + l10n；生成物不入库，CI 上由 check 自动触发）
-  fix       自动格式化 + dart fix --apply
-  analyze   只跑静态分析
-  layers    只跑分层、单文件 ≤350 行、单类 ≤300 行与裸 catch (_) 检查
-  test      只跑测试（纯 Dart 包用 dart test，Flutter 包用 flutter test）
-  golden    重新生成黄金图基线（仅 Windows，与 CI 一致）
-  install [device]  构建 release、装到模拟器并启动（保留应用数据；提交前必跑）
-  contract  契约测试（M1）
+  check [--no-goldens]  生成代码（按需）+ 格式 + 分析 + 分层规则 + 全部测试（默认；--no-goldens 跳过 apps/app/test/golden）
+  check-golden          生成代码（按需）+ 黄金图确定性检查 + 黄金图测试（Windows CI 基线 Job 用）
+  codegen               只跑生成代码（drift + l10n；生成物不入库，CI 上由 check 自动触发）
+  fix                   自动格式化 + dart fix --apply
+  analyze               只跑静态分析
+  layers                只跑分层、单文件 ≤350 行、单类 ≤300 行与裸 catch (_) 检查
+  test [--no-goldens|--only-goldens]
+                        只跑测试（纯 Dart 包用 dart test，Flutter 包用 flutter test）
+  golden                重新生成黄金图基线（仅 Windows，与 CI 一致）
+  install [device]      构建 release、装到模拟器并启动（保留应用数据；提交前必跑）
+  contract              契约测试（M1）
 ''');
   return unknown == null ? 0 : 64;
 }
 
-Future<int> check() async {
+Future<int> check({bool includeGoldens = true}) async {
   final steps = <({String name, Future<int> Function() run})>[
     (name: 'codegen', run: codegen),
     (name: 'format', run: formatCheck),
     (name: 'analyze', run: analyze),
     (name: 'layers', run: layerCheck),
     (name: 'goldens', run: goldenDeterminismCheck),
-    (name: 'tests', run: test),
+    (name: 'tests', run: () => test(includeGoldens: includeGoldens)),
   ];
+  return _runSteps(steps);
+}
 
-  final results = <String, int>{};
+Future<int> checkGolden() async {
+  final steps = <({String name, Future<int> Function() run})>[
+    (name: 'codegen', run: codegen),
+    (name: 'goldens', run: goldenDeterminismCheck),
+    (name: 'golden-tests', run: () => test(onlyGoldens: true)),
+  ];
+  return _runSteps(steps);
+}
+
+Future<int> _runSteps(
+  List<({String name, Future<int> Function() run})> steps,
+) async {
+  final results = <String, ({int code, Duration elapsed})>{};
   for (final step in steps) {
     stdout.writeln('\n=== ${step.name} ===');
+    final sw = Stopwatch()..start();
     final code = await step.run();
-    results[step.name] = code;
+    sw.stop();
+    results[step.name] = (code: code, elapsed: sw.elapsed);
     if (code != 0) {
-      stdout.writeln('\n!!! ${step.name} 失败（exit $code），后续步骤仍会执行以便一次看到全部问题');
+      stdout.writeln(
+        '\n!!! ${step.name} 失败（exit $code，耗时 ${_fmtDuration(sw.elapsed)}），后续步骤仍会执行以便一次看到全部问题',
+      );
     }
   }
 
   stdout.writeln('\n=== 汇总 ===');
   var failed = false;
-  results.forEach((name, code) {
-    final ok = code == 0;
+  results.forEach((name, r) {
+    final ok = r.code == 0;
     failed |= !ok;
-    stdout.writeln('${ok ? 'PASS' : 'FAIL'}  $name');
+    stdout.writeln(
+      '${ok ? 'PASS' : 'FAIL'}  ${name.padRight(14)} (${_fmtDuration(r.elapsed)})',
+    );
   });
   return failed ? 1 : 0;
 }
+
+String _fmtDuration(Duration d) =>
+    '${(d.inMilliseconds / 1000).toStringAsFixed(1)}s';
 
 Future<int> fix() async {
   var code = await runProc('dart', <String>['format', '.']);
@@ -188,25 +220,102 @@ Future<int> _codegenDrift() async {
   }
 
   stdout.writeln('drift 生成物缺失或过期 → dart run build_runner build');
-  return runProc('dart', <String>[
+  final code = await runProc('dart', <String>[
     'run',
     'build_runner',
     'build',
   ], workingDirectory: 'apps/app');
+  if (code == 0) {
+    final now = DateTime.now();
+    for (final group in driftGroups) {
+      final generatedFile = File(group.generated);
+      if (generatedFile.existsSync()) {
+        generatedFile.setLastModifiedSync(now);
+      }
+    }
+  }
+  return code;
 }
 
 Future<int> analyze() => runProc('dart', <String>['analyze', '.']);
 
-Future<int> test() async {
+List<String> _testRunnerFlags() {
+  final flags = <String>[];
+  if (Platform.environment['GITHUB_ACTIONS'] == 'true') {
+    flags.add('--reporter=github');
+  }
+  if (Platform.environment['CI'] == 'true') {
+    final cpus = Platform.numberOfProcessors;
+    if (cpus > 0) {
+      flags.add('--concurrency=${cpus.clamp(1, 8)}');
+    }
+  }
+  return flags;
+}
+
+/// 收集 `apps/app/test/` 下除 `golden/` 之外的全部测试入口（目录或根级 `*_test.dart`）。
+/// 新增非黄金测试文件或子目录会自动纳入，无需手动维护白名单或 tag。
+List<String> _nonGoldenAppTestTargets() {
+  final root = Directory('apps/app/test');
+  if (!root.existsSync()) return const <String>[];
+  final targets = <String>[];
+  for (final entity in root.listSync()) {
+    final name = entity.uri.pathSegments.where((String s) => s.isNotEmpty).last;
+    if (entity is Directory) {
+      if (name == 'golden') continue;
+      final hasTests = entity
+          .listSync(recursive: true)
+          .any(
+            (FileSystemEntity e) => e is File && e.path.endsWith('_test.dart'),
+          );
+      if (hasTests) targets.add('test/$name');
+    } else if (entity is File && name.endsWith('_test.dart')) {
+      targets.add('test/$name');
+    }
+  }
+  targets.sort();
+  return targets;
+}
+
+Future<int> test({bool includeGoldens = true, bool onlyGoldens = false}) async {
+  final flags = _testRunnerFlags();
+  if (onlyGoldens) {
+    stdout.writeln('--- flutter test apps/app (test/golden)');
+    return runProc('flutter', <String>[
+      'test',
+      ...flags,
+      'test/golden',
+    ], workingDirectory: 'apps/app');
+  }
+
   var code = 0;
   for (final pkg in _purePackages) {
     stdout.writeln('--- dart test $pkg');
-    final c = await runProc('dart', <String>['test'], workingDirectory: pkg);
+    final c = await runProc('dart', <String>[
+      'test',
+      ...flags,
+    ], workingDirectory: pkg);
     if (c != 0) code = c;
   }
   for (final pkg in _flutterPackages) {
+    if (pkg == 'apps/app' && !includeGoldens) {
+      final targets = _nonGoldenAppTestTargets();
+      stdout.writeln(
+        '--- flutter test apps/app (excluding test/golden, ${targets.length} targets)',
+      );
+      final c = await runProc('flutter', <String>[
+        'test',
+        ...flags,
+        ...targets,
+      ], workingDirectory: pkg);
+      if (c != 0) code = c;
+      continue;
+    }
     stdout.writeln('--- flutter test $pkg');
-    final c = await runProc('flutter', <String>['test'], workingDirectory: pkg);
+    final c = await runProc('flutter', <String>[
+      'test',
+      ...flags,
+    ], workingDirectory: pkg);
     if (c != 0) code = c;
   }
   return code;
@@ -239,8 +348,11 @@ Future<int> runProc(
   List<String> args, {
   String? workingDirectory,
 }) async {
+  final summary = args.length <= 10
+      ? args.join(' ')
+      : '${args.take(6).join(' ')} ... (${args.length} args)';
   stdout.writeln(
-    '\$ $executable ${args.join(' ')}${workingDirectory == null ? '' : '  (cwd: $workingDirectory)'}',
+    '\$ $executable $summary${workingDirectory == null ? '' : '  (cwd: $workingDirectory)'}',
   );
   final process = await Process.start(
     executable,

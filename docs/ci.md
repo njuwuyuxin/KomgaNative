@@ -64,12 +64,12 @@
 
 | 文件 | 触发 | 机器 | 做什么 |
 |---|---|---|---|
-| `ci.yml` | push to main、PR、手动 | `windows-latest` | `dart run tool/ci.dart check`：格式 + 分析 + 分层规则 + 全部测试 + 黄金图比对 |
-| `build-android.yml` | push to main（代码路径变化）、手动 | `ubuntu-latest` | `flutter pub get` → `dart run tool/ci.dart codegen` → `flutter build apk --release` → 上传 debug 签名 APK artifact |
-| `build-ios.yml` | push / PR / `v*` tag / 手动 | `macos-latest` | `flutter pub get` → `dart run tool/ci.dart codegen` → `flutter build ios --release --no-codesign` → 上传 `.app.zip` |
-| `release.yml` | push `v*` tag | `windows-latest` + `ubuntu-latest` | 先在 Windows 跑全量 `ci.dart check` 门禁 → 校验 tag 与 `pubspec.yaml` 版本一致 → 还原正式 keystore → 构建分架构与通用 release APK → `apksigner` 验签 → 自动发布到 GitHub Releases（附 `SHA256SUMS.txt`） |
+| `ci.yml` | push to main、PR（忽略 `docs/**` / `*.md`）、手动 | `ubuntu-latest` + `windows-latest`（并行） | `gate`（Ubuntu）：`dart run tool/ci.dart check --no-goldens`（格式 + 分析 + 分层 + 全量非黄金测试）；`goldens`（Windows）：`dart run tool/ci.dart check-golden`（仅跑黄金图基线比对）；两端均按 Drift 表源码精确哈希缓存 `*.g.dart` |
+| `build-android.yml` | push to main（代码路径变化）、手动 | `ubuntu-latest` | `flutter pub get` → Drift codegen 缓存/按需生成 → `flutter build apk --release` → 上传 debug 签名 APK artifact |
+| `build-ios.yml` | push / PR / `v*` tag / 手动 | `macos-latest` | `flutter pub get` → Drift codegen 缓存/按需生成 → `flutter build ios --release --no-codesign` → 上传 `.app.zip` |
+| `release.yml` | push `v*` tag | `ubuntu-latest` + `windows-latest`（并行门禁）→ `ubuntu-latest` | 并行跑完 `gate` + `goldens` → 校验 tag 与 `pubspec.yaml` 版本一致 → 还原正式 keystore → 构建分架构与通用 release APK → `apksigner` 验签 → 自动发布到 GitHub Releases（附 `SHA256SUMS.txt`） |
 
-**为什么门禁放在 Windows**：黄金图基线以 Windows 为唯一平台（`AGENTS.md` 的约定）。在 Linux/macOS 上跑会因字体光栅化差异导致 5 张基线全部失配，而且修不好——只能换基线平台。
+**为什么黄金图单独留在 Windows、其余门禁放到 Ubuntu**：黄金图基线以 Windows 为唯一平台（`AGENTS.md` 的约定），在 Linux/macOS 上跑会因字体光栅化差异失配；但 Windows runner 的 Flutter 环境恢复与全量单测显著慢于 Ubuntu，因此把非黄金门禁与全量测试拆到 `ubuntu-latest` 与 `windows-latest` 并行执行，大幅缩短单次 CI 墙钟时间。两端都走同一个 `tool/ci.dart`（`check --no-goldens` 与 `check-golden`），本地仍只需跑 `dart run tool/ci.dart check`。
 
 **为什么 iOS 现在也跟 push**：仓库是 public，macOS runner 免费。三条流水线都跑，PR 能同时看到"Android 能编、iOS 能编"。
 **如果转私有**：删掉 `build-ios.yml` 的 `pull_request` 与 `push` 触发，只留 `workflow_dispatch` 和 tag。
@@ -225,5 +225,4 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tool\bootstrap.ps1 -CheckOnl
 
 1. **iOS 正式签名**：用 App Store Connect API Key + `flutter build ipa` 接 TestFlight / App Store。
 2. **契约测试**：job 里 `docker run gotson/komga`，跑真实服务器用例（M1）。
-3. **分支保护**：Settings → Branches → 要求 `Gate` 通过才能合并（这也是"CI 当裁判"真正生效的地方）。
-4. **成本优化**（私有仓库才有意义）：把纯 Dart 测试拆到 ubuntu job，Windows 只跑黄金图，可把单次门禁从 ~12 分钟压到 ~6 分钟。
+3. **分支保护**：Settings → Branches → 要求 `Gate` 与 `Goldens` 均通过才能合并（这也是"CI 当裁判"真正生效的地方）。

@@ -1,12 +1,19 @@
 name: CI
 
 # 每次 push / PR 都跑：这是"裁判"，本地绿不算绿，CI 绿才算。
-# 为什么跑在 Windows：黄金图基线以 Windows 为唯一平台（见 AGENTS.md），
-# 换平台会让 5 张基线全部失配。
+# 拆成两个并行 Job 提速：
+# - gate (ubuntu-latest)：格式 + 静态分析 + 分层规则 + 全量非黄金测试（Ubuntu 上 Setup Flutter / 测试快得多）
+# - goldens (windows-latest)：仅跑黄金图基线比对（基线平台固定为 Windows，见 AGENTS.md）
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
   workflow_dispatch:
 
 concurrency:
@@ -18,9 +25,9 @@ permissions:
 
 jobs:
   gate:
-    name: Gate (format + analyze + layers + tests + goldens)
-    runs-on: windows-latest
-    timeout-minutes: 25
+    name: Gate (format + analyze + layers + tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -36,9 +43,59 @@ jobs:
         working-directory: apps/app
         run: flutter pub get
 
-      - name: Gate
-        # 与本地完全同一条命令，避免"CI 能过本地不能"的双轨问题。
-        run: dart run tool/ci.dart check
+      - name: Cache Drift codegen
+        id: drift-cache
+        uses: actions/cache@v6
+        with:
+          path: |
+            apps/app/lib/src/data/progress/progress_database.g.dart
+            apps/app/lib/src/data/cache/http_cache_database.g.dart
+          key: drift-v1-${{ runner.os }}-${{ hashFiles('apps/app/lib/src/data/local/local_tables.dart', 'apps/app/lib/src/data/progress/progress_database.dart', 'apps/app/lib/src/data/progress/progress_user_dao.dart', 'apps/app/lib/src/data/progress/user_tables.dart', 'apps/app/lib/src/data/cache/http_cache_database.dart', 'apps/app/lib/src/data/cache/http_cache_downloads_dao.dart', 'apps/app/lib/src/data/cache/http_cache_tables.dart', 'pubspec.lock') }}
+
+      - name: Refresh cached Drift timestamps
+        if: steps.drift-cache.outputs.cache-hit == 'true'
+        shell: bash
+        run: touch apps/app/lib/src/data/progress/progress_database.g.dart apps/app/lib/src/data/cache/http_cache_database.g.dart
+
+      - name: Gate (non-golden)
+        # 与本地共用 tool/ci.dart，避免"CI 能过本地不能"的双轨问题。
+        run: dart run tool/ci.dart check --no-goldens
+
+  goldens:
+    name: Goldens (Windows baseline)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.50.0
+          channel: stable
+          cache: true
+
+      - name: Pub get (workspace)
+        working-directory: apps/app
+        run: flutter pub get
+
+      - name: Cache Drift codegen
+        id: drift-cache
+        uses: actions/cache@v6
+        with:
+          path: |
+            apps/app/lib/src/data/progress/progress_database.g.dart
+            apps/app/lib/src/data/cache/http_cache_database.g.dart
+          key: drift-v1-${{ runner.os }}-${{ hashFiles('apps/app/lib/src/data/local/local_tables.dart', 'apps/app/lib/src/data/progress/progress_database.dart', 'apps/app/lib/src/data/progress/progress_user_dao.dart', 'apps/app/lib/src/data/progress/user_tables.dart', 'apps/app/lib/src/data/cache/http_cache_database.dart', 'apps/app/lib/src/data/cache/http_cache_downloads_dao.dart', 'apps/app/lib/src/data/cache/http_cache_tables.dart', 'pubspec.lock') }}
+
+      - name: Refresh cached Drift timestamps
+        if: steps.drift-cache.outputs.cache-hit == 'true'
+        shell: bash
+        run: touch apps/app/lib/src/data/progress/progress_database.g.dart apps/app/lib/src/data/cache/http_cache_database.g.dart
+
+      - name: Golden tests
+        run: dart run tool/ci.dart check-golden
 
       - name: Upload golden failures
         # 黄金图失配时 flutter_test 会把实际渲染图写到 failures/ 目录，

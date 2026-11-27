@@ -58,6 +58,20 @@ jobs:
         working-directory: apps/app
         run: flutter pub get
 
+      - name: Cache Drift codegen
+        id: drift-cache
+        uses: actions/cache@v6
+        with:
+          path: |
+            apps/app/lib/src/data/progress/progress_database.g.dart
+            apps/app/lib/src/data/cache/http_cache_database.g.dart
+          key: drift-v1-${{ runner.os }}-${{ hashFiles('apps/app/lib/src/data/local/local_tables.dart', 'apps/app/lib/src/data/progress/progress_database.dart', 'apps/app/lib/src/data/progress/progress_user_dao.dart', 'apps/app/lib/src/data/progress/user_tables.dart', 'apps/app/lib/src/data/cache/http_cache_database.dart', 'apps/app/lib/src/data/cache/http_cache_downloads_dao.dart', 'apps/app/lib/src/data/cache/http_cache_tables.dart', 'pubspec.lock') }}
+
+      - name: Refresh cached Drift timestamps
+        if: steps.drift-cache.outputs.cache-hit == 'true'
+        shell: bash
+        run: touch apps/app/lib/src/data/progress/progress_database.g.dart apps/app/lib/src/data/cache/http_cache_database.g.dart
+
       - name: Generate code (drift + l10n)
         # 生成物（*.g.dart / app_localizations*.dart）不入库，CI 是全新 clone：
         # 少了它们 AOT 编译会以 "The getter 'cachedResponses' isn't defined" 失败。
