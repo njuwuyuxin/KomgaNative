@@ -104,6 +104,7 @@ class QueueMenu extends ConsumerWidget {
           seriesId: record.seriesId,
           name: record.bookName.isEmpty ? record.bookId : record.bookName,
           pagesCount: record.pageCount,
+          sourceKey: record.scope.isNotEmpty ? record.scope : kLocalSourceKey,
         ),
       );
     }

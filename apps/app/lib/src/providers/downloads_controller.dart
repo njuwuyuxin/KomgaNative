@@ -52,8 +52,16 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
     state = <String, DownloadStatus>{...state};
   }
 
-  Future<bool> retryOne(String bookId, {Book? fallback}) async {
-    final book = await _resolveBook(bookId, fallback: fallback);
+  Future<bool> retryOne(
+    String bookId, {
+    Book? fallback,
+    String? sourceKey,
+  }) async {
+    final book = await _resolveBook(
+      bookId,
+      fallback: fallback,
+      sourceKey: sourceKey,
+    );
     if (book == null || _disposed) return false;
     _clear(bookId);
     await start(book);
@@ -65,7 +73,6 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
       for (final entry in state.entries)
         if (entry.value.hasError) entry.key,
     ];
-    if (failed.isEmpty) return 0;
     var queued = 0;
     for (final id in failed) {
       if (await retryOne(id)) queued++;
@@ -73,15 +80,20 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
     return queued;
   }
 
-  Future<Book?> _resolveBook(String bookId, {Book? fallback}) async {
+  Future<Book?> _resolveBook(
+    String bookId, {
+    Book? fallback,
+    String? sourceKey,
+  }) async {
     final cached = fallback ?? _knownBooks[bookId];
     if (cached != null) return cached;
-    try {
-      ref.invalidate(bookByIdProvider(bookId));
-      return await ref.read(bookByIdProvider(bookId).future);
-    } on Object {
-      return null;
-    }
+    final scope = (sourceKey != null && sourceKey.isNotEmpty)
+        ? sourceKey
+        : _scopeForId(bookId);
+    if (scope.isEmpty) return null;
+    final query = (sourceKey: scope, bookId: bookId);
+    ref.invalidate(bookByIdProvider(query));
+    return ref.read(bookByIdProvider(query).future);
   }
 
   @override
@@ -111,28 +123,26 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
 
   String _scopeForBook(Book book) => book.isCloud ? book.sourceKey : _scope;
 
-  String _scopeForId(String bookId) {
-    final known = _knownBooks[bookId];
-    return known != null ? _scopeForBook(known) : _scope;
-  }
+  String _scopeForId(String bookId) => _knownBooks[bookId] is Book
+      ? _scopeForBook(_knownBooks[bookId]!)
+      : _scope;
 
   void _invalidateDownloaded(String bookId, String scope) {
-    ref.invalidate(downloadedProvider(bookId));
-    ref.invalidate(
-      downloadedForSourceProvider((
-        sourceKey: scope.isEmpty ? null : scope,
-        bookId: bookId,
-      )),
-    );
-    if (scope.isNotEmpty) {
+    final scoped = scope.isEmpty ? null : scope;
+    ref
+      ..invalidate(downloadedProvider(bookId))
+      ..invalidate(
+        downloadedForSourceProvider((sourceKey: scoped, bookId: bookId)),
+      );
+    if (scoped != null) {
       ref.invalidate(
         downloadedForSourceProvider((sourceKey: null, bookId: bookId)),
       );
     }
   }
 
-  HttpCacheDatabase get _db => ref.read(httpCacheDatabaseProvider);
-  DownloadQueuePersistence get _queueStore => DownloadQueuePersistence(_db);
+  DownloadQueuePersistence get _queueStore =>
+      DownloadQueuePersistence(ref.read(httpCacheDatabaseProvider));
 
   Future<void> _restore(List<DownloadQueueEntry> entries) async {
     if (_restored || _disposed) return;
@@ -147,13 +157,7 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
         _queueStore.dequeue(entry.bookId, scope: _scope);
         continue;
       }
-      final book = Book(
-        id: entry.bookId,
-        seriesId: entry.seriesId,
-        name: entry.name,
-        number: entry.number,
-        pagesCount: entry.pagesCount,
-      );
+      final book = _queueStore.toBook(entry, fallbackScope: _scope);
       _knownBooks[book.id] = book;
       _queue.add(book);
       if (state[entry.bookId] == null) {

@@ -3,12 +3,13 @@ import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/src/data/cache/http_cache_database.dart';
 import 'package:yomu/src/data/download/download_service.dart';
 import 'package:yomu/src/data/download/downloaded_book_record.dart';
+import 'package:yomu/src/data/shelf_failure.dart';
 import 'package:yomu/src/providers/active_source_provider.dart';
 import 'package:yomu/src/providers/cache_providers.dart';
 import 'package:yomu/src/providers/downloads_controller.dart';
-import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/settings_provider.dart';
 import 'package:yomu/src/providers/source_registry_provider.dart';
+import 'package:yomu/src/providers/source_scoped_providers.dart';
 import 'package:yomu/src/session/session_controller.dart';
 import 'package:yomu_platform/yomu_platform.dart';
 
@@ -113,12 +114,27 @@ final downloadQueueProvider = FutureProvider<List<DownloadQueueEntry>>((
   return ref.watch(httpCacheDatabaseProvider).downloadQueue(scope: scope);
 });
 
-/// 下载管理页要显示书名：按 bookId 取一次（失败返回 null，不打断列表）。
-final bookByIdProvider = FutureProvider.family<Book?, String>((
+/// 下载管理页要显示书名：按显式 `(sourceKey, bookId)` 路由查书（失败返回 null，不打断列表）。
+///
+/// 必须按下载记录自身的远端 `scope` 查对应内容源，绝不跟随当前书架激活源（防止在"本机"
+/// 分组下打开或重试已下载云端书时误路由到本机库并造成跨分区进度污染）。
+final bookByIdProvider = FutureProvider.family<Book?, ScopedDownloadQuery>((
   Ref ref,
-  String bookId,
-) {
-  return ref.watch(libraryRepositoryProvider).book(bookId);
+  ScopedDownloadQuery query,
+) async {
+  final rawScope = query.sourceKey;
+  final scope = (rawScope != null && rawScope.isNotEmpty)
+      ? rawScope
+      : ref.watch(downloadScopeProvider);
+  if (scope.isEmpty) return null;
+  try {
+    final fetched = await ref
+        .watch(libraryRepositoryForSourceProvider(scope))
+        .book(query.bookId);
+    return fetched?.withSource(scope);
+  } on ShelfFailure {
+    return null;
+  }
 });
 
 /// 某本书是否已整本下载（默认活动下载源；兼容既有调用与单测）。
