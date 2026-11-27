@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:yomu/l10n/app_localizations.dart';
@@ -185,7 +187,7 @@ class LocalCatalogMutator {
             await targetDir.parent.delete(recursive: true);
           }
         }
-      } on Object catch (error) {
+      } on FileSystemException catch (error) {
         // 磁盘文件已不存在时忽略。
         debugPrint('LocalCatalogMutator: delete book file skipped: $error');
       }
@@ -196,7 +198,7 @@ class LocalCatalogMutator {
         if (await coverFile.exists()) {
           await coverFile.delete();
         }
-      } on Object catch (error) {
+      } on FileSystemException catch (error) {
         // 缩略图不存在时忽略。
         debugPrint('LocalCatalogMutator: delete cover file skipped: $error');
       }

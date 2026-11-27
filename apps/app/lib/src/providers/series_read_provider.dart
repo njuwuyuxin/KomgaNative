@@ -99,7 +99,7 @@ class ReaderProgressCommitter {
       await _ref
           .read(downloadsProvider.notifier)
           .delete(book.withSource(sourceKey));
-    } on Object catch (error) {
+    } on Exception catch (error) {
       // 自动清理属于增强行为，失败不影响进度结算。
       debugPrint(
         'ReaderProgressCommitter: auto-delete completed download failed: $error',

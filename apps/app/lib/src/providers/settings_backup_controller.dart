@@ -82,7 +82,7 @@ class SettingsBackupController {
     if (appliedSettings) {
       try {
         await _ref.read(settingsProvider.notifier).replaceAll(prevSettings);
-      } on Object catch (error) {
+      } on Exception catch (error) {
         debugPrint(
           'SettingsBackupController: rollback settings failed: $error',
         );
@@ -91,7 +91,7 @@ class SettingsBackupController {
     if (appliedPrefs) {
       try {
         await _ref.read(readerPrefsProvider.notifier).replaceAll(prevPrefs);
-      } on Object catch (error) {
+      } on Exception catch (error) {
         debugPrint(
           'SettingsBackupController: rollback readerPrefs failed: $error',
         );
@@ -100,7 +100,7 @@ class SettingsBackupController {
     if (prevPinned != null && appliedSettings) {
       try {
         await _ref.read(pinnedSeriesControllerProvider).replaceAll(prevPinned);
-      } on Object catch (error) {
+      } on Exception catch (error) {
         debugPrint(
           'SettingsBackupController: rollback pinnedSeries failed: $error',
         );

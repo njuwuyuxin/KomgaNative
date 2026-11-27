@@ -97,7 +97,7 @@ class SessionController extends Notifier<SessionState> {
       state = saved == null
           ? const SessionDisconnected()
           : SessionConnected(saved);
-    } on Object {
+    } on Exception {
       if (!ref.mounted || state is! SessionLoading) return;
       state = const SessionDisconnected(
         failure: ConnectionFailure(ConnectionFailureKind.restoreFailed),
@@ -257,7 +257,7 @@ class SessionController extends Notifier<SessionState> {
       state = const SessionDisconnected(
         failure: ConnectionFailure(ConnectionFailureKind.protocol),
       );
-    } on Object {
+    } on Exception {
       state = const SessionDisconnected(
         failure: ConnectionFailure(ConnectionFailureKind.unexpected),
       );

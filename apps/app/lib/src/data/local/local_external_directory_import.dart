@@ -73,7 +73,7 @@ Future<LocalImportBatchResult> importExternalDirectoryToSandbox({
   final List<ExternalTreeEntry> entries;
   try {
     entries = await bridge.listTree(root);
-  } on Object {
+  } on Exception {
     return LocalImportBatchResult(
       failures: <ImportFailureItem>[
         ImportFailureItem(
@@ -311,7 +311,7 @@ Future<Uint8List?> _readSmallExternalBytes({
       return null;
     }
     return await bridge.readFileRange(entry.uri, 0, len, root: root);
-  } on Object {
+  } on Exception {
     return null;
   }
 }

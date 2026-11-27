@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
@@ -30,7 +31,7 @@ class FakeCache implements HttpCache {
   @override
   Future<Uint8List?> read(String scope, String url) async {
     reads.add(_key(scope, url));
-    if (failOnRead) throw StateError('模拟磁盘读失败');
+    if (failOnRead) throw const FileSystemException('模拟磁盘读失败');
     return entries[_key(scope, url)];
   }
 
@@ -39,7 +40,7 @@ class FakeCache implements HttpCache {
     final key = _key(scope, url);
     if (!pinnedKeys.contains(key)) return null;
     reads.add(key);
-    if (failOnRead) throw StateError('模拟磁盘读失败');
+    if (failOnRead) throw const FileSystemException('模拟磁盘读失败');
     return entries[key];
   }
 
@@ -52,7 +53,7 @@ class FakeCache implements HttpCache {
   ) async {
     writes.add(_key(scope, url));
     lastKind = kind;
-    if (failOnWrite) throw StateError('模拟磁盘写失败');
+    if (failOnWrite) throw const FileSystemException('模拟磁盘写失败');
     entries[_key(scope, url)] = body;
   }
 

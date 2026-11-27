@@ -24,7 +24,7 @@ Future<BorderCrop?> pageBorderCrop(
       width: image.width,
       height: image.height,
     );
-  } on Object {
+  } on Exception {
     return null;
   } finally {
     image?.dispose();

@@ -190,11 +190,11 @@ class SecureServerStore implements ServerStore {
     final String? raw;
     try {
       raw = await _storage.read(key: _key);
-    } on Object {
+    } on Exception {
       // Android 换机/密钥失效时自动清掉坏条目，避免后续重新登录也跟着报错。
       try {
         await _storage.delete(key: _key);
-      } on Object catch (error) {
+      } on Exception catch (error) {
         // 清理失败不阻断本次按空状态恢复。
         debugPrint('ServerStore: delete corrupted key failed: $error');
       }

@@ -20,7 +20,7 @@ Future<void> tryCloseArchiveReader(ComicArchiveReader? reader) async {
   if (reader == null) return;
   try {
     await reader.close();
-  } on Object catch (error) {
+  } on Exception catch (error) {
     debugPrint('localImport: reader.close failed during cleanup: $error');
   }
 }
@@ -41,13 +41,13 @@ Future<void> rollbackCommittedLocalBook({
         if (await file.exists()) await file.delete();
       }
     }
-  } on Object catch (error) {
+  } on Exception catch (error) {
     debugPrint('localImport: DB rollback failed for $bookId: $error');
   }
   if (passwordStore != null) {
     try {
       await passwordStore.deleteBookPassword(bookId);
-    } on Object catch (error) {
+    } on Exception catch (error) {
       debugPrint('localImport: password rollback failed for $bookId: $error');
     }
   }

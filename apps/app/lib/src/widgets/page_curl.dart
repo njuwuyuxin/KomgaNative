@@ -81,8 +81,11 @@ class PageCurlProgram {
       );
       _program = program;
       return program;
-    } on Object {
+    } on Exception {
       // 拿不到着色器就退回平移：翻页动画是锦上添花，不能让它打断阅读。
+      _loading = null;
+      return null;
+    } on FlutterError {
       _loading = null;
       return null;
     }

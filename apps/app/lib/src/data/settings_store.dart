@@ -41,7 +41,7 @@ class SecureSettingsStore implements SettingsStore {
     final String? raw;
     try {
       raw = await _storage.read(key: _key);
-    } on Object {
+    } on Exception {
       return AppSettings.defaults;
     }
     if (raw == null || raw.isEmpty) return AppSettings.defaults;
@@ -61,7 +61,7 @@ class SecureSettingsStore implements SettingsStore {
       final updated = mutate(await load());
       try {
         await _storage.write(key: _key, value: jsonEncode(updated.toJson()));
-      } on Object catch (error) {
+      } on Exception catch (error) {
         // 偏好写失败只影响下次启动，不该冒泡成 UI 错误。
         debugPrint('SettingsStore: write failed: $error');
       }

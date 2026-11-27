@@ -39,7 +39,7 @@ class ReaderPrefsController extends Notifier<ReaderPrefs> {
       final saved = await _store.load();
       if (!ref.mounted || saved == null || _touched) return;
       state = saved;
-    } on Object catch (error) {
+    } on Exception catch (error) {
       // 读不出偏好就用默认值：不能让设置存储读失败挡住阅读。
       debugPrint('ReaderPrefsController: load prefs failed: $error');
     }

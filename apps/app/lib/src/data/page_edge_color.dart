@@ -36,7 +36,7 @@ Future<List<RgbColor>> pageEdgeGradient(
       width: image.width,
       height: image.height,
     );
-  } on Object {
+  } on Exception {
     return const <RgbColor>[];
   } finally {
     image?.dispose();

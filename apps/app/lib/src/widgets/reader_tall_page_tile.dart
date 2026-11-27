@@ -123,7 +123,7 @@ final class TallImageSliceCache {
         codec = await descriptor.instantiateCodec(targetWidth: safeW);
         final frame = await codec.getNextFrame();
         fullImage = frame.image;
-      } on Object {
+      } on Exception {
         codec?.dispose();
         codec = await descriptor.instantiateCodec(
           targetHeight: kTallImageTriggerHeight.clamp(1, rawH),
@@ -156,7 +156,7 @@ final class TallImageSliceCache {
         out.add(sliceImg);
       }
       return out;
-    } on Object {
+    } on Exception {
       for (final img in out) {
         img.dispose();
       }

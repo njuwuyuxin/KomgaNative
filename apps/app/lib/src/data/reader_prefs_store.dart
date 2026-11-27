@@ -30,10 +30,10 @@ class SecureReaderPrefsStore implements ReaderPrefsStore {
     final String? raw;
     try {
       raw = await _storage.read(key: _key);
-    } on Object {
+    } on Exception {
       try {
         await _storage.delete(key: _key);
-      } on Object catch (error) {
+      } on Exception catch (error) {
         // 清理失败不阻断阅读器回退默认偏好。
         debugPrint('ReaderPrefsStore: delete corrupted key failed: $error');
       }

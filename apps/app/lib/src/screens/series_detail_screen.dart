@@ -166,7 +166,7 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
           seriesId: seriesId,
           sourceKey: sourceKey,
         );
-      } on Object {
+      } on ShelfFailure {
         failed++;
       }
     }

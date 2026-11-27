@@ -130,7 +130,7 @@ class ReadingSessionRecorder {
   Future<void> delete(int id) async {
     try {
       await _ref.read(progressDatabaseProvider).deleteReadingSession(id);
-    } on Object catch (error) {
+    } on Exception catch (error) {
       // 见 [record]。
       debugPrint('ReadingSessionRecorder: delete($id) failed: $error');
     }
@@ -139,7 +139,7 @@ class ReadingSessionRecorder {
   Future<void> deleteMany(Iterable<int> ids) async {
     try {
       await _ref.read(progressDatabaseProvider).deleteReadingSessions(ids);
-    } on Object catch (error) {
+    } on Exception catch (error) {
       // 见 [record]。
       debugPrint('ReadingSessionRecorder: deleteMany failed: $error');
     }
@@ -151,7 +151,7 @@ class ReadingSessionRecorder {
       await _ref
           .read(progressDatabaseProvider)
           .clearReadingSessions(scopes: scopes);
-    } on Object catch (error) {
+    } on Exception catch (error) {
       // 见 [record]。
       debugPrint('ReadingSessionRecorder: clear failed: $error');
     }
@@ -176,7 +176,7 @@ class ReadingSessionRecorder {
             endPage: draft.endPage,
             completed: draft.completed,
           );
-    } on Object catch (error) {
+    } on Exception catch (error) {
       // 历史记录不该影响阅读本身。
       debugPrint(
         'ReadingSessionRecorder: record(${draft.bookId}) failed: $error',

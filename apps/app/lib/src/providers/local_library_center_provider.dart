@@ -154,7 +154,7 @@ class LocalLibraryScanController extends Notifier<LocalLibraryScanState> {
           totalSummary =
               totalSummary +
               await scanner.discoverAndScanDocumentsDirectory(docs);
-        } on Object catch (error) {
+        } on Exception catch (error) {
           // Documents 路径不可用时跳过。
           debugPrint('LocalLibraryScan: iOS Documents scan skipped: $error');
         }

@@ -164,10 +164,15 @@ class PrefsBackup {
   ReaderPrefs toReaderPrefs() {
     try {
       return ReaderPrefs.fromJson(reader);
-    } on Object catch (error) {
+    } on FormatException catch (error) {
       throw PrefsBackupException(
         PrefsBackupErrorKind.invalidPrefs,
         'Failed to parse reader prefs: $error',
+      );
+    } on TypeError catch (error) {
+      throw PrefsBackupException(
+        PrefsBackupErrorKind.invalidPrefs,
+        'Invalid field type in reader prefs: $error',
       );
     }
   }
@@ -176,10 +181,15 @@ class PrefsBackup {
   AppSettings toAppSettings() {
     try {
       return AppSettings.fromJson(settings);
-    } on Object catch (error) {
+    } on FormatException catch (error) {
       throw PrefsBackupException(
         PrefsBackupErrorKind.invalidPrefs,
         'Failed to parse app settings: $error',
+      );
+    } on TypeError catch (error) {
+      throw PrefsBackupException(
+        PrefsBackupErrorKind.invalidPrefs,
+        'Invalid field type in app settings: $error',
       );
     }
   }

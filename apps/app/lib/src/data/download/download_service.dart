@@ -70,7 +70,7 @@ class KomgaDownloadService implements DownloadService {
     if (bookMeta != null) {
       try {
         await bookMeta!(book.id);
-      } on Object catch (error) {
+      } on Exception catch (error) {
         // 仅作离线元信息预热，失败不影响页图下载。
         debugPrint(
           'DownloadService: bookMeta(${book.id}) warmup failed: $error',

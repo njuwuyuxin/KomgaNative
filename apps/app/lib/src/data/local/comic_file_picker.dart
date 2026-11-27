@@ -89,7 +89,7 @@ final class PlatformComicFilePicker implements ComicFilePicker {
   Future<void> clearTemporaryCache() async {
     try {
       await FilePicker.clearTemporaryFiles();
-    } on Object catch (error) {
+    } on Exception catch (error) {
       // 平台不支持或清理失败绝不阻断已完成的入库结果。
       debugPrint('ComicFilePicker: clearTemporaryFiles failed: $error');
     }

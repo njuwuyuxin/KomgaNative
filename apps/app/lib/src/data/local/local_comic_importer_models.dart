@@ -117,7 +117,7 @@ Future<({String seriesId, String bookId})> commitComicReaderToDatabase({
       await coverFile.parent.create(recursive: true);
       await coverFile.writeAsBytes(encoded, flush: true);
     }
-  } on Object {
+  } on Exception {
     coverRelPath = null;
   }
 
@@ -177,7 +177,7 @@ Future<String?> applySidecarSeriesCover({
   Uint8List? encoded;
   try {
     encoded = await coverEncoder(imageBytes, direction: direction);
-  } on Object {
+  } on Exception {
     encoded = null;
   }
   final payload = (encoded != null && encoded.isNotEmpty)

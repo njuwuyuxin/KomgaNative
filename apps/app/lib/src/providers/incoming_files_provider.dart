@@ -39,7 +39,7 @@ class IncomingComicCoordinator {
         return result.importedBookIds.first;
       }
       return null;
-    } on Object {
+    } on Exception {
       await _tryDeleteTempCopy(incoming.path);
       return null;
     } finally {

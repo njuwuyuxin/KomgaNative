@@ -28,8 +28,10 @@ abstract final class LiquidGlassProgram {
       _program = await ui.FragmentProgram.fromAsset(
         'packages/yomu_design_system/shaders/liquid_glass.frag',
       );
-    } on Object catch (error) {
+    } on Exception catch (error) {
       // 玻璃是装饰：拿不到着色器就用合成版，不打断启动。
+      debugPrint('LiquidGlassProgram: fallback to composited glass ($error)');
+    } on FlutterError catch (error) {
       debugPrint('LiquidGlassProgram: fallback to composited glass ($error)');
     }
   }

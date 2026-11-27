@@ -91,9 +91,12 @@ Future<void> drainUpToLimit(
       drained += chunk.length;
       if (drained >= maxDrainBytes) break;
     }
-  } on Object catch (error) {
-    // 客户端已断开或流已被监听时安全忽略。
+  } on IOException catch (error) {
+    // 客户端已断开时安全忽略。
     debugPrint('WifiTransfer: drain stream ignored: $error');
+  } on StateError catch (error) {
+    // 流已被监听时安全忽略。
+    debugPrint('WifiTransfer: drain stream already listened: $error');
   }
 }
 

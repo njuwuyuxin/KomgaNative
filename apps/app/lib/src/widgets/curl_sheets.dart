@@ -103,7 +103,7 @@ Future<ui.Image?> _decodeBytesDirectly(Uint8List bytes) async {
     codec = await ui.instantiateImageCodec(bytes);
     final frame = await codec.getNextFrame();
     return frame.image;
-  } on Object {
+  } on Exception {
     return null;
   } finally {
     codec?.dispose();

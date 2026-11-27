@@ -51,8 +51,10 @@ class SystemNetworkProbe implements NetworkProbe {
         }
       }
       return cellular ? NetworkKind.cellular : NetworkKind.unknown;
-    } on Object {
+    } on SocketException {
       // 查不到就放行（见 [NetworkKind.unknown] 的注释）。
+      return NetworkKind.unknown;
+    } on OSError {
       return NetworkKind.unknown;
     }
   }

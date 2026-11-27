@@ -62,7 +62,8 @@ class ProgressDatabase extends _$ProgressDatabase {
         }
         if (escaped.isNotEmpty) {
           await customStatement(
-            "UPDATE reading_sessions SET scope = '$escaped' WHERE scope = ''",
+            "UPDATE reading_sessions SET scope = '$escaped' "
+            "WHERE scope = '' OR scope = '$kLocalSourceKey'",
           );
         }
       }

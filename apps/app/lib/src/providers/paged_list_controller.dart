@@ -54,7 +54,6 @@ abstract class PagedListController<T> extends AsyncNotifier<PageResult<T>> {
       );
     } on ShelfFailure catch (failure) {
       if (!ref.mounted || generation != _generation) return;
-      _loadingMore = false;
       _loadMoreFailure = failure;
       // 触发一次保留旧值的重建，使监听者在保留已有结果的同时感知翻页失败（SCH-03）。
       state = AsyncData<PageResult<T>>(
@@ -65,9 +64,10 @@ abstract class PagedListController<T> extends AsyncNotifier<PageResult<T>> {
           size: current.size,
         ),
       );
-    } on Object {
-      if (!ref.mounted || generation != _generation) return;
-      _loadingMore = false;
+    } finally {
+      if (ref.mounted && generation == _generation) {
+        _loadingMore = false;
+      }
     }
   }
 }

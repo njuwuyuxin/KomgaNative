@@ -32,7 +32,7 @@ class DownloadQueuePersistence {
   Future<bool> isDownloaded(String bookId, {required String scope}) async {
     try {
       return await _db.download(bookId, scope: scope) != null;
-    } on Object catch (error, stackTrace) {
+    } on Exception catch (error, stackTrace) {
       debugPrint('DownloadQueuePersistence.isDownloaded failed: $error');
       onError?.call(error, stackTrace);
       // 查不了按未下完恢复。

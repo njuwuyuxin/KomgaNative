@@ -25,7 +25,7 @@ Future<void> maybeDeleteReadDownload(WidgetRef ref, Book book) async {
     );
     if (record == null) return;
     await ref.read(downloadsProvider.notifier).delete(book);
-  } on Object catch (error) {
+  } on Exception catch (error) {
     // 自动删除是"锦上添花"：失败不影响标记已读本身。
     debugPrint('downloadPolicyGate: auto-delete failed: $error');
   }
@@ -42,7 +42,7 @@ Future<String?> downloadBlockReason(
     if (policy == null || !policy.wifiOnly) return null;
     final kind = await ref.read(networkProbeProvider).current();
     return kind == NetworkKind.cellular ? l10n.downloadWifiOnlyBlocked : null;
-  } on Object catch (error) {
+  } on Exception catch (error) {
     // 设置读不出来就放行：下载不该因为"读不到设置"而不可用。
     debugPrint('downloadPolicyGate: network probe failed: $error');
     return null;
@@ -56,7 +56,7 @@ Future<bool> isBlockedByWifiPolicy(Ref ref) async {
   try {
     return await ref.read(networkProbeProvider).current() ==
         NetworkKind.cellular;
-  } on Object catch (error) {
+  } on Exception catch (error) {
     debugPrint('DownloadsController: network probe failed: $error');
     return false;
   }

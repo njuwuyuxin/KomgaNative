@@ -54,7 +54,7 @@ final class LocalReaderRepository implements ReaderRepository {
       try {
         final reader = await future;
         await reader.close();
-      } on Object catch (error) {
+      } on Exception catch (error) {
         // 销毁阶段忽略底层关闭异常。
         debugPrint('LocalReaderRepository: dispose close failed: $error');
       }
@@ -68,7 +68,7 @@ final class LocalReaderRepository implements ReaderRepository {
     try {
       final reader = await removed;
       await reader.close();
-    } on Object catch (error) {
+    } on Exception catch (error) {
       // 忽略已失效句柄。
       debugPrint(
         'LocalReaderRepository: closeBookHandle($bookId) failed: $error',

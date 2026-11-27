@@ -91,7 +91,7 @@ class ShelfController extends Notifier<ShelfState> {
       if (libraries.any((Library library) => library.id == stored)) {
         return stored;
       }
-    } on Object {
+    } on ShelfFailure {
       return stored;
     }
     return null;

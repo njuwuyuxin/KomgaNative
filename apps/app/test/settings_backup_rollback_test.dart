@@ -13,6 +13,8 @@ import 'package:yomu/src/providers/progress_providers.dart';
 import 'package:yomu/src/providers/reader_prefs_provider.dart';
 import 'package:yomu/src/providers/settings_backup_controller.dart';
 import 'package:yomu/src/providers/settings_provider.dart';
+import 'package:yomu/src/session/server_store.dart';
+import 'package:yomu/src/session/session_controller.dart';
 
 /// P1-5：设置备份还原原子性测试——任一步骤失败必须把已写入的控制器回滚至旧状态。
 void main() {
@@ -32,6 +34,7 @@ void main() {
         progressDatabaseProvider.overrideWithValue(db),
         readerPrefsStoreProvider.overrideWithValue(prefsStore),
         settingsStoreProvider.overrideWithValue(settingsStore),
+        serverStoreProvider.overrideWithValue(InMemoryServerStore()),
       ],
     );
     addTearDown(container.dispose);
@@ -86,6 +89,7 @@ void main() {
           progressDatabaseProvider.overrideWithValue(db),
           readerPrefsStoreProvider.overrideWithValue(prefsStore),
           settingsStoreProvider.overrideWithValue(settingsStore),
+          serverStoreProvider.overrideWithValue(InMemoryServerStore()),
         ],
       );
       addTearDown(container.dispose);

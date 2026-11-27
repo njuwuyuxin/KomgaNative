@@ -94,7 +94,7 @@ class WifiTransferController extends Notifier<WifiTransferState> {
       final urls = await server.start(pin: state.pinEnabled ? state.pin : null);
       if (!ref.mounted) return;
       state = state.copyWith(running: true, starting: false, urls: urls);
-    } on Object catch (e) {
+    } on Exception catch (e) {
       if (!ref.mounted) return;
       state = state.copyWith(
         running: false,

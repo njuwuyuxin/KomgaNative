@@ -31,7 +31,7 @@ final FutureProvider<AppInfo> appInfoProvider = FutureProvider<AppInfo>((
       version: info.version.isEmpty ? kFallbackAppVersion : info.version,
       buildNumber: info.buildNumber,
     );
-  } on Object {
+  } on Exception {
     return const AppInfo(version: kFallbackAppVersion, buildNumber: '');
   }
 });

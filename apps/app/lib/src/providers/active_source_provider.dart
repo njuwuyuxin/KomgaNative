@@ -51,7 +51,7 @@ class ActiveSourceController extends Notifier<ContentSource> {
         _persistedKey = saved.activeSourceKey;
       }
       _reconcile();
-    } on Object {
+    } on Exception {
       _restored = true;
       if (ref.mounted) _reconcile();
     }

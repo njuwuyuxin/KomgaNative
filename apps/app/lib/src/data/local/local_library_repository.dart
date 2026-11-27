@@ -181,7 +181,11 @@ final class LocalLibraryRepository implements LibraryRepository {
     try {
       reader = await _readerFactory.open(row, sniffDimensions: false);
       return await reader.readCoverImage() ?? await reader.readPage(1);
-    } on Object {
+    } on ArchiveException {
+      return null;
+    } on FileSystemException {
+      return null;
+    } on Exception {
       return null;
     } finally {
       await reader?.close();

@@ -60,7 +60,7 @@ Future<Uint8List?> encodeDefaultCoverThumbnail(
 
     final outData = await cropped.toByteData(format: ui.ImageByteFormat.png);
     return outData?.buffer.asUint8List() ?? rawPageBytes;
-  } on Object {
+  } on Exception {
     // 无头单测中构造的最小头部假图片不含完整像素载荷：回退保存原始字节作为缩略图。
     return rawPageBytes;
   } finally {

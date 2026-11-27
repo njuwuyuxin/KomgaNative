@@ -135,7 +135,7 @@ class KomgaSession {
     final Uint8List? body;
     try {
       body = await cache.read(_scope, url);
-    } on Object {
+    } on Exception {
       return null;
     }
     if (body == null) return null;
@@ -152,7 +152,7 @@ class KomgaSession {
     try {
       final body = Uint8List.fromList(utf8.encode(jsonEncode(data)));
       await cache.write(_scope, url, CacheKind.json, body);
-    } on Object {
+    } on Exception {
       // 写缓存失败不影响在线请求。
     }
   }
@@ -252,7 +252,7 @@ class KomgaSession {
     if (cache == null) return null;
     try {
       return await cache.readPinned(_scope, url);
-    } on Object {
+    } on Exception {
       return null;
     }
   }
@@ -273,7 +273,7 @@ class KomgaSession {
     cache.reportOffline(_scope, priority: priority);
     try {
       return await cache.read(_scope, url);
-    } on Object {
+    } on Exception {
       return null;
     }
   }
@@ -283,7 +283,7 @@ class KomgaSession {
     if (cache == null) return;
     try {
       await cache.write(_scope, url, CacheKind.image, bytes);
-    } on Object {
+    } on Exception {
       // 缓存写失败不影响本次读取。
     }
   }
