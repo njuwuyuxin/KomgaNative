@@ -91,18 +91,30 @@ Future<void> _stop(_Tools tools) async {
   }
   for (final serial in serials) {
     stdout.writeln('关闭 $serial ...');
-    await _run(tools.adb.path, <String>['-s', serial, 'emu', 'kill']);
+    await _stopSerial(tools, serial);
   }
 }
 
 Future<void> _start(_Tools tools, _Options options) async {
-  final running = await _emulatorSerials(tools);
+  var running = await _emulatorSerials(tools);
   for (final serial in running) {
-    if (await _avdName(tools, serial) == options.avd) {
-      stdout.writeln('${options.avd} 已在运行（$serial），跳过启动。');
-      await _afterBoot(options, serial);
-      return;
+    if (await _avdName(tools, serial) != options.avd) continue;
+    final headless = await _isHeadless(options.avd);
+    if (headless && !options.headless) {
+      // 上一次是 `--headless` 起的：进程活着、adb 也连得上，但根本没有窗口。
+      // 用户要的是窗口模式，直接复用会让人以为"模拟器开着却找不到"。
+      stdout.writeln(
+        '${options.avd} 正在以 --headless 运行（$serial，没有窗口），先关掉再以窗口模式启动...',
+      );
+      await _stopSerial(tools, serial);
+      running = await _emulatorSerials(tools);
+      break;
     }
+    stdout.writeln(
+      '${options.avd} 已在运行（$serial${headless ? '，--headless 无窗口' : ''}），跳过启动。',
+    );
+    await _afterBoot(options, serial);
+    return;
   }
 
   final accel = await _accelCheck(tools);
@@ -322,6 +334,42 @@ Future<Map<String, String>> _emulatorStates(_Tools tools) async {
 
 Future<List<String>> _emulatorSerials(_Tools tools) async =>
     (await _emulatorStates(tools)).keys.toList();
+
+/// 关闭一个模拟器并等它真的从 adb 里消失（最多 30 秒）。
+Future<void> _stopSerial(_Tools tools, String serial) async {
+  await _run(tools.adb.path, <String>['-s', serial, 'emu', 'kill']);
+  for (var i = 0; i < 30; i++) {
+    await Future<void>.delayed(const Duration(seconds: 1));
+    if (!(await _emulatorSerials(tools)).contains(serial)) return;
+  }
+  stderr.writeln('警告：$serial 30 秒内没有退出，继续启动可能会失败。');
+}
+
+/// 判断某个 AVD 是不是 `-no-window`（无窗口）启动的。
+///
+/// 模拟器没有通过 adb 暴露"有没有窗口"，只能查宿主进程命令行：
+/// Windows 用 PowerShell 读 Win32_Process，macOS/Linux 用 ps。
+Future<bool> _isHeadless(String avd) async {
+  final exe = Platform.isWindows ? 'powershell' : 'ps';
+  final args = Platform.isWindows
+      ? <String>[
+          '-NoProfile',
+          '-NonInteractive',
+          '-Command',
+          r"Get-CimInstance Win32_Process | Where-Object { $_.Name -like 'qemu*' } | ForEach-Object { $_.CommandLine }",
+        ]
+      : <String>['-eww', '-o', 'args='];
+  try {
+    final result = await Process.run(exe, args);
+    for (final line in '${result.stdout}'.split('\n')) {
+      if (line.contains('-avd $avd') && line.contains('-no-window'))
+        return true;
+    }
+  } on ProcessException {
+    return false;
+  }
+  return false;
+}
 
 /// 查运行中的模拟器用的是哪个 AVD（`adb emu avd name` 返回 "名字\nOK"）。
 Future<String?> _avdName(_Tools tools, String serial) async {

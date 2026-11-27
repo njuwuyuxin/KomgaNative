@@ -345,6 +345,7 @@ dart run tool/emulator.dart --stop   # 关机
 
 - 用 `ANDROID_HOME` / `ANDROID_SDK_ROOT` 找 SDK，找不到退回 `D:\DevTools\android-sdk`；
 - 同名 AVD 已在运行时直接复用（打印 serial 后退出），不会重复启动；`--run` 仍会接上 `flutter run`；
+- 复用前会判断现有实例是不是 `--headless` 起的（查宿主进程命令行里的 `-no-window`）：是的话**先关掉再以窗口模式重启**，避免"脚本说在运行、任务栏却找不到窗口"；
 - **绝对路径**调用 `emulator.exe` / `adb.exe`，不依赖 PATH；
 - AVD 不存在时用 `avdmanager` 创建（`pixel_7` / API 36），随后 `-memory 4096 -gpu host -no-boot-anim` 启动；
 - 默认带 `-feature -Vulkan`（原因见 §11.4 第一条），代价是不能用 guest Vulkan，本项目用不到；
@@ -368,6 +369,7 @@ dart run tool/emulator.dart --stop   # 关机
 | `silent_install.bat` 里 `sc start aehd` 失败 | Hyper-V 开着，或内核隔离开着 | 关掉后重试（§11.2） |
 | `emulator` 命令找不到 | bootstrap 写 PATH 时该目录还不存在，被跳过 | 用 `dart run tool/emulator.dart`；或补 PATH 后重开终端 |
 | 窗口黑屏 / 启动即崩 | 显卡驱动、远程桌面、多显卡 | `dart run tool/emulator.dart --gpu swiftshader_indirect` |
+| 脚本提示"已在运行"，但任务栏里找不到模拟器窗口 | 这个实例是 `--headless`（`-no-window`）起的：进程活着、adb 能连、App 也在跑，就是没有窗口 | 重新执行 `dart run tool/emulator.dart`，脚本会自动关掉 headless 实例并重启为窗口模式；也可以 `--stop` 后手动重启。确认方式：`Get-CimInstance Win32_Process | ? Name -like 'qemu*' | % CommandLine` 里有没有 `-no-window` |
 | 首次启动 0.5–3 分钟 | 冷启动 + 首次解压镜像 | 正常；之后走 quickboot 快照，异常时加 `--cold` |
 | C 盘被占 | AVD 默认在 `%USERPROFILE%\.android\avd` | 设 `ANDROID_AVD_HOME` 指向别的盘，再重建 AVD |
 
