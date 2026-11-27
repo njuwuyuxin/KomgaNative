@@ -42,8 +42,22 @@ Future<String?> downloadBlockReason(
     if (policy == null || !policy.wifiOnly) return null;
     final kind = await ref.read(networkProbeProvider).current();
     return kind == NetworkKind.cellular ? l10n.downloadWifiOnlyBlocked : null;
-  } on Object {
+  } on Object catch (error) {
     // 设置读不出来就放行：下载不该因为"读不到设置"而不可用。
+    debugPrint('downloadPolicyGate: network probe failed: $error');
     return null;
+  }
+}
+
+/// 供下载队列调度器复用：仅当开启"仅 Wi-Fi"且探测到蜂窝网络时返回 true。
+Future<bool> isBlockedByWifiPolicy(Ref ref) async {
+  final policy = ref.read(downloadPolicyProvider).value;
+  if (!(policy?.wifiOnly ?? false)) return false;
+  try {
+    return await ref.read(networkProbeProvider).current() ==
+        NetworkKind.cellular;
+  } on Object catch (error) {
+    debugPrint('DownloadsController: network probe failed: $error');
+    return false;
   }
 }

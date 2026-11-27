@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/src/data/cache/http_cache_database.dart';
@@ -8,8 +7,8 @@ import 'package:yomu/src/data/download/download_queue_persistence.dart';
 import 'package:yomu/src/data/download/download_service.dart';
 import 'package:yomu/src/data/shelf_failure.dart';
 import 'package:yomu/src/providers/cache_providers.dart';
+import 'package:yomu/src/providers/download_policy_gate.dart';
 import 'package:yomu/src/providers/download_providers.dart';
-import 'package:yomu_platform/yomu_platform.dart';
 
 /// 单本书的下载状态：进行中（带进度）、排队中或失败种类（按 Locale 渲染）。
 class DownloadStatus {
@@ -31,9 +30,10 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
   final Set<String> _running = <String>{};
   int _concurrency = 1;
   bool _paused = false;
-  bool _restored = false;
+  final Set<String> _restoredScopes = <String>{};
   bool _checkingWifi = false;
-  String _scope = '';
+
+  String get _currentScope => ref.read(downloadScopeProvider);
 
   bool get paused => _paused;
 
@@ -57,11 +57,19 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
     Book? fallback,
     String? sourceKey,
   }) async {
-    final book = await _resolveBook(
-      bookId,
-      fallback: fallback,
-      sourceKey: sourceKey,
-    );
+    final cached = fallback ?? _knownBooks[bookId];
+    final Book? book;
+    if (cached != null) {
+      book = cached;
+    } else {
+      final scope = (sourceKey != null && sourceKey.isNotEmpty)
+          ? sourceKey
+          : _scopeForId(bookId);
+      if (scope.isEmpty) return false;
+      final query = (sourceKey: scope, bookId: bookId);
+      ref.invalidate(bookByIdProvider(query));
+      book = await ref.read(bookByIdProvider(query).future);
+    }
     if (book == null || _disposed) return false;
     _clear(bookId);
     await start(book);
@@ -69,51 +77,35 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
   }
 
   Future<int> retryFailed() async {
-    final failed = <String>[
-      for (final entry in state.entries)
-        if (entry.value.hasError) entry.key,
-    ];
     var queued = 0;
-    for (final id in failed) {
-      if (await retryOne(id)) queued++;
+    for (final entry in state.entries.toList()) {
+      if (entry.value.hasError && await retryOne(entry.key)) queued++;
     }
     return queued;
-  }
-
-  Future<Book?> _resolveBook(
-    String bookId, {
-    Book? fallback,
-    String? sourceKey,
-  }) async {
-    final cached = fallback ?? _knownBooks[bookId];
-    if (cached != null) return cached;
-    final scope = (sourceKey != null && sourceKey.isNotEmpty)
-        ? sourceKey
-        : _scopeForId(bookId);
-    if (scope.isEmpty) return null;
-    final query = (sourceKey: scope, bookId: bookId);
-    ref.invalidate(bookByIdProvider(query));
-    return ref.read(bookByIdProvider(query).future);
   }
 
   @override
   Map<String, DownloadStatus> build() {
     _disposed = false;
-    _restored = false;
+    _restoredScopes.clear();
     _paused = false;
     _checkingWifi = false;
     _queue.clear();
     _knownBooks.clear();
     _running.clear();
-    _scope = ref.watch(downloadScopeProvider);
     ref.onDispose(() => _disposed = true);
+    // 不 watch downloadScopeProvider：切换分组（如服务器 A -> 本机）不得重建控制器，
+    // 否则进行中任务状态丢失、队列停摆、并发上限失效；改为按需监听各分区持久化队列恢复。
     ref.listen<AsyncValue<List<DownloadQueueEntry>>>(downloadQueueProvider, (
       AsyncValue<List<DownloadQueueEntry>>? _,
       AsyncValue<List<DownloadQueueEntry>> next,
     ) {
       final entries = next.value;
       if (entries == null || entries.isEmpty) return;
-      unawaited(Future<void>.microtask(() => _restore(entries)));
+      final scope = _currentScope;
+      if (_restoredScopes.contains(scope)) return;
+      _restoredScopes.add(scope);
+      unawaited(Future<void>.microtask(() => _restore(entries, scope)));
     }, fireImmediately: true);
     return const <String, DownloadStatus>{};
   }
@@ -121,11 +113,18 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
   DownloadService _serviceFor(String scope) =>
       ref.read(downloadServiceForSourceProvider(scope.isEmpty ? null : scope));
 
-  String _scopeForBook(Book book) => book.isCloud ? book.sourceKey : _scope;
+  String _scopeForBook(Book book) =>
+      book.isCloud ? book.sourceKey : _currentScope;
+
+  Book _tagBook(Book book) {
+    if (book.isCloud) return book;
+    final scope = _currentScope;
+    return scope.isNotEmpty ? book.withSource(scope) : book;
+  }
 
   String _scopeForId(String bookId) => _knownBooks[bookId] is Book
       ? _scopeForBook(_knownBooks[bookId]!)
-      : _scope;
+      : _currentScope;
 
   void _invalidateDownloaded(String bookId, String scope) {
     final scoped = scope.isEmpty ? null : scope;
@@ -144,24 +143,22 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
   DownloadQueuePersistence get _queueStore =>
       DownloadQueuePersistence(ref.read(httpCacheDatabaseProvider));
 
-  Future<void> _restore(List<DownloadQueueEntry> entries) async {
-    if (_restored || _disposed) return;
-    _restored = true;
-    for (final entry in entries) {
-      if (_disposed) return;
-      if (_running.contains(entry.bookId) ||
-          _queue.any((Book q) => q.id == entry.bookId)) {
-        continue;
-      }
-      if (await _queueStore.isDownloaded(entry.bookId, scope: _scope)) {
-        _queueStore.dequeue(entry.bookId, scope: _scope);
-        continue;
-      }
-      final book = _queueStore.toBook(entry, fallbackScope: _scope);
+  Future<void> _restore(
+    List<DownloadQueueEntry> entries,
+    String fallbackScope,
+  ) async {
+    if (_disposed) return;
+    final books = await _queueStore.filterPendingEntries(
+      entries,
+      fallbackScope: fallbackScope,
+      isAlreadyTracked: _isActiveOrQueued,
+    );
+    if (_disposed || books.isEmpty) return;
+    for (final book in books) {
       _knownBooks[book.id] = book;
       _queue.add(book);
-      if (state[entry.bookId] == null) {
-        _set(entry.bookId, const DownloadStatus(queued: true));
+      if (state[book.id] == null) {
+        _set(book.id, const DownloadStatus(queued: true));
       }
     }
     if (_queue.isNotEmpty) await _pump();
@@ -205,13 +202,14 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
       _queue.any((Book q) => q.id == bookId);
 
   void _enqueueAndPersist(Book book) {
-    final scope = _scopeForBook(book);
-    _knownBooks[book.id] = book;
-    _queue.add(book);
-    if (state[book.id] == null) {
-      _set(book.id, const DownloadStatus(queued: true));
+    final tagged = _tagBook(book);
+    final scope = _scopeForBook(tagged);
+    _knownBooks[tagged.id] = tagged;
+    _queue.add(tagged);
+    if (state[tagged.id] == null) {
+      _set(tagged.id, const DownloadStatus(queued: true));
     }
-    _queueStore.enqueue(book, scope: scope);
+    _queueStore.enqueue(tagged, scope: scope);
   }
 
   void cancelMany(Iterable<String> bookIds) {
@@ -227,21 +225,14 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
         _running.length >= _concurrency) {
       return;
     }
-    final policy = ref.read(downloadPolicyProvider).value;
-    if (policy?.wifiOnly ?? false) {
+    if (ref.read(downloadPolicyProvider).value?.wifiOnly ?? false) {
       if (_checkingWifi) return;
       _checkingWifi = true;
-      try {
-        final kind = await ref.read(networkProbeProvider).current();
-        if (kind == NetworkKind.cellular) {
-          if (!_disposed && !_paused) pauseAll();
-          return;
-        }
-      } on Object catch (error) {
-        // 探测失败按 unknown 放行。
-        debugPrint('DownloadsController: network probe failed: $error');
-      } finally {
-        _checkingWifi = false;
+      final blocked = await isBlockedByWifiPolicy(ref);
+      _checkingWifi = false;
+      if (blocked) {
+        if (!_disposed && !_paused) pauseAll();
+        return;
       }
       if (_paused || _disposed) return;
     }
@@ -296,7 +287,7 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
     for (final id in pending) {
       _serviceFor(_scopeForId(id)).cancel(id);
     }
-    _queueStore.clear(scope: _scope);
+    _queueStore.clear();
     if (_disposed) return;
     state = <String, DownloadStatus>{
       for (final entry in state.entries)
