@@ -127,6 +127,7 @@ final Provider<LocalLibraryRepository> localLibraryRepositoryProvider =
       return LocalLibraryRepository(
         ref.watch(progressDatabaseProvider),
         ref.watch(localComicsStorageProvider),
+        passwordStore: ref.watch(archivePasswordStoreProvider),
       );
     });
 
