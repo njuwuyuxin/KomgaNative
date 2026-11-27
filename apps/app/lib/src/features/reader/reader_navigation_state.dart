@@ -1,9 +1,49 @@
-import 'package:flutter/services.dart' show KeyEvent;
+import 'package:flutter/services.dart'
+    show KeyDownEvent, KeyEvent, LogicalKeyboardKey;
 import 'package:yomu/src/data/reader_prefs.dart';
-import 'package:yomu/src/widgets/reader_content_viewport.dart';
 import 'package:yomu/src/features/reader/reader_layout.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu_reader/yomu_reader.dart';
+
+/// 阅读器键盘快捷键的语义动作（纯值类型，便于无 Widget 树单测）。
+sealed class ReaderKeyAction {
+  const ReaderKeyAction();
+}
+
+final class ReaderTurnAction extends ReaderKeyAction {
+  const ReaderTurnAction(this.delta);
+
+  final int delta;
+}
+
+final class ReaderExitAction extends ReaderKeyAction {
+  const ReaderExitAction();
+}
+
+/// 将键盘事件映射为阅读器语义动作（无关按键返回 null）。
+ReaderKeyAction? resolveReaderKeyAction(
+  KeyEvent event, {
+  required bool rightToLeft,
+}) {
+  if (event is! KeyDownEvent) return null;
+  final key = event.logicalKey;
+  if (key == LogicalKeyboardKey.arrowRight) {
+    return ReaderTurnAction(rightToLeft ? -1 : 1);
+  }
+  if (key == LogicalKeyboardKey.arrowLeft) {
+    return ReaderTurnAction(rightToLeft ? 1 : -1);
+  }
+  if (key == LogicalKeyboardKey.pageDown || key == LogicalKeyboardKey.space) {
+    return const ReaderTurnAction(1);
+  }
+  if (key == LogicalKeyboardKey.pageUp) {
+    return const ReaderTurnAction(-1);
+  }
+  if (key == LogicalKeyboardKey.escape) {
+    return const ReaderExitAction();
+  }
+  return null;
+}
 
 /// 翻页指令的执行结果（供外层编排决定更新页码还是切换下一本）。
 sealed class ReaderTurnOutcome {

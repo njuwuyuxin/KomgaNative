@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:yomu/src/data/progress/progress_database.dart';
+import 'package:yomu_domain/yomu_domain.dart';
 
 /// 某一天读过的一本书（按 `scope + bookId` 去重，汇总当天时长并保留最新一次阅读时间）。
 class ReadingDayBook {
@@ -19,6 +20,12 @@ class ReadingDayBook {
   final String bookName;
   final int minutes;
   final DateTime lastReadAt;
+
+  /// 该条历史是否归属本机书库（把源键归属判断留在数据层，UI 不直接探测原始键）。
+  bool get isLocal => isLocalSourceKey(resolvedScope);
+
+  /// 归一化后的内容源分区键（兼容历史空键）。
+  String get resolvedScope => normalizeLegacySourceKey(scope);
 }
 
 /// 某一天的阅读量（Insights 热力图的一格）。

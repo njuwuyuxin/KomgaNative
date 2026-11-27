@@ -1,4 +1,3 @@
-import 'package:flutter/services.dart' show KeyDownEvent, LogicalKeyboardKey;
 import 'package:material_ui/material_ui.dart';
 import 'package:yomu/src/data/reader_prefs.dart';
 import 'package:yomu/src/widgets/page_curl.dart';
@@ -9,46 +8,6 @@ import 'package:yomu/src/widgets/reader_vertical_view.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu_reader/yomu_reader.dart';
-
-/// 阅读器键盘快捷键的语义动作（纯值类型，便于无 Widget 树单测）。
-sealed class ReaderKeyAction {
-  const ReaderKeyAction();
-}
-
-final class ReaderTurnAction extends ReaderKeyAction {
-  const ReaderTurnAction(this.delta);
-
-  final int delta;
-}
-
-final class ReaderExitAction extends ReaderKeyAction {
-  const ReaderExitAction();
-}
-
-/// 将键盘事件映射为阅读器语义动作（无关按键返回 null）。
-ReaderKeyAction? resolveReaderKeyAction(
-  KeyEvent event, {
-  required bool rightToLeft,
-}) {
-  if (event is! KeyDownEvent) return null;
-  final key = event.logicalKey;
-  if (key == LogicalKeyboardKey.arrowRight) {
-    return ReaderTurnAction(rightToLeft ? -1 : 1);
-  }
-  if (key == LogicalKeyboardKey.arrowLeft) {
-    return ReaderTurnAction(rightToLeft ? 1 : -1);
-  }
-  if (key == LogicalKeyboardKey.pageDown || key == LogicalKeyboardKey.space) {
-    return const ReaderTurnAction(1);
-  }
-  if (key == LogicalKeyboardKey.pageUp) {
-    return const ReaderTurnAction(-1);
-  }
-  if (key == LogicalKeyboardKey.escape) {
-    return const ReaderExitAction();
-  }
-  return null;
-}
 
 /// 阅读器正文视口：根据模式切换条漫纵向滚动与翻页绘制，并统一应用图像滤镜（P3-1）。
 class ReaderContentViewport extends StatelessWidget {

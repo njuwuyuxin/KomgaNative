@@ -87,7 +87,7 @@ class _ReadListPickerSheet extends ConsumerWidget {
           summaryKey: const Key('readlist-create-summary'),
           okKey: const Key('readlist-create-ok'),
         );
-        if (form == null) return null;
+        if (!context.mounted || form == null) return null;
         markSaving();
         final created = await ref
             .read(collectionsControllerProvider.notifier)

@@ -235,9 +235,10 @@ extension _TurnImages on _PageTurn {
     final sourceKey =
         ScopedSourceScope.readOf(context) ??
         ref.read(activeSourceProvider).sourceKey;
-    final bytes = ref
-        .read(readerRepositoryForSourceProvider(sourceKey))
-        .cachedPageImage(widget.bookId, pageIndex + 1);
+    final bytes = ref.read(readerCachedPageLookupProvider(sourceKey))(
+      widget.bookId,
+      pageIndex + 1,
+    );
     if (bytes == null) return null;
     final adopted = trySyncImageFromCache(bytes);
     if (adopted != null) _sheets.putSync(pageIndex, adopted);
@@ -282,9 +283,11 @@ extension _TurnImages on _PageTurn {
     final sourceKey =
         ScopedSourceScope.readOf(context) ??
         ref.read(activeSourceProvider).sourceKey;
-    final repository = ref.read(readerRepositoryForSourceProvider(sourceKey));
     final page = pageIndex + 1;
-    final cached = repository.cachedPageImage(bookId, page);
+    final cached = ref.read(readerCachedPageLookupProvider(sourceKey))(
+      bookId,
+      page,
+    );
     final Uint8List resolvedBytes;
     if (cached != null) {
       final sync = trySyncImageFromCache(cached);

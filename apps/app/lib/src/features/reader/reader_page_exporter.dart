@@ -1,32 +1,21 @@
 import 'dart:async';
 
 import 'package:flutter/services.dart' show PlatformException;
-import 'package:go_router/go_router.dart';
-import 'package:material_ui/material_ui.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/src/data/page_save.dart';
 import 'package:yomu/src/data/page_share.dart';
 import 'package:yomu/src/data/reader_repository.dart';
 import 'package:yomu/src/data/shelf_failure.dart';
+import 'package:yomu/src/features/reader/reader_layout.dart';
 import 'package:yomu/src/l10n/failure_text.dart';
 import 'package:yomu/src/providers/reader_prefs_provider.dart';
-import 'package:yomu/src/screens/reader_args.dart';
-import 'package:yomu/src/features/reader/reader_layout.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
-import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu_platform/yomu_platform.dart';
 import 'package:yomu_reader/yomu_reader.dart';
 
-/// 阅读器辅助动作执行器：画面保存至相册、系统分享、双页分组切换与切到下一本（P3-1）。
+/// 阅读器纯业务导出与分组执行器：画面保存至相册、系统分享与双页分组切换（无 UI / 路由依赖，P1-5）。
 class ReaderPageExporter {
   bool _savingImage = false;
-
-  /// 在阅读器顶部展示轻提示（自动替换前一条）。
-  void showToast(BuildContext context, String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
-  }
 
   /// 保存当前单页或双页合图至系统相册；返回应提示给用户的文案（被重入跳过时返回 null）。
   Future<String?> saveScreenImage({
@@ -124,24 +113,6 @@ class ReaderPageExporter {
       toast: next == null
           ? l10n.readerGroupAutomatic
           : l10n.readerGroupFrom(clamped),
-    );
-  }
-
-  /// 打开下一本（优先走测试接缝，生产环境替换当前阅读路由）。
-  void openNextBook(
-    BuildContext context, {
-    required Book next,
-    required ReadingDirection direction,
-    required String sourceKey,
-    void Function(Book next)? overrideHandler,
-  }) {
-    if (overrideHandler != null) {
-      overrideHandler(next);
-      return;
-    }
-    context.pushReplacement(
-      '/reader/${next.id}',
-      extra: ReaderArgs(book: next, direction: direction, sourceKey: sourceKey),
     );
   }
 }

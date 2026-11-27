@@ -10,7 +10,6 @@ import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/src/data/shelf_failure.dart';
 import 'package:yomu/src/providers/active_source_provider.dart';
 import 'package:yomu/src/providers/reader_providers.dart';
-import 'package:yomu/src/providers/source_scoped_providers.dart';
 import 'package:yomu/src/widgets/page_curl.dart';
 import 'package:yomu/src/widgets/reader_page.dart';
 import 'package:yomu/src/widgets/reader_palette.dart';

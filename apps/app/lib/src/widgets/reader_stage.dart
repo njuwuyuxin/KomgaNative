@@ -10,6 +10,7 @@ import 'package:yomu/src/features/reader/reader_session_coordinator.dart';
 import 'package:yomu/src/providers/reader_prefs_provider.dart';
 import 'package:yomu/src/providers/reader_providers.dart';
 import 'package:yomu/src/providers/source_scoped_providers.dart';
+import 'package:yomu/src/screens/reader_args.dart';
 import 'package:yomu/src/widgets/reader_background.dart';
 import 'package:yomu/src/widgets/reader_bottom_chrome.dart';
 import 'package:yomu/src/widgets/reader_content_viewport.dart';
@@ -95,13 +96,26 @@ class ReaderStage extends ConsumerWidget {
         ? l10n.readerPageLabelWithSession(layout.pageLabel(l10n), mins)
         : layout.pageLabel(l10n);
 
-    void openNext(Book next) => exporter.openNextBook(
-      context,
-      next: next,
-      direction: nav.direction,
-      sourceKey: sourceKey,
-      overrideHandler: onOpenNext,
-    );
+    void showToast(String message) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(message)));
+    }
+
+    void openNext(Book next) {
+      if (onOpenNext != null) {
+        onOpenNext!(next);
+        return;
+      }
+      context.pushReplacement(
+        '/reader/${next.id}',
+        extra: ReaderArgs(
+          book: next,
+          direction: nav.direction,
+          sourceKey: sourceKey,
+        ),
+      );
+    }
 
     void jumpToPage(int targetPage) {
       final target = nav.jumpTo(targetPage, total);
@@ -125,7 +139,7 @@ class ReaderStage extends ConsumerWidget {
         nav.setPage(result.groupedPage!);
         session.scheduleProgress(result.groupedPage!);
       }
-      exporter.showToast(context, result.toast);
+      showToast(result.toast);
     }
 
     Future<void> sharePage(int targetPage) async {
@@ -137,7 +151,7 @@ class ReaderStage extends ConsumerWidget {
         overrideHandler: onSharePage,
       );
       if (error != null && context.mounted) {
-        exporter.showToast(context, error);
+        showToast(error);
       }
     }
 
@@ -151,7 +165,7 @@ class ReaderStage extends ConsumerWidget {
         l10n: () => AppLocalizations.of(context),
       );
       if (message != null && context.mounted) {
-        exporter.showToast(context, message);
+        showToast(message);
       }
     }
 
@@ -199,8 +213,7 @@ class ReaderStage extends ConsumerWidget {
               onToggleIncognito: () {
                 final enabled = session.toggleIncognito();
                 onMutated();
-                exporter.showToast(
-                  context,
+                showToast(
                   enabled ? l10n.incognitoEnabled : l10n.incognitoDisabled,
                 );
               },

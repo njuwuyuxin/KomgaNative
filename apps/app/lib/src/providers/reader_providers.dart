@@ -65,6 +65,17 @@ final readerPageImageProvider = FutureProvider.family<Uint8List, PageRequest>((
       .pageImage(req.bookId, req.page);
 }, isAutoDispose: true);
 
+/// 同步查询指定内容源内存 LRU 中的页图字节（不触发网络/磁盘 I/O；供卷页动画零帧借图，UI 不直碰 Repository）。
+final readerCachedPageLookupProvider =
+    Provider.family<Uint8List? Function(String bookId, int page), String?>((
+      Ref ref,
+      String? sourceKey,
+    ) {
+      final key = resolveEffectiveSourceKey(ref, sourceKey);
+      final repo = ref.watch(readerRepositoryForSourceProvider(key));
+      return repo.cachedPageImage;
+    });
+
 /// 单页低精度缩略图字节（服务端 300px JPEG，autoDispose）。
 ///
 /// 供底栏缩略图滑条、跳页面板以及原图到达前的低清渐进占位使用：体积仅为原图的 1%–5%，

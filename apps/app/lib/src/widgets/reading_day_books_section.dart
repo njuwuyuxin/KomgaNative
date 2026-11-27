@@ -8,7 +8,6 @@ import 'package:yomu/src/data/reading_stats.dart';
 import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/widgets/cover_image.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
-import 'package:yomu_domain/yomu_domain.dart';
 
 /// 阅读热力图下方选中日期的阅读明细：当天日期、时长与读过的书（封面 + 标题）。
 class ReadingDayBooksSection extends StatelessWidget {
@@ -74,7 +73,7 @@ class ReadingDayBooksSection extends StatelessWidget {
                   final book = day.readBooks[index];
                   final removed =
                       existingLocalIds != null &&
-                      isLocalSourceKey(book.scope) &&
+                      book.isLocal &&
                       !existingLocalIds!.contains(book.bookId);
                   return _DayBookTile(book: book, removed: removed);
                 },
@@ -92,18 +91,16 @@ class _DayBookTile extends ConsumerWidget {
   final ReadingDayBook book;
   final bool removed;
 
-  String get _resolvedScope =>
-      book.scope.isEmpty ? kLocalSourceKey : book.scope;
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final eink = AppTheme.isEink(theme);
+    final scope = book.resolvedScope;
     final cover = removed
         ? null
         : ref
               .watch(
-                bookCoverProvider((sourceKey: _resolvedScope, id: book.bookId)),
+                bookCoverProvider((sourceKey: scope, id: book.bookId)),
               )
               .value;
 
@@ -117,7 +114,7 @@ class _DayBookTile extends ConsumerWidget {
         onTap: removed
             ? null
             : () {
-                final query = '?source=${Uri.encodeComponent(_resolvedScope)}';
+                final query = '?source=${Uri.encodeComponent(scope)}';
                 unawaited(context.push('/reader/${book.bookId}$query'));
               },
         child: Column(

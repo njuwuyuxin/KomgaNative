@@ -92,7 +92,7 @@ class _CollectionPickerSheet extends ConsumerWidget {
           fieldKey: const Key('collection-create-field'),
           okKey: const Key('collection-create-ok'),
         );
-        if (name == null || name.isEmpty) return null;
+        if (!context.mounted || name == null || name.isEmpty) return null;
         markSaving();
         await ref
             .read(collectionsControllerProvider.notifier)
