@@ -15,12 +15,13 @@ mixin _ShelfBatch on ConsumerState<LibraryScreen> {
   Future<void> _markSelected({required bool read}) async {
     final ids = ref.read(shelfSelectionProvider).ids.toList();
     if (ids.isEmpty || _batchBusy) return;
+    final sourceKey = ref.read(activeSourceProvider).sourceKey;
     setState(() => _batchBusy = true);
     final reader = ref.read(seriesReadProvider.notifier);
     var failed = 0;
     for (final id in ids) {
       try {
-        await reader.setRead(id, read: read);
+        await reader.setRead(id, read: read, sourceKey: sourceKey);
       } on ShelfFailure {
         failed++;
       }
@@ -48,7 +49,12 @@ mixin _ShelfBatch on ConsumerState<LibraryScreen> {
   Future<void> _addSelectedToCollection() async {
     final ids = ref.read(shelfSelectionProvider).ids.toList();
     if (ids.isEmpty || _batchBusy) return;
-    final changed = await showCollectionPickerSheet(context, seriesIds: ids);
+    final sourceKey = ref.read(activeSourceProvider).sourceKey;
+    final changed = await showCollectionPickerSheet(
+      context,
+      seriesIds: ids,
+      sourceKey: sourceKey,
+    );
     if (changed && mounted) {
       ref.read(shelfSelectionProvider.notifier).exit();
     }

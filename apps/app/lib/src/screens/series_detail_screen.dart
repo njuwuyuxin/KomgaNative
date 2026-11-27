@@ -103,12 +103,13 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
   /// 进阅读器；回来时刷新进度。
   Future<void> _openBook(Book book, ReadingDirection direction) async {
     final sourceKey = _readSourceKey;
+    final effectiveSource = sourceKey ?? book.sourceKey;
     await context.push(
-      '/reader/${book.id}',
+      '/reader/${book.id}?source=${Uri.encodeComponent(effectiveSource)}',
       extra: ReaderArgs(
         book: book,
         direction: direction,
-        sourceKey: sourceKey ?? book.sourceKey,
+        sourceKey: effectiveSource,
       ),
     );
     ref.invalidate(seriesDetailProvider(_seriesQuery(sourceKey)));
@@ -126,7 +127,11 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
   Future<void> _addSelectedBooksToReadList() async {
     final ids = ref.read(bookSelectionProvider).ids.toList();
     if (ids.isEmpty || _batchBusy) return;
-    final changed = await showReadListPickerSheet(context, bookIds: ids);
+    final changed = await showReadListPickerSheet(
+      context,
+      bookIds: ids,
+      sourceKey: _readSourceKey,
+    );
     if (changed && mounted) {
       ref.read(bookSelectionProvider.notifier).exit();
     }
@@ -185,8 +190,11 @@ class _SeriesDetailScreenState extends ConsumerState<SeriesDetailScreen> {
       );
   }
 
-  Future<void> _openCollectionsPicker() =>
-      showCollectionPickerSheet(context, seriesIds: <String>[seriesId]);
+  Future<void> _openCollectionsPicker() => showCollectionPickerSheet(
+    context,
+    seriesIds: <String>[seriesId],
+    sourceKey: _readSourceKey,
+  );
 
   Future<void> _markSeriesRead({required bool read}) async {
     try {

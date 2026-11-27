@@ -223,7 +223,11 @@ class SeriesBookRow extends ConsumerWidget {
       case BookMenuAction.removeFromReadList:
         await onRemoveFromReadList?.call();
       case BookMenuAction.addToReadList:
-        await showReadListPickerSheet(context, bookIds: <String>[book.id]);
+        await showReadListPickerSheet(
+          context,
+          bookIds: <String>[book.id],
+          sourceKey: book.sourceKey,
+        );
       case BookMenuAction.markPreviousRead:
         await onMarkPrevious?.call(read: true);
       case BookMenuAction.markPreviousUnread:
@@ -253,6 +257,7 @@ class SeriesBookRow extends ConsumerWidget {
                 read: action == BookMenuAction.markRead,
                 pagesCount: book.pagesCount,
                 seriesId: book.seriesId,
+                sourceKey: book.sourceKey,
               );
           if (!context.mounted) return;
           // "读完自动删除"（DLD-01）：标记已读后按策略删掉这一本的下载。

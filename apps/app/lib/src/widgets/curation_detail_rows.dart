@@ -98,8 +98,11 @@ class CollectionSeriesSliver extends StatelessWidget {
                   coverSize: ShelfCoverSize.medium,
                   heroTag: heroTag,
                   onTap: () => context.push(
-                    '/series/${series.id}',
-                    extra: SeriesDetailArgs(heroTag: heroTag),
+                    '/series/${series.id}?source=${Uri.encodeComponent(series.sourceKey)}',
+                    extra: SeriesDetailArgs(
+                      heroTag: heroTag,
+                      sourceKey: series.sourceKey,
+                    ),
                   ),
                   onLongPress: () =>
                       unawaited(onLongPressSeries(rowContext, series, heroTag)),

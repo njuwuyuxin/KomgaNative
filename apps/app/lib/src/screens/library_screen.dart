@@ -14,6 +14,7 @@ import 'package:yomu/src/providers/local_catalog_mutator_provider.dart';
 import 'package:yomu/src/providers/local_folder_tree_provider.dart';
 import 'package:yomu/src/providers/pinned_series_provider.dart';
 import 'package:yomu/src/providers/shelf_selection_provider.dart';
+import 'package:yomu/src/screens/series_detail_args.dart';
 import 'package:yomu/src/session/session_controller.dart';
 import 'package:yomu/src/widgets/collection_picker_sheet.dart';
 import 'package:yomu/src/widgets/local_folder_tree_sliver.dart';

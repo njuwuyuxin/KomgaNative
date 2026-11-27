@@ -47,7 +47,11 @@ class SeriesShelfTile extends ConsumerWidget {
     };
     final tag = heroTag ?? seriesHeroTag(series.id);
     final pinned =
-        ref.watch(pinnedSeriesIdsProvider).value?.contains(series.id) ?? false;
+        ref
+            .watch(pinnedSeriesIdsForSourceProvider(series.sourceKey))
+            .value
+            ?.contains(series.id) ??
+        false;
     final unread = series.booksCount - series.booksReadCount;
 
     final tile = SeriesTile(
@@ -140,7 +144,11 @@ class SeriesShelfRow extends ConsumerWidget {
     );
     final tag = heroTag ?? seriesHeroTag(series.id);
     final pinned =
-        ref.watch(pinnedSeriesIdsProvider).value?.contains(series.id) ?? false;
+        ref
+            .watch(pinnedSeriesIdsForSourceProvider(series.sourceKey))
+            .value
+            ?.contains(series.id) ??
+        false;
 
     final coverBox = AnimatedScale(
       scale: (!eink && selected) ? 0.94 : 1.0,

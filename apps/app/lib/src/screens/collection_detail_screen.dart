@@ -209,7 +209,15 @@ class _CollectionDetailScreenState
         .value;
     final displayName = _displayTitle(l10n, detail);
     final pinnedIds =
-        ref.watch(pinnedSeriesIdsProvider).value?.toSet() ?? const <String>{};
+        ref
+            .watch(
+              detail != null
+                  ? pinnedSeriesIdsForSourceProvider(detail.sourceKey)
+                  : pinnedSeriesIdsProvider,
+            )
+            .value
+            ?.toSet() ??
+        const <String>{};
 
     return Scaffold(
       body: GlassPageBackground(

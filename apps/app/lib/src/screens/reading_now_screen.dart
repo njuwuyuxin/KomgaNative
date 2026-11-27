@@ -214,8 +214,11 @@ class _SeriesShelfState extends State<_SeriesShelf> {
                 heroTag: heroTag,
                 onTap: () => unawaited(
                   context.push(
-                    '/series/${item.id}',
-                    extra: SeriesDetailArgs(heroTag: heroTag),
+                    '/series/${item.id}?source=${Uri.encodeComponent(item.sourceKey)}',
+                    extra: SeriesDetailArgs(
+                      heroTag: heroTag,
+                      sourceKey: item.sourceKey,
+                    ),
                   ),
                 ),
               ),

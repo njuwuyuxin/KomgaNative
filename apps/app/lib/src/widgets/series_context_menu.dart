@@ -110,18 +110,26 @@ Future<void> showSeriesMenu(
     case SeriesMenuAction.removeFromCollection:
       await onRemoveFromCollection?.call();
     case SeriesMenuAction.addToCollection:
-      await showCollectionPickerSheet(context, seriesIds: <String>[series.id]);
+      await showCollectionPickerSheet(
+        context,
+        seriesIds: <String>[series.id],
+        sourceKey: series.sourceKey,
+      );
     case SeriesMenuAction.viewDetails:
       await context.push(
-        '/series/${series.id}',
-        extra: SeriesDetailArgs(heroTag: heroTag),
+        '/series/${series.id}?source=${Uri.encodeComponent(series.sourceKey)}',
+        extra: SeriesDetailArgs(heroTag: heroTag, sourceKey: series.sourceKey),
       );
     case SeriesMenuAction.markRead:
     case SeriesMenuAction.markUnread:
       try {
         await ref
             .read(seriesReadProvider.notifier)
-            .setRead(series.id, read: action == SeriesMenuAction.markRead);
+            .setRead(
+              series.id,
+              read: action == SeriesMenuAction.markRead,
+              sourceKey: series.sourceKey,
+            );
       } on ShelfFailure catch (failure) {
         messenger?.showSnackBar(
           SnackBar(content: Text(l10n.failureTitle(failure.kind))),
@@ -130,11 +138,11 @@ Future<void> showSeriesMenu(
     case SeriesMenuAction.pin:
       await ref
           .read(pinnedSeriesControllerProvider)
-          .toggle(series.id, pinned: true);
+          .toggle(series.id, pinned: true, sourceKey: series.sourceKey);
     case SeriesMenuAction.unpin:
       await ref
           .read(pinnedSeriesControllerProvider)
-          .toggle(series.id, pinned: false);
+          .toggle(series.id, pinned: false, sourceKey: series.sourceKey);
     case SeriesMenuAction.editMetadata:
       await showEditLocalSeriesSheet(context, ref, series);
     case SeriesMenuAction.deleteFromDevice:

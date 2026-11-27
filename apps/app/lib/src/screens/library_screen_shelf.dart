@@ -227,7 +227,11 @@ mixin _ShelfSlivers on ConsumerState<LibraryScreen> {
 
   /// 进系列页；回来时原地刷新进度（别把列表清空跳回顶部）。
   Future<void> _openSeries(Series series) async {
-    await context.push('/series/${series.id}');
+    final query = '?source=${Uri.encodeComponent(series.sourceKey)}';
+    await context.push(
+      '/series/${series.id}$query',
+      extra: SeriesDetailArgs(sourceKey: series.sourceKey),
+    );
     await ref.read(shelfProvider.notifier).refreshInPlace();
   }
 }

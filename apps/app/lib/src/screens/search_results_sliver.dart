@@ -130,9 +130,10 @@ class SearchResultsSliver extends ConsumerWidget {
               coverSize: ShelfCoverSize.small,
               heroTag: seriesHeroTag(item.id, scope: 'search'),
               onTap: () => context.push(
-                '/series/${item.id}',
+                '/series/${item.id}?source=${Uri.encodeComponent(item.sourceKey)}',
                 extra: SeriesDetailArgs(
                   heroTag: seriesHeroTag(item.id, scope: 'search'),
+                  sourceKey: item.sourceKey,
                 ),
               ),
             ),
@@ -152,8 +153,8 @@ class SearchResultsSliver extends ConsumerWidget {
               showSeriesTitle: true,
               onOpen: () async {
                 await context.push(
-                  '/reader/${book.id}',
-                  extra: ReaderArgs(book: book),
+                  '/reader/${book.id}?source=${Uri.encodeComponent(book.sourceKey)}',
+                  extra: ReaderArgs(book: book, sourceKey: book.sourceKey),
                 );
               },
             ),
