@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -96,6 +97,57 @@ void main() {
         '02.png',
         '03.png',
       ]);
+    });
+
+    test('P2-2 按 maxCachedBytes 字节上限 LRU 淘汰，单页超限直接返回且不爆内存上限', () async {
+      final names = <String>['01.png', '02.png', '03.png', '04.png'];
+      final cache = SolidArchiveWindowCache(
+        orderedEntryNames: names,
+        windowSize: 2,
+        maxCachedPages: 18,
+        maxCachedBytes: 250,
+        extractWindow: (List<String> batch) async => <String, Uint8List>{
+          for (final n in batch)
+            n: Uint8List(n == '04.png' ? 300 : 100)
+              ..fillRange(0, 1, n.codeUnitAt(1)),
+        },
+      );
+
+      // 读取 1、2（总计 200B ≤ 250B），再读 3（触发 3+4 批次：3 为 100B 淘汰 1，4 为 300B > 250B 不入缓存）。
+      await cache.readPage(1);
+      expect(cache.cachedBytes, 200);
+      expect(cache.cachedPageCount, 2);
+
+      final p3 = await cache.readPage(3);
+      expect(p3?.length, 100);
+      expect(cache.cachedBytes, lessThanOrEqualTo(250));
+      expect(cache.cachedPageCount, 2);
+
+      // 单页 300B > 250B 仍正常返回给调用方，但不会写入缓存破坏字节上限。
+      final p4 = await cache.readPage(4);
+      expect(p4?.length, 300);
+      expect(cache.cachedBytes, lessThanOrEqualTo(250));
+    });
+
+    test('P2-2 clear() 后仍在途的批次完成时不得把旧数据回灌缓存', () async {
+      final gate = Completer<Map<String, Uint8List>>();
+      final cache = SolidArchiveWindowCache(
+        orderedEntryNames: const <String>['01.png', '02.png'],
+        windowSize: 2,
+        extractWindow: (_) => gate.future,
+      );
+
+      final pending = cache.readPage(1);
+      cache.clear();
+      gate.complete(<String, Uint8List>{
+        '01.png': Uint8List(64),
+        '02.png': Uint8List(64),
+      });
+
+      final result = await pending;
+      expect(result?.length, 64);
+      expect(cache.cachedPageCount, 0);
+      expect(cache.cachedBytes, 0);
     });
   });
 

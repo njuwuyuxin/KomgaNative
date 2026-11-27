@@ -5,7 +5,12 @@ library;
 
 export 'src/archive_errors.dart';
 export 'src/archive_isolate.dart'
-    show ArchiveWorkerStats, archiveWorkerStats, shutdownArchiveWorker;
+    show
+        ArchiveWorkerStats,
+        archiveWorkerStats,
+        kDefaultArchiveTaskTimeout,
+        offloadArchiveTask,
+        shutdownArchiveWorker;
 export 'src/byte_source.dart';
 export 'src/chapter_extractor.dart';
 export 'src/comic_info_parser.dart';

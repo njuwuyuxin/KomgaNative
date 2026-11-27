@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -318,6 +319,42 @@ void main() {
       );
       addTearDown(reader.close);
       expect(await reader.readPage(1), page);
+    });
+
+    test('P2-2 shutdownArchiveWorker 立即以异常结束所有在途任务而不永久挂死', () async {
+      await shutdownArchiveWorker();
+      final pending = offloadArchiveTask<int>(() async {
+        await Future<void>.delayed(const Duration(seconds: 10));
+        return 42;
+      });
+      final assertion = expectLater(
+        pending.timeout(const Duration(seconds: 2)),
+        throwsA(isA<StateError>()),
+      );
+
+      // 等待任务派发进入后台 Worker，再主动关闭池。
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await shutdownArchiveWorker();
+      await assertion;
+
+      // 关闭后池子仍可懒重启并执行新任务。
+      expect(await offloadArchiveTask<int>(() => 99), 99);
+    });
+
+    test('P2-2 后台任务超限时抛出 TimeoutException 并回收卡死 Worker 槽位', () async {
+      await shutdownArchiveWorker();
+      final slowTask = offloadArchiveTask<int>(() async {
+        await Future<void>.delayed(const Duration(seconds: 5));
+        return 1;
+      }, timeout: const Duration(milliseconds: 80));
+
+      await expectLater(
+        slowTask.timeout(const Duration(seconds: 2)),
+        throwsA(isA<TimeoutException>()),
+      );
+
+      // 超时回收后后续任务立即可用。
+      expect(await offloadArchiveTask<int>(() => 7), 7);
     });
   });
 }

@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:isolate';
 import 'dart:typed_data';
 
+import 'package:yomu_local_archive/src/archive_worker_slot.dart';
+
 /// 归档 CPU 密集型任务卸载到后台 Isolate 的字节阈值配置（P2-2）。
 ///
 /// 小块数据（如数 KB 的缩略图或单页测试夹具）直接同步处理以避免消息派发开销；
@@ -11,6 +13,9 @@ const int kZipInflateIsolateThreshold = 64 * 1024;
 const int kZipCryptoIsolateThreshold = 32 * 1024;
 const int kCentralDirectoryIsolateThreshold = 32 * 1024;
 const int kTarScanIsolateThreshold = 256 * 1024;
+
+/// 单个后台归档任务的默认超时时间（P2-2），防止异常输入或损坏流永久挂死。
+const Duration kDefaultArchiveTaskTimeout = Duration(seconds: 30);
 
 /// 后台归档工作 Isolate 池的运行统计（用于诊断与单测验证复用行为）。
 typedef ArchiveWorkerStats = ({
@@ -54,29 +59,38 @@ Future<T> offloadBytesParse<T>(
 }
 
 /// 在长驻后台 Worker 池中执行任意可跨 Isolate 传输的同步或异步归档任务。
-Future<T> offloadArchiveTask<T>(FutureOr<T> Function() task) {
-  return _defaultArchiveWorkerPool.run<T>(task);
+Future<T> offloadArchiveTask<T>(
+  FutureOr<T> Function() task, {
+  Duration? timeout,
+}) {
+  return _defaultArchiveWorkerPool.run<T>(task, timeout: timeout);
 }
 
 /// 返回当前默认后台归档 Worker 池的累计创建次数、存活数量与完成任务数。
 ArchiveWorkerStats archiveWorkerStats() => _defaultArchiveWorkerPool.stats;
 
-/// 主动关闭默认后台归档 Worker 池（释放空闲 Isolate；后续再次调用会按需重新懒启动）。
+/// 主动关闭默认后台归档 Worker 池（释放空闲 Isolate 并立即失败所有在途任务；后续再次调用会按需重新懒启动）。
 Future<void> shutdownArchiveWorker() => _defaultArchiveWorkerPool.shutdown();
 
 final _ArchiveWorkerPool _defaultArchiveWorkerPool = _ArchiveWorkerPool(
   maxWorkers: 2,
   idleTimeout: const Duration(seconds: 20),
+  defaultTaskTimeout: kDefaultArchiveTaskTimeout,
 );
 
 /// 按需懒启动、空闲自动回收的小型长驻 Isolate 工作池。
 final class _ArchiveWorkerPool {
-  _ArchiveWorkerPool({required this.maxWorkers, required this.idleTimeout});
+  _ArchiveWorkerPool({
+    required this.maxWorkers,
+    required this.idleTimeout,
+    required this.defaultTaskTimeout,
+  });
 
   final int maxWorkers;
   final Duration idleTimeout;
+  final Duration defaultTaskTimeout;
 
-  final List<_ArchiveWorkerSlot> _workers = <_ArchiveWorkerSlot>[];
+  final List<ArchiveWorkerSlot> _workers = <ArchiveWorkerSlot>[];
   int _totalSpawns = 0;
   int _completedTasks = 0;
   int _roundRobin = 0;
@@ -87,15 +101,18 @@ final class _ArchiveWorkerPool {
     completedTasks: _completedTasks,
   );
 
-  Future<T> run<T>(FutureOr<T> Function() task) async {
+  Future<T> run<T>(FutureOr<T> Function() task, {Duration? timeout}) async {
     final slot = _acquireSlot();
-    final raw = await slot.execute(() => task());
+    final raw = await slot.execute(
+      () => task(),
+      timeout: timeout ?? defaultTaskTimeout,
+    );
     _completedTasks++;
     return raw as T;
   }
 
-  _ArchiveWorkerSlot _acquireSlot() {
-    _workers.removeWhere((_ArchiveWorkerSlot w) => w.isClosed);
+  ArchiveWorkerSlot _acquireSlot() {
+    _workers.removeWhere((ArchiveWorkerSlot w) => w.isClosed);
 
     // 优先复用当前完全空闲的已存活 worker，避免重复 spawn。
     for (final worker in _workers) {
@@ -105,8 +122,8 @@ final class _ArchiveWorkerPool {
     // 池未满且已有 worker 忙碌时再按需扩容（例如翻页与预读并行）。
     if (_workers.length < maxWorkers) {
       _totalSpawns++;
-      late final _ArchiveWorkerSlot created;
-      created = _ArchiveWorkerSlot(
+      late final ArchiveWorkerSlot created;
+      created = ArchiveWorkerSlot(
         idleTimeout: idleTimeout,
         onClosed: () => _workers.remove(created),
       );
@@ -127,188 +144,10 @@ final class _ArchiveWorkerPool {
   }
 
   Future<void> shutdown() async {
-    final snapshot = List<_ArchiveWorkerSlot>.of(_workers);
+    final snapshot = List<ArchiveWorkerSlot>.of(_workers);
     _workers.clear();
     for (final slot in snapshot) {
       await slot.close();
     }
   }
-}
-
-final class _ArchiveWorkerSlot {
-  _ArchiveWorkerSlot({required this.idleTimeout, required this.onClosed}) {
-    _ready = _spawn();
-  }
-
-  final Duration idleTimeout;
-  final void Function() onClosed;
-
-  late final Future<SendPort> _ready;
-  Isolate? _isolate;
-  ReceivePort? _responses;
-  ReceivePort? _exitPort;
-  final Map<int, Completer<Object?>> _pending = <int, Completer<Object?>>{};
-  Timer? _idleTimer;
-  int _nextId = 1;
-  bool _closed = false;
-
-  bool get isClosed => _closed;
-  int get inFlight => _pending.length;
-
-  Future<SendPort> _spawn() async {
-    final responses = ReceivePort();
-    final exitPort = ReceivePort();
-    _responses = responses;
-    _exitPort = exitPort;
-
-    final handshake = Completer<SendPort>();
-    responses.listen((Object? message) {
-      if (!handshake.isCompleted && message is SendPort) {
-        handshake.complete(message);
-        return;
-      }
-      if (message is List<Object?> && message.length >= 3) {
-        final id = message[0] as int;
-        final ok = message[1] as bool;
-        final completer = _pending.remove(id);
-        _scheduleIdleIfEmpty();
-        if (completer == null || completer.isCompleted) return;
-        if (ok) {
-          completer.complete(message[2]);
-        } else {
-          final error = message[2] ?? StateError('Archive worker task failed');
-          final stack = message.length >= 4 && message[3] is String
-              ? StackTrace.fromString(message[3]! as String)
-              : StackTrace.current;
-          completer.completeError(error, stack);
-        }
-      }
-    });
-
-    exitPort.listen((Object? _) {
-      if (!handshake.isCompleted) {
-        handshake.completeError(
-          StateError('Archive worker isolate exited before handshake'),
-        );
-      }
-      _failAllAndCleanup(StateError('Archive worker isolate terminated'));
-    });
-
-    final isolate = await Isolate.spawn<SendPort>(
-      _archiveWorkerEntry,
-      responses.sendPort,
-      onExit: exitPort.sendPort,
-      debugName: 'yomu_archive_worker',
-    );
-    _isolate = isolate;
-    if (_closed) {
-      isolate.kill(priority: Isolate.immediate);
-      responses.close();
-      exitPort.close();
-      throw StateError('Archive worker closed during startup');
-    }
-    return handshake.future;
-  }
-
-  Future<Object?> execute(FutureOr<Object?> Function() task) async {
-    _idleTimer?.cancel();
-    _idleTimer = null;
-    final id = _nextId++;
-    final completer = Completer<Object?>();
-    _pending[id] = completer;
-
-    try {
-      final sendPort = await _ready;
-      if (_closed) {
-        _pending.remove(id);
-        throw StateError('Archive worker closed before dispatch');
-      }
-      sendPort.send(<Object?>[id, task]);
-    } on Object catch (error, stackTrace) {
-      _pending.remove(id);
-      _scheduleIdleIfEmpty();
-      if (!completer.isCompleted) {
-        completer.completeError(error, stackTrace);
-      }
-    }
-    return completer.future;
-  }
-
-  void _scheduleIdleIfEmpty() {
-    if (_closed || _pending.isNotEmpty) return;
-    _idleTimer?.cancel();
-    _idleTimer = Timer(idleTimeout, () => unawaited(close()));
-  }
-
-  Future<void> close() async {
-    if (_closed) return;
-    _closed = true;
-    _idleTimer?.cancel();
-    _idleTimer = null;
-    onClosed();
-    try {
-      final sendPort = await _ready;
-      sendPort.send(null);
-    } on Object {
-      // 启动阶段失败或已退出时直接强制回收即可。
-      _isolate?.kill(priority: Isolate.immediate);
-    }
-    _responses?.close();
-    _exitPort?.close();
-    _responses = null;
-    _exitPort = null;
-    _isolate = null;
-  }
-
-  void _failAllAndCleanup(Object error) {
-    if (!_closed) {
-      _closed = true;
-      _idleTimer?.cancel();
-      _idleTimer = null;
-      onClosed();
-      _responses?.close();
-      _exitPort?.close();
-      _responses = null;
-      _exitPort = null;
-      _isolate = null;
-    }
-    if (_pending.isEmpty) return;
-    final entries = List<Completer<Object?>>.of(_pending.values);
-    _pending.clear();
-    for (final completer in entries) {
-      if (!completer.isCompleted) {
-        completer.completeError(error);
-      }
-    }
-  }
-}
-
-void _archiveWorkerEntry(SendPort replyPort) {
-  final commands = ReceivePort();
-  replyPort.send(commands.sendPort);
-
-  commands.listen((Object? message) async {
-    if (message == null) {
-      commands.close();
-      return;
-    }
-    if (message is! List<Object?> || message.length < 2) return;
-    final id = message[0] as int;
-    final task = message[1] as FutureOr<Object?> Function();
-    try {
-      final result = await task();
-      replyPort.send(<Object?>[id, true, result]);
-    } on Object catch (error, stackTrace) {
-      try {
-        replyPort.send(<Object?>[id, false, error, stackTrace.toString()]);
-      } on ArgumentError {
-        replyPort.send(<Object?>[
-          id,
-          false,
-          StateError(error.toString()),
-          stackTrace.toString(),
-        ]);
-      }
-    }
-  });
 }

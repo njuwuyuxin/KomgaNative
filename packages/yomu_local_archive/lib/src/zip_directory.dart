@@ -84,13 +84,17 @@ Future<List<ZipEntryInfo>> readZipCentralDirectory(
     final zip64Bounds = await _readZip64Bounds(
       source,
       eocdAbsoluteOffset: tailOffset + eocdRelPos,
+      totalLength: totalLength,
     );
     cdSize = zip64Bounds.cdSize;
     cdOffset = zip64Bounds.cdOffset;
   }
 
   if (cdSize == 0) return const <ZipEntryInfo>[];
-  if (cdOffset < 0 || cdSize < 0 || cdOffset + cdSize > totalLength) {
+  if (cdOffset < 0 ||
+      cdSize < 0 ||
+      cdOffset > totalLength ||
+      cdSize > totalLength - cdOffset) {
     throw const ArchiveException(
       ArchiveErrorKind.corruptedArchive,
       'Central directory bounds exceed archive length',
@@ -140,6 +144,7 @@ int _findEocdOffset(Uint8List tail) {
 Future<({int cdOffset, int cdSize})> _readZip64Bounds(
   RandomAccessByteSource source, {
   required int eocdAbsoluteOffset,
+  required int totalLength,
 }) async {
   if (eocdAbsoluteOffset < 20) {
     throw const ArchiveException(
@@ -156,6 +161,14 @@ Future<({int cdOffset, int cdSize})> _readZip64Bounds(
     );
   }
   final zip64EocdOffset = locView.getUint64(8, Endian.little);
+  if (zip64EocdOffset < 0 ||
+      totalLength < 56 ||
+      zip64EocdOffset > totalLength - 56) {
+    throw const ArchiveException(
+      ArchiveErrorKind.corruptedArchive,
+      'ZIP64 EOCD offset out of bounds',
+    );
+  }
   final record = await source.readRange(zip64EocdOffset, 56);
   if (record.length < 56) {
     throw const ArchiveException(
@@ -172,6 +185,12 @@ Future<({int cdOffset, int cdSize})> _readZip64Bounds(
   }
   final cdSize = recView.getUint64(40, Endian.little);
   final cdOffset = recView.getUint64(48, Endian.little);
+  if (cdSize < 0 || cdOffset < 0) {
+    throw const ArchiveException(
+      ArchiveErrorKind.corruptedArchive,
+      'ZIP64 central directory bounds overflow signed 64-bit range',
+    );
+  }
   return (cdOffset: cdOffset, cdSize: cdSize);
 }
 
@@ -282,14 +301,32 @@ String _decodeEntryName(Uint8List bytes, {required bool isUtf8}) =>
       int? offset;
       if (needUncomp && q + 8 <= end) {
         uncomp = view.getUint64(q, Endian.little);
+        if (uncomp < 0) {
+          throw const ArchiveException(
+            ArchiveErrorKind.corruptedArchive,
+            'ZIP64 uncompressed size overflows signed 64-bit range',
+          );
+        }
         q += 8;
       }
       if (needComp && q + 8 <= end) {
         comp = view.getUint64(q, Endian.little);
+        if (comp < 0) {
+          throw const ArchiveException(
+            ArchiveErrorKind.corruptedArchive,
+            'ZIP64 compressed size overflows signed 64-bit range',
+          );
+        }
         q += 8;
       }
       if (needOffset && q + 8 <= end) {
         offset = view.getUint64(q, Endian.little);
+        if (offset < 0) {
+          throw const ArchiveException(
+            ArchiveErrorKind.corruptedArchive,
+            'ZIP64 local header offset overflows signed 64-bit range',
+          );
+        }
       }
       return (uncompSize: uncomp, compSize: comp, localOffset: offset);
     }

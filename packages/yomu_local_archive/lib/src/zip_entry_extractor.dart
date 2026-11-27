@@ -52,6 +52,12 @@ Future<int> resolveZipEntryDataOffset(
   int localHeaderOffset, {
   bool allowEncrypted = false,
 }) async {
+  if (localHeaderOffset < 0) {
+    throw const ArchiveException(
+      ArchiveErrorKind.corruptedArchive,
+      'Invalid negative local file header offset',
+    );
+  }
   final header = await source.readRange(localHeaderOffset, 30);
   if (header.length < 30) {
     throw const ArchiveException(
