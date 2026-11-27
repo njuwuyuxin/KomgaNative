@@ -1,10 +1,10 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:yomu_local_archive/src/archive_errors.dart';
 import 'package:yomu_local_archive/src/legacy_charset.dart';
 import 'package:yomu_local_archive/src/zip_directory.dart';
+import 'package:yomu_local_archive/src/zip_entry_extractor.dart';
 
 /// 为中文/日文老压缩包生成多编码密码字节候选列表（LMB-13）。
 ///
@@ -90,12 +90,14 @@ int computeCrc32(Uint8List data) {
   return (crc ^ 0xFFFFFFFF) & 0xFFFFFFFF;
 }
 
-/// 尝试使用给定的单组密码字节解密并解压单个 ZIP 条目（校验头字节与 CRC32，返回 `null` 表示密码错误）。
+/// 尝试使用给定的单组密码字节解密并解压单个 ZIP 条目（校验头字节、解压体积上限与 CRC32，返回 `null` 表示密码错误）。
 Uint8List? tryDecryptAndInflateZipEntry(
   Uint8List rawEncrypted,
   ZipEntryInfo entry,
-  Uint8List passwordBytes,
-) {
+  Uint8List passwordBytes, {
+  int maxUncompressedBytes = kMaxZipEntryUncompressedBytes,
+}) {
+  validateZipEntrySizeBounds(entry, maxUncompressedBytes: maxUncompressedBytes);
   final primaryCheck = entry.hasDataDescriptor
       ? (entry.lastModTime >> 8) & 0xFF
       : (entry.crc32 >> 24) & 0xFF;
@@ -113,14 +115,19 @@ Uint8List? tryDecryptAndInflateZipEntry(
 
   final Uint8List plain;
   if (entry.compressionMethod == 0) {
+    if (decrypted.length > maxUncompressedBytes ||
+        decrypted.length != entry.uncompressedSize) {
+      return null;
+    }
     plain = decrypted;
   } else if (entry.compressionMethod == 8) {
     try {
-      final inflated = ZLibCodec(raw: true).decode(decrypted);
-      plain = inflated is Uint8List ? inflated : Uint8List.fromList(inflated);
-    } on FormatException {
-      return null;
-    } on IOException {
+      plain = inflateRawDeflateBounded(
+        decrypted,
+        maxBytes: maxUncompressedBytes,
+        expectedSize: entry.uncompressedSize,
+      );
+    } on ArchiveException {
       return null;
     }
   } else {
@@ -140,10 +147,16 @@ Uint8List? tryDecryptAndInflateZipEntry(
 ({Uint8List passwordBytes, Uint8List plainBytes})? probeZipCryptoPassword(
   Uint8List rawEncrypted,
   ZipEntryInfo entry,
-  String password,
-) {
+  String password, {
+  int maxUncompressedBytes = kMaxZipEntryUncompressedBytes,
+}) {
   for (final candidate in expandPasswordByteCandidates(password)) {
-    final plain = tryDecryptAndInflateZipEntry(rawEncrypted, entry, candidate);
+    final plain = tryDecryptAndInflateZipEntry(
+      rawEncrypted,
+      entry,
+      candidate,
+      maxUncompressedBytes: maxUncompressedBytes,
+    );
     if (plain != null) {
       return (passwordBytes: candidate, plainBytes: plain);
     }

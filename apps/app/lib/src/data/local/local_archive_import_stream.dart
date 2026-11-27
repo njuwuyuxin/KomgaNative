@@ -244,6 +244,7 @@ Future<LocalImportBatchResult?> _tryUnpackNestedCollection({
         final childBytes = await ZipComicReader.extractEntry(
           outerSource,
           entry,
+          maxUncompressedBytes: kMaxNestedZipEntryBytes,
         );
         final sub = await importArchiveOrCollectionStream(
           db: db,

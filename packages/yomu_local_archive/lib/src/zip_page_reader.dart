@@ -154,6 +154,7 @@ final class ZipComicReader implements ComicArchiveReader {
     Uint8List? resolvedPwd;
     if (hasEncrypted) {
       final firstEnc = imageEntries.firstWhere((e) => e.isEncrypted);
+      validateZipEntrySizeBounds(firstEnc);
       final dataOffset = await resolveZipEntryDataOffset(
         source,
         firstEnc.localHeaderOffset,
@@ -304,6 +305,11 @@ final class ZipComicReader implements ComicArchiveReader {
 
   static Future<Uint8List> extractEntry(
     RandomAccessByteSource source,
-    ZipEntryInfo entry,
-  ) => extractZipEntryBytes(source, entry);
+    ZipEntryInfo entry, {
+    int maxUncompressedBytes = kMaxZipEntryUncompressedBytes,
+  }) => extractZipEntryBytes(
+    source,
+    entry,
+    maxUncompressedBytes: maxUncompressedBytes,
+  );
 }

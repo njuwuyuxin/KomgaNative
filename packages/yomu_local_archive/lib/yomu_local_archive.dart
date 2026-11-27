@@ -22,4 +22,9 @@ export 'src/solid_window_cache.dart';
 export 'src/tar_page_reader.dart';
 export 'src/zip_crypto.dart';
 export 'src/zip_directory.dart';
+export 'src/zip_entry_extractor.dart'
+    show
+        kMaxNestedZipEntryBytes,
+        kMaxZipEntryUncompressedBytes,
+        inflateRawDeflateBounded;
 export 'src/zip_page_reader.dart';
