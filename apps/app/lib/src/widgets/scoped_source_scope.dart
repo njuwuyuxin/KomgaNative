@@ -15,21 +15,14 @@ class ScopedSourceScope extends InheritedWidget {
 
   final String? sourceKey;
 
-  /// 读取最近的祖先作用域携带的 `sourceKey`（未包裹或为空串时返回 `null`）。
-  static String? maybeOf(BuildContext context) {
-    final value = context
-        .dependOnInheritedWidgetOfExactType<ScopedSourceScope>()
-        ?.sourceKey;
-    return value == null || value.isEmpty ? null : value;
-  }
+  /// 读取最近的祖先作用域携带的 `sourceKey`（未包裹时返回 `null`）。
+  static String? maybeOf(BuildContext context) => context
+      .dependOnInheritedWidgetOfExactType<ScopedSourceScope>()
+      ?.sourceKey;
 
   /// 读取不建立依赖关系的当前 `sourceKey`（用于 `initState` 或一次性事件回调）。
-  static String? readOf(BuildContext context) {
-    final value = context
-        .getInheritedWidgetOfExactType<ScopedSourceScope>()
-        ?.sourceKey;
-    return value == null || value.isEmpty ? null : value;
-  }
+  static String? readOf(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<ScopedSourceScope>()?.sourceKey;
 
   @override
   bool updateShouldNotify(ScopedSourceScope oldWidget) =>

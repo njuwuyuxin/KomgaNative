@@ -47,8 +47,9 @@ final seriesCoverProvider = FutureProvider.family<Uint8List?, CoverQuery>((
   Ref ref,
   CoverQuery query,
 ) {
+  final key = resolveEffectiveSourceKey(ref, query.sourceKey);
   return ref
-      .watch(libraryRepositoryForSourceProvider(query.sourceKey))
+      .watch(libraryRepositoryForSourceProvider(key))
       .seriesCover(query.id);
 });
 
@@ -57,8 +58,9 @@ final seriesDetailProvider = FutureProvider.family<Series?, SeriesQuery>((
   Ref ref,
   SeriesQuery query,
 ) {
+  final key = resolveEffectiveSourceKey(ref, query.sourceKey);
   return ref
-      .watch(libraryRepositoryForSourceProvider(query.sourceKey))
+      .watch(libraryRepositoryForSourceProvider(key))
       .seriesById(query.seriesId);
 });
 
@@ -82,15 +84,18 @@ class SeriesBooksController extends PagedListController<Book> {
   int get pageSize => kSeriesBooksPageSize;
 
   @override
-  Future<PageResult<Book>> fetchPage(int page, int size) => ref
-      .watch(libraryRepositoryForSourceProvider(query.sourceKey))
-      .books(
-        query.seriesId,
-        page: page,
-        size: size,
-        sort: query.sort,
-        readStatus: query.readStatus,
-      );
+  Future<PageResult<Book>> fetchPage(int page, int size) {
+    final key = resolveEffectiveSourceKey(ref, query.sourceKey);
+    return ref
+        .watch(libraryRepositoryForSourceProvider(key))
+        .books(
+          query.seriesId,
+          page: page,
+          size: size,
+          sort: query.sort,
+          readStatus: query.readStatus,
+        );
+  }
 }
 
 final seriesBooksProvider =
@@ -105,9 +110,8 @@ final bookCoverProvider = FutureProvider.family<Uint8List?, CoverQuery>((
   Ref ref,
   CoverQuery query,
 ) {
-  return ref
-      .watch(libraryRepositoryForSourceProvider(query.sourceKey))
-      .bookCover(query.id);
+  final key = resolveEffectiveSourceKey(ref, query.sourceKey);
+  return ref.watch(libraryRepositoryForSourceProvider(key)).bookCover(query.id);
 });
 
 /// 最近添加的系列（"正在读"首页的第二块，UI-P2-6）。

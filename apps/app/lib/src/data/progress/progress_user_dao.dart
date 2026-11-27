@@ -27,6 +27,42 @@ extension ProgressUserDao on ProgressDatabase {
     );
   }
 
+  Future<void> _backfillEmptyScopesToV7() async {
+    const escapedLocal = kLocalSourceKey;
+    // 1) local_progress（复合主键 (scope, book_id)）
+    await customStatement(
+      'INSERT OR IGNORE INTO local_progress '
+      '(scope, book_id, page, completed, updated_at, server_last_modified, pending_seq) '
+      "SELECT '$escapedLocal', book_id, page, completed, updated_at, server_last_modified, pending_seq "
+      "FROM local_progress WHERE scope = ''",
+    );
+    await customStatement("DELETE FROM local_progress WHERE scope = ''");
+
+    // 2) reading_sessions（自增主键 id）
+    await customStatement(
+      "UPDATE reading_sessions SET scope = '$escapedLocal' WHERE scope = ''",
+    );
+
+    // 3) pinned_series_rows（复合主键 (server_id, series_id)）
+    await customStatement(
+      'INSERT OR IGNORE INTO pinned_series_rows (server_id, series_id, created_at) '
+      "SELECT '$escapedLocal', series_id, created_at "
+      "FROM pinned_series_rows WHERE server_id = ''",
+    );
+    await customStatement(
+      "DELETE FROM pinned_series_rows WHERE server_id = ''",
+    );
+
+    // 4) page_bookmarks_rows（复合主键 (scope, book_id, page)）
+    await customStatement(
+      'INSERT OR IGNORE INTO page_bookmarks_rows '
+      '(scope, book_id, page, note, created_at) '
+      "SELECT '$escapedLocal', book_id, page, note, created_at "
+      "FROM page_bookmarks_rows WHERE scope = ''",
+    );
+    await customStatement("DELETE FROM page_bookmarks_rows WHERE scope = ''");
+  }
+
   Future<void> _migrateFromLegacyCacheIfNeeded() async {
     final resolver = legacyCacheDbPath;
     if (resolver == null) return;
@@ -35,7 +71,8 @@ extension ProgressUserDao on ProgressDatabase {
       if (path == null || path.isEmpty || !File(path).existsSync()) return;
       final escapedPath = path.replaceAll("'", "''");
       final rawScope = await defaultLegacyScope?.call() ?? '';
-      final escapedScope = rawScope.replaceAll("'", "''");
+      final effectiveScope = rawScope.isEmpty ? kLocalSourceKey : rawScope;
+      final escapedScope = effectiveScope.replaceAll("'", "''");
       await customStatement("ATTACH DATABASE '$escapedPath' AS legacy_cache");
       try {
         final tablesRows = await customSelect(
@@ -142,7 +179,7 @@ extension ProgressUserDao on ProgressDatabase {
   }
 
   Future<int> addReadingSession({
-    String scope = '',
+    String scope = kLocalSourceKey,
     required String bookId,
     required String seriesId,
     required String bookName,
@@ -153,9 +190,10 @@ extension ProgressUserDao on ProgressDatabase {
     required int endPage,
     required bool completed,
   }) {
+    final normalizedScope = scope.isEmpty ? kLocalSourceKey : scope;
     return into(readingSessions).insert(
       ReadingSessionsCompanion.insert(
-        scope: Value<String>(scope),
+        scope: Value<String>(normalizedScope),
         bookId: bookId,
         seriesId: seriesId,
         bookName: Value<String>(bookName),
@@ -176,13 +214,9 @@ extension ProgressUserDao on ProgressDatabase {
   }) {
     final query = select(readingSessions);
     if (scopes != null && scopes.isNotEmpty) {
-      query.where(
-        (ReadingSessions t) => t.scope.isIn(scopes) | t.scope.equals(''),
-      );
+      query.where((ReadingSessions t) => t.scope.isIn(scopes));
     } else if (scope != null && scope.isNotEmpty) {
-      query.where(
-        (ReadingSessions t) => t.scope.equals(scope) | t.scope.equals(''),
-      );
+      query.where((ReadingSessions t) => t.scope.equals(scope));
     }
     query
       ..orderBy(<OrderClauseGenerator<ReadingSessions>>[
@@ -211,13 +245,9 @@ extension ProgressUserDao on ProgressDatabase {
   Future<void> clearReadingSessions({String? scope, Set<String>? scopes}) {
     final stmt = delete(readingSessions);
     if (scopes != null && scopes.isNotEmpty) {
-      stmt.where(
-        (ReadingSessions t) => t.scope.isIn(scopes) | t.scope.equals(''),
-      );
+      stmt.where((ReadingSessions t) => t.scope.isIn(scopes));
     } else if (scope != null && scope.isNotEmpty) {
-      stmt.where(
-        (ReadingSessions t) => t.scope.equals(scope) | t.scope.equals(''),
-      );
+      stmt.where((ReadingSessions t) => t.scope.equals(scope));
     }
     return stmt.go();
   }

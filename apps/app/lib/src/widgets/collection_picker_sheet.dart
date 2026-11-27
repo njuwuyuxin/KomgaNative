@@ -7,6 +7,7 @@ import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/src/data/curation_ops.dart';
 import 'package:yomu/src/data/shelf_failure.dart';
 import 'package:yomu/src/l10n/failure_text.dart';
+import 'package:yomu/src/providers/active_source_provider.dart';
 import 'package:yomu/src/providers/collections_controller.dart';
 import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/widgets/collection_covers.dart';
@@ -178,7 +179,9 @@ class _CollectionPickerSheetState
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final async = ref.watch(allCollectionsForSourceProvider(widget.sourceKey));
+    final sourceKey =
+        widget.sourceKey ?? ref.watch(activeSourceProvider).sourceKey;
+    final async = ref.watch(allCollectionsForSourceProvider(sourceKey));
     final items = async.value;
     final hasChanges = items != null && !_planFor(items).isEmpty;
     final maxHeight = MediaQuery.sizeOf(context).height * 0.72;
@@ -239,7 +242,7 @@ class _CollectionPickerSheetState
                   ),
                 ),
               ),
-            Flexible(child: _buildBody(context, l10n, async)),
+            Flexible(child: _buildBody(context, l10n, async, sourceKey)),
             const Divider(height: AppSizes.hairline),
             Padding(
               padding: const EdgeInsets.all(AppSpacing.md),
@@ -270,6 +273,7 @@ class _CollectionPickerSheetState
     BuildContext context,
     AppLocalizations l10n,
     AsyncValue<List<Collection>> async,
+    String sourceKey,
   ) {
     if (async.hasError && !async.hasValue) {
       return Padding(
@@ -279,7 +283,7 @@ class _CollectionPickerSheetState
           title: l10n.failureTitle(failureKindOf(async.error)),
           actionLabel: l10n.retry,
           onAction: () =>
-              ref.invalidate(allCollectionsForSourceProvider(widget.sourceKey)),
+              ref.invalidate(allCollectionsForSourceProvider(sourceKey)),
         ),
       );
     }
@@ -300,10 +304,9 @@ class _CollectionPickerSheetState
       );
     }
     final q = _query.trim().toLowerCase();
-    final visible = <Collection>[
-      for (final c in items)
-        if (q.isEmpty || c.name.toLowerCase().contains(q)) c,
-    ];
+    final visible = items
+        .where((c) => q.isEmpty || c.name.toLowerCase().contains(q))
+        .toList();
     if (visible.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(AppSpacing.lg),
@@ -314,31 +317,28 @@ class _CollectionPickerSheetState
       shrinkWrap: true,
       itemCount: visible.length,
       itemBuilder: (BuildContext context, int index) {
-        final collection = visible[index];
-        final initial = membershipOf(collection.seriesIds, widget.seriesIds);
-        final state = _desired[collection.id] ?? initial;
-        final bool? value = switch (state) {
-          MembershipState.all => true,
-          MembershipState.none => false,
-          MembershipState.partial => null,
-        };
+        final c = visible[index];
+        final state =
+            _desired[c.id] ?? membershipOf(c.seriesIds, widget.seriesIds);
         final hitCount = _isBatch
-            ? widget.seriesIds.where(collection.seriesIds.contains).length
+            ? widget.seriesIds.where(c.seriesIds.contains).length
             : 0;
         final subtitle = state == MembershipState.partial
             ? l10n.collectionsPartialMember(hitCount)
-            : l10n.seriesCount(collection.seriesCount);
+            : l10n.seriesCount(c.seriesCount);
         return CheckboxListTile(
-          key: Key('collection-pick-${collection.id}'),
+          key: Key('collection-pick-${c.id}'),
           tristate: _isBatch,
-          value: value,
-          onChanged: _saving ? null : (_) => _toggle(collection),
+          value: state == MembershipState.partial
+              ? null
+              : state == MembershipState.all,
+          onChanged: _saving ? null : (_) => _toggle(c),
           secondary: CollectionCovers(
-            collectionId: collection.id,
-            name: collection.name,
-            seriesIds: collection.seriesIds,
+            collectionId: c.id,
+            name: c.name,
+            seriesIds: c.seriesIds,
           ),
-          title: _ellipsisText(collection.name),
+          title: _ellipsisText(c.name),
           subtitle: _ellipsisText(subtitle),
         );
       },

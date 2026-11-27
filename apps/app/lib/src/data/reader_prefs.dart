@@ -84,7 +84,7 @@ class ReaderPrefs {
 
   /// 组合带服务器分区的键（远程源为 `$serverKey|$id`；本机源或未提供标识时使用裸 `id`）。
   static String scopedKey(String? serverKey, String id) =>
-      (serverKey == null || isLocalSourceKey(serverKey))
+      (serverKey == null || serverKey.isEmpty || isLocalSourceKey(serverKey))
       ? id
       : '$serverKey|$id';
 

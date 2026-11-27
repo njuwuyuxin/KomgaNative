@@ -255,5 +255,38 @@ void main() {
       expect(await repo.bookCover('any-book'), isNull);
       await expectLater(repo.series(), throwsA(isA<ServerFailure>()));
     });
+
+    test(
+      '空 sourceKey 在 registry 与所有 scoped provider 中语义统一为缺失源（P1-1）',
+      () async {
+        final container = buildContainer();
+        await container.read(serverListProvider.future);
+
+        final registry = container.read(sourceRegistryProvider);
+        expect(registry.bundleOrNull(''), isNull);
+        expect(() => registry.bundleFor(''), throwsStateError);
+
+        expect(
+          container.read(sourceCapabilitiesForKeyProvider('')),
+          SourceCapabilities.none,
+        );
+        expect(
+          container.read(libraryRepositoryForSourceProvider('')),
+          isA<MissingSourceRepository>(),
+        );
+        expect(
+          container.read(readerRepositoryForSourceProvider('')),
+          isA<MissingSourceRepository>(),
+        );
+        expect(
+          container.read(collectionsRepositoryForSourceProvider('')),
+          isA<MissingSourceRepository>(),
+        );
+        expect(
+          container.read(readStatusRepositoryForSourceProvider('')),
+          isA<MissingSourceRepository>(),
+        );
+      },
+    );
   });
 }

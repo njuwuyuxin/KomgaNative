@@ -41,7 +41,7 @@ class ProgressDatabase extends _$ProgressDatabase {
   final FutureOr<String> Function()? defaultLegacyScope;
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -86,6 +86,9 @@ class ProgressDatabase extends _$ProgressDatabase {
           await m.addColumn(localBooksRows, localBooksRows.isCloudPlaceholder);
         }
       }
+      if (from < 7) {
+        await _backfillEmptyScopesToV7();
+      }
     },
     beforeOpen: (OpeningDetails details) async {
       await _migrateFromLegacyCacheIfNeeded();
@@ -94,14 +97,18 @@ class ProgressDatabase extends _$ProgressDatabase {
 
   int _seqSeed = 0;
 
-  Future<int> enqueue(ProgressTarget target, {String scope = ''}) async {
+  Future<int> enqueue(
+    ProgressTarget target, {
+    String scope = kLocalSourceKey,
+  }) async {
+    final normalizedScope = scope.isEmpty ? kLocalSourceKey : scope;
     final now = DateTime.now().toUtc();
     final micros = now.microsecondsSinceEpoch;
     final seq = micros > _seqSeed ? micros : _seqSeed + 1;
     _seqSeed = seq;
     await into(localProgress).insertOnConflictUpdate(
       LocalProgressCompanion.insert(
-        scope: Value<String>(scope),
+        scope: Value<String>(normalizedScope),
         bookId: target.bookId,
         page: target.page,
         completed: target.completed,
@@ -112,7 +119,11 @@ class ProgressDatabase extends _$ProgressDatabase {
     return seq;
   }
 
-  Future<bool> ack(String bookId, int seq, {String scope = ''}) async {
+  Future<bool> ack(
+    String bookId,
+    int seq, {
+    String scope = kLocalSourceKey,
+  }) async {
     final updated =
         await (update(localProgress)..where(
               (LocalProgress t) =>
@@ -129,14 +140,17 @@ class ProgressDatabase extends _$ProgressDatabase {
     return updated > 0;
   }
 
-  Future<LocalProgressData?> record(String bookId, {String scope = ''}) =>
+  Future<LocalProgressData?> record(
+    String bookId, {
+    String scope = kLocalSourceKey,
+  }) =>
       (select(localProgress)
             ..where((t) => t.scope.equals(scope) & t.bookId.equals(bookId)))
           .getSingleOrNull();
 
   Future<List<LocalProgressData>> records(
     List<String> bookIds, {
-    String scope = '',
+    String scope = kLocalSourceKey,
   }) async {
     if (bookIds.isEmpty) return const <LocalProgressData>[];
     return (select(
@@ -144,7 +158,9 @@ class ProgressDatabase extends _$ProgressDatabase {
     )..where((t) => t.scope.equals(scope) & t.bookId.isIn(bookIds))).get();
   }
 
-  Future<List<PendingProgress>> pending({String scope = ''}) async {
+  Future<List<PendingProgress>> pending({
+    String scope = kLocalSourceKey,
+  }) async {
     final rows =
         await (select(localProgress)
               ..where((t) => t.scope.equals(scope) & t.pendingSeq.isNotNull())
@@ -168,20 +184,22 @@ class ProgressDatabase extends _$ProgressDatabase {
   Future<void> adoptRemote(
     String bookId,
     ReadProgress? remote, {
-    String scope = '',
+    String scope = kLocalSourceKey,
   }) async {
-    final current = await record(bookId, scope: scope);
+    final normalizedScope = scope.isEmpty ? kLocalSourceKey : scope;
+    final current = await record(bookId, scope: normalizedScope);
     if (current?.pendingSeq != null) return;
 
     if (remote == null) {
-      await (delete(
-        localProgress,
-      )..where((t) => t.scope.equals(scope) & t.bookId.equals(bookId))).go();
+      await (delete(localProgress)..where(
+            (t) => t.scope.equals(normalizedScope) & t.bookId.equals(bookId),
+          ))
+          .go();
       return;
     }
     await into(localProgress).insertOnConflictUpdate(
       LocalProgressCompanion.insert(
-        scope: Value<String>(scope),
+        scope: Value<String>(normalizedScope),
         bookId: bookId,
         page: remote.page,
         completed: remote.completed,
@@ -194,17 +212,19 @@ class ProgressDatabase extends _$ProgressDatabase {
   Future<void> forceAdopt(
     String bookId,
     ReadProgress? remote, {
-    String scope = '',
+    String scope = kLocalSourceKey,
   }) async {
+    final normalizedScope = scope.isEmpty ? kLocalSourceKey : scope;
     if (remote == null) {
-      await (delete(
-        localProgress,
-      )..where((t) => t.scope.equals(scope) & t.bookId.equals(bookId))).go();
+      await (delete(localProgress)..where(
+            (t) => t.scope.equals(normalizedScope) & t.bookId.equals(bookId),
+          ))
+          .go();
       return;
     }
     await into(localProgress).insertOnConflictUpdate(
       LocalProgressCompanion.insert(
-        scope: Value<String>(scope),
+        scope: Value<String>(normalizedScope),
         bookId: bookId,
         page: remote.page,
         completed: remote.completed,

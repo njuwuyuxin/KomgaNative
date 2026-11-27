@@ -10,9 +10,10 @@ const String kLocalSourceKey = 'local://device';
 /// 本机书库的默认虚拟库 ID。
 const String kLocalLibraryId = 'local://library';
 
-/// 判断给定的 [sourceKey] 是否属于本机书库（空串兼容旧存档与单测默认值）。
-bool isLocalSourceKey(String sourceKey) =>
-    sourceKey.isEmpty || sourceKey == kLocalSourceKey;
+/// 判断给定的 [sourceKey] 是否为本机书库标识。
+///
+/// 空串 `''` 不合法且不再隐式等同于本机；历史存档的空 `scope` 应在数据库迁移阶段补齐为 [kLocalSourceKey]。
+bool isLocalSourceKey(String sourceKey) => sourceKey == kLocalSourceKey;
 
 /// 支持或预留的内容源协议种类。
 enum SourceKind { local, komga, kavita, opds }
@@ -108,7 +109,10 @@ final class RemoteContentSource extends ContentSource {
     this.subtitle = '',
     this.kind = SourceKind.komga,
     this.capabilities = SourceCapabilities.komga,
-  });
+  }) : assert(
+         sourceKey.length > 0 && sourceKey != kLocalSourceKey,
+         'RemoteContentSource.sourceKey must be a non-empty remote key',
+       );
 
   @override
   final String sourceKey;

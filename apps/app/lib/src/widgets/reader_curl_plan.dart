@@ -232,7 +232,9 @@ extension _TurnImages on _PageTurn {
   ui.Image? _imageOrAdoptSync(int pageIndex) {
     final existing = _sheets.imageFor(pageIndex);
     if (existing != null) return existing;
-    final sourceKey = ScopedSourceScope.readOf(context);
+    final sourceKey =
+        ScopedSourceScope.readOf(context) ??
+        ref.read(activeSourceProvider).sourceKey;
     final bytes = ref
         .read(readerRepositoryForSourceProvider(sourceKey))
         .cachedPageImage(widget.bookId, pageIndex + 1);
@@ -277,7 +279,9 @@ extension _TurnImages on _PageTurn {
 
   Future<ui.Image?> _decodePage(int pageIndex) async {
     final bookId = widget.bookId;
-    final sourceKey = ScopedSourceScope.readOf(context);
+    final sourceKey =
+        ScopedSourceScope.readOf(context) ??
+        ref.read(activeSourceProvider).sourceKey;
     final repository = ref.read(readerRepositoryForSourceProvider(sourceKey));
     final page = pageIndex + 1;
     Uint8List? bytes = repository.cachedPageImage(bookId, page);

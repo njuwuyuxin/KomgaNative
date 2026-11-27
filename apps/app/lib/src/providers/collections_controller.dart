@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/data/collections_repository.dart';
 import 'package:yomu/src/data/curation_ops.dart';
 import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/source_scoped_providers.dart';
@@ -9,6 +10,12 @@ class CollectionsController extends Notifier<void> {
   @override
   void build() {}
 
+  CollectionsRepository _repo(String? sourceKey) => ref.read(
+    collectionsRepositoryForSourceProvider(
+      readEffectiveSourceKey(ref, sourceKey),
+    ),
+  );
+
   // ── 收藏集（系列维度） ──────────────────────────────────────────
 
   Future<Collection> create({
@@ -17,8 +24,7 @@ class CollectionsController extends Notifier<void> {
     bool ordered = false,
     String? sourceKey,
   }) async {
-    final created = await ref
-        .read(collectionsRepositoryForSourceProvider(sourceKey))
+    final created = await _repo(sourceKey)
         .createCollection(name: name, seriesIds: seriesIds, ordered: ordered);
     _invalidateCollections(seriesIds: seriesIds, sourceKey: sourceKey);
     return created;
@@ -29,9 +35,7 @@ class CollectionsController extends Notifier<void> {
     String name, {
     String? sourceKey,
   }) async {
-    await ref
-        .read(collectionsRepositoryForSourceProvider(sourceKey))
-        .renameCollection(collectionId, name);
+    await _repo(sourceKey).renameCollection(collectionId, name);
     _invalidateCollections(
       collectionIds: <String>[collectionId],
       sourceKey: sourceKey,
@@ -43,9 +47,7 @@ class CollectionsController extends Notifier<void> {
     List<String> seriesIds, {
     String? sourceKey,
   }) async {
-    await ref
-        .read(collectionsRepositoryForSourceProvider(sourceKey))
-        .updateCollection(collectionId, seriesIds: seriesIds);
+    await _repo(sourceKey).updateCollection(collectionId, seriesIds: seriesIds);
     _invalidateCollections(
       collectionIds: <String>[collectionId],
       invalidateAllSeriesCollections: true,
@@ -59,7 +61,7 @@ class CollectionsController extends Notifier<void> {
     List<String> seriesIdsToAdd, {
     String? sourceKey,
   }) async {
-    final repo = ref.read(collectionsRepositoryForSourceProvider(sourceKey));
+    final repo = _repo(sourceKey);
     final current = await repo.collectionById(collectionId);
     final existing = current?.seriesIds ?? const <String>[];
     final next = mergeUniqueIds(existing, seriesIdsToAdd);
@@ -80,7 +82,7 @@ class CollectionsController extends Notifier<void> {
     List<String> affectedSeriesIds = const <String>[],
     String? sourceKey,
   }) async {
-    final repo = ref.read(collectionsRepositoryForSourceProvider(sourceKey));
+    final repo = _repo(sourceKey);
     final touched = <String>[];
     for (final update in plan.updates) {
       await repo.updateCollection(update.id, seriesIds: update.nextIds);
@@ -98,9 +100,7 @@ class CollectionsController extends Notifier<void> {
   }
 
   Future<void> delete(String collectionId, {String? sourceKey}) async {
-    await ref
-        .read(collectionsRepositoryForSourceProvider(sourceKey))
-        .deleteCollection(collectionId);
+    await _repo(sourceKey).deleteCollection(collectionId);
     _invalidateCollections(
       collectionIds: <String>[collectionId],
       invalidateAllSeriesCollections: true,
@@ -141,14 +141,12 @@ class CollectionsController extends Notifier<void> {
     bool ordered = false,
     String? sourceKey,
   }) async {
-    final created = await ref
-        .read(collectionsRepositoryForSourceProvider(sourceKey))
-        .createReadList(
-          name: name,
-          summary: summary,
-          bookIds: bookIds,
-          ordered: ordered,
-        );
+    final created = await _repo(sourceKey).createReadList(
+      name: name,
+      summary: summary,
+      bookIds: bookIds,
+      ordered: ordered,
+    );
     _invalidateReadLists();
     return created;
   }
@@ -161,15 +159,13 @@ class CollectionsController extends Notifier<void> {
     List<String>? bookIds,
     String? sourceKey,
   }) async {
-    await ref
-        .read(collectionsRepositoryForSourceProvider(sourceKey))
-        .updateReadList(
-          readListId,
-          name: name,
-          summary: summary,
-          ordered: ordered,
-          bookIds: bookIds,
-        );
+    await _repo(sourceKey).updateReadList(
+      readListId,
+      name: name,
+      summary: summary,
+      ordered: ordered,
+      bookIds: bookIds,
+    );
     _invalidateReadLists(readListIds: <String>[readListId]);
   }
 
@@ -178,7 +174,7 @@ class CollectionsController extends Notifier<void> {
     MembershipChangePlan plan, {
     String? sourceKey,
   }) async {
-    final repo = ref.read(collectionsRepositoryForSourceProvider(sourceKey));
+    final repo = _repo(sourceKey);
     final touched = <String>[];
     for (final update in plan.updates) {
       await repo.updateReadList(update.id, bookIds: update.nextIds);
@@ -192,9 +188,7 @@ class CollectionsController extends Notifier<void> {
   }
 
   Future<void> deleteReadList(String readListId, {String? sourceKey}) async {
-    await ref
-        .read(collectionsRepositoryForSourceProvider(sourceKey))
-        .deleteReadList(readListId);
+    await _repo(sourceKey).deleteReadList(readListId);
     _invalidateReadLists(readListIds: <String>[readListId]);
   }
 

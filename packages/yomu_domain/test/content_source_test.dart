@@ -85,5 +85,22 @@ void main() {
       ).withSource('https://komga.example.com');
       expect(rl.isCloud, isTrue);
     });
+
+    test('isLocalSourceKey 仅认 kLocalSourceKey，空串不再视作本机（P1-1）', () {
+      expect(isLocalSourceKey(kLocalSourceKey), isTrue);
+      expect(isLocalSourceKey(''), isFalse);
+      expect(isLocalSourceKey('https://komga.example.com'), isFalse);
+      expect(
+        () => RemoteContentSource(sourceKey: '', displayName: 'Bad'),
+        throwsA(isA<AssertionError>()),
+      );
+      expect(
+        () => RemoteContentSource(
+          sourceKey: kLocalSourceKey,
+          displayName: 'BadLocal',
+        ),
+        throwsA(isA<AssertionError>()),
+      );
+    });
   });
 }

@@ -92,6 +92,9 @@ class _DayBookTile extends ConsumerWidget {
   final ReadingDayBook book;
   final bool removed;
 
+  String get _resolvedScope =>
+      book.scope.isEmpty ? kLocalSourceKey : book.scope;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
@@ -100,10 +103,7 @@ class _DayBookTile extends ConsumerWidget {
         ? null
         : ref
               .watch(
-                bookCoverProvider((
-                  sourceKey: book.scope.isEmpty ? null : book.scope,
-                  id: book.bookId,
-                )),
+                bookCoverProvider((sourceKey: _resolvedScope, id: book.bookId)),
               )
               .value;
 
@@ -117,9 +117,7 @@ class _DayBookTile extends ConsumerWidget {
         onTap: removed
             ? null
             : () {
-                final query = book.scope.isEmpty
-                    ? ''
-                    : '?source=${Uri.encodeComponent(book.scope)}';
+                final query = '?source=${Uri.encodeComponent(_resolvedScope)}';
                 unawaited(context.push('/reader/${book.bookId}$query'));
               },
         child: Column(

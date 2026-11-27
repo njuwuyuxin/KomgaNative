@@ -1,9 +1,10 @@
 import 'package:drift/drift.dart';
+import 'package:yomu_domain/yomu_domain.dart' show kLocalSourceKey;
 
 /// 本地进度 + 待提交队列（合一张表：按 `{scope, bookId}` 分区，pending 非空即可提交）。
 class LocalProgress extends Table {
-  /// 服务器分区键（规范化 `baseUrl`）；空串兼容未分区单测与旧存档。
-  TextColumn get scope => text().withDefault(const Constant(''))();
+  /// 内容源分区键（本机为 [kLocalSourceKey]，远端为规范化 `baseUrl`）。
+  TextColumn get scope => text().withDefault(const Constant(kLocalSourceKey))();
 
   TextColumn get bookId => text()();
 
@@ -42,8 +43,8 @@ class PinnedSeriesRows extends Table {
 class ReadingSessions extends Table {
   IntColumn get id => integer().autoIncrement()();
 
-  /// 所属服务器标识（规范化 `baseUrl`）；默认空串兼容旧历史行。
-  TextColumn get scope => text().withDefault(const Constant(''))();
+  /// 所属内容源标识（本机为 [kLocalSourceKey]，远端为规范化 `baseUrl`）。
+  TextColumn get scope => text().withDefault(const Constant(kLocalSourceKey))();
 
   TextColumn get bookId => text()();
 
@@ -67,7 +68,7 @@ class ReadingSessions extends Table {
 
 /// 通用页级书签表（本地书与远程 Komga 书均可打书签，按 `{scope, bookId, page}` 隔离，LMB-05）。
 class PageBookmarksRows extends Table {
-  TextColumn get scope => text().withDefault(const Constant(''))();
+  TextColumn get scope => text().withDefault(const Constant(kLocalSourceKey))();
 
   TextColumn get bookId => text()();
 

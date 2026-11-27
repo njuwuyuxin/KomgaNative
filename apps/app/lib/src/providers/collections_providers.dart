@@ -34,11 +34,11 @@ final collectionsProvider =
       CollectionsListController.new,
     );
 
-/// 按源寻址的全量收藏集（供跨源系列详情页的收藏选择器使用）。
+/// 按非空 `sourceKey` 寻址的全量收藏集（供跨源系列详情页的收藏选择器使用）。
 final allCollectionsForSourceProvider =
-    FutureProvider.family<List<Collection>, String?>((
+    FutureProvider.family<List<Collection>, String>((
       Ref ref,
-      String? sourceKey,
+      String sourceKey,
     ) async {
       final repo = ref.watch(collectionsRepositoryForSourceProvider(sourceKey));
       return _fetchAllPages<Collection>(
@@ -49,7 +49,8 @@ final allCollectionsForSourceProvider =
 /// 选择器用的全量收藏集（当前激活源，自动翻页拉全，不截断）。
 final FutureProvider<List<Collection>> allCollectionsProvider =
     FutureProvider<List<Collection>>((Ref ref) {
-      return ref.watch(allCollectionsForSourceProvider(null).future);
+      final activeKey = ref.watch(activeSourceProvider).sourceKey;
+      return ref.watch(allCollectionsForSourceProvider(activeKey).future);
     });
 
 /// 单个收藏集元信息（含当前 `seriesIds`）。
@@ -60,11 +61,15 @@ final collectionDetailProvider = FutureProvider.family<Collection?, String>(
 
 /// 某系列所属的收藏集列表（系列详情页收藏图标高亮状态用，按 `sourceKey` 路由）。
 final seriesCollectionsProvider =
-    FutureProvider.family<List<Collection>, SeriesQuery>(
-      (Ref ref, SeriesQuery query) => ref
-          .watch(collectionsRepositoryForSourceProvider(query.sourceKey))
-          .seriesCollections(query.seriesId),
-    );
+    FutureProvider.family<List<Collection>, SeriesQuery>((
+      Ref ref,
+      SeriesQuery query,
+    ) {
+      final key = resolveEffectiveSourceKey(ref, query.sourceKey);
+      return ref
+          .watch(collectionsRepositoryForSourceProvider(key))
+          .seriesCollections(query.seriesId);
+    });
 
 /// 阅读列表增量分页控制器（ARC-12）。
 class ReadListsController extends PagedListController<ReadList> {
@@ -82,11 +87,11 @@ final readListsProvider =
       ReadListsController.new,
     );
 
-/// 按源寻址的全量阅读列表（供跨源系列详情页的阅读列表选择器使用）。
+/// 按非空 `sourceKey` 寻址的全量阅读列表（供跨源系列详情页的阅读列表选择器使用）。
 final allReadListsForSourceProvider =
-    FutureProvider.family<List<ReadList>, String?>((
+    FutureProvider.family<List<ReadList>, String>((
       Ref ref,
-      String? sourceKey,
+      String sourceKey,
     ) async {
       final repo = ref.watch(collectionsRepositoryForSourceProvider(sourceKey));
       return _fetchAllPages<ReadList>(
@@ -97,7 +102,8 @@ final allReadListsForSourceProvider =
 /// 选择器用的全量阅读列表（当前激活源，自动翻页拉全，不截断）。
 final FutureProvider<List<ReadList>> allReadListsProvider =
     FutureProvider<List<ReadList>>((Ref ref) {
-      return ref.watch(allReadListsForSourceProvider(null).future);
+      final activeKey = ref.watch(activeSourceProvider).sourceKey;
+      return ref.watch(allReadListsForSourceProvider(activeKey).future);
     });
 
 /// 单个阅读列表元信息（含 `summary` 与当前 `bookIds`）。

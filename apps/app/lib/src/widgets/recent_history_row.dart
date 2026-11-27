@@ -95,12 +95,12 @@ class _RecentHistoryTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final resolvedScope = session.scope.isEmpty
+        ? kLocalSourceKey
+        : session.scope;
     final cover = ref
         .watch(
-          bookCoverProvider((
-            sourceKey: session.scope.isEmpty ? null : session.scope,
-            id: session.bookId,
-          )),
+          bookCoverProvider((sourceKey: resolvedScope, id: session.bookId)),
         )
         .value;
     return SizedBox(
@@ -109,9 +109,7 @@ class _RecentHistoryTile extends ConsumerWidget {
         key: Key('recent-history-${session.bookId}'),
         borderRadius: BorderRadius.circular(AppRadii.sm),
         onTap: () {
-          final query = session.scope.isEmpty
-              ? ''
-              : '?source=${Uri.encodeComponent(session.scope)}';
+          final query = '?source=${Uri.encodeComponent(resolvedScope)}';
           context.push('/reader/${session.bookId}$query');
         },
         child: Column(

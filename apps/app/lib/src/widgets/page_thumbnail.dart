@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu/src/providers/active_source_provider.dart';
 import 'package:yomu/src/providers/reader_providers.dart';
 import 'package:yomu/src/providers/source_scoped_providers.dart';
 import 'package:yomu/src/widgets/reader_palette.dart';
@@ -35,7 +36,9 @@ class PageThumbnailImage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sourceKey = ScopedSourceScope.maybeOf(context);
+    final sourceKey =
+        ScopedSourceScope.maybeOf(context) ??
+        ref.watch(activeSourceProvider).sourceKey;
     final request = (sourceKey: sourceKey, bookId: bookId, page: page);
     final repo = ref.watch(readerRepositoryForSourceProvider(sourceKey));
     final syncThumb = repo.cachedPageThumbnail(bookId, page);

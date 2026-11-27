@@ -110,8 +110,9 @@ class DownloadsController extends Notifier<Map<String, DownloadStatus>> {
     return const <String, DownloadStatus>{};
   }
 
-  DownloadService _serviceFor(String scope) =>
-      ref.read(downloadServiceForSourceProvider(scope.isEmpty ? null : scope));
+  DownloadService _serviceFor(String scope) => scope.isEmpty
+      ? ref.read(downloadServiceProvider)
+      : ref.read(downloadServiceForSourceProvider(scope));
 
   String _scopeForBook(Book book) =>
       book.isCloud ? book.sourceKey : _currentScope;

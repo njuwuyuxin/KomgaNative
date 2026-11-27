@@ -61,12 +61,9 @@ final Provider<DownloadService> downloadServiceProvider =
           const NoopDownloadService();
     });
 
-/// 按显式 `sourceKey` 路由获取对应内容源的 [DownloadService]（P1-2）。
+/// 按非空 `sourceKey` 路由获取对应内容源的 [DownloadService]（P1-1 / P1-2）。
 final downloadServiceForSourceProvider =
-    Provider.family<DownloadService, String?>((Ref ref, String? sourceKey) {
-      if (sourceKey == null || sourceKey.isEmpty) {
-        return ref.watch(downloadServiceProvider);
-      }
+    Provider.family<DownloadService, String>((Ref ref, String sourceKey) {
       return ref
               .watch(sourceRegistryProvider)
               .bundleOrNull(sourceKey)
@@ -151,8 +148,13 @@ final downloadedForSourceProvider =
       Ref ref,
       ScopedDownloadQuery query,
     ) {
+      final rawScope = query.sourceKey;
+      final scope = (rawScope != null && rawScope.isNotEmpty)
+          ? rawScope
+          : ref.watch(downloadScopeProvider);
+      if (scope.isEmpty) return Future<DownloadedBook?>.value(null);
       return ref
-          .watch(downloadServiceForSourceProvider(query.sourceKey))
+          .watch(downloadServiceForSourceProvider(scope))
           .downloaded(query.bookId);
     });
 

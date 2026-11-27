@@ -29,9 +29,8 @@ final readerBookProvider = FutureProvider.family<Book?, ReaderBookQuery>((
   Ref ref,
   ReaderBookQuery query,
 ) {
-  return ref
-      .watch(readerRepositoryForSourceProvider(query.sourceKey))
-      .book(query.bookId);
+  final key = resolveEffectiveSourceKey(ref, query.sourceKey);
+  return ref.watch(readerRepositoryForSourceProvider(key)).book(query.bookId);
 });
 
 /// 页列表（尺寸用于布局；页码 1 基）。
@@ -40,8 +39,9 @@ final readerPagesProvider =
       Ref ref,
       ReaderBookQuery query,
     ) {
+      final key = resolveEffectiveSourceKey(ref, query.sourceKey);
       return ref
-          .watch(readerRepositoryForSourceProvider(query.sourceKey))
+          .watch(readerRepositoryForSourceProvider(key))
           .pages(query.bookId);
     });
 
@@ -56,8 +56,9 @@ final readerPageImageProvider = FutureProvider.family<Uint8List, PageRequest>((
   Ref ref,
   PageRequest req,
 ) {
+  final key = resolveEffectiveSourceKey(ref, req.sourceKey);
   return ref
-      .watch(readerRepositoryForSourceProvider(req.sourceKey))
+      .watch(readerRepositoryForSourceProvider(key))
       .pageImage(req.bookId, req.page);
 }, isAutoDispose: true);
 
@@ -67,8 +68,9 @@ final readerPageImageProvider = FutureProvider.family<Uint8List, PageRequest>((
 /// 且走仓库独立 LRU，不会把正在阅读的原图挤出内存。
 final readerPageThumbnailProvider =
     FutureProvider.family<Uint8List, PageRequest>((Ref ref, PageRequest req) {
+      final key = resolveEffectiveSourceKey(ref, req.sourceKey);
       return ref
-          .watch(readerRepositoryForSourceProvider(req.sourceKey))
+          .watch(readerRepositoryForSourceProvider(key))
           .pageThumbnail(req.bookId, req.page);
     }, isAutoDispose: true);
 
@@ -116,8 +118,9 @@ final nextBookProvider = FutureProvider.family<Book?, NextBookQuery>((
   Ref ref,
   NextBookQuery query,
 ) async {
+  final key = resolveEffectiveSourceKey(ref, query.sourceKey);
   final page = await ref
-      .watch(libraryRepositoryForSourceProvider(query.sourceKey))
+      .watch(libraryRepositoryForSourceProvider(key))
       .books(query.seriesId);
   final index = page.items.indexWhere((Book book) => book.id == query.bookId);
   if (index < 0 || index + 1 >= page.items.length) return null;

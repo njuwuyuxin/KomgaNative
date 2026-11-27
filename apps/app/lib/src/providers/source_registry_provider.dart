@@ -93,17 +93,16 @@ final class SourceRegistry {
 
   bool get hasRemoteSources => _remoteSources.isNotEmpty;
 
-  /// 按 `sourceKey` 查询对应装配单元；未知远程 `sourceKey` 返回 `null` 而非回退本机。
-  SourceBundle? bundleOrNull(String? sourceKey) {
-    if (sourceKey == null || isLocalSourceKey(sourceKey)) {
-      return localBundle;
-    }
+  /// 按 `sourceKey` 查询对应装配单元；空串或未知远程 `sourceKey` 返回 `null` 而非回退本机。
+  SourceBundle? bundleOrNull(String sourceKey) {
+    if (sourceKey.isEmpty) return null;
+    if (isLocalSourceKey(sourceKey)) return localBundle;
     if (!_remoteSources.containsKey(sourceKey)) return null;
     return _resolveRemote(sourceKey);
   }
 
-  /// 按 `sourceKey` 获取对应装配单元；未知远程 `sourceKey` 抛 [StateError]。
-  SourceBundle bundleFor(String? sourceKey) {
+  /// 按 `sourceKey` 获取对应装配单元；空串或未知远程 `sourceKey` 抛 [StateError]。
+  SourceBundle bundleFor(String sourceKey) {
     final bundle = bundleOrNull(sourceKey);
     if (bundle == null) {
       throw StateError('Unknown content source: $sourceKey');

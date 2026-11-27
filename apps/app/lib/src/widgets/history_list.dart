@@ -8,6 +8,7 @@ import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/reading_history_provider.dart';
 import 'package:yomu/src/widgets/cover_image.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu_domain/yomu_domain.dart' show kLocalSourceKey;
 
 /// 阅读历史按天分组列表：今天 / 昨天 / 具体日期。
 class HistoryList extends StatelessWidget {
@@ -95,6 +96,9 @@ class _HistoryRow extends ConsumerWidget {
   final bool removed;
   final ValueChanged<int> onDelete;
 
+  String get _resolvedScope =>
+      session.scope.isEmpty ? kLocalSourceKey : session.scope;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
@@ -104,7 +108,7 @@ class _HistoryRow extends ConsumerWidget {
         : ref
               .watch(
                 bookCoverProvider((
-                  sourceKey: session.scope.isEmpty ? null : session.scope,
+                  sourceKey: _resolvedScope,
                   id: session.bookId,
                 )),
               )
@@ -173,9 +177,7 @@ class _HistoryRow extends ConsumerWidget {
   }
 
   void _openSessionBook(BuildContext context) {
-    final query = session.scope.isEmpty
-        ? ''
-        : '?source=${Uri.encodeComponent(session.scope)}';
+    final query = '?source=${Uri.encodeComponent(_resolvedScope)}';
     unawaited(context.push('/reader/${session.bookId}$query'));
   }
 

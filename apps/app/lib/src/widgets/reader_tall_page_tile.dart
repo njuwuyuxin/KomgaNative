@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:yomu/src/providers/active_source_provider.dart';
 import 'package:yomu/src/providers/reader_providers.dart';
 import 'package:yomu/src/providers/source_scoped_providers.dart';
 import 'package:yomu/src/widgets/reader_chrome.dart';
@@ -237,7 +238,9 @@ class _ReaderTallPageTileState extends ConsumerState<ReaderTallPageTile> {
   @override
   Widget build(BuildContext context) {
     final page = widget.pageIndex + 1;
-    final sourceKey = ScopedSourceScope.maybeOf(context);
+    final sourceKey =
+        ScopedSourceScope.maybeOf(context) ??
+        ref.watch(activeSourceProvider).sourceKey;
     final request = (sourceKey: sourceKey, bookId: widget.bookId, page: page);
     final repo = ref.watch(readerRepositoryForSourceProvider(sourceKey));
     final async = ref.watch(readerPageImageProvider(request));

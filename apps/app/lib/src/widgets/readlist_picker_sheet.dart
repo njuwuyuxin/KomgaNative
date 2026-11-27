@@ -7,6 +7,7 @@ import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/src/data/curation_ops.dart';
 import 'package:yomu/src/data/shelf_failure.dart';
 import 'package:yomu/src/l10n/failure_text.dart';
+import 'package:yomu/src/providers/active_source_provider.dart';
 import 'package:yomu/src/providers/collections_controller.dart';
 import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/widgets/curation_dialogs.dart';
@@ -169,7 +170,9 @@ class _ReadListPickerSheetState extends ConsumerState<_ReadListPickerSheet> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final async = ref.watch(allReadListsForSourceProvider(widget.sourceKey));
+    final sourceKey =
+        widget.sourceKey ?? ref.watch(activeSourceProvider).sourceKey;
+    final async = ref.watch(allReadListsForSourceProvider(sourceKey));
     final items = async.value;
     final hasChanges = items != null && !_planFor(items).isEmpty;
     final maxHeight = MediaQuery.sizeOf(context).height * 0.72;
@@ -269,8 +272,11 @@ class _ReadListPickerSheetState extends ConsumerState<_ReadListPickerSheet> {
           icon: Icons.cloud_off_outlined,
           title: l10n.failureTitle(failureKindOf(async.error)),
           actionLabel: l10n.retry,
-          onAction: () =>
-              ref.invalidate(allReadListsForSourceProvider(widget.sourceKey)),
+          onAction: () => ref.invalidate(
+            allReadListsForSourceProvider(
+              widget.sourceKey ?? ref.read(activeSourceProvider).sourceKey,
+            ),
+          ),
         ),
       );
     }

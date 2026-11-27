@@ -129,8 +129,9 @@ class SeriesReadController extends Notifier<Set<String>> {
     if (state.contains(seriesId)) return;
     state = <String>{...state, seriesId};
     try {
+      final key = readEffectiveSourceKey(ref, sourceKey);
       await ref
-          .read(readStatusRepositoryForSourceProvider(sourceKey))
+          .read(readStatusRepositoryForSourceProvider(key))
           .setSeriesRead(seriesId, read: read);
       if (_disposed) return;
       invalidateAfterReadStatusChange(

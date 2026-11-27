@@ -22,8 +22,9 @@ class BookReadController extends Notifier<Set<String>> {
     if (state.contains(bookId)) return;
     state = <String>{...state, bookId};
     try {
+      final key = readEffectiveSourceKey(ref, sourceKey);
       await ref
-          .read(readStatusRepositoryForSourceProvider(sourceKey))
+          .read(readStatusRepositoryForSourceProvider(key))
           .setBookRead(bookId, read: read, pagesCount: pagesCount);
       if (_disposed) return;
       invalidateAfterReadStatusChange(
