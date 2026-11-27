@@ -16,19 +16,24 @@ final class WifiQuotaLease {
     this._quota, {
     required this.perFileLimit,
     required int initialReserved,
-  }) : _held = initialReserved;
+    required int generation,
+  }) : _held = initialReserved,
+       _generation = generation;
 
   final WifiSessionQuota _quota;
   final int perFileLimit;
+  final int _generation;
   int _held;
   int _written = 0;
   bool _settled = false;
 
   int get writtenBytes => _written;
 
-  /// 为新到达的 [bytes] 申请单文件与整次会话额度；任一超限即返回 `false`。
+  /// 为新到达的 [bytes] 申请单文件与整次会话额度；任一超限或所属会话已重启/重置即返回 `false`。
   bool consume(int bytes) {
-    if (_settled || bytes < 0) return false;
+    if (_settled || bytes < 0 || !_quota._isCurrentGeneration(_generation)) {
+      return false;
+    }
     final nextWritten = _written + bytes;
     if (nextWritten > perFileLimit) return false;
     if (nextWritten > _held) {
@@ -40,19 +45,23 @@ final class WifiQuotaLease {
     return true;
   }
 
-  /// 上传落盘成功：将实际写入字节数转入永久已用额度，释放多余预占。
+  /// 上传落盘成功：将实际写入字节数转入永久已用额度，释放多余预占（旧会话租约不再污染新会话额度）。
   void commit() {
     if (_settled) return;
     _settled = true;
-    _quota._commit(heldBytes: _held, writtenBytes: _written);
+    if (_quota._isCurrentGeneration(_generation)) {
+      _quota._commit(heldBytes: _held, writtenBytes: _written);
+    }
     _held = 0;
   }
 
-  /// 上传中止或失败：释放全部在途预占额度（对应半截文件已删除）。
+  /// 上传中止或失败：释放全部在途预占额度（对应半截文件已删除；旧会话租约安全忽略）。
   void release() {
     if (_settled) return;
     _settled = true;
-    _quota._release(_held);
+    if (_quota._isCurrentGeneration(_generation)) {
+      _quota._release(_held);
+    }
     _held = 0;
   }
 }
@@ -60,7 +69,8 @@ final class WifiQuotaLease {
 /// Wi-Fi 传书会话级并发与流量额度管理器（P2-1）：
 /// - 限制同时进行的上传请求数，防止无限并发撑爆磁盘与文件句柄；
 /// - 原子预占（已知 `Content-Length`）+ 逐块实时扣减（`Transfer-Encoding: chunked`），
-///   保证并发上传永远无法绕过 [maxSessionBytes] 上限。
+///   保证并发上传永远无法绕过 [maxSessionBytes] 上限；
+/// - 每次 [reset] 递增会话代际号，确保快速重启时旧会话在途租约绝不扣减新会话额度。
 final class WifiSessionQuota {
   WifiSessionQuota({
     required this.maxSessionBytes,
@@ -70,15 +80,19 @@ final class WifiSessionQuota {
   final int maxSessionBytes;
   final int maxConcurrentUploads;
 
+  int _generation = 0;
   int _committedBytes = 0;
   int _reservedBytes = 0;
   int _activeUploads = 0;
 
+  int get generation => _generation;
   int get committedBytes => _committedBytes;
   int get reservedBytes => _reservedBytes;
   int get usedBytes => _committedBytes + _reservedBytes;
   int get remainingBytes => math.max(0, maxSessionBytes - usedBytes);
   int get activeUploads => _activeUploads;
+
+  bool _isCurrentGeneration(int generation) => generation == _generation;
 
   bool tryEnterUpload() {
     if (_activeUploads >= maxConcurrentUploads) return false;
@@ -86,7 +100,8 @@ final class WifiSessionQuota {
     return true;
   }
 
-  void leaveUpload() {
+  void leaveUpload({int? generation}) {
+    if (generation != null && generation != _generation) return;
     if (_activeUploads > 0) _activeUploads--;
   }
 
@@ -111,6 +126,7 @@ final class WifiSessionQuota {
       this,
       perFileLimit: perFileLimit,
       initialReserved: initialReserved,
+      generation: _generation,
     );
   }
 
@@ -133,6 +149,7 @@ final class WifiSessionQuota {
   }
 
   void reset() {
+    _generation++;
     _committedBytes = 0;
     _reservedBytes = 0;
     _activeUploads = 0;

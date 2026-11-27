@@ -291,12 +291,17 @@ class SessionController extends Notifier<SessionState> {
     if (current is SessionConnected && current.server.id == server.id) {
       await signOut();
     }
-    // 清理被删除服务器的进度与 outbox 记录，避免永不被消费的孤儿数据滞留数据库（P3）。
-    // 直接读写 progressStoreProvider（不经 progressSyncProvider，避免与后者监听 sessionProvider 形成循环依赖）。
+    // 清理被删除服务器的进度、outbox 记录以及同步服务内存状态（P3）。
+    // 持久层走 progressStoreProvider，内存态通过单向 scopeRemovedListenersProvider 广播，避免循环依赖。
     try {
       await ref.read(progressStoreProvider).clearScope(server.id);
     } on Exception catch (error) {
       debugPrint('SessionController: clearScope(${server.id}) failed: $error');
+    }
+    for (final listener in List<void Function(String)>.of(
+      ref.read(scopeRemovedListenersProvider),
+    )) {
+      listener(server.id);
     }
   }
 }

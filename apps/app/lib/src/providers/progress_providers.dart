@@ -54,6 +54,15 @@ final Provider<ProgressStore> progressStoreProvider = Provider<ProgressStore>(
   (Ref ref) => DriftProgressStore(ref.watch(progressDatabaseProvider)),
 );
 
+/// 服务器移除时触发的内存清理回调注册表（单向解耦：`SessionController` 仅广播，
+/// `progressSyncProvider` 注册清理动作，避免循环依赖且不受 Riverpod 3 监听暂停影响）。
+final Provider<Set<void Function(String scope)>> scopeRemovedListenersProvider =
+    Provider<Set<void Function(String scope)>>((Ref ref) {
+      final listeners = <void Function(String scope)>{};
+      ref.onDispose(listeners.clear);
+      return listeners;
+    });
+
 /// 进度同步服务：经 [contentSourceDescriptorsProvider] 的 `syncsProgressRemotely`
 /// 与 [progressSinkForSourceProvider] 按显式内容源分区独立上传（ARC-07 / P1-4）。
 final Provider<ProgressSyncService> progressSyncProvider =
@@ -74,6 +83,12 @@ final Provider<ProgressSyncService> progressSyncProvider =
         scopedUpload: (String scope, ProgressTarget target) =>
             _uploadProgress(ref, scope, target),
       );
+      void onScopeRemoved(String scope) {
+        unawaited(service.clearScope(scope));
+      }
+
+      final removedListeners = ref.read(scopeRemovedListenersProvider)
+        ..add(onScopeRemoved);
       ref.listen<Map<String, ContentSource>>(contentSourceDescriptorsProvider, (
         _,
         Map<String, ContentSource> next,
@@ -95,7 +110,10 @@ final Provider<ProgressSyncService> progressSyncProvider =
           unawaited(service.flush(scope: scope));
         }
       });
-      ref.onDispose(service.dispose);
+      ref.onDispose(() {
+        removedListeners.remove(onScopeRemoved);
+        service.dispose();
+      });
       return service;
     });
 

@@ -243,14 +243,17 @@ final class WifiTransferServer {
   }
 
   Future<void> _dispatchPost(String path, HttpRequest request) async {
-    if (path == '/api/abort-folder') {
-      await handleWifiAbortFolder(
-        request: request,
-        staging: _stagingDir,
-        stagedFolders: _stagedFolders,
+    final staging = _stagingDir;
+    if (_server == null || staging == null) {
+      await writeWifiJson(
+        request.response,
+        HttpStatus.serviceUnavailable,
+        const <String, Object?>{'ok': false, 'error': 'server_stopped'},
+        closeConnection: true,
       );
       return;
     }
+    final sessionGeneration = _quota.generation;
     if (!_quota.tryEnterUpload()) {
       await drainUpToLimit(request);
       request.response.headers.set(HttpHeaders.retryAfterHeader, '1');
@@ -263,8 +266,15 @@ final class WifiTransferServer {
       return;
     }
     try {
+      if (path == '/api/abort-folder') {
+        await handleWifiAbortFolder(
+          request: request,
+          staging: staging,
+          stagedFolders: _stagedFolders,
+        );
+        return;
+      }
       unawaited(sweepExpiredStagedFolders());
-      final staging = _stagingDir ??= await _createStagingDir();
       if (path == '/api/upload') {
         final outcome = await handleWifiArchiveUpload(
           request: request,
@@ -296,13 +306,17 @@ final class WifiTransferServer {
         _receivedCount += await handleWifiCommitFolder(
           request: request,
           importer: _importer,
-          staging: _stagingDir,
+          staging: staging,
           stagedFolders: _stagedFolders,
           emit: _emit,
         );
       }
     } finally {
-      _quota.leaveUpload();
+      _quota.leaveUpload(generation: sessionGeneration);
+      // 若请求在途期间服务已 stop/重启，清掉其可能残留的旧会话暂存目录，防止泄露孤儿目录。
+      if (_quota.generation != sessionGeneration || _stagingDir != staging) {
+        unawaited(tryDeleteImportDir(staging));
+      }
     }
   }
 

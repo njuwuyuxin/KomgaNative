@@ -190,12 +190,39 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      // 同时拉起真实 progressSyncProvider，验证 removeServer 不构成循环依赖。
-      container.read(progressSyncProvider);
+      // 同时拉起真实 progressSyncProvider，验证 removeServer 不构成循环依赖且同步清理其内存缓存。
+      await container.read(serverListProvider.future);
+      final sync = container.read(progressSyncProvider);
+      sync.noteBook(
+        Book(
+          id: 'b1',
+          seriesId: 's1',
+          name: 'Server A Book',
+          pagesCount: 20,
+          sourceKey: serverA.id,
+        ),
+        scope: serverA.id,
+      );
+      expect(
+        await sync.pendingInProgressBooks(scope: serverA.id),
+        hasLength(1),
+      );
+
       await container.read(sessionProvider.notifier).removeServer(serverA);
+      await container.read(serverListProvider.future);
+      await Future<void>.delayed(Duration.zero);
 
       expect(await progressStore.pending(scope: serverA.id), isEmpty);
       expect(await progressStore.record('b1', scope: serverA.id), isNull);
+      // 即使再模拟一条未清的 pending，_knownBooks[serverA.id] 也已被 clearScope 彻底清除。
+      await progressStore.enqueue(
+        const ProgressTarget(bookId: 'b1', page: 8, completed: false),
+        scope: serverA.id,
+      );
+      expect(
+        await sync.pendingInProgressBooks(scope: serverA.id),
+        isEmpty,
+      );
       // 服务器 B 与本机进度必须完好无损。
       expect(await progressStore.pending(scope: serverB.id), hasLength(1));
       expect(

@@ -1,10 +1,12 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/src/data/prefs_backup.dart';
+import 'package:yomu/src/l10n/failure_text.dart';
 import 'package:yomu/src/providers/settings_backup_controller.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
 
@@ -43,12 +45,19 @@ class SettingsBackupSection extends ConsumerWidget {
     WidgetRef ref,
     AppLocalizations l10n,
   ) async {
-    final encoded = await ref
-        .read(settingsBackupControllerProvider)
-        .exportJson();
-    await Clipboard.setData(ClipboardData(text: encoded));
-    if (!context.mounted) return;
-    _toast(context, l10n.settingsExportDone);
+    try {
+      final encoded = await ref
+          .read(settingsBackupControllerProvider)
+          .exportJson();
+      await Clipboard.setData(ClipboardData(text: encoded));
+      if (!context.mounted) return;
+      _toast(context, l10n.settingsExportDone);
+    } on Object catch (error) {
+      debugPrint('SettingsBackupSection: export failed: $error');
+      if (context.mounted) {
+        _toast(context, l10n.failureTitle(failureKindOf(error)));
+      }
+    }
   }
 
   Future<void> _import(
@@ -89,6 +98,11 @@ class SettingsBackupSection extends ConsumerWidget {
       if (context.mounted) _toast(context, l10n.settingsImportDone);
     } on PrefsBackupException catch (error) {
       if (context.mounted) _toast(context, _backupErrorText(l10n, error));
+    } on Object catch (error) {
+      debugPrint('SettingsBackupSection: import failed: $error');
+      if (context.mounted) {
+        _toast(context, l10n.failureTitle(failureKindOf(error)));
+      }
     }
   }
 

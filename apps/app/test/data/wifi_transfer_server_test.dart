@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:yomu/src/data/local/local_catalog_query_dao.dart';
 import 'package:yomu/src/data/local/local_comic_importer.dart';
 import 'package:yomu/src/data/local/local_comics_storage.dart';
+import 'package:yomu/src/data/local/wifi_transfer_quota.dart';
 import 'package:yomu/src/data/local/wifi_transfer_server.dart';
 import 'package:yomu/src/data/progress/progress_database.dart';
 import 'package:yomu_domain/yomu_domain.dart';
@@ -604,6 +605,35 @@ void main() {
       clock = clock.add(const Duration(minutes: 2));
       expect(await ttlServer.sweepExpiredStagedFolders(), 1);
       expect(folderDir('StaleComic').existsSync(), isFalse);
+    });
+
+    test('快速重启时旧会话租约的 consume / commit / leaveUpload 不污染新会话额度', () {
+      final quota = WifiSessionQuota(
+        maxSessionBytes: 1000,
+        maxConcurrentUploads: 2,
+      );
+      final gen1 = quota.generation;
+      expect(quota.tryEnterUpload(), isTrue);
+      final oldLease = quota.beginWrite(perFileLimit: 500, declaredLength: 200);
+      expect(oldLease.consume(150), isTrue);
+
+      // 模拟快速重启：reset() 递增代际号并开启新会话。
+      quota.reset();
+      expect(quota.usedBytes, 0);
+      expect(quota.tryEnterUpload(), isTrue);
+      expect(quota.activeUploads, 1);
+
+      // 旧会话租约继续写入、提交或释放均不得影响新会话。
+      expect(oldLease.consume(10), isFalse);
+      oldLease.commit();
+      expect(quota.usedBytes, 0);
+      expect(quota.committedBytes, 0);
+
+      // 旧会话 finally 归还并发槽不得扣减新会话的 activeUploads。
+      quota.leaveUpload(generation: gen1);
+      expect(quota.activeUploads, 1);
+      quota.leaveUpload(generation: quota.generation);
+      expect(quota.activeUploads, 0);
     });
   });
 }
