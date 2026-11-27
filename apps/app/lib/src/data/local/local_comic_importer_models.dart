@@ -37,16 +37,12 @@ final class LocalImportBatchResult {
     this.importedBookIds = const <String>[],
     this.failures = const <ImportFailureItem>[],
     this.cancelled = false,
-    this.preservedArchivePaths = const <String>[],
   });
 
   final List<String> importedSeriesIds;
   final List<String> importedBookIds;
   final List<ImportFailureItem> failures;
   final bool cancelled;
-
-  /// 嵌套合集全部子书导入失败时保留下来的外层原压缩包路径（P2-8）。
-  final List<String> preservedArchivePaths;
 
   int get importedCount => importedBookIds.length;
   bool get hasFailures => failures.isNotEmpty;

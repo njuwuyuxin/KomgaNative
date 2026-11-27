@@ -56,7 +56,6 @@ final class LocalComicImporter {
     final seriesIds = <String>{};
     final bookIds = <String>[];
     final failures = <ImportFailureItem>[];
-    final preserved = <String>[];
     var cancelled = false;
 
     for (var i = 0; i < files.length; i++) {
@@ -84,7 +83,6 @@ final class LocalComicImporter {
         seriesIds.addAll(imported.importedSeriesIds);
         bookIds.addAll(imported.importedBookIds);
         failures.addAll(imported.failures);
-        preserved.addAll(imported.preservedArchivePaths);
         if (imported.cancelled) {
           cancelled = true;
           break;
@@ -115,7 +113,6 @@ final class LocalComicImporter {
       importedBookIds: bookIds,
       failures: failures,
       cancelled: cancelled,
-      preservedArchivePaths: preserved,
     );
   }
 

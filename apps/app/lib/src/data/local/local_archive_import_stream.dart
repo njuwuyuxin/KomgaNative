@@ -129,21 +129,10 @@ Future<LocalImportBatchResult> importArchiveOrCollectionStream({
           cancelToken: cancelToken,
         );
         if (unpacked != null) {
-          // 仅当至少成功拆出一本子书或用户主动取消时才清理外层合集副本；
-          // 若所有子书均导入失败，保留外层归档避免丢失原包（P2-8）。
-          if (unpacked.importedBookIds.isNotEmpty || unpacked.cancelled) {
-            await tryDeleteImportDir(destFile.parent);
-            return unpacked;
-          }
-          return LocalImportBatchResult(
-            importedSeriesIds: unpacked.importedSeriesIds,
-            importedBookIds: unpacked.importedBookIds,
-            failures: unpacked.failures,
-            preservedArchivePaths: <String>[
-              ...unpacked.preservedArchivePaths,
-              destFile.path,
-            ],
-          );
+          // destFile 只是本次流式拷入沙盒的临时外层合集副本（用户原始源文件从未改动）；
+          // 无论子书部分成功、全部失败还是取消，都必须清理临时副本，绝不在 books/ 下遗留无数据库索引的孤儿文件（N5）。
+          await tryDeleteImportDir(destFile.parent);
+          return unpacked;
         }
         rethrow;
       } else {

@@ -219,7 +219,7 @@ void main() {
       expect(secondResult?.importedCount, 1);
     });
 
-    test('嵌套合集所有子书都失败时保留外层原压缩包，不默默删除', () async {
+    test('N5: 嵌套合集所有子书都失败时彻底清理沙盒临时外层副本，不遗留无索引孤儿文件', () async {
       final brokenChild = Uint8List.fromList(<int>[0x50, 0x4B, 0x03, 0x04]);
       final nestedCollection = _buildStoredZip(<String, List<int>>{
         'broken1.cbz': brokenChild,
@@ -236,10 +236,12 @@ void main() {
 
       expect(result.importedCount, 0);
       expect(result.failures, hasLength(2));
-      expect(result.preservedArchivePaths, hasLength(1));
-      final preservedFile = File(result.preservedArchivePaths.single);
-      expect(preservedFile.existsSync(), isTrue);
-      expect(preservedFile.lengthSync(), nestedCollection.length);
+      // 沙盒 books 目录下不得残留任何无数据库记录的孤儿文件。
+      final booksDir = Directory('${sandboxDir.path}/books');
+      final remainingFiles = booksDir.existsSync()
+          ? booksDir.listSync(recursive: true).whereType<File>().toList()
+          : <File>[];
+      expect(remainingFiles, isEmpty);
     });
 
     test('嵌套合集至少拆出一本成功子书时清理外层原压缩包避免双份占盘', () async {
@@ -262,7 +264,9 @@ void main() {
 
       expect(result.importedCount, 1);
       expect(result.failures, hasLength(1));
-      expect(result.preservedArchivePaths, isEmpty);
+      final booksDir = Directory('${sandboxDir.path}/books');
+      final bookDirs = booksDir.listSync().whereType<Directory>().toList();
+      expect(bookDirs, hasLength(1));
     });
   });
 }
