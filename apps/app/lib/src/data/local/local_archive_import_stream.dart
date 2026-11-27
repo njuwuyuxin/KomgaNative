@@ -5,6 +5,7 @@ import 'package:yomu/src/data/local/archive_password_store.dart';
 import 'package:yomu/src/data/local/cover_thumbnail_generator.dart';
 import 'package:yomu/src/data/local/local_comic_importer_models.dart';
 import 'package:yomu/src/data/local/local_comics_storage.dart';
+import 'package:yomu/src/data/local/local_import_cleanup.dart';
 import 'package:yomu/src/data/local/native_archive_reader.dart';
 import 'package:yomu/src/data/local/native_pdf_reader.dart';
 import 'package:yomu/src/data/progress/progress_database.dart';
@@ -55,6 +56,7 @@ Future<LocalImportBatchResult> importArchiveOrCollectionStream({
   final destFile = await storage.resolveFile(archiveRelPath);
 
   ComicArchiveReader? reader;
+  String? committedBookId;
   try {
     await destFile.parent.create(recursive: true);
     await writeStreamToFile(openStream(), destFile);
@@ -153,17 +155,27 @@ Future<LocalImportBatchResult> importArchiveOrCollectionStream({
       reader: reader,
       generateSeriesId: () => nextId('s'),
     );
+    committedBookId = result.bookId;
     if (unlockedPassword != null && unlockedPassword.isNotEmpty) {
       await passwordStore?.saveBookPassword(bookId, unlockedPassword);
     }
-    await reader.close();
+    final closing = reader;
     reader = null;
+    await closing.close();
     return LocalImportBatchResult(
       importedSeriesIds: <String>[result.seriesId],
       importedBookIds: <String>[result.bookId],
     );
   } on Object {
-    await reader?.close();
+    await tryCloseArchiveReader(reader);
+    if (committedBookId != null) {
+      await rollbackCommittedLocalBook(
+        db: db,
+        storage: storage,
+        bookId: committedBookId,
+        passwordStore: passwordStore,
+      );
+    }
     await tryDeleteImportDir(destFile.parent);
     rethrow;
   }

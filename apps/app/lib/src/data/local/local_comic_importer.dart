@@ -7,6 +7,7 @@ import 'package:yomu/src/data/local/cover_thumbnail_generator.dart';
 import 'package:yomu/src/data/local/local_archive_import_stream.dart';
 import 'package:yomu/src/data/local/local_comic_importer_models.dart';
 import 'package:yomu/src/data/local/local_comics_storage.dart';
+import 'package:yomu/src/data/local/local_import_cleanup.dart';
 import 'package:yomu/src/data/local/local_external_directory_import.dart';
 import 'package:yomu/src/data/progress/progress_database.dart';
 import 'package:yomu_local_archive/yomu_local_archive.dart';
@@ -128,6 +129,8 @@ final class LocalComicImporter {
     final folderRelPath = 'books/$safeFolder/pages';
     final destDir = await _storage.resolveDirectory(folderRelPath);
 
+    FolderComicReader? reader;
+    String? committedBookId;
     try {
       await destDir.create(recursive: true);
       var totalBytes = 0;
@@ -139,7 +142,7 @@ final class LocalComicImporter {
         await writeStreamToFile(item.openRead(), outFile);
         totalBytes += await outFile.length();
       }
-      final reader = await FolderComicReader.open(destDir);
+      reader = await FolderComicReader.open(destDir);
       final imported = await commitComicReaderToDatabase(
         db: _db,
         storage: _storage,
@@ -154,13 +157,24 @@ final class LocalComicImporter {
         reader: reader,
         generateSeriesId: () => _nextId('s'),
       );
-      await reader.close();
+      committedBookId = imported.bookId;
+      final closing = reader;
+      reader = null;
+      await closing.close();
       onProgress?.call(valid.length, valid.length, '');
       return LocalImportBatchResult(
         importedSeriesIds: <String>[imported.seriesId],
         importedBookIds: <String>[imported.bookId],
       );
     } on ArchiveException catch (e) {
+      await tryCloseArchiveReader(reader);
+      if (committedBookId != null) {
+        await rollbackCommittedLocalBook(
+          db: _db,
+          storage: _storage,
+          bookId: committedBookId,
+        );
+      }
       await tryDeleteImportDir(destDir.parent);
       return LocalImportBatchResult(
         failures: <ImportFailureItem>[
@@ -171,6 +185,14 @@ final class LocalComicImporter {
         ],
       );
     } on FileSystemException {
+      await tryCloseArchiveReader(reader);
+      if (committedBookId != null) {
+        await rollbackCommittedLocalBook(
+          db: _db,
+          storage: _storage,
+          bookId: committedBookId,
+        );
+      }
       await tryDeleteImportDir(destDir.parent);
       return LocalImportBatchResult(
         failures: <ImportFailureItem>[

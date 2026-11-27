@@ -6,6 +6,7 @@ import 'package:yomu/src/data/local/cover_thumbnail_generator.dart';
 import 'package:yomu/src/data/local/local_archive_import_stream.dart';
 import 'package:yomu/src/data/local/local_comic_importer.dart';
 import 'package:yomu/src/data/local/local_comics_storage.dart';
+import 'package:yomu/src/data/local/local_import_cleanup.dart';
 import 'package:yomu/src/data/progress/progress_database.dart';
 import 'package:yomu_local_archive/yomu_local_archive.dart';
 import 'package:yomu_platform/yomu_platform.dart';
@@ -168,6 +169,7 @@ Future<LocalImportBatchResult> importExternalDirectoryToSandbox({
   final folderRelPath = 'books/$safeFolder/pages';
   final destDir = await storage.resolveDirectory(folderRelPath);
   FolderComicReader? managedReader;
+  String? committedBookId;
 
   try {
     await destDir.create(recursive: true);
@@ -211,15 +213,24 @@ Future<LocalImportBatchResult> importExternalDirectoryToSandbox({
       reader: managedReader,
       generateSeriesId: () => nextId('s'),
     );
-    await managedReader.close();
+    committedBookId = imported.bookId;
+    final closing = managedReader;
     managedReader = null;
+    await closing.close();
     onProgress?.call(imageEntries.length, imageEntries.length, '');
     return LocalImportBatchResult(
       importedSeriesIds: <String>[imported.seriesId],
       importedBookIds: <String>[imported.bookId],
     );
   } on ArchiveException catch (e) {
-    await managedReader?.close();
+    await tryCloseArchiveReader(managedReader);
+    if (committedBookId != null) {
+      await rollbackCommittedLocalBook(
+        db: db,
+        storage: storage,
+        bookId: committedBookId,
+      );
+    }
     await tryDeleteImportDir(destDir.parent);
     return LocalImportBatchResult(
       failures: <ImportFailureItem>[
@@ -230,7 +241,14 @@ Future<LocalImportBatchResult> importExternalDirectoryToSandbox({
       ],
     );
   } on FileSystemException {
-    await managedReader?.close();
+    await tryCloseArchiveReader(managedReader);
+    if (committedBookId != null) {
+      await rollbackCommittedLocalBook(
+        db: db,
+        storage: storage,
+        bookId: committedBookId,
+      );
+    }
     await tryDeleteImportDir(destDir.parent);
     return LocalImportBatchResult(
       failures: <ImportFailureItem>[

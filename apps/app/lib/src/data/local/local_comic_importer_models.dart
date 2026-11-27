@@ -5,6 +5,7 @@ import 'package:yomu/src/data/local/cover_thumbnail_generator.dart';
 import 'package:yomu/src/data/local/local_catalog_edit_dao.dart';
 import 'package:yomu/src/data/local/local_catalog_write_dao.dart';
 import 'package:yomu/src/data/local/local_comics_storage.dart';
+import 'package:yomu/src/data/local/local_import_cleanup.dart';
 import 'package:yomu/src/data/progress/progress_database.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu_local_archive/yomu_local_archive.dart';
@@ -211,14 +212,6 @@ Future<void> writeStreamToFile(Stream<List<int>> stream, File dest) async {
   }
 }
 
-Future<void> tryDeleteImportDir(Directory dir) async {
-  try {
-    if (await dir.exists()) await dir.delete(recursive: true);
-  } on FileSystemException {
-    // 清理失败不覆盖主异常。
-  }
-}
-
 String importBaseName(String path) {
   final norm = path.replaceAll(r'\', '/');
   final stripped = norm.endsWith('/')
@@ -243,6 +236,8 @@ Future<LocalImportBatchResult> importLocalImageFolderToSandbox({
   final folderRelPath = 'books/$safeFolder/pages';
   final destDir = await storage.resolveDirectory(folderRelPath);
   FolderComicReader? probeReader;
+  FolderComicReader? managedReader;
+  String? committedBookId;
 
   try {
     probeReader = await FolderComicReader.open(sourceDir);
@@ -262,7 +257,7 @@ Future<LocalImportBatchResult> importLocalImageFolderToSandbox({
     await probeReader.close();
     probeReader = null;
 
-    final managedReader = await FolderComicReader.open(destDir);
+    managedReader = await FolderComicReader.open(destDir);
     final imported = await commitComicReaderToDatabase(
       db: db,
       storage: storage,
@@ -277,14 +272,24 @@ Future<LocalImportBatchResult> importLocalImageFolderToSandbox({
       reader: managedReader,
       generateSeriesId: () => nextId('s'),
     );
+    committedBookId = imported.bookId;
     await managedReader.close();
+    managedReader = null;
     onProgress?.call(1, 1, '');
     return LocalImportBatchResult(
       importedSeriesIds: <String>[imported.seriesId],
       importedBookIds: <String>[imported.bookId],
     );
   } on ArchiveException catch (e) {
-    await probeReader?.close();
+    await tryCloseArchiveReader(probeReader);
+    await tryCloseArchiveReader(managedReader);
+    if (committedBookId != null) {
+      await rollbackCommittedLocalBook(
+        db: db,
+        storage: storage,
+        bookId: committedBookId,
+      );
+    }
     await tryDeleteImportDir(destDir.parent);
     return LocalImportBatchResult(
       failures: <ImportFailureItem>[
@@ -295,7 +300,15 @@ Future<LocalImportBatchResult> importLocalImageFolderToSandbox({
       ],
     );
   } on FileSystemException {
-    await probeReader?.close();
+    await tryCloseArchiveReader(probeReader);
+    await tryCloseArchiveReader(managedReader);
+    if (committedBookId != null) {
+      await rollbackCommittedLocalBook(
+        db: db,
+        storage: storage,
+        bookId: committedBookId,
+      );
+    }
     await tryDeleteImportDir(destDir.parent);
     return LocalImportBatchResult(
       failures: <ImportFailureItem>[
