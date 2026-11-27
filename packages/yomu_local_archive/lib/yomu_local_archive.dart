@@ -8,6 +8,7 @@ export 'src/archive_isolate.dart'
     show
         ArchiveWorkerStats,
         archiveWorkerStats,
+        kArchiveScanTaskTimeout,
         kDefaultArchiveTaskTimeout,
         offloadArchiveTask,
         shutdownArchiveWorker;

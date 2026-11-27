@@ -49,6 +49,7 @@ final class TarComicReader implements ComicArchiveReader {
       final ({List<ArchivePageEntry> pages, Uint8List? comicInfoBytes}) scanned;
       if (source is FileByteSource && totalLength >= kTarScanIsolateThreshold) {
         // RandomAccessFile 句柄不可跨 Isolate 传输，因此在长驻工作线程按只读路径完成顺序头扫描后立即关闭句柄。
+        // 大 TAR 顺序扫描可能跨越数 GB，使用更宽松的 kArchiveScanTaskTimeout（N4）。
         final path = source.filePath;
         scanned = await offloadArchiveTask(() async {
           final bgSource = await FileByteSource.open(File(path));
@@ -61,7 +62,7 @@ final class TarComicReader implements ComicArchiveReader {
           } finally {
             await bgSource.close();
           }
-        });
+        }, timeout: kArchiveScanTaskTimeout);
       } else {
         scanned = await _scanTarArchive(
           source,

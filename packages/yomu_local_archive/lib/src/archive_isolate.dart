@@ -14,8 +14,11 @@ const int kZipCryptoIsolateThreshold = 32 * 1024;
 const int kCentralDirectoryIsolateThreshold = 32 * 1024;
 const int kTarScanIsolateThreshold = 256 * 1024;
 
-/// 单个后台归档任务的默认超时时间（P2-2），防止异常输入或损坏流永久挂死。
+/// 单个后台归档任务（单页解压/解密等）的默认超时时间（P2-2），防止异常输入或损坏流永久挂死。
 const Duration kDefaultArchiveTaskTimeout = Duration(seconds: 30);
+
+/// 整本目录/大 TAR 头部顺序扫描任务的宽松超时时间（N4），避免慢速 SD 卡读取数 GB 归档时被 30s 误杀。
+const Duration kArchiveScanTaskTimeout = Duration(minutes: 5);
 
 /// 后台归档工作 Isolate 池的运行统计（用于诊断与单测验证复用行为）。
 typedef ArchiveWorkerStats = ({
@@ -47,6 +50,7 @@ Future<T> offloadBytesParse<T>(
   Uint8List input,
   T Function(Uint8List bytes) parse, {
   required int thresholdBytes,
+  Duration? timeout,
 }) async {
   if (input.length < thresholdBytes) {
     return parse(input);
@@ -55,7 +59,7 @@ Future<T> offloadBytesParse<T>(
   return offloadArchiveTask<T>(() {
     final materialized = packet.materialize().asUint8List();
     return parse(materialized);
-  });
+  }, timeout: timeout);
 }
 
 /// 在长驻后台 Worker 池中执行任意可跨 Isolate 传输的同步或异步归档任务。
@@ -114,13 +118,17 @@ final class _ArchiveWorkerPool {
   ArchiveWorkerSlot _acquireSlot() {
     _workers.removeWhere((ArchiveWorkerSlot w) => w.isClosed);
 
+    final accepting = _workers
+        .where((ArchiveWorkerSlot w) => w.isAcceptingWork)
+        .toList(growable: false);
+
     // 优先复用当前完全空闲的已存活 worker，避免重复 spawn。
-    for (final worker in _workers) {
+    for (final worker in accepting) {
       if (worker.inFlight == 0) return worker;
     }
 
-    // 池未满且已有 worker 忙碌时再按需扩容（例如翻页与预读并行）。
-    if (_workers.length < maxWorkers) {
+    // 池未满且已有 worker 忙碌（或正在排空）时再按需扩容（例如翻页与预读并行）。
+    if (accepting.length < maxWorkers) {
       _totalSpawns++;
       late final ArchiveWorkerSlot created;
       created = ArchiveWorkerSlot(
@@ -131,15 +139,15 @@ final class _ArchiveWorkerPool {
       return created;
     }
 
-    // 全部 worker 均在忙时选择当前积压最少的一条（同载轮询）。
-    var best = _workers[_roundRobin % _workers.length];
-    for (var i = 1; i < _workers.length; i++) {
-      final candidate = _workers[(_roundRobin + i) % _workers.length];
+    // 全部可用 worker 均在忙时选择当前积压最少的一条（同载轮询）。
+    var best = accepting[_roundRobin % accepting.length];
+    for (var i = 1; i < accepting.length; i++) {
+      final candidate = accepting[(_roundRobin + i) % accepting.length];
       if (candidate.inFlight < best.inFlight) {
         best = candidate;
       }
     }
-    _roundRobin = (_roundRobin + 1) % _workers.length;
+    _roundRobin = (_roundRobin + 1) % accepting.length;
     return best;
   }
 

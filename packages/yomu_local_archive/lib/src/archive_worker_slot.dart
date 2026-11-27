@@ -19,8 +19,10 @@ final class ArchiveWorkerSlot {
   Timer? _idleTimer;
   int _nextId = 1;
   bool _closed = false;
+  bool _draining = false;
 
   bool get isClosed => _closed;
+  bool get isAcceptingWork => !_closed && !_draining;
   int get inFlight => _pending.length;
 
   Future<SendPort> _spawn() async {
@@ -40,7 +42,11 @@ final class ArchiveWorkerSlot {
         final ok = message[1] as bool;
         _taskTimers.remove(id)?.cancel();
         final completer = _pending.remove(id);
-        _scheduleIdleIfEmpty();
+        if (_draining && _pending.isEmpty) {
+          unawaited(close());
+        } else {
+          _scheduleIdleIfEmpty();
+        }
         if (completer == null || completer.isCompleted) return;
         if (ok) {
           completer.complete(message[2]);
@@ -96,10 +102,14 @@ final class ArchiveWorkerSlot {
           TimeoutException('Archive worker task timed out', timeout),
         );
       }
-      // 单任务超时可能意味着该 Worker Isolate 陷入死循环或阻塞，立即回收该槽位以免拖死后续任务。
-      unawaited(
-        close(reason: TimeoutException('Archive worker recycled', timeout)),
-      );
+      // N4: 停止向该槽位继续派发新任务；若同 Worker 上还有其他健康任务在跑，先排空不误杀，
+      // 仅当在途任务全部结束（或无其他任务）时再回收 Isolate。
+      _draining = true;
+      if (_pending.isEmpty) {
+        unawaited(
+          close(reason: TimeoutException('Archive worker recycled', timeout)),
+        );
+      }
     });
 
     try {

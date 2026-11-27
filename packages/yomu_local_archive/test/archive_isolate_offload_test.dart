@@ -356,5 +356,30 @@ void main() {
       // 超时回收后后续任务立即可用。
       expect(await offloadArchiveTask<int>(() => 7), 7);
     });
+
+    test('N4 单任务超时进入排空态，不误杀同 Worker 上并发执行的其他健康任务', () async {
+      await shutdownArchiveWorker();
+      // 发射 3 个并发任务（池上限为 2，第 3 个必定复用某个已有 Worker）：
+      // 两个长任务（150ms）配宽松超时，一个短超时任务（40ms）触发超时。
+      final long1 = offloadArchiveTask<int>(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 160));
+        return 101;
+      }, timeout: const Duration(seconds: 3));
+      final long2 = offloadArchiveTask<int>(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 160));
+        return 202;
+      }, timeout: const Duration(seconds: 3));
+      final timedOut = offloadArchiveTask<int>(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+        return 303;
+      }, timeout: const Duration(milliseconds: 40));
+
+      await expectLater(timedOut, throwsA(isA<TimeoutException>()));
+      // 同槽位上的健康任务必须正常完成，不被连坐杀死。
+      expect(await long1, 101);
+      expect(await long2, 202);
+      // 扫描类默认超时显著高于单页默认超时。
+      expect(kArchiveScanTaskTimeout, greaterThan(kDefaultArchiveTaskTimeout));
+    });
   });
 }

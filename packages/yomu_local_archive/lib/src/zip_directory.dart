@@ -112,6 +112,7 @@ Future<List<ZipEntryInfo>> readZipCentralDirectory(
     cdBytes,
     _parseCentralDirectoryEntries,
     thresholdBytes: kCentralDirectoryIsolateThreshold,
+    timeout: kArchiveScanTaskTimeout,
   );
 }
 
