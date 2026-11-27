@@ -7,6 +7,7 @@ import 'package:yomu/src/data/local/local_comics_storage.dart';
 import 'package:yomu/src/data/local/local_library_repository.dart';
 import 'package:yomu/src/data/local/local_read_status_repository.dart';
 import 'package:yomu/src/data/local/local_reader_repository.dart';
+import 'package:yomu/src/data/progress_sink.dart';
 import 'package:yomu/src/data/read_status_repository.dart';
 import 'package:yomu/src/data/reader_repository.dart';
 import 'package:yomu/src/providers/archive_password_provider.dart';
@@ -17,10 +18,10 @@ import 'package:yomu/src/session/server_store.dart';
 import 'package:yomu/src/session/session_controller.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 
-/// 单一内容源完整装配单元（五大领域能力 + 源能力描述符）。
+/// 单一内容源完整装配单元（领域仓库 + 下载服务 + 进度上传端口 + 源能力描述符）。
 ///
-/// 后续扩展 Kavita / OPDS 时只需实现对应的 `SourceBundle` 挂入 [SourceRegistry]，
-/// 上层 UI 与状态机零改动。
+/// 后续扩展 Kavita / OPDS 时只需实现对应的 [RemoteSourcePlugin] 挂入
+/// [remoteSourcePluginsProvider]，上层 UI、同步服务与状态机零改动。
 final class SourceBundle {
   const SourceBundle({
     required this.source,
@@ -29,6 +30,7 @@ final class SourceBundle {
     required this.collections,
     required this.readStatus,
     this.download = const NoopDownloadService(),
+    this.progressSink = const NoopProgressSink(),
   });
 
   final ContentSource source;
@@ -37,7 +39,96 @@ final class SourceBundle {
   final CollectionsRepository collections;
   final ReadStatusRepository readStatus;
   final DownloadService download;
+  final ProgressSink progressSink;
 }
+
+/// 远程协议插件契约（P1-4）：将进度上传端口与完整 [SourceBundle] 拆分为两阶段构建，
+/// 确保 `progressSyncProvider` 仅依赖轻量进度端口而不与需要叠加本地进度的仓库产生环依赖。
+abstract interface class RemoteSourcePlugin {
+  /// 构建远程进度上传端口；不支持远程同步的协议返回 [NoopProgressSink]。
+  ProgressSink? buildProgressSink(Ref ref, StoredServer server);
+
+  /// 构建该服务器的完整 [SourceBundle]（含已装配好的 [progressSink]）。
+  SourceBundle? buildBundle(
+    Ref ref,
+    StoredServer server,
+    ProgressSink progressSink,
+  );
+}
+
+final class _KomgaSourcePlugin implements RemoteSourcePlugin {
+  const _KomgaSourcePlugin();
+
+  @override
+  ProgressSink? buildProgressSink(Ref ref, StoredServer server) {
+    final session = ref.watch(komgaSessionForServerProvider(server.id));
+    if (session == null) return null;
+    return KomgaProgressSink(session);
+  }
+
+  @override
+  SourceBundle? buildBundle(
+    Ref ref,
+    StoredServer server,
+    ProgressSink progressSink,
+  ) {
+    final session = ref.watch(komgaSessionForServerProvider(server.id));
+    if (session == null) return null;
+    final sync = ref.watch(progressSyncProvider);
+    final cacheDb = ref.watch(httpCacheDatabaseProvider);
+    return SourceBundle(
+      source: remoteSourceOfServer(server),
+      library: KomgaLibraryRepository(session, sync),
+      reader: KomgaReaderRepository(session, sync),
+      collections: KomgaCollectionsRepository(session, sync),
+      readStatus: KomgaReadStatusRepository(session, sync),
+      download: KomgaDownloadService.forSession(session, cacheDb),
+      progressSink: progressSink,
+    );
+  }
+}
+
+/// 按 [SourceKind] 注册的远程内容源协议插件表（P1-4）。
+final Provider<Map<SourceKind, RemoteSourcePlugin>>
+remoteSourcePluginsProvider = Provider<Map<SourceKind, RemoteSourcePlugin>>(
+  (Ref ref) => const <SourceKind, RemoteSourcePlugin>{
+    SourceKind.komga: _KomgaSourcePlugin(),
+  },
+);
+
+/// 轻量内容源元数据表（本机 + 已保存/已连接的远程源描述符），不触发任何仓库或会话创建。
+final Provider<Map<String, ContentSource>> contentSourceDescriptorsProvider =
+    Provider<Map<String, ContentSource>>((Ref ref) {
+      final connectedServer = ref.watch(
+        sessionProvider.select(
+          (SessionState state) =>
+              state is SessionConnected ? state.server : null,
+        ),
+      );
+      final savedServers =
+          ref.watch(serverListProvider).value ?? const <StoredServer>[];
+
+      return Map<String, ContentSource>.unmodifiable(<String, ContentSource>{
+        kLocalSourceKey: const LocalContentSource(),
+        for (final s in savedServers) s.id: remoteSourceOfServer(s),
+        if (connectedServer != null)
+          connectedServer.id: remoteSourceOfServer(connectedServer),
+      });
+    });
+
+/// 按 `sourceKey` 懒解析远程进度上传端口（由 [remoteSourcePluginsProvider] 按协议分派）。
+final progressSinkForSourceProvider = Provider.family<ProgressSink?, String>((
+  Ref ref,
+  String sourceKey,
+) {
+  if (sourceKey.isEmpty) return null;
+  if (isLocalSourceKey(sourceKey)) return const NoopProgressSink();
+  final server = ref.watch(storedServerByIdProvider(sourceKey));
+  if (server == null) return null;
+  final plugin = ref.watch(remoteSourcePluginsProvider)[server.kind];
+  if (plugin == null) return null;
+  return plugin.buildProgressSink(ref, server);
+});
 
 /// 多源插件注册表：按 `sourceKey` 懒解析对应的 [SourceBundle]（P1-3）。
 ///
@@ -58,12 +149,6 @@ final class SourceRegistry {
        _resolveRemote = ((String key) => remoteBundles[key]);
 
   /// 懒加载构造：仅注册轻量 [RemoteContentSource] 列表，按需解析具体 [SourceBundle]。
-  ///
-  /// 生命周期约束：本注册表不会订阅每台远程源 [SourceBundle] 的内部变更。
-  /// 当单台服务器的会话或凭据重建（如更换 API Key）导致底层 bundle 重建时，
-  /// 已持有本 `SourceRegistry` 引用的调用方**不会**自动刷新，需等待
-  /// `serverListProvider` / `sessionProvider` 变化触发注册表整体重建，或直接监听
-  /// `remoteSourceBundleProvider(sourceKey)`。
   SourceRegistry.lazy({
     required this.localBundle,
     required List<RemoteContentSource> remoteSources,
@@ -160,60 +245,41 @@ RemoteContentSource remoteSourceOfServer(StoredServer server) =>
       sourceKey: server.id,
       displayName: server.label,
       subtitle: server.address.baseUrl,
+      kind: server.kind,
+      capabilities: SourceCapabilities.forKind(server.kind),
     );
 
-/// 单台远程服务器的懒加载 [SourceBundle]（P1-3）。
+/// 单台远程服务器的懒加载 [SourceBundle]（P1-3 / P1-4）。
 ///
-/// 仅在访问该服务器时创建其会话与仓库实例（含封面内存 LRU），
+/// 仅在访问该服务器时按 `server.kind` 分派创建其会话与仓库实例（含封面内存 LRU），
 /// 切换或增删其他服务器不会销毁重建本服务器的缓存。
 final remoteSourceBundleProvider = Provider.family<SourceBundle?, String>((
   Ref ref,
   String serverId,
 ) {
   final server = ref.watch(storedServerByIdProvider(serverId));
-  final session = ref.watch(komgaSessionForServerProvider(serverId));
-  if (server == null || session == null) return null;
-  final sync = ref.watch(progressSyncProvider);
-  final cacheDb = ref.watch(httpCacheDatabaseProvider);
-  return SourceBundle(
-    source: remoteSourceOfServer(server),
-    library: KomgaLibraryRepository(session, sync),
-    reader: KomgaReaderRepository(session, sync),
-    collections: KomgaCollectionsRepository(session, sync),
-    readStatus: KomgaReadStatusRepository(session, sync),
-    download: KomgaDownloadService.forSession(session, cacheDb),
-  );
+  if (server == null) return null;
+  final plugin = ref.watch(remoteSourcePluginsProvider)[server.kind];
+  if (plugin == null) return null;
+  final sink = ref.watch(progressSinkForSourceProvider(server.id));
+  if (sink == null) return null;
+  return plugin.buildBundle(ref, server, sink);
 });
 
 /// 全局多源注册表：自动汇聚常驻本机源 + 已保存/已连接的远程源描述符，
 /// 远程 `SourceBundle` 经 [remoteSourceBundleProvider] 按需懒创建并长驻缓存。
-///
-/// 刷新约束：`resolveRemote` 内部使用 `ref.read(remoteSourceBundleProvider(sourceKey))`，
-/// 刻意不建立对单台远程 bundle 的依赖，以免单服访问/失效拖累整张注册表重建。
-/// 因此仅当 `serverListProvider` 或 `sessionProvider` 变更时才会重建注册表并通知下游；
-/// 若调用方需响应单台服务器的凭据/会话热更新，应直接 `ref.watch(remoteSourceBundleProvider(key))`
-/// 并确保凭据更新路径同步刷新 `serverListProvider`。
 final Provider<SourceRegistry> sourceRegistryProvider =
     Provider<SourceRegistry>((Ref ref) {
       final local = ref.watch(localSourceBundleProvider);
-      final connectedServer = ref.watch(
-        sessionProvider.select(
-          (SessionState state) =>
-              state is SessionConnected ? state.server : null,
-        ),
-      );
-      final savedServers =
-          ref.watch(serverListProvider).value ?? const <StoredServer>[];
-
-      final remoteSourcesById = <String, RemoteContentSource>{
-        for (final s in savedServers) s.id: remoteSourceOfServer(s),
-        if (connectedServer != null)
-          connectedServer.id: remoteSourceOfServer(connectedServer),
-      };
+      final descriptors = ref.watch(contentSourceDescriptorsProvider);
+      final remoteSources = <RemoteContentSource>[
+        for (final source in descriptors.values)
+          if (source is RemoteContentSource) source,
+      ];
 
       return SourceRegistry.lazy(
         localBundle: local,
-        remoteSources: remoteSourcesById.values.toList(growable: false),
+        remoteSources: remoteSources,
         resolveRemote: (String sourceKey) =>
             ref.read(remoteSourceBundleProvider(sourceKey)),
       );

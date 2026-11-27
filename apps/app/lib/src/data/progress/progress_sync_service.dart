@@ -21,15 +21,19 @@ class ProgressSyncService {
     ProgressUpload? upload,
     ScopedProgressUpload? scopedUpload,
     Iterable<String> Function()? defaultFlushScopes,
+    bool Function(String scope)? syncsRemotely,
   }) : assert(upload != null || scopedUpload != null, '必须提供上传实现'),
        _store = store,
        _defaultFlushScopes = defaultFlushScopes ?? (() => const <String>['']),
+       _syncsRemotely =
+           syncsRemotely ?? ((String scope) => !isLocalSourceKey(scope)),
        _upload =
            scopedUpload ??
            ((String _, ProgressTarget target) => upload!(target));
 
   final ProgressStore _store;
   final Iterable<String> Function() _defaultFlushScopes;
+  final bool Function(String scope) _syncsRemotely;
   final ScopedProgressUpload _upload;
 
   Future<void>? _inFlight;
@@ -67,15 +71,15 @@ class ProgressSyncService {
   }) => _store.forceAdopt(bookId, remote, scope: scope);
 
   /// 记一页进度：
-  /// - 本机源（[scope] 为 [kLocalSourceKey]）直接落盘至 `kLocalSourceKey`（`pendingSeq = null`），不入远程队列；
-  /// - 远程服务器先落入对应 [scope] 分区，再针对该分区触发冲洗提交（不阻塞调用方）。
+  /// - 不支持远程同步的源（`syncsProgressRemotely == false`，如本机书库或只读 OPDS）直接落盘（`pendingSeq = null`），不入远程队列；
+  /// - 支持远程同步的源先落入对应 [scope] 分区，再针对该分区触发冲洗提交（不阻塞调用方）。
   Future<void> save(
     String bookId, {
     required int page,
     required bool completed,
     required String scope,
   }) async {
-    if (scope == kLocalSourceKey) {
+    if (isLocalSourceKey(scope) || !_syncsRemotely(scope)) {
       await _store.forceAdopt(
         bookId,
         ReadProgress(
@@ -83,7 +87,7 @@ class ProgressSyncService {
           completed: completed,
           lastModified: DateTime.now().toUtc(),
         ),
-        scope: kLocalSourceKey,
+        scope: scope,
       );
       return;
     }
@@ -140,7 +144,8 @@ class ProgressSyncService {
 
   Future<void> _flushScope(String scope) async {
     if (_disposed ||
-        scope == kLocalSourceKey ||
+        isLocalSourceKey(scope) ||
+        !_syncsRemotely(scope) ||
         _authBlockedScopes.contains(scope)) {
       return;
     }

@@ -16,7 +16,20 @@ const String kLocalLibraryId = 'local://library';
 bool isLocalSourceKey(String sourceKey) => sourceKey == kLocalSourceKey;
 
 /// 支持或预留的内容源协议种类。
-enum SourceKind { local, komga, kavita, opds }
+enum SourceKind {
+  local,
+  komga,
+  kavita,
+  opds;
+
+  /// 从持久化字符串解析协议种类；空或未知值默认回退 [SourceKind.komga] 以兼容老版本存档。
+  static SourceKind parse(String? raw) {
+    for (final kind in values) {
+      if (kind.name == raw) return kind;
+    }
+    return SourceKind.komga;
+  }
+}
 
 /// 某个内容源对上层 UI 声明的静态能力位。
 final class SourceCapabilities {
@@ -48,6 +61,34 @@ final class SourceCapabilities {
     supportsCollections: true,
     syncsProgressRemotely: true,
   );
+
+  /// Kavita 服务器能力：支持离线缓存、服务端收藏集与远程进度同步。
+  static const SourceCapabilities kavita = SourceCapabilities(
+    canImportLocalFiles: false,
+    canMutateCatalog: false,
+    canDownloadOffline: true,
+    showsNetworkOfflineBanner: true,
+    supportsCollections: true,
+    syncsProgressRemotely: true,
+  );
+
+  /// OPDS 目录源能力：只读目录浏览与离线下载，不支持远程收藏集变更或远程进度同步。
+  static const SourceCapabilities opds = SourceCapabilities(
+    canImportLocalFiles: false,
+    canMutateCatalog: false,
+    canDownloadOffline: true,
+    showsNetworkOfflineBanner: true,
+    supportsCollections: false,
+    syncsProgressRemotely: false,
+  );
+
+  /// 按协议种类返回默认能力声明。
+  static SourceCapabilities forKind(SourceKind kind) => switch (kind) {
+    SourceKind.local => local,
+    SourceKind.komga => komga,
+    SourceKind.kavita => kavita,
+    SourceKind.opds => opds,
+  };
 
   /// 未知或已移除内容源的最保守能力集（全部能力关闭，避免误判为可下载或可远程同步）。
   static const SourceCapabilities none = SourceCapabilities(

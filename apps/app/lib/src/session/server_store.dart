@@ -16,12 +16,16 @@ class StoredServer {
     required this.accountEmail,
     this.accountId = '',
     this.certificateFingerprint,
+    this.kind = SourceKind.komga,
   });
 
   final ServerAddress address;
   final String apiKey;
   final String accountEmail;
   final String accountId;
+
+  /// 服务器协议种类（默认为 [SourceKind.komga]，为 Kavita / OPDS 预留）。
+  final SourceKind kind;
 
   /// 用户手动接受过的服务端证书指纹（SHA-256，小写无分隔符）。
   ///
@@ -40,20 +44,23 @@ class StoredServer {
   /// 展示名：优先账号邮箱，没有就用地址。
   String get label => accountEmail.isEmpty ? address.baseUrl : accountEmail;
 
-  StoredServer copyWith({String? certificateFingerprint}) => StoredServer(
-    address: address,
-    apiKey: apiKey,
-    accountEmail: accountEmail,
-    accountId: accountId,
-    certificateFingerprint:
-        certificateFingerprint ?? this.certificateFingerprint,
-  );
+  StoredServer copyWith({String? certificateFingerprint, SourceKind? kind}) =>
+      StoredServer(
+        address: address,
+        apiKey: apiKey,
+        accountEmail: accountEmail,
+        accountId: accountId,
+        certificateFingerprint:
+            certificateFingerprint ?? this.certificateFingerprint,
+        kind: kind ?? this.kind,
+      );
 
   Map<String, Object?> toJson() => <String, Object?>{
     'baseUrl': address.baseUrl,
     'apiKey': apiKey,
     'accountEmail': accountEmail,
     'accountId': accountId,
+    if (kind != SourceKind.komga) 'kind': kind.name,
     if (certificateFingerprint != null)
       'certificateFingerprint': certificateFingerprint,
   };
@@ -65,7 +72,8 @@ class StoredServer {
       other.apiKey == apiKey &&
       other.accountEmail == accountEmail &&
       other.accountId == accountId &&
-      other.certificateFingerprint == certificateFingerprint;
+      other.certificateFingerprint == certificateFingerprint &&
+      other.kind == kind;
 
   @override
   int get hashCode => Object.hash(
@@ -74,12 +82,14 @@ class StoredServer {
     accountEmail,
     accountId,
     certificateFingerprint,
+    kind,
   );
 
   static StoredServer fromJson(Map<String, Object?> json) {
     // 存档可能被任何人写过（旧版本/手工改过），字段类型一律先判再取，
     // 不能因为一个脏字段就把整个会话读崩。
     final fingerprint = json['certificateFingerprint'];
+    final rawKind = json['kind'];
     return StoredServer(
       address: ServerAddress.parse((json['baseUrl'] as String?) ?? ''),
       apiKey: (json['apiKey'] as String?) ?? '',
@@ -88,6 +98,7 @@ class StoredServer {
       certificateFingerprint: fingerprint is String
           ? _fingerprintOrNull(fingerprint)
           : null,
+      kind: rawKind is String ? SourceKind.parse(rawKind) : SourceKind.komga,
     );
   }
 
