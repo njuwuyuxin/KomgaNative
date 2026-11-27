@@ -132,6 +132,12 @@ class SettingsScreen extends ConsumerWidget {
                           title: Text(l10n.history),
                           onTap: () => context.push('/history'),
                         ),
+                        ListTile(
+                          key: const Key('settings-insights'),
+                          leading: const Icon(Icons.insights_outlined),
+                          title: Text(l10n.insights),
+                          onTap: () => context.push('/insights'),
+                        ),
                       ],
                     ),
                     AppListGroup(

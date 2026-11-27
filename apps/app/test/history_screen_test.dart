@@ -115,12 +115,13 @@ void main() {
     expect((await db.readingSessionList()).length, 2);
   });
 
-  testWidgets('清空：确认后全没了，回到空态', (WidgetTester tester) async {
+  testWidgets('清空：确认后全没了，回到空态（且菜单不含阅读统计入口）', (WidgetTester tester) async {
     await seed();
     await pumpHistory(tester);
 
     await tester.tap(find.byKey(const Key('history-menu')));
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('history-insights')), findsNothing);
     await tester.tap(find.byKey(const Key('history-clear')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('history-clear-ok')));

@@ -215,25 +215,43 @@ void main() {
         // 隔三差五地读：热力图有明显深浅，连续天数不是一条直线。
         if (i % 4 == 0) continue;
         final startedAt = now.subtract(Duration(days: i, hours: 3));
+        final minutes = (i % 3 + 1) * 12;
         await db.addReadingSession(
           bookId: 'b${i % 3}',
           seriesId: 's1',
           bookName: 'Vol. ${i % 3}',
           startedAt: startedAt,
-          endedAt: startedAt.add(const Duration(minutes: 18)),
-          durationMs: 18 * 60 * 1000,
+          endedAt: startedAt.add(Duration(minutes: minutes)),
+          durationMs: minutes * 60 * 1000,
           startPage: 1,
           endPage: 20,
           completed: false,
         );
       }
+      // 最近一天再加一本不同书，让黄金图展示多本封面 + 书名的横向排版。
+      final latestDay = now.subtract(const Duration(days: 1, hours: 1));
+      await db.addReadingSession(
+        bookId: 'b2',
+        seriesId: 's2',
+        bookName: 'Dune Vol. 2',
+        startedAt: latestDay,
+        endedAt: latestDay.add(const Duration(minutes: 20)),
+        durationMs: 20 * 60 * 1000,
+        startPage: 1,
+        endPage: 24,
+        completed: false,
+      );
     }
+    final fake = FakeLibraryRepository(series: demoShelf());
     await pumpGoldenScreen(
       tester,
       screen: InsightsScreen(now: insightsNow),
       size: size,
       theme: theme,
-      overrides: <Override>[progressDatabaseProvider.overrideWithValue(db)],
+      overrides: <Override>[
+        progressDatabaseProvider.overrideWithValue(db),
+        ...testSourceOverrides(library: fake),
+      ],
       realTimeSettle: true,
     );
     await expectGolden(tester, name);

@@ -1,16 +1,18 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/src/data/reading_stats.dart';
 import 'package:yomu/src/providers/reading_history_provider.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:yomu/src/widgets/reading_heatmap_card.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu_domain/yomu_domain.dart';
 
-/// Insights（HIS-03）：连续天数、最长连续、热力图、周/月汇总。
+/// Insights（HIS-03）：连续天数、最长连续、GitHub 样式热力图、周/月汇总。
 ///
 /// 全部来自本地 `reading_sessions`，没有服务端参与——
 /// 这里回答的是"我自己读了多少"，不是"服务器上有什么"。
-class InsightsScreen extends ConsumerWidget {
+class InsightsScreen extends ConsumerStatefulWidget {
   const InsightsScreen({this.now, super.key});
 
   /// 统计口径里的"今天"。默认取系统时钟。
@@ -21,13 +23,29 @@ class InsightsScreen extends ConsumerWidget {
   final DateTime? now;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<InsightsScreen> createState() => _InsightsScreenState();
+}
+
+class _InsightsScreenState extends ConsumerState<InsightsScreen> {
+  DateTime? _selectedDate;
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final today = ReadingStats.dateOnly(widget.now ?? DateTime.now());
     final sessions = ref.watch(readingSessionsProvider).value;
     final stats = sessions == null
         ? ReadingStats.empty
-        : ReadingStats.fromSessions(sessions, now: now);
+        : ReadingStats.fromSessions(sessions, now: widget.now);
+    final hasLocal =
+        sessions?.any(
+          (ReadingSession session) => isLocalSourceKey(session.scope),
+        ) ??
+        false;
+    final existingLocalIds = hasLocal
+        ? ref.watch(existingLocalBookIdsProvider).value
+        : null;
 
     return Scaffold(
       body: GlassPageBackground(
@@ -49,9 +67,11 @@ class InsightsScreen extends ConsumerWidget {
                       Expanded(
                         child: Text(
                           l10n.insights,
+                          key: const Key('insights-title'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: AppTypography.of(context).title,
+                          style: AppTypography.of(context).title
+                              .copyWith(fontWeight: FontWeight.w400),
                         ),
                       ),
                     ],
@@ -96,9 +116,9 @@ class InsightsScreen extends ConsumerWidget {
             else
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.md,
-                  AppSpacing.md,
-                  AppSpacing.md,
+                  0,
+                  AppSpacing.sm,
+                  0,
                   AppSizes.navBarClearance,
                 ),
                 sliver: SliverList.list(
@@ -119,7 +139,6 @@ class InsightsScreen extends ConsumerWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: AppSpacing.md),
                     AppListGroup(
                       header: l10n.insightsThisWeek,
                       children: <Widget>[
@@ -137,7 +156,6 @@ class InsightsScreen extends ConsumerWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: AppSpacing.md),
                     AppListGroup(
                       header: l10n.insightsThisMonth,
                       children: <Widget>[
@@ -154,17 +172,14 @@ class InsightsScreen extends ConsumerWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: AppSpacing.md),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                      child: Text(
-                        l10n.insightsHeatmap,
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
+                    ReadingHeatmapCard(
+                      stats: stats,
+                      today: today,
+                      selectedDate: _selectedDate,
+                      onSelectDate: (DateTime date) =>
+                          setState(() => _selectedDate = date),
+                      existingLocalIds: existingLocalIds,
                     ),
-                    ReadingHeatmap(days: stats.days),
                   ],
                 ),
               ),
@@ -202,69 +217,5 @@ class _StatRow extends StatelessWidget {
             .copyWith(color: theme.colorScheme.primary),
       ),
     );
-  }
-}
-
-/// 热力图：12 周 × 7 天的小方块，颜色深浅表示当天阅读时长。
-class ReadingHeatmap extends StatelessWidget {
-  const ReadingHeatmap({required this.days, super.key});
-
-  final List<ReadingDay> days;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    if (days.isEmpty) return const SizedBox.shrink();
-    final maxMinutes = days
-        .map((ReadingDay d) => d.minutes)
-        .fold<int>(0, (int a, int b) => a > b ? a : b);
-    const cell = AppSizes.heatmapCell;
-    const gap = AppSpacing.xxs;
-
-    // 每 7 天一周：按周切列，列内从上到下是周一…周日。
-    final weeks = <List<ReadingDay>>[];
-    for (var i = 0; i < days.length; i += 7) {
-      weeks.add(days.sublist(i, (i + 7 > days.length) ? days.length : i + 7));
-    }
-
-    return SingleChildScrollView(
-      key: const Key('insights-heatmap'),
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          for (final week in weeks)
-            Padding(
-              padding: const EdgeInsets.only(right: gap),
-              child: Column(
-                children: <Widget>[
-                  for (final day in week)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: gap),
-                      child: Container(
-                        width: cell,
-                        height: cell,
-                        decoration: BoxDecoration(
-                          color: _colorFor(day, maxMinutes, theme),
-                          borderRadius: BorderRadius.circular(AppRadii.xs / 2),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Color _colorFor(ReadingDay day, int maxMinutes, ThemeData theme) {
-    if (day.minutes <= 0) {
-      return theme.colorScheme.surfaceContainerHighest;
-    }
-    // 4 档深浅：够表达"轻度/正常/多/很多"，再多也没法分辨。
-    final ratio = maxMinutes == 0 ? 1.0 : day.minutes / maxMinutes;
-    final alpha = 0.25 + 0.75 * ratio.clamp(0.0, 1.0);
-    return theme.colorScheme.primary.withValues(alpha: alpha);
   }
 }

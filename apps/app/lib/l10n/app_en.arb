@@ -159,6 +159,15 @@
   "insightsMinutes": "{count} min",
   "@insightsMinutes": { "placeholders": { "count": {} } },
   "insightsHeatmap": "Last 12 weeks",
+  "insightsHeatmapWeeks": "Last {weeks} weeks",
+  "@insightsHeatmapWeeks": {
+    "placeholders": {
+      "weeks": { "type": "int" }
+    }
+  },
+  "insightsHeatmapLess": "Less",
+  "insightsHeatmapMore": "More",
+  "insightsDayEmpty": "No books read on this day",
   "readerPageLabelWithSession": "{label} · {minutes} min",
   "@readerPageLabelWithSession": { "placeholders": { "label": {}, "minutes": {} } },
   "settingsShowSessionTime": "Show time read in reader",

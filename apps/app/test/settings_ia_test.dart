@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/l10n/l10n.dart';
@@ -119,5 +120,60 @@ void main() {
     expect(find.text('READING'), findsOneWidget);
     expect(find.byKey(const Key('settings-page-turn')), findsOneWidget);
     // 顺序由 settings@eink 黄金图钉住（外观 → 阅读 → 书架 → 服务器 → 存储）。
+  });
+
+  testWidgets('阅读历史栏目内并列展示阅读历史与阅读统计，点击阅读统计跳转 /insights', (
+    WidgetTester tester,
+  ) async {
+    prefsStore = InMemoryReaderPrefsStore();
+    settingsStore = InMemorySettingsStore();
+    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+
+    final router = GoRouter(
+      initialLocation: '/settings',
+      routes: <RouteBase>[
+        GoRoute(
+          path: '/settings',
+          builder: (BuildContext context, GoRouterState state) =>
+              const SettingsScreen(),
+        ),
+        GoRoute(
+          path: '/insights',
+          builder: (BuildContext context, GoRouterState state) =>
+              const Scaffold(body: Text('insights-page')),
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          settingsStoreProvider.overrideWithValue(settingsStore),
+          readerPrefsStoreProvider.overrideWithValue(prefsStore),
+          ...testSourceOverrides(
+            library: FakeLibraryRepository(series: demoShelf()),
+          ),
+        ],
+        child: MaterialApp.router(
+          locale: const Locale('en'),
+          localizationsDelegates: appLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          theme: AppTheme.light(),
+          routerConfig: router,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final insightsTile = find.byKey(const Key('settings-insights'));
+    await reveal(tester, insightsTile);
+    expect(find.byKey(const Key('settings-history')), findsOneWidget);
+    expect(insightsTile, findsOneWidget);
+
+    await tester.tap(insightsTile);
+    await tester.pumpAndSettle();
+    expect(find.text('insights-page'), findsOneWidget);
   });
 }

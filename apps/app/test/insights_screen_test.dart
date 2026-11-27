@@ -2,20 +2,18 @@ import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/l10n/l10n.dart';
 import 'package:yomu/src/data/progress/progress_database.dart';
 import 'package:yomu/src/providers/progress_providers.dart';
 import 'package:yomu/src/screens/insights_screen.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
 
-/// HIS-03：Insights 页只认注入的“今天”。
-///
-/// 这组用例是给一次 CI 事故补的：页面原本直接读 `DateTime.now()`，黄金图基线在
-/// 本地（+08）烙、CI 跑在 UTC，跨日之后“本月”少算一个会话（252 vs 270 分钟），
-/// 三张 insights 基线全部失配——而本地永远是绿的。
-/// 所以这里钉死两件事：注入的 [InsightsScreen.now] 必须生效，且结果随它变化。
+import 'support/fake_library.dart';
+import 'support/test_source_overrides.dart';
+
+/// HIS-03：Insights 页的时钟注入、标题样式、热力图对齐与点击查书交互。
 void main() {
   // 与黄金图同一份数据形状：21 天里每 4 天休一天，每次读 18 分钟。
   final now = DateTime(2026, 11, 25, 20, 30);
@@ -47,7 +45,12 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       ProviderScope(
-        overrides: <Override>[progressDatabaseProvider.overrideWithValue(db)],
+        overrides: <Override>[
+          progressDatabaseProvider.overrideWithValue(db),
+          ...testSourceOverrides(
+            library: FakeLibraryRepository(series: demoShelf()),
+          ),
+        ],
         child: MaterialApp(
           locale: const Locale('en'),
           localizationsDelegates: appLocalizationsDelegates,
@@ -85,5 +88,62 @@ void main() {
     expect(valueOf(tester, 'insights-month-minutes'), '0 min');
     expect(valueOf(tester, 'insights-week-minutes'), '0 min');
     expect(valueOf(tester, 'insights-current-streak'), '0 days');
+  });
+
+  testWidgets('标题栏不加粗，热力图与上方统计卡片左右对齐', (WidgetTester tester) async {
+    await pumpInsights(tester, now);
+
+    final title = tester.widget<Text>(find.byKey(const Key('insights-title')));
+    expect(title.style?.fontWeight, FontWeight.w400);
+
+    final groups = find.byType(AppListGroup);
+    expect(groups, findsNWidgets(4));
+    final firstRect = tester.getRect(groups.first);
+    final heatmapGroupRect = tester.getRect(groups.last);
+    expect(heatmapGroupRect.left, firstRect.left);
+    expect(heatmapGroupRect.right, firstRect.right);
+
+    final heatmapRect = tester.getRect(
+      find.byKey(const Key('insights-heatmap')),
+    );
+    expect(
+      heatmapRect.width,
+      closeTo(heatmapGroupRect.width - AppSpacing.md * 4, 1),
+    );
+  });
+
+  testWidgets('默认显示最近读过书的那天，点击热力图方块切换日期与书籍列表', (WidgetTester tester) async {
+    await pumpInsights(tester, now);
+
+    // 11-25（i=0）未读，最近读过书的是 11-24（i=1，Vol. 1）。
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('insights-selected-date')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(valueOf(tester, 'insights-selected-date'), '2026-11-24');
+    expect(valueOf(tester, 'insights-selected-minutes'), '18 min');
+    expect(find.byKey(const Key('insights-day-book-b1')), findsOneWidget);
+    expect(find.text('Vol. 1'), findsOneWidget);
+
+    // 点击 11-23（i=2，Vol. 2）：切换显示当天日期与书籍。
+    final nov23 = find.byKey(const Key('heatmap-day-2026-11-23'));
+    await tester.ensureVisible(nov23);
+    await tester.tap(nov23);
+    await tester.pumpAndSettle();
+
+    expect(valueOf(tester, 'insights-selected-date'), '2026-11-23');
+    expect(find.byKey(const Key('insights-day-book-b2')), findsOneWidget);
+    expect(find.text('Vol. 2'), findsOneWidget);
+
+    // 点击空白日期 11-25（i=0，未读）：显示当天日期与空态提示。
+    final nov25 = find.byKey(const Key('heatmap-day-2026-11-25'));
+    await tester.ensureVisible(nov25);
+    await tester.tap(nov25);
+    await tester.pumpAndSettle();
+
+    expect(valueOf(tester, 'insights-selected-date'), '2026-11-25');
+    expect(find.byKey(const Key('insights-selected-empty')), findsOneWidget);
+    expect(find.byKey(const Key('insights-selected-minutes')), findsNothing);
   });
 }

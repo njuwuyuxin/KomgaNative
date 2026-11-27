@@ -98,4 +98,75 @@ void main() {
     expect(stats.totalMinutes, 4);
     expect(stats.currentStreak, 1);
   });
+
+  test('当天读过的书按去重汇总，按最近阅读时间倒序，并记录 latestActiveDate', () {
+    final stats = ReadingStats.fromSessions(<ReadingSession>[
+      session(bookId: 'b1', startedAt: DateTime(2026, 11, 18, 9), minutes: 6),
+      session(bookId: 'b2', startedAt: DateTime(2026, 11, 19, 8), minutes: 5),
+      session(bookId: 'b1', startedAt: DateTime(2026, 11, 19, 10), minutes: 7),
+      session(bookId: 'b2', startedAt: DateTime(2026, 11, 19, 12), minutes: 9),
+    ], now: now);
+
+    expect(stats.latestActiveDate, DateTime(2026, 11, 19));
+    final day = stats.dayOf(DateTime(2026, 11, 19));
+    expect(day.minutes, 21);
+    expect(day.books, 2);
+    expect(
+      day.readBooks.map((ReadingDayBook b) => (b.bookId, b.minutes)).toList(),
+      <(String, int)>[('b2', 14), ('b1', 7)],
+    );
+    expect(stats.dayOf(DateTime(2026, 11, 20)).readBooks, isEmpty);
+  });
+
+  test('heatmapWeeks 按自然周周一..周日对齐，今天之后的格子为 null', () {
+    // 2026-11-20 是周五（weekday == 5）。
+    final stats = ReadingStats.fromSessions(<ReadingSession>[
+      session(bookId: 'b1', startedAt: DateTime(2026, 11, 20, 9), minutes: 12),
+    ], now: now);
+    final weeks = stats.heatmapWeeks(today: now, weeks: 12);
+
+    expect(weeks.length, 12);
+    for (final col in weeks) {
+      expect(col.length, 7);
+    }
+    // 第一列周一
+    expect(weeks.first.first!.date.weekday, DateTime.monday);
+    // 最后一列周一..周五有值，周六/周日为未来日期 null
+    final lastCol = weeks.last;
+    expect(lastCol[0]!.date, DateTime(2026, 11, 16));
+    expect(lastCol[4]!.date, DateTime(2026, 11, 20));
+    expect(lastCol[4]!.minutes, 12);
+    expect(lastCol[5], isNull);
+    expect(lastCol[6], isNull);
+    expect(stats.heatmapWeeks(today: now, weeks: 0), isEmpty);
+  });
+
+  test('heatmapLevel 与 heatmapWeekCountForWidth 边界值', () {
+    ReadingDay d(int minutes) =>
+        ReadingDay(date: DateTime(2026, 11, 20), minutes: minutes, books: 1);
+
+    expect(ReadingStats.heatmapLevel(d(0), 40), 0);
+    expect(ReadingStats.heatmapLevel(d(10), 40), 1);
+    expect(ReadingStats.heatmapLevel(d(20), 40), 2);
+    expect(ReadingStats.heatmapLevel(d(30), 40), 3);
+    expect(ReadingStats.heatmapLevel(d(40), 40), 4);
+    expect(ReadingStats.heatmapLevel(d(5), 0), 4);
+
+    expect(
+      ReadingStats.heatmapWeekCountForWidth(0, cellTarget: 24, gap: 4),
+      12,
+    );
+    expect(
+      ReadingStats.heatmapWeekCountForWidth(326, cellTarget: 24, gap: 4),
+      12,
+    );
+    expect(
+      ReadingStats.heatmapWeekCountForWidth(960, cellTarget: 24, gap: 4),
+      34,
+    );
+    expect(
+      ReadingStats.heatmapWeekCountForWidth(5000, cellTarget: 24, gap: 4),
+      52,
+    );
+  });
 }
