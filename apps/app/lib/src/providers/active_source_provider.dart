@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show ValueListenable, ValueNotifier;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yomu/src/data/app_settings.dart';
 import 'package:yomu/src/data/settings_store.dart';
@@ -25,14 +26,29 @@ class ActiveSourceController extends Notifier<ContentSource> {
   bool _manualTouched = false;
   bool _restored = false;
   String? _persistedKey;
+  final ValueNotifier<bool> _restoring = ValueNotifier<bool>(false);
+
+  /// 冷启动持久化源与会话尚未完成对账时为 `true`（N8）。
+  ///
+  /// 测试桩子类若覆写 [build] 且不调用 `super.build()`，默认值为 `false`（立即可用）。
+  ValueListenable<bool> get restoringListenable => _restoring;
 
   @override
   ContentSource build() {
+    ref.onDispose(_restoring.dispose);
     final initialSession = ref.read(sessionProvider);
     // 同步触发 serverListProvider 预热，使多服务器注册表尽快就绪。
     ref.read(serverListProvider);
     ref.listen<SessionState>(sessionProvider, _onSessionChanged);
     ref.listen<SourceRegistry>(sourceRegistryProvider, _onRegistryChanged);
+    ref.listen<AsyncValue<Object?>>(serverListProvider, (_, _) {
+      unawaited(
+        Future<void>.microtask(() {
+          if (ref.mounted) _reconcile();
+        }),
+      );
+    });
+    _restoring.value = initialSession is! SessionConnected;
     unawaited(_restore());
     if (initialSession is SessionConnected) {
       return remoteSourceOfServer(initialSession.server);
@@ -66,6 +82,7 @@ class ActiveSourceController extends Notifier<ContentSource> {
         _manualTouched = true;
         _persistedKey = next.server.id;
         state = remoteSourceOfServer(next.server);
+        _restoring.value = false;
         unawaited(_persistSourceKey(next.server.id));
         return;
       }
@@ -76,6 +93,7 @@ class ActiveSourceController extends Notifier<ContentSource> {
         _manualTouched = true;
         _persistedKey = kLocalSourceKey;
         state = const LocalContentSource();
+        _restoring.value = false;
         unawaited(_persistSourceKey(kLocalSourceKey));
         return;
       }
@@ -105,16 +123,20 @@ class ActiveSourceController extends Notifier<ContentSource> {
     final desiredKey = _persistedKey;
 
     if (desiredKey == null) {
+      if (!_restored) return;
       if (session is SessionConnected) {
         _setStateIfChanged(remoteSourceOfServer(session.server));
-      } else if (_restored && session is! SessionLoading) {
+        _restoring.value = false;
+      } else if (session is! SessionLoading) {
         _setStateIfChanged(const LocalContentSource());
+        _restoring.value = false;
       }
       return;
     }
 
     if (isLocalSourceKey(desiredKey)) {
       _setStateIfChanged(const LocalContentSource());
+      _restoring.value = false;
       return;
     }
 
@@ -122,13 +144,15 @@ class ActiveSourceController extends Notifier<ContentSource> {
     final remoteSource = registry.remoteSourceOrNull(desiredKey);
     if (remoteSource != null) {
       _setStateIfChanged(remoteSource);
+      _restoring.value = false;
       return;
     }
 
     // 若注册表和会话均已加载完毕但找不到目标服务器（已被删除），回退本机源。
-    final listLoaded = ref.read(serverListProvider).hasValue;
-    if (_restored && session is! SessionLoading && listLoaded) {
+    final listSettled = !ref.read(serverListProvider).isLoading;
+    if (_restored && session is! SessionLoading && listSettled) {
       _setStateIfChanged(const LocalContentSource());
+      _restoring.value = false;
     }
   }
 
@@ -138,6 +162,7 @@ class ActiveSourceController extends Notifier<ContentSource> {
     if (isLocalSourceKey(sourceKey)) {
       _persistedKey = kLocalSourceKey;
       state = const LocalContentSource();
+      _restoring.value = false;
       await _persistSourceKey(kLocalSourceKey);
       return;
     }
@@ -147,6 +172,9 @@ class ActiveSourceController extends Notifier<ContentSource> {
     final remoteSource = registry.remoteSourceOrNull(sourceKey);
     if (remoteSource != null) {
       state = remoteSource;
+      _restoring.value = false;
+    } else {
+      _restoring.value = true;
     }
     await _persistSourceKey(sourceKey);
   }
@@ -163,9 +191,19 @@ activeSourceProvider = NotifierProvider<ActiveSourceController, ContentSource>(
   ActiveSourceController.new,
 );
 
-/// 当前激活内容源对应的 [SourceBundle]（源未就绪或已被删除时返回 `null`，绝不静默回退本机源）。
+/// 当前是否正处于冷启动恢复持久化的活动源阶段（N8）。
+final Provider<bool> activeSourceRestoringProvider = Provider<bool>((Ref ref) {
+  final ctrl = ref.watch(activeSourceProvider.notifier);
+  void onChanged() => ref.invalidateSelf();
+  ctrl.restoringListenable.addListener(onChanged);
+  ref.onDispose(() => ctrl.restoringListenable.removeListener(onChanged));
+  return ctrl.restoringListenable.value;
+});
+
+/// 当前激活内容源对应的 [SourceBundle]（冷启动未恢复、源未就绪或已被删除时返回 `null`，绝不静默回退本机源）。
 final Provider<SourceBundle?> activeSourceBundleProvider =
     Provider<SourceBundle?>((Ref ref) {
+      if (ref.watch(activeSourceRestoringProvider)) return null;
       final active = ref.watch(activeSourceProvider);
       final registry = ref.watch(sourceRegistryProvider);
       return registry.bundleOrNull(active.sourceKey);

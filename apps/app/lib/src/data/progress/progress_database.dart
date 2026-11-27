@@ -61,10 +61,10 @@ class ProgressDatabase extends _$ProgressDatabase {
         await _upgradeLocalProgressToV3(escaped);
         if (from >= 2) {
           await m.addColumn(readingSessions, readingSessions.scope);
+          // v2 的 reading_sessions 没有 scope 列；新加列默认值在 v7 为 kLocalSourceKey，
+          // 因此升级时应无条件把旧行全部归属到迁移目标分区 rawScope。
+          await customStatement("UPDATE reading_sessions SET scope = '$escaped'");
         }
-        await customStatement(
-          "UPDATE reading_sessions SET scope = '$escaped' WHERE scope = ''",
-        );
       }
       if (from < 4) {
         await m.createTable(localSeriesRows);

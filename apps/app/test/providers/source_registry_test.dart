@@ -337,5 +337,90 @@ void main() {
       await Future<void>.delayed(Duration.zero);
       expect(container.read(shelfProvider).failure, isNull);
     });
+
+    test(
+      'N8：冷启动持久化 activeSourceKey 未加载完前绝不暴露本机仓库，加载后直切目标远程源',
+      () async {
+        final server = StoredServer(
+          address: ServerAddress.parse('https://remote.komga.test'),
+          apiKey: 'secret-key',
+          accountEmail: 'reader@test.com',
+        );
+        final settingsCompleter = Completer<AppSettings>();
+        final delayedStore = _DelayedSettingsStore(settingsCompleter.future);
+        final db = ProgressDatabase(NativeDatabase.memory());
+        // 往本机库先种入一本漫画，若冷启动误走本机仓库则书架会闪出本机内容。
+        await db.insertImportedLocalBook(
+          const LocalBookImportDraft(
+            bookId: 'local:seed-1',
+            seriesTitle: 'Local Flash Trap',
+            bookName: 'Vol. 1',
+            storageKind: 'zip',
+            relativePath: 'trap.cbz',
+            sizeBytes: 100,
+            pages: <ArchivePageEntry>[
+              ArchivePageEntry(
+                number: 1,
+                entryName: '1.jpg',
+                uncompressedSize: 100,
+              ),
+            ],
+          ),
+          generateSeriesId: () => 'local:seed-s1',
+        );
+        final container = ProviderContainer(
+          overrides: <Override>[
+            progressDatabaseProvider.overrideWithValue(db),
+            localComicsStorageProvider.overrideWithValue(
+              LocalComicsStorage(rootResolver: () async => tempDir),
+            ),
+            serverStoreProvider.overrideWithValue(
+              InMemoryServerStore.withAll(<StoredServer>[server]),
+            ),
+            settingsStoreProvider.overrideWithValue(delayedStore),
+          ],
+        );
+        addTearDown(() async {
+          container.dispose();
+          await db.close();
+        });
+
+        await container.read(serverListProvider.future);
+        container.read(activeSourceProvider);
+
+        // settingsStore.load() 尚未返回前：必须处于 restoring 态，绝不返回 LocalLibraryRepository。
+        expect(container.read(activeSourceRestoringProvider), isTrue);
+        expect(container.read(activeSourceBundleProvider), isNull);
+        expect(
+          container.read(libraryRepositoryProvider),
+          isA<MissingSourceRepository>(),
+        );
+        final shelfWhileRestoring = container.read(shelfProvider);
+        expect(shelfWhileRestoring.series, isEmpty);
+        expect(shelfWhileRestoring.failure, isNull);
+
+        // 持久化选择返回远程源后，一步到位切到远程源并解除 restoring 态。
+        settingsCompleter.complete(
+          AppSettings(activeSourceKey: server.id),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+
+        expect(container.read(activeSourceRestoringProvider), isFalse);
+        expect(container.read(activeSourceProvider).sourceKey, server.id);
+        expect(
+          container.read(activeSourceBundleProvider)?.source.sourceKey,
+          server.id,
+        );
+      },
+    );
   });
+}
+
+final class _DelayedSettingsStore extends InMemorySettingsStore {
+  _DelayedSettingsStore(this._loadFuture);
+
+  final Future<AppSettings> _loadFuture;
+
+  @override
+  Future<AppSettings> load() => _loadFuture;
 }

@@ -28,10 +28,11 @@ class ShelfController extends Notifier<ShelfState> {
   ShelfState build() {
     final repo = ref.watch(libraryRepositoryProvider);
     ref.onDispose(() => _debounce?.cancel());
-    // 服务器列表仍在冷启动加载且目标远程源尚未注册时，保持初始 loading 态，
-    // 绝不把远程筛选预设套到本机库，也不在过渡帧闪错误态（P1-3）。
+    // 冷启动恢复活动源或服务器列表加载期间目标源尚未就绪时，保持初始 loading 态，
+    // 绝不把远程筛选预设套到本机库，也不在过渡帧闪本机书架或错误态（P1-3 / N8）。
     if (repo is MissingSourceRepository &&
-        ref.watch(serverListProvider).isLoading) {
+        (ref.watch(activeSourceRestoringProvider) ||
+            ref.watch(serverListProvider).isLoading)) {
       return const ShelfState();
     }
     ref.listen<int>(readStatusEpochProvider, (_, _) {
