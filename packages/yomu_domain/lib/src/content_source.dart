@@ -52,8 +52,8 @@ final class SourceCapabilities {
     syncsProgressRemotely: false,
   );
 
-  /// Komga 服务器能力：支持整本离线缓存、服务端双向收藏集与远程进度 Outbox 对账。
-  static const SourceCapabilities komga = SourceCapabilities(
+  /// 双向同步型远程服务器能力：支持整本离线缓存、服务端收藏集与远程进度 Outbox 对账。
+  static const SourceCapabilities remoteSync = SourceCapabilities(
     canImportLocalFiles: false,
     canMutateCatalog: false,
     canDownloadOffline: true,
@@ -62,18 +62,8 @@ final class SourceCapabilities {
     syncsProgressRemotely: true,
   );
 
-  /// Kavita 服务器能力：支持离线缓存、服务端收藏集与远程进度同步。
-  static const SourceCapabilities kavita = SourceCapabilities(
-    canImportLocalFiles: false,
-    canMutateCatalog: false,
-    canDownloadOffline: true,
-    showsNetworkOfflineBanner: true,
-    supportsCollections: true,
-    syncsProgressRemotely: true,
-  );
-
-  /// OPDS 目录源能力：只读目录浏览与离线下载，不支持远程收藏集变更或远程进度同步。
-  static const SourceCapabilities opds = SourceCapabilities(
+  /// 只读远程目录源能力（如 OPDS）：支持目录浏览与离线下载，不支持远程收藏集变更或进度同步。
+  static const SourceCapabilities remoteReadOnly = SourceCapabilities(
     canImportLocalFiles: false,
     canMutateCatalog: false,
     canDownloadOffline: true,
@@ -85,9 +75,8 @@ final class SourceCapabilities {
   /// 按协议种类返回默认能力声明。
   static SourceCapabilities forKind(SourceKind kind) => switch (kind) {
     SourceKind.local => local,
-    SourceKind.komga => komga,
-    SourceKind.kavita => kavita,
-    SourceKind.opds => opds,
+    SourceKind.komga || SourceKind.kavita => remoteSync,
+    SourceKind.opds => remoteReadOnly,
   };
 
   /// 未知或已移除内容源的最保守能力集（全部能力关闭，避免误判为可下载或可远程同步）。
@@ -142,14 +131,14 @@ final class LocalContentSource extends ContentSource {
   int get hashCode => kLocalSourceKey.hashCode;
 }
 
-/// 远程服务器内容源（Komga，及后续扩展的 Kavita / OPDS）。
+/// 远程服务器内容源（协议插件提供具体实现）。
 final class RemoteContentSource extends ContentSource {
   const RemoteContentSource({
     required this.sourceKey,
     required this.displayName,
     this.subtitle = '',
     this.kind = SourceKind.komga,
-    this.capabilities = SourceCapabilities.komga,
+    this.capabilities = SourceCapabilities.remoteSync,
   }) : assert(
          sourceKey.length > 0 && sourceKey != kLocalSourceKey,
          'RemoteContentSource.sourceKey must be a non-empty remote key',

@@ -178,6 +178,10 @@ final class SourceRegistry {
 
   bool get hasRemoteSources => _remoteSources.isNotEmpty;
 
+  /// 纯元数据查询远程源描述符：不触发任何仓库或网络连接池的懒加载构建（P3）。
+  RemoteContentSource? remoteSourceOrNull(String sourceKey) =>
+      _remoteSources[sourceKey];
+
   /// 按 `sourceKey` 查询对应装配单元；空串或未知远程 `sourceKey` 返回 `null` 而非回退本机。
   SourceBundle? bundleOrNull(String sourceKey) {
     if (sourceKey.isEmpty) return null;

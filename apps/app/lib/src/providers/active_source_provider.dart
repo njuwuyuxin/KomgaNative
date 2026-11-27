@@ -100,7 +100,9 @@ class ActiveSourceController extends Notifier<ContentSource> {
   void _reconcile() {
     final registry = ref.read(sourceRegistryProvider);
     final session = ref.read(sessionProvider);
-    final desiredKey = _manualTouched ? state.sourceKey : _persistedKey;
+    // 手动选择同样会更新 `_persistedKey`；统一读取 `_persistedKey` 可保证：
+    // 若用户选择目标源时注册表尚未就绪，待 `serverListProvider` 加载完毕后立刻生效而无需冷启动（P3）。
+    final desiredKey = _persistedKey;
 
     if (desiredKey == null) {
       if (session is SessionConnected) {
@@ -116,9 +118,10 @@ class ActiveSourceController extends Notifier<ContentSource> {
       return;
     }
 
-    final remote = registry.remoteBundleOrNull(desiredKey);
-    if (remote != null) {
-      _setStateIfChanged(remote.source);
+    // 仅查轻量描述符，绝不在此触发远程会话或仓库连接池创建（P3）。
+    final remoteSource = registry.remoteSourceOrNull(desiredKey);
+    if (remoteSource != null) {
+      _setStateIfChanged(remoteSource);
       return;
     }
 
@@ -141,9 +144,9 @@ class ActiveSourceController extends Notifier<ContentSource> {
 
     _persistedKey = sourceKey;
     final registry = ref.read(sourceRegistryProvider);
-    final bundle = registry.remoteBundleOrNull(sourceKey);
-    if (bundle != null) {
-      state = bundle.source;
+    final remoteSource = registry.remoteSourceOrNull(sourceKey);
+    if (remoteSource != null) {
+      state = remoteSource;
     }
     await _persistSourceKey(sourceKey);
   }

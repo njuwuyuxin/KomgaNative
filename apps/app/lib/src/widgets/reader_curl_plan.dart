@@ -301,6 +301,8 @@ extension _TurnImages on _PageTurn {
         );
       } on ShelfFailure {
         return null;
+      } on Exception {
+        return null;
       }
     }
     if (!mounted || widget.bookId != bookId) return null;

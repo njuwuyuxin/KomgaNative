@@ -65,19 +65,28 @@ class ReaderNavigationState {
   }
 
   /// 基于当前导航状态构造这一屏的 [ReaderLayout]。
+  ///
+  /// 允许显式传入 [direction] / [landscape] / [tablet] 以便 `build()` 保持纯读取，
+  /// 不在渲染阶段修改状态字段（P3）。
   ReaderLayout buildLayout({
     required List<PageInfo> pages,
     required TabletLayoutChoice tabletLayout,
     required ReaderConfig config,
     required int? resumedPage,
     required int? groupFrom,
+    ReadingDirection? direction,
+    bool? landscape,
+    bool? tablet,
   }) {
+    final effectiveDirection = direction ?? this.direction;
+    final effectiveLandscape = landscape ?? this.landscape;
+    final effectiveTablet = tablet ?? this.tablet;
     final mode = resolveReaderMode(
       mode: config.mode,
       tabletLayout: tabletLayout,
-      direction: direction,
-      landscape: landscape,
-      tablet: tablet,
+      direction: effectiveDirection,
+      landscape: effectiveLandscape,
+      tablet: effectiveTablet,
     );
     return ReaderLayout(
       pages: pages,
@@ -86,9 +95,9 @@ class ReaderNavigationState {
       groupFrom: groupFrom,
       splitWidePages: config.splitWidePages.isActive(
         mode: mode,
-        landscape: landscape,
+        landscape: effectiveLandscape,
       ),
-      rightToLeft: config.direction.resolveRightToLeft(direction),
+      rightToLeft: config.direction.resolveRightToLeft(effectiveDirection),
       currentHalf: pageHalf,
       mergedWidePageIndex: mergedWidePageIndex,
     );

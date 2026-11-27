@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:komga_api/komga_api.dart';
 import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/providers/progress_providers.dart';
 import 'package:yomu/src/session/certificate_prompt.dart';
 import 'package:yomu/src/session/connection_service.dart';
 import 'package:yomu/src/session/server_store.dart';
@@ -285,6 +286,8 @@ class SessionController extends Notifier<SessionState> {
   Future<void> removeServer(StoredServer server) async {
     final current = state;
     await _store.remove(server);
+    // 清理被删除服务器的进度与 outbox 记录，避免永不被消费的孤儿数据滞留数据库（P3）。
+    await ref.read(progressSyncProvider).clearScope(server.id);
     ref.invalidate(serverListProvider);
     if (current is SessionConnected && current.server.id == server.id) {
       await signOut();

@@ -71,6 +71,15 @@ class _FixedSessionController extends SessionController {
   }
 }
 
+class _FixedActiveSource extends ActiveSourceController {
+  _FixedActiveSource(this._source);
+
+  final ContentSource _source;
+
+  @override
+  ContentSource build() => _source;
+}
+
 void main() {
   const serverAKey = 'https://alpha.komga.test';
   const serverBKey = 'https://beta.komga.test';
@@ -158,6 +167,9 @@ void main() {
         sessionProvider.overrideWith(
           () => _FixedSessionController(SessionConnected(serverA)),
         ),
+        activeSourceProvider.overrideWith(
+          () => _FixedActiveSource(remoteSourceOfServer(serverB)),
+        ),
       ],
     );
     addTearDown(container.dispose);
@@ -193,6 +205,12 @@ void main() {
       overrides: <Override>[
         sourceRegistryProvider.overrideWithValue(faultyRegistry),
         settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
+        sessionProvider.overrideWith(
+          () => _FixedSessionController(SessionConnected(serverA)),
+        ),
+        activeSourceProvider.overrideWith(
+          () => _FixedActiveSource(remoteSourceOfServer(serverB)),
+        ),
       ],
     );
     addTearDown(faultyContainer.dispose);
@@ -328,7 +346,7 @@ void main() {
     );
     expect(
       container.read(sourceCapabilitiesForKeyProvider(serverAKey)),
-      same(SourceCapabilities.komga),
+      same(SourceCapabilities.remoteSync),
     );
     final unknownCaps = container.read(
       sourceCapabilitiesForKeyProvider('https://deleted-server.komga.test'),
@@ -379,6 +397,9 @@ void main() {
       overrides: <Override>[
         sourceRegistryProvider.overrideWithValue(registry),
         settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
+        sessionProvider.overrideWith(
+          () => _FixedSessionController(SessionConnected(serverA)),
+        ),
         // 模拟生产侧对顶层 provider 施加装饰器：不得影响按 sourceKey 路由。
         libraryRepositoryProvider.overrideWithValue(FakeLibraryRepository()),
         downloadServiceProvider.overrideWithValue(_RecordingDownloadService()),

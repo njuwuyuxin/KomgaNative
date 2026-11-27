@@ -3,7 +3,10 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:yomu/src/data/reader_prefs.dart';
+import 'package:yomu/src/features/reader/reader_layout.dart';
 import 'package:yomu/src/features/reader/reader_navigation_state.dart';
+import 'package:yomu/src/features/reader/reader_page_exporter.dart';
+import 'package:yomu/src/features/reader/reader_preloader.dart';
 import 'package:yomu/src/features/reader/reader_session_coordinator.dart';
 import 'package:yomu/src/providers/active_source_provider.dart';
 import 'package:yomu/src/providers/library_providers.dart';
@@ -16,9 +19,6 @@ import 'package:yomu/src/providers/settings_provider.dart';
 import 'package:yomu/src/providers/source_scoped_providers.dart';
 import 'package:yomu/src/widgets/edge_swipe_back.dart';
 import 'package:yomu/src/widgets/reader_content_viewport.dart';
-import 'package:yomu/src/features/reader/reader_layout.dart';
-import 'package:yomu/src/features/reader/reader_page_exporter.dart';
-import 'package:yomu/src/features/reader/reader_preloader.dart';
 import 'package:yomu/src/widgets/reader_opening_hero.dart';
 import 'package:yomu/src/widgets/reader_paged_view.dart';
 import 'package:yomu/src/widgets/reader_pages_gate.dart';
@@ -91,13 +91,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   ReaderBookQuery get _bookQuery =>
       (sourceKey: _sourceKey, bookId: widget.bookId);
 
+  String? _lastKnownSeriesId;
+
+  /// 纯内存读取当前书所属系列 ID（绝不在 `dispose()` 或退出回调里触碰 `ref.read`，P3）。
   String? get _seriesId =>
-      (_session.lastBook ??
-              widget.book ??
-              (!_session.settledLeave && mounted
-                  ? ref.read(readerBookProvider(_bookQuery)).value
-                  : null))
-          ?.seriesId;
+      (_session.lastBook ?? widget.book)?.seriesId ?? _lastKnownSeriesId;
 
   ReaderConfig _effectiveConfig(ReaderPrefs prefs) =>
       prefs.forSeries(_seriesId, serverKey: _sourceKey);
@@ -106,6 +104,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _lastKnownSeriesId = widget.book?.seriesId;
+    _nav.direction = widget.direction;
     final initialKey = widget.sourceKey;
     final resolvedInitialSource = (initialKey != null && initialKey.isNotEmpty)
         ? initialKey
@@ -127,6 +127,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         if (mounted) setState(() {});
       },
     );
+    if (widget.book != null) {
+      _session.noteBook(widget.book!);
+    }
     _session.start(initialPage: widget.book?.readProgress?.page ?? 1);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _keyboardFocus.requestFocus();
@@ -140,6 +143,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     if (scoped != null && scoped.isNotEmpty) {
       _session.resolvedSourceKey = scoped;
     }
+    _nav.landscape = MediaQuery.orientationOf(context) == Orientation.landscape;
+    _nav.tablet =
+        WindowSizeClass.of(MediaQuery.sizeOf(context).width) ==
+        WindowSizeClass.expanded;
   }
 
   @override
@@ -158,13 +165,27 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   Widget build(BuildContext context) {
     final isEink = ref.watch(effectiveEinkProvider);
     final bookQuery = _bookQuery;
+    ref.listen<AsyncValue<Book?>>(readerBookProvider(bookQuery), (_, next) {
+      final loaded = next.value;
+      if (loaded != null) {
+        _lastKnownSeriesId = loaded.seriesId;
+        _session.noteBook(loaded);
+      }
+    });
     final book = widget.book ?? ref.watch(readerBookProvider(bookQuery)).value;
-    _nav.direction = _resolveDirection(book);
+    final seriesId = book?.seriesId ?? _seriesId;
+    if (widget.direction == ReadingDirection.unknown && seriesId != null) {
+      ref.listen<AsyncValue<Series?>>(
+        seriesDetailProvider((sourceKey: _sourceKey, seriesId: seriesId)),
+        (_, next) {
+          final dir = next.value?.readingDirection;
+          if (dir != null) _nav.direction = dir;
+        },
+      );
+    }
+    final direction = _resolveDirection(book);
     final allPrefs = ref.watch(readerPrefsProvider);
-    final config = allPrefs.forSeries(
-      book?.seriesId ?? _seriesId,
-      serverKey: _sourceKey,
-    );
+    final config = allPrefs.forSeries(seriesId, serverKey: _sourceKey);
     final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     final body = PopScope(
       onPopInvokedWithResult: (bool didPop, Object? _) {
@@ -187,6 +208,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
                   allPrefs.tabletLayout,
                   config,
                   book,
+                  direction,
                 ),
               ),
               if (widget.heroTag != null && !isEink && !reduceMotion)
@@ -212,13 +234,15 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     TabletLayoutChoice tabletLayout,
     ReaderConfig config,
     Book? book,
+    ReadingDirection direction,
   ) {
-    _nav.landscape = MediaQuery.orientationOf(context) == Orientation.landscape;
-    _nav.tablet =
-        WindowSizeClass.of(MediaQuery.sizeOf(context).width) ==
-        WindowSizeClass.expanded;
-    final layout = _buildLayout(pages, tabletLayout, config);
-    _session.noteBookAndLayout(book, layout);
+    final layout = _buildLayout(
+      pages,
+      tabletLayout,
+      config,
+      direction: direction,
+    );
+    _session.noteLayout(layout);
     _preloader.scheduleFor('${layout.page}:${layout.mode.name}', () {
       final live = _currentLayout();
       if (live == null || live.mode == ReadingMode.verticalScroll) return;
@@ -265,8 +289,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   ReaderLayout _buildLayout(
     List<PageInfo> pages,
     TabletLayoutChoice tabletLayout,
-    ReaderConfig config,
-  ) => _nav.buildLayout(
+    ReaderConfig config, {
+    ReadingDirection? direction,
+  }) => _nav.buildLayout(
     pages: pages,
     tabletLayout: tabletLayout,
     config: config,
@@ -276,6 +301,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     groupFrom: ref
         .read(readerPrefsProvider)
         .spreadFromFor(widget.bookId, serverKey: _sourceKey),
+    direction: direction,
   );
 
   ReaderLayout? _currentLayout() {

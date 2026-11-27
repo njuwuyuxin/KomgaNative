@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yomu/src/data/shelf_failure.dart';
 import 'package:yomu/src/providers/active_source_provider.dart';
 import 'package:yomu/src/providers/source_registry_provider.dart';
+import 'package:yomu/src/session/session_controller.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 
 /// 跨源单本封面查询参数。
@@ -38,8 +39,9 @@ final scopedSeriesCoverProvider =
       return bundle.library.seriesCover(req.seriesId);
     });
 
-/// 首页「正在读」跨源无感汇聚（ADR 0008 不变量 3 / P1-2 多远程源汇聚）：
-/// - 并行拉取「本机」与所有已配置远程内容源的 `ondeck`；
+/// 首页「正在读」跨源无感汇聚（ADR 0008 不变量 3 / P3 懒加载保真）：
+/// - 始终拉取「本机」书库；
+/// - 远程侧仅按需解析「当前激活远程源 + 当前已连接会话源」（不遍历全部历史保存服务器建池）；
 /// - 在读书籍（`!isUnread && !isCompleted`）按 `lastModified` 倒序排在最前，跨源最新读的那本始终居首；
 /// - 紧随其后展示下一卷未读（`Up Next`）；
 /// - 故障隔离：单个远程源断网或鉴权失败时，静默保留其余源的在读书，仅在全部源无书且当前活动远程源失败时抛错。
@@ -48,9 +50,23 @@ crossSourceOndeckProvider = FutureProvider<PageResult<Book>>((Ref ref) async {
   const targetSize = 20;
   final registry = ref.watch(sourceRegistryProvider);
   final activeSource = ref.watch(activeSourceProvider);
+  final connectedServerId = ref.watch(
+    sessionProvider.select(
+      (SessionState s) => s is SessionConnected ? s.server.id : null,
+    ),
+  );
 
   final localFuture = registry.localBundle.library.ondeck(size: targetSize);
-  final remoteBundles = registry.remoteBundles.toList(growable: false);
+  final remoteKeys = <String>{
+    if (activeSource.isCloud) activeSource.sourceKey,
+    if (connectedServerId != null && connectedServerId.isNotEmpty)
+      connectedServerId,
+  };
+  final remoteBundles = <SourceBundle>[
+    for (final key in remoteKeys)
+      if (registry.remoteBundleOrNull(key) case final SourceBundle bundle)
+        bundle,
+  ];
 
   final remoteResults =
       await Future.wait<

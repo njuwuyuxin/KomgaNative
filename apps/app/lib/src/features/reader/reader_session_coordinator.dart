@@ -96,14 +96,28 @@ class ReaderSessionCoordinator {
     _onSessionMinutesChanged();
   }
 
-  /// 缓存最新书籍元信息与布局快照，供退出（`dispose` 时不再碰 `ref`）结算使用。
-  void noteBookAndLayout(Book? book, ReaderLayout layout) {
-    _lastLayout = layout;
-    if (book != null) {
-      _lastBook = book;
-      _initialBookUnread ??= book.isUnread;
+  /// 记录已加载的书籍元信息并通知进度服务（仅在 `initState` / `ref.listen` 调用，不在 `build` 里做副作用）。
+  void noteBook(Book book) {
+    final sameBook =
+        _lastBook != null &&
+        _lastBook!.id == book.id &&
+        _lastBook!.readProgress == book.readProgress;
+    _lastBook = book;
+    _initialBookUnread ??= book.isUnread;
+    if (!sameBook) {
       _progressSync.noteBook(book, scope: resolvedSourceKey);
     }
+  }
+
+  /// 缓存最新布局快照，供退出（`dispose` 时不再碰 `ref`）结算使用（纯内存赋值，无 I/O）。
+  void noteLayout(ReaderLayout layout) {
+    _lastLayout = layout;
+  }
+
+  /// 兼容旧调用点：同时记录书与布局。
+  void noteBookAndLayout(Book? book, ReaderLayout layout) {
+    noteLayout(layout);
+    if (book != null) noteBook(book);
   }
 
   /// 记录翻页并调度防抖进度写入。

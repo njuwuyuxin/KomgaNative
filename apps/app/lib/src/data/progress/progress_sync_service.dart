@@ -52,6 +52,14 @@ class ProgressSyncService {
     _pendingFlushScopes.clear();
   }
 
+  /// 删除服务器时彻底清理该分区的 outbox 队列、本地进度记录与内存缓存（P3）。
+  Future<void> clearScope(String scope) async {
+    _knownBooks.remove(scope);
+    _pendingFlushScopes.remove(scope);
+    _authBlockedScopes.remove(scope);
+    await _store.clearScope(scope);
+  }
+
   /// 记住一本书的基础元信息（供离线/同步失败时把本地 pending 书补进"继续阅读"）。
   void noteBook(Book book, {required String scope}) {
     final bucket = _knownBooks.putIfAbsent(scope, () => <String, Book>{});

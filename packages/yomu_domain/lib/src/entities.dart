@@ -5,46 +5,7 @@ library;
 
 import 'package:yomu_domain/src/content_source.dart';
 
-/// 服务器认证方式。
-enum AuthKind {
-  /// 长期有效的 API Key（`X-API-Key`），推荐。
-  apiKey,
-
-  /// 用户名/密码（Basic Auth），仅用于首次换取 API Key。
-  basic,
-}
-
-/// 用户配置的一台 Komga 服务器。
-class ServerProfile {
-  const ServerProfile({
-    required this.id,
-    required this.displayName,
-    required this.baseUrl,
-    this.authKind = AuthKind.apiKey,
-    this.userId,
-  });
-
-  final String id;
-  final String displayName;
-
-  /// 形如 `https://komga.example.com`，不带结尾斜杠。
-  final String baseUrl;
-
-  final AuthKind authKind;
-  final String? userId;
-
-  ServerProfile copyWith({String? displayName, String? baseUrl}) {
-    return ServerProfile(
-      id: id,
-      displayName: displayName ?? this.displayName,
-      baseUrl: baseUrl ?? this.baseUrl,
-      authKind: authKind,
-      userId: userId,
-    );
-  }
-}
-
-/// 漫画阅读方向。Komga 在系列元数据里下发，因此可跨端同步。
+/// 漫画阅读方向（可由服务端或本地归档元数据下发）。
 enum ReadingDirection {
   leftToRight,
   rightToLeft,

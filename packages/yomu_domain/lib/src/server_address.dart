@@ -1,13 +1,30 @@
-/// Komga 服务器地址（值对象）。
+/// 远程漫画服务器地址（值对象）。
 ///
-/// 解析用户输入并做规范化：补协议、去尾斜杠、保留子路径（`https://host/komga` 这种反代部署）。
+/// 解析用户输入并做规范化：补协议、去尾斜杠、保留子路径（如反代部署的 `https://host/comics`）。
 /// 校验放在领域层而不是 UI 层，这样 router / 连接页 / 设置页共用同一套规则。
+
+/// 服务器地址解析失败的结构化原因（UI 按需按当前 Locale 映射提示文案，不在领域层硬编码界面文本）。
+enum ServerAddressError {
+  empty,
+  containsWhitespace,
+  invalidSyntax,
+  unsupportedScheme,
+  missingHost,
+}
+
+/// 携带结构化 [reason] 的地址格式异常（继承 [FormatException] 保持兼容）。
+final class ServerAddressFormatException extends FormatException {
+  const ServerAddressFormatException(this.reason, [super.message = '']);
+
+  final ServerAddressError reason;
+}
+
 class ServerAddress {
   const ServerAddress._(this.uri);
 
   final Uri uri;
 
-  /// 不含结尾斜杠的基址，交给 `KomgaUrls`。
+  /// 不含结尾斜杠的规范化基址。
   String get baseUrl => uri.toString();
 
   String get host => uri.host;
@@ -18,16 +35,22 @@ class ServerAddress {
 
   /// 宽松解析：用户只输入 `192.168.1.10:25600` 也接受（默认补 https）。
   ///
-  /// 抛 [FormatException]，消息可以直接展示给用户。
+  /// 抛 [ServerAddressFormatException]（继承自 [FormatException]）。
   static ServerAddress parse(String raw) {
     final input = raw.trim();
     if (input.isEmpty) {
-      throw const FormatException('Please enter your Komga server address');
+      throw const ServerAddressFormatException(
+        ServerAddressError.empty,
+        'empty',
+      );
     }
     // `Uri.parse` 会把空格百分号编码进 host（`not a url` → `not%20a%20url`），
     // 这种输入必须挡在前面，否则会带着一个"看起来合法"的地址去发请求。
     if (RegExp(r'\s').hasMatch(input)) {
-      throw const FormatException('The address must not contain spaces');
+      throw const ServerAddressFormatException(
+        ServerAddressError.containsWhitespace,
+        'contains_whitespace',
+      );
     }
 
     final withScheme = input.contains('://') ? input : 'https://$input';
@@ -35,14 +58,23 @@ class ServerAddress {
     try {
       parsed = Uri.parse(withScheme);
     } on FormatException {
-      throw const FormatException('That does not look like a valid address');
+      throw const ServerAddressFormatException(
+        ServerAddressError.invalidSyntax,
+        'invalid_syntax',
+      );
     }
 
     if (parsed.scheme != 'http' && parsed.scheme != 'https') {
-      throw const FormatException('Only http:// and https:// are supported');
+      throw const ServerAddressFormatException(
+        ServerAddressError.unsupportedScheme,
+        'unsupported_scheme',
+      );
     }
     if (parsed.host.isEmpty) {
-      throw const FormatException('The address is missing a host name');
+      throw const ServerAddressFormatException(
+        ServerAddressError.missingHost,
+        'missing_host',
+      );
     }
 
     // 统一去掉末尾斜杠与多余的查询/片段，保留路径（反代子路径）。

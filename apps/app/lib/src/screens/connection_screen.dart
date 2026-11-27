@@ -8,6 +8,7 @@ import 'package:yomu/src/l10n/connection_failure_text.dart';
 import 'package:yomu/src/session/server_store.dart';
 import 'package:yomu/src/session/session_controller.dart';
 import 'package:yomu/src/widgets/certificate_panel.dart';
+import 'package:yomu/src/widgets/connection_credentials_section.dart';
 import 'package:yomu/src/widgets/saved_servers_card.dart';
 import 'package:yomu_design_system/yomu_design_system.dart';
 import 'package:yomu_domain/yomu_domain.dart';
@@ -151,72 +152,21 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
                                 ),
                               ),
                               const SizedBox(height: AppSpacing.md),
-                              if (_mode == _AuthMode.account) ...<Widget>[
-                                TextField(
-                                  controller: _username,
-                                  enabled: !submitting,
-                                  keyboardType: TextInputType.emailAddress,
-                                  textInputAction: TextInputAction.next,
-                                  autofillHints: const <String>[
-                                    AutofillHints.username,
-                                    AutofillHints.email,
-                                  ],
-                                  autocorrect: false,
-                                  decoration: InputDecoration(
-                                    labelText: l10n.email,
-                                    prefixIcon: const Icon(
-                                      Icons.alternate_email,
-                                    ),
-                                  ),
+                              ConnectionCredentialsFields(
+                                useAccount: _mode == _AuthMode.account,
+                                submitting: submitting,
+                                showPassword: _showPassword,
+                                usernameController: _username,
+                                passwordController: _password,
+                                apiKeyController: _apiKey,
+                                onToggleShowPassword: () => setState(
+                                  () => _showPassword = !_showPassword,
                                 ),
-                                const SizedBox(height: AppSpacing.md),
-                                TextField(
-                                  controller: _password,
-                                  enabled: !submitting,
-                                  obscureText: !_showPassword,
-                                  textInputAction: TextInputAction.done,
-                                  autofillHints: const <String>[
-                                    AutofillHints.password,
-                                  ],
-                                  onSubmitted: (_) {
-                                    if (!submitting) unawaited(_submit());
-                                  },
-                                  decoration: InputDecoration(
-                                    labelText: l10n.password,
-                                    prefixIcon: const Icon(Icons.lock_outline),
-                                    suffixIcon: IconButton(
-                                      onPressed: () => setState(
-                                        () => _showPassword = !_showPassword,
-                                      ),
-                                      icon: Icon(
-                                        _showPassword
-                                            ? Icons.visibility_off
-                                            : Icons.visibility,
-                                      ),
-                                      tooltip: _showPassword
-                                          ? l10n.hidePassword
-                                          : l10n.showPassword,
-                                    ),
-                                  ),
-                                ),
-                              ] else
-                                TextField(
-                                  controller: _apiKey,
-                                  enabled: !submitting,
-                                  textInputAction: TextInputAction.done,
-                                  autocorrect: false,
-                                  onSubmitted: (_) {
-                                    if (!submitting) unawaited(_submit());
-                                  },
-                                  decoration: InputDecoration(
-                                    labelText: l10n.apiKey,
-                                    hintText: l10n.apiKeyHint,
-                                    prefixIcon: const Icon(Icons.key_outlined),
-                                  ),
-                                ),
+                                onSubmit: () => unawaited(_submit()),
+                              ),
                               if (insecureWarning != null) ...<Widget>[
                                 const SizedBox(height: AppSpacing.md),
-                                _Banner(
+                                ConnectionStatusBanner(
                                   icon: Icons.warning_amber_outlined,
                                   text: insecureWarning,
                                   background: theme.colorScheme.errorContainer,
@@ -238,7 +188,7 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
                                 ),
                               ] else if (error != null) ...<Widget>[
                                 const SizedBox(height: AppSpacing.md),
-                                _Banner(
+                                ConnectionStatusBanner(
                                   icon: Icons.error_outline,
                                   text: hint == null ? error : '$error\n$hint',
                                   background: theme.colorScheme.errorContainer,
@@ -305,45 +255,6 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _Banner extends StatelessWidget {
-  const _Banner({
-    required this.icon,
-    required this.text,
-    required this.background,
-    required this.foreground,
-  });
-
-  final IconData icon;
-  final String text;
-  final Color background;
-  final Color foreground;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(AppRadii.md),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Icon(icon, size: AppSizes.iconMd, color: foreground),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Text(
-              text,
-              style: Theme.of(context).textTheme.bodySmall
-                  ?.copyWith(color: foreground),
-            ),
-          ),
-        ],
       ),
     );
   }
