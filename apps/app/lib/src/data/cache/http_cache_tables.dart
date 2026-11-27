@@ -25,10 +25,10 @@ class CachedResponses extends Table {
   Set<Column<Object>> get primaryKey => <Column<Object>>{scope, url};
 }
 
-/// 已下载（整本）的书（ARC-07：按 `{scope, bookId}` 复合主键隔离多服务器）。
+/// 已下载（整本）的书（ARC-07 / N6：按非空 `{scope, bookId}` 复合主键隔离多服务器）。
 class DownloadedBooks extends Table {
-  /// 服务器分区键（规范化 baseUrl）；空串兼容单测默认值。
-  TextColumn get scope => text().withDefault(const Constant(''))();
+  /// 服务器分区键（规范化 baseUrl，不可为空）。
+  TextColumn get scope => text()();
 
   TextColumn get bookId => text()();
 
@@ -48,10 +48,10 @@ class DownloadedBooks extends Table {
   Set<Column<Object>> get primaryKey => <Column<Object>>{scope, bookId};
 }
 
-/// 下载队列的持久化条目（FIX-07 / ARC-07：按 `{scope, bookId}` 复合主键隔离多服务器）。
+/// 下载队列的持久化条目（FIX-07 / ARC-07 / N6：按非空 `{scope, bookId}` 复合主键隔离多服务器）。
 class DownloadQueueEntries extends Table {
-  /// 服务器分区键（规范化 baseUrl）；空串兼容单测默认值。
-  TextColumn get scope => text().withDefault(const Constant(''))();
+  /// 服务器分区键（规范化 baseUrl，不可为空）。
+  TextColumn get scope => text()();
 
   TextColumn get bookId => text()();
 

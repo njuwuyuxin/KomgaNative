@@ -43,7 +43,10 @@ class KomgaDownloadService implements DownloadService {
     required this.db,
     required this.scope,
     this.bookMeta,
-  });
+  }) : assert(
+         scope.isNotEmpty,
+         'KomgaDownloadService requires non-empty scope',
+       );
 
   final Future<List<PageInfo>> Function(String bookId) pages;
   final Future<Uint8List> Function(String bookId, int page) pageImage;
@@ -82,16 +85,17 @@ class KomgaDownloadService implements DownloadService {
     var progress = DownloadProgress(done: 0, total: list.length);
     var bytes = 0;
     var completed = false;
-    final urls = scope.isEmpty ? null : KomgaUrls(scope);
+    final urls = KomgaUrls(scope);
     try {
       await db.setBookPagesPinned(scope: scope, bookId: book.id, pinned: true);
       onProgress(progress);
       for (final page in list) {
         if (_cancelFlags[book.id] ?? false) return false;
         // 断点续传：本地已缓存该页图时直接复用并钉住，避免取消/失败重试重复下载。
-        final cached = urls == null
-            ? null
-            : await db.read(scope, urls.pageImage(book.id, page.number));
+        final cached = await db.read(
+          scope,
+          urls.pageImage(book.id, page.number),
+        );
         final data = cached?.body ?? await pageImage(book.id, page.number);
         // 逐页立即钉住：即使单书总大小超过被动 LRU 预算，后续页也不会把前面的页挤掉。
         await db.setBookPagesPinned(

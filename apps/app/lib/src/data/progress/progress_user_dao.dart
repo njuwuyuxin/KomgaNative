@@ -29,7 +29,27 @@ extension ProgressUserDao on ProgressDatabase {
 
   Future<void> _backfillEmptyScopesToV7() async {
     const escapedLocal = kLocalSourceKey;
-    // 1) local_progress（复合主键 (scope, book_id)）
+    // 1) local_progress（复合主键 (scope, book_id)）：
+    // 若同一本书在 '' 与 local://device 下同时存在，按 updated_at 保留更新的那条（N6）。
+    await customStatement('''
+      UPDATE local_progress
+      SET
+        page = (SELECT e.page FROM local_progress e WHERE e.scope = '' AND e.book_id = local_progress.book_id),
+        completed = (SELECT e.completed FROM local_progress e WHERE e.scope = '' AND e.book_id = local_progress.book_id),
+        updated_at = (SELECT e.updated_at FROM local_progress e WHERE e.scope = '' AND e.book_id = local_progress.book_id),
+        server_last_modified = (SELECT e.server_last_modified FROM local_progress e WHERE e.scope = '' AND e.book_id = local_progress.book_id),
+        pending_seq = COALESCE(
+          (SELECT e.pending_seq FROM local_progress e WHERE e.scope = '' AND e.book_id = local_progress.book_id),
+          pending_seq
+        )
+      WHERE scope = '$escapedLocal'
+        AND EXISTS (
+          SELECT 1 FROM local_progress e
+          WHERE e.scope = ''
+            AND e.book_id = local_progress.book_id
+            AND e.updated_at > local_progress.updated_at
+        )
+    ''');
     await customStatement(
       'INSERT OR IGNORE INTO local_progress '
       '(scope, book_id, page, completed, updated_at, server_last_modified, pending_seq) '
@@ -43,7 +63,21 @@ extension ProgressUserDao on ProgressDatabase {
       "UPDATE reading_sessions SET scope = '$escapedLocal' WHERE scope = ''",
     );
 
-    // 3) pinned_series_rows（复合主键 (server_id, series_id)）
+    // 3) pinned_series_rows（复合主键 (server_id, series_id)）：冲突时保留更新的 created_at
+    await customStatement('''
+      UPDATE pinned_series_rows
+      SET created_at = (
+        SELECT e.created_at FROM pinned_series_rows e
+        WHERE e.server_id = '' AND e.series_id = pinned_series_rows.series_id
+      )
+      WHERE server_id = '$escapedLocal'
+        AND EXISTS (
+          SELECT 1 FROM pinned_series_rows e
+          WHERE e.server_id = ''
+            AND e.series_id = pinned_series_rows.series_id
+            AND e.created_at > pinned_series_rows.created_at
+        )
+    ''');
     await customStatement(
       'INSERT OR IGNORE INTO pinned_series_rows (server_id, series_id, created_at) '
       "SELECT '$escapedLocal', series_id, created_at "
@@ -53,7 +87,21 @@ extension ProgressUserDao on ProgressDatabase {
       "DELETE FROM pinned_series_rows WHERE server_id = ''",
     );
 
-    // 4) page_bookmarks_rows（复合主键 (scope, book_id, page)）
+    // 4) page_bookmarks_rows（复合主键 (scope, book_id, page)）：冲突时保留更新的书签
+    await customStatement('''
+      UPDATE page_bookmarks_rows
+      SET
+        note = (SELECT e.note FROM page_bookmarks_rows e WHERE e.scope = '' AND e.book_id = page_bookmarks_rows.book_id AND e.page = page_bookmarks_rows.page),
+        created_at = (SELECT e.created_at FROM page_bookmarks_rows e WHERE e.scope = '' AND e.book_id = page_bookmarks_rows.book_id AND e.page = page_bookmarks_rows.page)
+      WHERE scope = '$escapedLocal'
+        AND EXISTS (
+          SELECT 1 FROM page_bookmarks_rows e
+          WHERE e.scope = ''
+            AND e.book_id = page_bookmarks_rows.book_id
+            AND e.page = page_bookmarks_rows.page
+            AND e.created_at > page_bookmarks_rows.created_at
+        )
+    ''');
     await customStatement(
       'INSERT OR IGNORE INTO page_bookmarks_rows '
       '(scope, book_id, page, note, created_at) '
@@ -70,8 +118,9 @@ extension ProgressUserDao on ProgressDatabase {
       final path = await resolver();
       if (path == null || path.isEmpty || !File(path).existsSync()) return;
       final escapedPath = path.replaceAll("'", "''");
-      final rawScope = await defaultLegacyScope?.call() ?? '';
-      final effectiveScope = rawScope.isEmpty ? kLocalSourceKey : rawScope;
+      final effectiveScope = normalizeLegacySourceKey(
+        await defaultLegacyScope?.call(),
+      );
       final escapedScope = effectiveScope.replaceAll("'", "''");
       await customStatement("ATTACH DATABASE '$escapedPath' AS legacy_cache");
       try {

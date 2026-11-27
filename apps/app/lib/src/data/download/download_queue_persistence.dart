@@ -62,13 +62,14 @@ class DownloadQueuePersistence {
   /// 将持久化队列行还原为携带远端 `sourceKey` 的领域 [Book]。
   Book toBook(DownloadQueueEntry entry, {required String fallbackScope}) {
     final bookScope = entry.scope.isNotEmpty ? entry.scope : fallbackScope;
+    assert(bookScope.isNotEmpty, 'DownloadQueueEntry requires non-empty scope');
     return Book(
       id: entry.bookId,
       seriesId: entry.seriesId,
       name: entry.name,
       number: entry.number,
       pagesCount: entry.pagesCount,
-      sourceKey: bookScope.isNotEmpty ? bookScope : kLocalSourceKey,
+      sourceKey: bookScope,
     );
   }
 

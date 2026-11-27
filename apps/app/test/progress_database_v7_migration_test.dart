@@ -71,7 +71,10 @@ void main() {
         );
       ''');
 
-      // local_progress: b1 仅空串；b2 空串更旧、local 更新（冲突时应保留 local）。
+      // local_progress:
+      // - b1 仅空串；
+      // - b2 空串更旧、local 更新（冲突时应保留 local）；
+      // - b3 空串更新、local 更旧（冲突时应以 updated_at 保留更新的空串记录，N6）。
       raw.execute(
         "INSERT INTO local_progress VALUES ('', 'b1', 12, 0, 1000, NULL, NULL);",
       );
@@ -80,6 +83,12 @@ void main() {
       );
       raw.execute(
         "INSERT INTO local_progress VALUES ('$kLocalSourceKey', 'b2', 9, 0, 2000, NULL, NULL);",
+      );
+      raw.execute(
+        "INSERT INTO local_progress VALUES ('', 'b3', 18, 1, 3000, NULL, 99);",
+      );
+      raw.execute(
+        "INSERT INTO local_progress VALUES ('$kLocalSourceKey', 'b3', 5, 0, 2000, NULL, NULL);",
       );
       raw.execute(
         'INSERT INTO reading_sessions '
@@ -105,6 +114,12 @@ void main() {
     final b2 = await db.record('b2', scope: kLocalSourceKey);
     expect(b2, isNotNull);
     expect(b2!.page, 9);
+
+    final b3 = await db.record('b3', scope: kLocalSourceKey);
+    expect(b3, isNotNull);
+    expect(b3!.page, 18);
+    expect(b3.completed, isTrue);
+    expect(b3.pendingSeq, 99);
 
     final sessions = await db.readingSessionList(scope: kLocalSourceKey);
     expect(sessions, hasLength(1));

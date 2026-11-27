@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:drift/drift.dart';
 import 'package:yomu/src/data/cache/http_cache_tables.dart';
+import 'package:yomu_domain/yomu_domain.dart';
 
 export 'package:yomu/src/data/cache/http_cache_tables.dart';
 
@@ -28,7 +29,7 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
   int? _seqSeed;
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -39,7 +40,9 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
       if (from < 2) await m.createTable(downloadedBooks);
       if (from < 3) await m.createTable(downloadQueueEntries);
       if (from < 6) {
-        final rawScope = await defaultLegacyScope?.call() ?? '';
+        final rawScope = normalizeLegacySourceKey(
+          await defaultLegacyScope?.call(),
+        );
         final escaped = rawScope.replaceAll("'", "''");
         if (from >= 2) await _upgradeDownloadedBooksToV6(escaped);
         if (from >= 3) await _upgradeDownloadQueueToV6(escaped);
@@ -57,7 +60,7 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
         ''');
       }
       if (from < 8) {
-        // from < 2 时上面 createTable(downloadedBooks) 已按最新 v8 建表，自带 book_name。
+        // from < 2 时上面 createTable(downloadedBooks) 已按最新建表，自带 book_name。
         if (from >= 2) {
           await m.addColumn(downloadedBooks, downloadedBooks.bookName);
         }
@@ -73,6 +76,12 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
               )
           )
         ''');
+      }
+      if (from < 9) {
+        final targetScope = normalizeLegacySourceKey(
+          await defaultLegacyScope?.call(),
+        );
+        await _backfillEmptyScopesToV9(targetScope);
       }
     },
   );

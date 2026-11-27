@@ -15,6 +15,12 @@ const String kLocalLibraryId = 'local://library';
 /// 空串 `''` 不合法且不再隐式等同于本机；历史存档的空 `scope` 应在数据库迁移阶段补齐为 [kLocalSourceKey]。
 bool isLocalSourceKey(String sourceKey) => sourceKey == kLocalSourceKey;
 
+/// 历史旧版数据库/持久化配置中遗留的空或 null `scope` 唯一迁移归一化入口（P1-1 / N6）。
+///
+/// 仅供数据库升级迁移或旧存档反序列化调用；正常运行期代码必须始终传递非空 `sourceKey`。
+String normalizeLegacySourceKey(String? raw) =>
+    (raw == null || raw.isEmpty) ? kLocalSourceKey : raw;
+
 /// 支持或预留的内容源协议种类。
 enum SourceKind {
   local,

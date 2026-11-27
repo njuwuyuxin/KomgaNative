@@ -261,5 +261,93 @@ void main() {
       );
       expect((await db.download('b8', scope: scope))?.bookName, 'Volume 8');
     });
+
+    test('N6: v8 -> v9 补齐 downloaded_books / download_queue_entries 空 scope，冲突按最新时间保留', () async {
+      final raw = sqlite.sqlite3.openInMemory();
+      raw.execute('''
+        CREATE TABLE cached_responses (
+          scope TEXT NOT NULL,
+          url TEXT NOT NULL,
+          kind TEXT NOT NULL,
+          byte_size INTEGER NOT NULL,
+          body BLOB NOT NULL,
+          last_used_seq INTEGER NOT NULL,
+          pinned INTEGER NOT NULL DEFAULT 0,
+          PRIMARY KEY (scope, url)
+        );
+      ''');
+      raw.execute('''
+        CREATE TABLE downloaded_books (
+          scope TEXT NOT NULL DEFAULT '',
+          book_id TEXT NOT NULL,
+          series_id TEXT NOT NULL,
+          book_name TEXT NOT NULL DEFAULT '',
+          page_count INTEGER NOT NULL,
+          bytes INTEGER NOT NULL,
+          saved_at INTEGER NOT NULL,
+          PRIMARY KEY (scope, book_id)
+        );
+      ''');
+      raw.execute('''
+        CREATE TABLE download_queue_entries (
+          scope TEXT NOT NULL DEFAULT '',
+          book_id TEXT NOT NULL,
+          series_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          number TEXT NOT NULL DEFAULT '',
+          pages_count INTEGER NOT NULL,
+          state TEXT NOT NULL,
+          done INTEGER NOT NULL DEFAULT 0,
+          total INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL,
+          PRIMARY KEY (scope, book_id)
+        );
+      ''');
+      const target = 'https://srv-v9';
+      // 1) b-only 仅在 '' 下存在；
+      // 2) b-empty-newer 在 '' 下更新（saved_at 3000 > 2000），应覆盖目标行；
+      // 3) b-target-newer 在目标 scope 下更新（saved_at 4000 > 1000），应保留目标行。
+      raw.execute(
+        'INSERT INTO downloaded_books (scope, book_id, series_id, book_name, page_count, bytes, saved_at) VALUES '
+        "('', 'b-only', 's1', 'Only Empty', 10, 1000, 1000),"
+        "('', 'b-empty-newer', 's1', 'Newer Empty', 12, 1200, 3000),"
+        "('$target', 'b-empty-newer', 's1', 'Older Target', 8, 800, 2000),"
+        "('', 'b-target-newer', 's1', 'Older Empty', 6, 600, 1000),"
+        "('$target', 'b-target-newer', 's1', 'Newer Target', 20, 2000, 4000)",
+      );
+      raw.execute(
+        'INSERT INTO download_queue_entries '
+        '(scope, book_id, series_id, name, number, pages_count, state, done, total, created_at) VALUES '
+        "('', 'q-empty-newer', 's1', 'Queue Newer', '1', 10, 'queued', 4, 10, 5000),"
+        "('$target', 'q-empty-newer', 's1', 'Queue Older', '1', 10, 'queued', 1, 10, 2000)",
+      );
+      raw.execute('PRAGMA user_version = 8');
+
+      final db = HttpCacheDatabase(
+        NativeDatabase.opened(raw),
+        defaultLegacyScope: () => target,
+      );
+      addTearDown(db.close);
+
+      expect(
+        (await db.download('b-only', scope: target))?.bookName,
+        'Only Empty',
+      );
+      expect(
+        (await db.download('b-empty-newer', scope: target))?.bookName,
+        'Newer Empty',
+      );
+      expect(
+        (await db.download('b-target-newer', scope: target))?.bookName,
+        'Newer Target',
+      );
+      expect(await db.downloads(scope: ''), isEmpty);
+
+      final queue = await db.downloadQueue(scope: target);
+      expect(queue, hasLength(1));
+      expect(queue.single.name, 'Queue Newer');
+      expect(queue.single.done, 4);
+      expect(await db.downloadQueue(scope: ''), isEmpty);
+    });
   });
 }

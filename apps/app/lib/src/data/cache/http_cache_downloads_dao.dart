@@ -54,6 +54,73 @@ extension HttpCacheDownloadsDao on HttpCacheDatabase {
     );
   }
 
+  Future<void> _backfillEmptyScopesToV9(String targetScope) async {
+    final escaped = targetScope.replaceAll("'", "''");
+    // 1) downloaded_books：若同一 book_id 在 '' 与目标 scope 下并存，按 saved_at 保留更新的那条。
+    await customStatement('''
+      UPDATE downloaded_books
+      SET
+        series_id = (SELECT e.series_id FROM downloaded_books e WHERE e.scope = '' AND e.book_id = downloaded_books.book_id),
+        book_name = (SELECT e.book_name FROM downloaded_books e WHERE e.scope = '' AND e.book_id = downloaded_books.book_id),
+        page_count = (SELECT e.page_count FROM downloaded_books e WHERE e.scope = '' AND e.book_id = downloaded_books.book_id),
+        bytes = (SELECT e.bytes FROM downloaded_books e WHERE e.scope = '' AND e.book_id = downloaded_books.book_id),
+        saved_at = (SELECT e.saved_at FROM downloaded_books e WHERE e.scope = '' AND e.book_id = downloaded_books.book_id)
+      WHERE scope = '$escaped'
+        AND EXISTS (
+          SELECT 1 FROM downloaded_books e
+          WHERE e.scope = ''
+            AND e.book_id = downloaded_books.book_id
+            AND e.saved_at > downloaded_books.saved_at
+        )
+    ''');
+    await customStatement(
+      'INSERT OR IGNORE INTO downloaded_books '
+      '(scope, book_id, series_id, book_name, page_count, bytes, saved_at) '
+      "SELECT '$escaped', book_id, series_id, book_name, page_count, bytes, saved_at "
+      "FROM downloaded_books WHERE scope = ''",
+    );
+    await customStatement("DELETE FROM downloaded_books WHERE scope = ''");
+
+    // 2) download_queue_entries：冲突时按 created_at 保留更新的排队记录。
+    await customStatement('''
+      UPDATE download_queue_entries
+      SET
+        series_id = (SELECT e.series_id FROM download_queue_entries e WHERE e.scope = '' AND e.book_id = download_queue_entries.book_id),
+        name = (SELECT e.name FROM download_queue_entries e WHERE e.scope = '' AND e.book_id = download_queue_entries.book_id),
+        number = (SELECT e.number FROM download_queue_entries e WHERE e.scope = '' AND e.book_id = download_queue_entries.book_id),
+        pages_count = (SELECT e.pages_count FROM download_queue_entries e WHERE e.scope = '' AND e.book_id = download_queue_entries.book_id),
+        state = (SELECT e.state FROM download_queue_entries e WHERE e.scope = '' AND e.book_id = download_queue_entries.book_id),
+        done = (SELECT e.done FROM download_queue_entries e WHERE e.scope = '' AND e.book_id = download_queue_entries.book_id),
+        total = (SELECT e.total FROM download_queue_entries e WHERE e.scope = '' AND e.book_id = download_queue_entries.book_id),
+        created_at = (SELECT e.created_at FROM download_queue_entries e WHERE e.scope = '' AND e.book_id = download_queue_entries.book_id)
+      WHERE scope = '$escaped'
+        AND EXISTS (
+          SELECT 1 FROM download_queue_entries e
+          WHERE e.scope = ''
+            AND e.book_id = download_queue_entries.book_id
+            AND e.created_at > download_queue_entries.created_at
+        )
+    ''');
+    await customStatement(
+      'INSERT OR IGNORE INTO download_queue_entries '
+      '(scope, book_id, series_id, name, number, pages_count, state, done, total, created_at) '
+      "SELECT '$escaped', book_id, series_id, name, number, pages_count, state, done, total, created_at "
+      "FROM download_queue_entries WHERE scope = ''",
+    );
+    await customStatement(
+      "DELETE FROM download_queue_entries WHERE scope = ''",
+    );
+
+    // 3) cached_responses：同步清理遗留的空 scope 缓存行。
+    await customStatement(
+      'INSERT OR IGNORE INTO cached_responses '
+      '(scope, url, kind, byte_size, body, last_used_seq, pinned) '
+      "SELECT '$escaped', url, kind, byte_size, body, last_used_seq, pinned "
+      "FROM cached_responses WHERE scope = ''",
+    );
+    await customStatement("DELETE FROM cached_responses WHERE scope = ''");
+  }
+
   Future<int> setBookPagesPinned({
     required String scope,
     required String bookId,
@@ -71,17 +138,18 @@ extension HttpCacheDownloadsDao on HttpCacheDatabase {
   }
 
   Future<void> markDownloaded({
-    String scope = '',
+    required String scope,
     required String bookId,
     required String seriesId,
     String bookName = '',
     required int pageCount,
     required int bytes,
   }) async {
+    assert(scope.isNotEmpty, 'markDownloaded requires a non-empty scope');
     await setBookPagesPinned(scope: scope, bookId: bookId, pinned: true);
     await into(downloadedBooks).insertOnConflictUpdate(
       DownloadedBooksCompanion.insert(
-        scope: Value<String>(scope),
+        scope: scope,
         bookId: bookId,
         seriesId: seriesId,
         bookName: Value<String>(bookName),
@@ -92,7 +160,8 @@ extension HttpCacheDownloadsDao on HttpCacheDatabase {
     );
   }
 
-  Future<DownloadedBook?> download(String bookId, {String scope = ''}) {
+  Future<DownloadedBook?> download(String bookId, {required String scope}) {
+    assert(scope.isNotEmpty, 'download requires a non-empty scope');
     return (select(downloadedBooks)
           ..where((t) => t.scope.equals(scope) & t.bookId.equals(bookId)))
         .getSingleOrNull();
@@ -117,23 +186,25 @@ extension HttpCacheDownloadsDao on HttpCacheDatabase {
     );
   }
 
-  Future<void> removeDownload(String bookId, {String scope = ''}) async {
+  Future<void> removeDownload(String bookId, {required String scope}) async {
+    assert(scope.isNotEmpty, 'removeDownload requires a non-empty scope');
     await (delete(
       downloadedBooks,
     )..where((t) => t.scope.equals(scope) & t.bookId.equals(bookId))).go();
   }
 
   Future<void> enqueueDownload({
-    String scope = '',
+    required String scope,
     required String bookId,
     required String seriesId,
     required String name,
     required String number,
     required int pagesCount,
   }) async {
+    assert(scope.isNotEmpty, 'enqueueDownload requires a non-empty scope');
     await into(downloadQueueEntries).insertOnConflictUpdate(
       DownloadQueueEntriesCompanion.insert(
-        scope: Value<String>(scope),
+        scope: scope,
         bookId: bookId,
         seriesId: seriesId,
         name: name,
@@ -146,12 +217,13 @@ extension HttpCacheDownloadsDao on HttpCacheDatabase {
   }
 
   Future<void> updateQueueEntry({
-    String scope = '',
+    required String scope,
     required String bookId,
     required String state,
     required int done,
     required int total,
   }) async {
+    assert(scope.isNotEmpty, 'updateQueueEntry requires a non-empty scope');
     await (update(
       downloadQueueEntries,
     )..where((t) => t.scope.equals(scope) & t.bookId.equals(bookId))).write(
@@ -163,7 +235,8 @@ extension HttpCacheDownloadsDao on HttpCacheDatabase {
     );
   }
 
-  Future<void> dequeueDownload(String bookId, {String scope = ''}) async {
+  Future<void> dequeueDownload(String bookId, {required String scope}) async {
+    assert(scope.isNotEmpty, 'dequeueDownload requires a non-empty scope');
     await (delete(
       downloadQueueEntries,
     )..where((t) => t.scope.equals(scope) & t.bookId.equals(bookId))).go();

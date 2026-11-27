@@ -85,11 +85,9 @@ final class ProgressAdoptPlan {
 /// [ProgressOutbox]、[InMemoryProgressStore] 与生产环境 `DriftProgressStore`
 /// 全部复用本组纯函数，确保测试与线上持久化共享完全一致的合并、排序、回执与对账语义。
 abstract final class ProgressOutboxRules {
-  /// 空 scope 统一归一化到 [kLocalSourceKey]，避免历史空串与本地分区出现双义。
-  static String normalizeScope(String scope) {
-    final trimmed = scope.trim();
-    return trimmed.isEmpty ? kLocalSourceKey : trimmed;
-  }
+  /// 空 scope 统一经 [normalizeLegacySourceKey] 归一化，避免历史空串与本地分区出现双义。
+  static String normalizeScope(String scope) =>
+      normalizeLegacySourceKey(scope.trim());
 
   /// 生成严格单调递增的入队序号：同时大于历史最大序号与当前记录已有序号，
   /// 即使跨重启或系统时钟回拨也不会与旧待提交序号冲突。

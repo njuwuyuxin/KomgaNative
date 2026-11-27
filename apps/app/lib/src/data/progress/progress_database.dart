@@ -54,18 +54,17 @@ class ProgressDatabase extends _$ProgressDatabase {
         await m.createTable(readingSessions);
       }
       if (from < 3) {
-        final rawScope = await defaultLegacyScope?.call() ?? '';
+        final rawScope = normalizeLegacySourceKey(
+          await defaultLegacyScope?.call(),
+        );
         final escaped = rawScope.replaceAll("'", "''");
         await _upgradeLocalProgressToV3(escaped);
         if (from >= 2) {
           await m.addColumn(readingSessions, readingSessions.scope);
         }
-        if (escaped.isNotEmpty) {
-          await customStatement(
-            "UPDATE reading_sessions SET scope = '$escaped' "
-            "WHERE scope = '' OR scope = '$kLocalSourceKey'",
-          );
-        }
+        await customStatement(
+          "UPDATE reading_sessions SET scope = '$escaped' WHERE scope = ''",
+        );
       }
       if (from < 4) {
         await m.createTable(localSeriesRows);
