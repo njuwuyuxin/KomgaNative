@@ -186,6 +186,29 @@ void main() {
 
       final c = inferTitlesFromFileName('04.cbz', parentFolderName: '孤独摇滚');
       expect(c.seriesTitle, '孤独摇滚');
+
+      // 末尾裸四位年份（1900–2099）不应被误判为卷号，带前缀的明确卷号与非年份编号仍保留。
+      final year1 = inferTitlesFromFileName('Bobby_Make_Believe_1915.cbt');
+      expect(year1.seriesTitle, 'Bobby_Make_Believe_1915');
+      expect(year1.number, isEmpty);
+      expect(year1.numberSort, 0);
+
+      final year2 = inferTitlesFromFileName('Will_Eisner_M16A1_Comic_1969.zip');
+      expect(year2.number, isEmpty);
+
+      final issue = inferTitlesFromFileName('Roy_Rogers_and_Trigger_096.cbr');
+      expect(issue.seriesTitle, 'Roy_Rogers_and_Trigger');
+      expect(issue.number, '96');
+      expect(issue.numberSort, 96);
+
+      final longRun = inferTitlesFromFileName('Detective_Conan_1050.cbz');
+      expect(longRun.seriesTitle, 'Detective_Conan');
+      expect(longRun.number, '1050');
+      expect(longRun.numberSort, 1050);
+
+      final explicitVolYear = inferTitlesFromFileName('Special Vol. 2001.cbz');
+      expect(explicitVolYear.seriesTitle, 'Special');
+      expect(explicitVolYear.number, '2001');
     });
   });
 }

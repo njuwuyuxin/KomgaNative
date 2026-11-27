@@ -237,13 +237,19 @@ inferTitlesFromFileName(String rawFileName, {String? parentFolderName}) {
 
   String? extractedSeries;
   String number = '';
-  for (final pattern in volPatterns) {
-    final m = pattern.firstMatch(cleanStem);
+  for (var i = 0; i < volPatterns.length; i++) {
+    final m = volPatterns[i].firstMatch(cleanStem);
     if (m != null) {
       final candidateSeries = (m.group(1) ?? '')
           .replaceAll(RegExp(r'[-_.\s]+$'), '')
           .trim();
       final candidateNum = (m.group(2) ?? '').trim();
+      // 末尾裸数字（无 Vol./Ch./#/第...卷 前缀）若落在 1900–2099 的四位年份区间，
+      // 通常是出版年份（如 `Bobby_Make_Believe_1915`），不应误判为第 1915 卷。
+      if (i == volPatterns.length - 1 &&
+          _looksLikeFourDigitYear(candidateNum)) {
+        continue;
+      }
       if (candidateNum.isNotEmpty) {
         number = candidateNum;
         if (candidateSeries.isNotEmpty) {
@@ -267,4 +273,10 @@ inferTitlesFromFileName(String rawFileName, {String? parentFolderName}) {
     number: number,
     numberSort: numberSort,
   );
+}
+
+bool _looksLikeFourDigitYear(String candidate) {
+  if (candidate.length != 4 || candidate.contains('.')) return false;
+  final year = int.tryParse(candidate);
+  return year != null && year >= 1900 && year <= 2099;
 }
