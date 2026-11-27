@@ -1,28 +1,39 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:yomu/src/data/local/wifi_transfer_quota.dart';
 
-/// 单文件或单次会话上传体积超限时抛出的内部异常（映射为 HTTP 413）。
-final class WifiPayloadTooLargeException implements Exception {
-  const WifiPayloadTooLargeException(this.limitBytes);
+export 'package:yomu/src/data/local/wifi_transfer_quota.dart';
 
-  final int limitBytes;
-}
-
-/// 带硬字节上限的流式落盘：边读边计数，超限立即停止写盘、删半截文件，
-/// 并最多优雅排空少量在途缓冲以避免内核 TCP RST 吞掉 HTTP 413 响应头。
+/// 带硬字节上限与原子会话额度的流式落盘：边读边扣减，超限立即停止写盘、删半截文件并释放预占，
+/// 同时最多优雅排空少量在途缓冲以避免内核 TCP RST 吞掉 HTTP 413 响应头。
 Future<int> writeStreamToFileWithLimit(
   Stream<List<int>> stream,
   File dest, {
   required int maxBytes,
+  WifiSessionQuota? quota,
   int? declaredLength,
   int maxDrainBytes = 256 * 1024,
 }) async {
-  if (maxBytes <= 0 || (declaredLength != null && declaredLength > maxBytes)) {
+  WifiQuotaLease? lease;
+  try {
+    if (quota != null) {
+      lease = quota.beginWrite(
+        perFileLimit: maxBytes,
+        declaredLength: declaredLength,
+      );
+    } else if (maxBytes <= 0 ||
+        (declaredLength != null && declaredLength > maxBytes)) {
+      throw WifiPayloadTooLargeException(maxBytes);
+    }
+  } on WifiPayloadTooLargeException {
     await drainUpToLimit(stream, maxDrainBytes: maxDrainBytes);
-    throw WifiPayloadTooLargeException(maxBytes);
+    rethrow;
   }
+
+  await dest.parent.create(recursive: true);
   final sink = dest.openWrite();
   var written = 0;
   var overflowDrained = 0;
@@ -35,25 +46,31 @@ Future<int> writeStreamToFileWithLimit(
         if (overflowDrained >= maxDrainBytes) break;
         continue;
       }
-      written += chunk.length;
-      if (written > maxBytes) {
+      final allowed = lease != null
+          ? lease.consume(chunk.length)
+          : (written + chunk.length <= maxBytes);
+      if (!allowed) {
         exceeded = true;
         failed = true;
         overflowDrained += chunk.length;
         if (overflowDrained >= maxDrainBytes) break;
         continue;
       }
+      written += chunk.length;
       sink.add(chunk);
     }
     if (exceeded) throw WifiPayloadTooLargeException(maxBytes);
     await sink.flush();
+    lease?.commit();
     return written;
   } on Object {
     failed = true;
+    lease?.release();
     rethrow;
   } finally {
     await sink.close();
     if (failed) {
+      lease?.release();
       try {
         if (await dest.exists()) await dest.delete();
       } on FileSystemException {
@@ -163,4 +180,70 @@ final class WifiPinGuard {
     }
     return diff == 0;
   }
+}
+
+/// 校验 POST 请求的 PIN 头并按结果写出 401/429 JSON 响应。
+Future<bool> authorizeWifiPost(
+  HttpRequest request,
+  WifiPinGuard pinGuard, {
+  required String? expectedPin,
+}) async {
+  final res = pinGuard.verify(request, expectedPin: expectedPin);
+  if (res.status == WifiPinStatus.locked) {
+    request.response.headers.set(
+      HttpHeaders.retryAfterHeader,
+      '${res.retryAfterSeconds}',
+    );
+    await writeWifiJson(
+      request.response,
+      HttpStatus.tooManyRequests,
+      <String, Object?>{
+        'ok': false,
+        'error': 'too_many_attempts',
+        'retryAfterSeconds': res.retryAfterSeconds,
+      },
+    );
+    return false;
+  }
+  if (res.status == WifiPinStatus.invalid) {
+    await writeWifiJson(
+      request.response,
+      HttpStatus.unauthorized,
+      const <String, Object?>{'ok': false, 'error': 'invalid_pin'},
+    );
+    return false;
+  }
+  return true;
+}
+
+Future<void> writeWifiJson(
+  HttpResponse response,
+  int statusCode,
+  Map<String, Object?> body, {
+  bool closeConnection = false,
+}) async {
+  if (closeConnection) response.persistentConnection = false;
+  response
+    ..statusCode = statusCode
+    ..headers.contentType = ContentType.json
+    ..write(jsonEncode(body));
+  await response.flush();
+  await response.close();
+}
+
+String sanitizeWifiSegment(String raw) {
+  final base = raw.replaceAll(r'\', '/').split('/').last.trim();
+  final safe = base.replaceAll(RegExp(r'[<>:"|?*\x00-\x1F]'), '_');
+  return safe.isEmpty || safe == '.' || safe == '..' ? 'comic' : safe;
+}
+
+String sanitizeWifiRelativePath(String raw) {
+  final norm = raw.replaceAll(r'\', '/');
+  final cleanParts = <String>[];
+  for (final part in norm.split('/')) {
+    final trimmed = part.trim();
+    if (trimmed.isEmpty || trimmed == '.' || trimmed == '..') continue;
+    cleanParts.add(trimmed.replaceAll(RegExp(r'[<>:"|?*\x00-\x1F]'), '_'));
+  }
+  return cleanParts.join('/');
 }

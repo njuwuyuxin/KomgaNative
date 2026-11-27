@@ -236,6 +236,8 @@ async function processBatch(entries) {
         const res = await sendStream('/api/commit-folder?folder=' + encodeURIComponent(folder), new Blob());
         if (res.status >= 200 && res.status < 300 && res.data.ok) row.setDone('已导入目录');
         else row.setError(res.data.error || '导入失败');
+      } else {
+        try { await sendStream('/api/abort-folder?folder=' + encodeURIComponent(folder), new Blob()); } catch (abortErr) { console.warn('abort-folder failed', abortErr); }
       }
     } catch (e) { row.setError('上传失败'); }
   }

@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:yomu/src/data/local/local_comic_importer.dart';
@@ -35,7 +34,8 @@ final class WifiTransferEvent {
 ///
 /// 安全机制：
 /// - 仅经 `X-Yomu-Pin` 请求头校验 PIN（拒绝 query string）+ 按 IP 限流锁定（[WifiPinGuard]）；
-/// - 单压缩包、单图片及整次会话总上传体积硬上限，流式写盘超限即刻中止并返回 413。
+/// - 并发上传上限 + 原子预占与逐块实时扣减的整次会话流量上限（[WifiSessionQuota]）；
+/// - 未提交的暂存文件夹图片按 TTL 定时回收，并支持 `/api/abort-folder` 即时清理。
 final class WifiTransferServer {
   WifiTransferServer({
     required LocalComicImporter importer,
@@ -44,6 +44,9 @@ final class WifiTransferServer {
     this.maxArchiveBytes = defaultMaxArchiveBytes,
     this.maxImageBytes = defaultMaxImageBytes,
     this.maxSessionBytes = defaultMaxSessionBytes,
+    this.maxConcurrentUploads = defaultMaxConcurrentUploads,
+    Duration stagedFolderTtl = defaultStagedFolderTtl,
+    Duration stagedFolderSweepInterval = defaultStagedFolderSweepInterval,
     int maxPinFailures = defaultMaxPinFailures,
     Duration pinLockoutDuration = defaultPinLockoutDuration,
     DateTime Function()? now,
@@ -51,6 +54,15 @@ final class WifiTransferServer {
        _stagingRootResolver = stagingRootResolver,
        _lanAddressesResolver = lanAddressesResolver ?? discoverLanIpv4Addresses,
        _now = now ?? (() => DateTime.now().toUtc()),
+       _stagedFolderSweepInterval = stagedFolderSweepInterval,
+       _quota = WifiSessionQuota(
+         maxSessionBytes: maxSessionBytes,
+         maxConcurrentUploads: maxConcurrentUploads,
+       ),
+       _stagedFolders = WifiStagedFolderTracker(
+         ttl: stagedFolderTtl,
+         now: now ?? (() => DateTime.now().toUtc()),
+       ),
        _pinGuard = WifiPinGuard(
          maxFailures: maxPinFailures,
          lockoutDuration: pinLockoutDuration,
@@ -60,6 +72,9 @@ final class WifiTransferServer {
   static const int defaultMaxArchiveBytes = 512 * 1024 * 1024;
   static const int defaultMaxImageBytes = 32 * 1024 * 1024;
   static const int defaultMaxSessionBytes = 4 * 1024 * 1024 * 1024;
+  static const int defaultMaxConcurrentUploads = 4;
+  static const Duration defaultStagedFolderTtl = Duration(minutes: 5);
+  static const Duration defaultStagedFolderSweepInterval = Duration(minutes: 1);
   static const int defaultMaxPinFailures = 5;
   static const Duration defaultPinLockoutDuration = Duration(seconds: 30);
 
@@ -69,22 +84,27 @@ final class WifiTransferServer {
   final int maxArchiveBytes;
   final int maxImageBytes;
   final int maxSessionBytes;
+  final int maxConcurrentUploads;
+  final Duration _stagedFolderSweepInterval;
   final DateTime Function() _now;
+  final WifiSessionQuota _quota;
+  final WifiStagedFolderTracker _stagedFolders;
   final WifiPinGuard _pinGuard;
   final StreamController<WifiTransferEvent> _events =
       StreamController<WifiTransferEvent>.broadcast();
 
   HttpServer? _server;
   Directory? _stagingDir;
+  Timer? _sweepTimer;
   String? _pin;
   int _receivedCount = 0;
-  int _sessionBytesReceived = 0;
 
   Stream<WifiTransferEvent> get events => _events.stream;
   bool get isRunning => _server != null;
   int? get port => _server?.port;
   int get receivedCount => _receivedCount;
   String? get pin => _pin;
+  int get sessionBytesUsed => _quota.usedBytes;
 
   void setPin(String? pin) {
     final cleaned = pin?.trim() ?? '';
@@ -100,7 +120,8 @@ final class WifiTransferServer {
   }) async {
     if (_server != null) return _buildUrls(_server!.port);
     setPin(pin);
-    _sessionBytesReceived = 0;
+    _quota.reset();
+    _stagedFolders.reset();
     final addr = bindAddress ?? InternetAddress.anyIPv4;
     HttpServer bound;
     try {
@@ -110,6 +131,9 @@ final class WifiTransferServer {
     }
     _server = bound;
     _stagingDir = await _createStagingDir();
+    _sweepTimer = Timer.periodic(_stagedFolderSweepInterval, (_) {
+      unawaited(sweepExpiredStagedFolders());
+    });
     unawaited(_serveLoop(bound));
     return _buildUrls(bound.port);
   }
@@ -118,13 +142,20 @@ final class WifiTransferServer {
   Future<void> stop() async {
     final server = _server;
     _server = null;
-    _sessionBytesReceived = 0;
+    _sweepTimer?.cancel();
+    _sweepTimer = null;
+    _quota.reset();
+    _stagedFolders.reset();
     _pinGuard.reset();
     if (server != null) await server.close(force: true);
     final dir = _stagingDir;
     _stagingDir = null;
     if (dir != null) await tryDeleteImportDir(dir);
   }
+
+  /// 清理已超过 TTL 且无在途写入/提交的未提交暂存文件夹，返回被回收的目录数。
+  Future<int> sweepExpiredStagedFolders() =>
+      _stagedFolders.sweepExpired(_stagingDir);
 
   Future<void> dispose() async {
     await stop();
@@ -155,11 +186,6 @@ final class WifiTransferServer {
     }
   }
 
-  int _effectiveLimit(int perFileLimit) {
-    final remaining = maxSessionBytes - _sessionBytesReceived;
-    return remaining <= 0 ? 0 : math.min(perFileLimit, remaining);
-  }
-
   Future<void> _handleRequest(HttpRequest request) async {
     try {
       final path = request.uri.path;
@@ -185,8 +211,11 @@ final class WifiTransferServer {
           (path == '/api/upload' ||
               path == '/api/upload-image' ||
               path == '/api/commit-folder' ||
+              path == '/api/abort-folder' ||
               path == '/api/upload-series-cover')) {
-        if (!await _authorizePost(request)) return;
+        if (!await authorizeWifiPost(request, _pinGuard, expectedPin: _pin)) {
+          return;
+        }
         await _dispatchPost(path, request);
         return;
       }
@@ -213,68 +242,67 @@ final class WifiTransferServer {
     }
   }
 
-  Future<bool> _authorizePost(HttpRequest request) async {
-    final res = _pinGuard.verify(request, expectedPin: _pin);
-    if (res.status == WifiPinStatus.locked) {
-      request.response.headers.set(
-        HttpHeaders.retryAfterHeader,
-        '${res.retryAfterSeconds}',
-      );
-      await writeWifiJson(
-        request.response,
-        HttpStatus.tooManyRequests,
-        <String, Object?>{
-          'ok': false,
-          'error': 'too_many_attempts',
-          'retryAfterSeconds': res.retryAfterSeconds,
-        },
-      );
-      return false;
-    }
-    if (res.status == WifiPinStatus.invalid) {
-      await writeWifiJson(
-        request.response,
-        HttpStatus.unauthorized,
-        const <String, Object?>{'ok': false, 'error': 'invalid_pin'},
-      );
-      return false;
-    }
-    return true;
-  }
-
   Future<void> _dispatchPost(String path, HttpRequest request) async {
-    final staging = _stagingDir ?? await _createStagingDir();
-    if (path == '/api/upload') {
-      final outcome = await handleWifiArchiveUpload(
+    if (path == '/api/abort-folder') {
+      await handleWifiAbortFolder(
         request: request,
-        importer: _importer,
-        staging: staging,
-        emit: _emit,
-        maxBytes: _effectiveLimit(maxArchiveBytes),
-      );
-      _receivedCount += outcome.importedCount;
-      _sessionBytesReceived += outcome.bytesReceived;
-    } else if (path == '/api/upload-image') {
-      _sessionBytesReceived += await handleWifiImageUpload(
-        request: request,
-        staging: staging,
-        maxBytes: _effectiveLimit(maxImageBytes),
-      );
-    } else if (path == '/api/upload-series-cover') {
-      _sessionBytesReceived += await handleWifiSeriesCoverUpload(
-        request: request,
-        importer: _importer,
-        staging: staging,
-        emit: _emit,
-        maxBytes: _effectiveLimit(maxImageBytes),
-      );
-    } else {
-      _receivedCount += await handleWifiCommitFolder(
-        request: request,
-        importer: _importer,
         staging: _stagingDir,
-        emit: _emit,
+        stagedFolders: _stagedFolders,
       );
+      return;
+    }
+    if (!_quota.tryEnterUpload()) {
+      await drainUpToLimit(request);
+      request.response.headers.set(HttpHeaders.retryAfterHeader, '1');
+      await writeWifiJson(
+        request.response,
+        HttpStatus.serviceUnavailable,
+        const <String, Object?>{'ok': false, 'error': 'too_many_uploads'},
+        closeConnection: true,
+      );
+      return;
+    }
+    try {
+      unawaited(sweepExpiredStagedFolders());
+      final staging = _stagingDir ??= await _createStagingDir();
+      if (path == '/api/upload') {
+        final outcome = await handleWifiArchiveUpload(
+          request: request,
+          importer: _importer,
+          staging: staging,
+          emit: _emit,
+          maxBytes: maxArchiveBytes,
+          quota: _quota,
+        );
+        _receivedCount += outcome.importedCount;
+      } else if (path == '/api/upload-image') {
+        await handleWifiImageUpload(
+          request: request,
+          staging: staging,
+          maxBytes: maxImageBytes,
+          quota: _quota,
+          stagedFolders: _stagedFolders,
+        );
+      } else if (path == '/api/upload-series-cover') {
+        await handleWifiSeriesCoverUpload(
+          request: request,
+          importer: _importer,
+          staging: staging,
+          emit: _emit,
+          maxBytes: maxImageBytes,
+          quota: _quota,
+        );
+      } else {
+        _receivedCount += await handleWifiCommitFolder(
+          request: request,
+          importer: _importer,
+          staging: _stagingDir,
+          stagedFolders: _stagedFolders,
+          emit: _emit,
+        );
+      }
+    } finally {
+      _quota.leaveUpload();
     }
   }
 

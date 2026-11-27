@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:yomu/src/data/local/comic_file_picker.dart';
@@ -62,6 +61,7 @@ Future<({int importedCount, int bytesReceived})> handleWifiArchiveUpload({
   required Directory staging,
   required WifiEmitEvent emit,
   required int maxBytes,
+  required WifiSessionQuota quota,
 }) async {
   final rawName = request.uri.queryParameters['name']?.trim() ?? '';
   final fileName = sanitizeWifiSegment(
@@ -82,6 +82,7 @@ Future<({int importedCount, int bytesReceived})> handleWifiArchiveUpload({
       request,
       tempFile,
       maxBytes: maxBytes,
+      quota: quota,
       declaredLength: request.contentLength >= 0 ? request.contentLength : null,
     );
     final result = await importer.importArchiveFiles(<PickedComicFile>[
@@ -139,6 +140,8 @@ Future<int> handleWifiImageUpload({
   required HttpRequest request,
   required Directory staging,
   required int maxBytes,
+  required WifiSessionQuota quota,
+  required WifiStagedFolderTracker stagedFolders,
 }) async {
   final folder = sanitizeWifiSegment(
     request.uri.queryParameters['folder']?.trim() ?? 'Uploaded Comic',
@@ -155,12 +158,13 @@ Future<int> handleWifiImageUpload({
     return 0;
   }
   final dest = File('${staging.path}/folders/$folder/$relPath');
-  await dest.parent.create(recursive: true);
+  stagedFolders.enter(folder);
   try {
     final received = await writeStreamToFileWithLimit(
       request,
       dest,
       maxBytes: maxBytes,
+      quota: quota,
       declaredLength: request.contentLength >= 0 ? request.contentLength : null,
     );
     await writeWifiJson(
@@ -177,6 +181,8 @@ Future<int> handleWifiImageUpload({
       closeConnection: true,
     );
     return 0;
+  } finally {
+    stagedFolders.leave(folder);
   }
 }
 
@@ -184,6 +190,7 @@ Future<int> handleWifiCommitFolder({
   required HttpRequest request,
   required LocalComicImporter importer,
   required Directory? staging,
+  required WifiStagedFolderTracker stagedFolders,
   required WifiEmitEvent emit,
 }) async {
   final folder = sanitizeWifiSegment(
@@ -203,6 +210,7 @@ Future<int> handleWifiCommitFolder({
     return 0;
   }
 
+  stagedFolders.enter(folder);
   try {
     final result = await importer.importDirectory(dir.path);
     if (result.importedCount > 0) {
@@ -229,7 +237,23 @@ Future<int> handleWifiCommitFolder({
     return 0;
   } finally {
     await tryDeleteImportDir(dir);
+    stagedFolders.leave(folder, committed: true);
   }
+}
+
+Future<void> handleWifiAbortFolder({
+  required HttpRequest request,
+  required Directory? staging,
+  required WifiStagedFolderTracker stagedFolders,
+}) async {
+  final folder = sanitizeWifiSegment(
+    request.uri.queryParameters['folder']?.trim() ?? 'Uploaded Comic',
+  );
+  final removed = await stagedFolders.abort(staging, folder);
+  await writeWifiJson(request.response, HttpStatus.ok, <String, Object?>{
+    'ok': true,
+    'removed': removed,
+  });
 }
 
 Future<int> handleWifiSeriesCoverUpload({
@@ -238,6 +262,7 @@ Future<int> handleWifiSeriesCoverUpload({
   required Directory staging,
   required WifiEmitEvent emit,
   required int maxBytes,
+  required WifiSessionQuota quota,
 }) async {
   final rawSeriesId = request.uri.queryParameters['seriesId']?.trim();
   final seriesId = (rawSeriesId != null && rawSeriesId.isNotEmpty)
@@ -265,6 +290,7 @@ Future<int> handleWifiSeriesCoverUpload({
       request,
       tempFile,
       maxBytes: maxBytes,
+      quota: quota,
       declaredLength: request.contentLength >= 0 ? request.contentLength : null,
     );
     final bytes = await tempFile.readAsBytes();
@@ -305,36 +331,4 @@ Future<int> handleWifiSeriesCoverUpload({
       // 清理临时封面文件失败不影响主流程。
     }
   }
-}
-
-Future<void> writeWifiJson(
-  HttpResponse response,
-  int statusCode,
-  Map<String, Object?> body, {
-  bool closeConnection = false,
-}) async {
-  if (closeConnection) response.persistentConnection = false;
-  response
-    ..statusCode = statusCode
-    ..headers.contentType = ContentType.json
-    ..write(jsonEncode(body));
-  await response.flush();
-  await response.close();
-}
-
-String sanitizeWifiSegment(String raw) {
-  final base = raw.replaceAll(r'\', '/').split('/').last.trim();
-  final safe = base.replaceAll(RegExp(r'[<>:"|?*\x00-\x1F]'), '_');
-  return safe.isEmpty || safe == '.' || safe == '..' ? 'comic' : safe;
-}
-
-String sanitizeWifiRelativePath(String raw) {
-  final norm = raw.replaceAll(r'\', '/');
-  final cleanParts = <String>[];
-  for (final part in norm.split('/')) {
-    final trimmed = part.trim();
-    if (trimmed.isEmpty || trimmed == '.' || trimmed == '..') continue;
-    cleanParts.add(trimmed.replaceAll(RegExp(r'[<>:"|?*\x00-\x1F]'), '_'));
-  }
-  return cleanParts.join('/');
 }

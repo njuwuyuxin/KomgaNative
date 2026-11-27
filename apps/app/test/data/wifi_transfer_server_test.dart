@@ -411,5 +411,199 @@ void main() {
       await overSessionRes.drain<void>();
       expect(overSessionRes.statusCode, HttpStatus.requestEntityTooLarge);
     });
+
+    test('P2-1 并发上传无法绕过会话 4GB 上限（原子预占 + 分块流实时扣减）', () async {
+      final limitedServer = WifiTransferServer(
+        importer: LocalComicImporter(
+          db: db,
+          storage: LocalComicsStorage(rootResolver: () async => sandboxTemp),
+          coverEncoder: (
+            Uint8List raw, {
+            required ReadingDirection direction,
+          }) async => raw,
+        ),
+        lanAddressesResolver: () async => const <String>['127.0.0.1'],
+        maxImageBytes: 80,
+        maxArchiveBytes: 80,
+        maxSessionBytes: 100,
+        maxConcurrentUploads: 4,
+      );
+      addTearDown(limitedServer.dispose);
+
+      final urls = await limitedServer.start(
+        bindAddress: InternetAddress.loopbackIPv4,
+        preferredPort: 0,
+      );
+      final base = Uri.parse(urls.single);
+
+      // 1) 两个带 Content-Length=60 的并发请求同时在途：总计 120 > 100，
+      //    第二个必须在首个尚未写完时即被原子预占拦截为 413。
+      final req1 = await client.postUrl(
+        base.resolve('/api/upload-image?folder=Race&name=01.png'),
+      );
+      req1.contentLength = 60;
+      req1.add(Uint8List(30));
+      await req1.flush();
+
+      // 给服务端事件循环一个机会进入 req1 的流式接收阶段并预占 60 字节。
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+
+      final req2 = await client.postUrl(
+        base.resolve('/api/upload-image?folder=Race&name=02.png'),
+      );
+      req2.contentLength = 60;
+      req2.add(Uint8List(60));
+      final res2 = await req2.close();
+      await res2.drain<void>();
+      expect(res2.statusCode, HttpStatus.requestEntityTooLarge);
+
+      // 补齐 req1 剩余 30 字节并正常完成。
+      req1.add(Uint8List(30));
+      final res1 = await req1.close();
+      await res1.drain<void>();
+      expect(res1.statusCode, HttpStatus.ok);
+      expect(limitedServer.sessionBytesUsed, 60);
+
+      // 2) 两个未知长度的 chunked 并发请求各尝试发送 30 字节（剩余 40 字节）：
+      //    累计不能突破 100 字节上限，至少一个返回 413。
+      final c1 = await client.postUrl(
+        base.resolve('/api/upload-image?folder=Race&name=03.png'),
+      );
+      c1.headers.chunkedTransferEncoding = true;
+      c1.add(Uint8List(25));
+      await c1.flush();
+
+      final c2 = await client.postUrl(
+        base.resolve('/api/upload-image?folder=Race&name=04.png'),
+      );
+      c2.headers.chunkedTransferEncoding = true;
+      c2.add(Uint8List(25));
+      await c2.flush();
+
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+      c1.add(Uint8List(5));
+      c2.add(Uint8List(5));
+      final responses = await Future.wait<HttpClientResponse>(
+        <Future<HttpClientResponse>>[c1.close(), c2.close()],
+      );
+      for (final r in responses) {
+        await r.drain<void>();
+      }
+      final statuses = responses.map((r) => r.statusCode).toList();
+      expect(statuses, contains(HttpStatus.requestEntityTooLarge));
+      expect(limitedServer.sessionBytesUsed, lessThanOrEqualTo(100));
+    });
+
+    test('P2-1 并发上传数超上限返回 503 且不撑爆连接', () async {
+      final limitedServer = WifiTransferServer(
+        importer: LocalComicImporter(
+          db: db,
+          storage: LocalComicsStorage(rootResolver: () async => sandboxTemp),
+          coverEncoder: (
+            Uint8List raw, {
+            required ReadingDirection direction,
+          }) async => raw,
+        ),
+        lanAddressesResolver: () async => const <String>['127.0.0.1'],
+        maxConcurrentUploads: 1,
+      );
+      addTearDown(limitedServer.dispose);
+
+      final urls = await limitedServer.start(
+        bindAddress: InternetAddress.loopbackIPv4,
+        preferredPort: 0,
+      );
+      final base = Uri.parse(urls.single);
+
+      final req1 = await client.postUrl(
+        base.resolve('/api/upload-image?folder=Conc&name=01.png'),
+      );
+      req1.contentLength = 40;
+      req1.add(Uint8List(10));
+      await req1.flush();
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+
+      final req2 = await client.postUrl(
+        base.resolve('/api/upload-image?folder=Conc&name=02.png'),
+      );
+      req2.add(Uint8List(10));
+      final res2 = await req2.close();
+      await res2.drain<void>();
+      expect(res2.statusCode, HttpStatus.serviceUnavailable);
+      expect(res2.headers.value(HttpHeaders.retryAfterHeader), '1');
+
+      req1.add(Uint8List(30));
+      final res1 = await req1.close();
+      await res1.drain<void>();
+      expect(res1.statusCode, HttpStatus.ok);
+    });
+
+    test('P2-1 未提交暂存文件夹支持过期 TTL 回收与 /api/abort-folder 即时清理', () async {
+      var clock = DateTime.utc(2026, 11, 26, 12);
+      final stagingRoot = Directory('${sandboxTemp.path}/wifi_staging_root')
+        ..createSync(recursive: true);
+      final ttlServer = WifiTransferServer(
+        importer: LocalComicImporter(
+          db: db,
+          storage: LocalComicsStorage(rootResolver: () async => sandboxTemp),
+          coverEncoder: (
+            Uint8List raw, {
+            required ReadingDirection direction,
+          }) async => raw,
+        ),
+        stagingRootResolver: () async => stagingRoot,
+        lanAddressesResolver: () async => const <String>['127.0.0.1'],
+        stagedFolderTtl: const Duration(minutes: 5),
+        stagedFolderSweepInterval: const Duration(hours: 1),
+        now: () => clock,
+      );
+      addTearDown(ttlServer.dispose);
+
+      final urls = await ttlServer.start(
+        bindAddress: InternetAddress.loopbackIPv4,
+        preferredPort: 0,
+      );
+      final base = Uri.parse(urls.single);
+
+      // 1) 上传两批未提交文件夹图片
+      for (final folder in const <String>['StaleComic', 'AbortedComic']) {
+        final req = await client.postUrl(
+          base.resolve('/api/upload-image?folder=$folder&name=01.png'),
+        );
+        req.add(_fakePng(200, 300));
+        final res = await req.close();
+        await res.drain<void>();
+        expect(res.statusCode, HttpStatus.ok);
+      }
+
+      Directory folderDir(String name) {
+        final sessionDir = stagingRoot.listSync().whereType<Directory>().single;
+        return Directory('${sessionDir.path}/folders/$name');
+      }
+
+      expect(folderDir('StaleComic').existsSync(), isTrue);
+      expect(folderDir('AbortedComic').existsSync(), isTrue);
+
+      // 2) 调用 /api/abort-folder 立即删除 AbortedComic
+      final abortReq = await client.postUrl(
+        base.resolve('/api/abort-folder?folder=AbortedComic'),
+      );
+      final abortRes = await abortReq.close();
+      final abortJson =
+          jsonDecode(await utf8.decodeStream(abortRes)) as Map<String, Object?>;
+      expect(abortRes.statusCode, HttpStatus.ok);
+      expect(abortJson['removed'], isTrue);
+      expect(folderDir('AbortedComic').existsSync(), isFalse);
+      expect(folderDir('StaleComic').existsSync(), isTrue);
+
+      // 3) 未过期前 sweep 不删；时钟推进超过 5 分钟后 sweep 自动回收 StaleComic
+      clock = clock.add(const Duration(minutes: 4));
+      expect(await ttlServer.sweepExpiredStagedFolders(), 0);
+      expect(folderDir('StaleComic').existsSync(), isTrue);
+
+      clock = clock.add(const Duration(minutes: 2));
+      expect(await ttlServer.sweepExpiredStagedFolders(), 1);
+      expect(folderDir('StaleComic').existsSync(), isFalse);
+    });
   });
 }
