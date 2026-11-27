@@ -57,7 +57,10 @@ class HttpCacheDatabase extends _$HttpCacheDatabase {
         ''');
       }
       if (from < 8) {
-        await m.addColumn(downloadedBooks, downloadedBooks.bookName);
+        // from < 2 时上面 createTable(downloadedBooks) 已按最新 v8 建表，自带 book_name。
+        if (from >= 2) {
+          await m.addColumn(downloadedBooks, downloadedBooks.bookName);
+        }
         await customStatement('''
           UPDATE cached_responses
           SET pinned = 1

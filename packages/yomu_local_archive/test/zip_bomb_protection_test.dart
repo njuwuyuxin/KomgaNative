@@ -157,6 +157,76 @@ void main() {
       );
       expect(result, isNull);
     });
+
+    test('零字节与截断伪 ZIP 统一抛 ArchiveException（P2-6）', () async {
+      await expectLater(
+        () => ZipComicReader.open(MemoryByteSource(Uint8List(0))),
+        throwsA(isA<ArchiveException>()),
+      );
+      await expectLater(
+        () => ZipComicReader.open(
+          MemoryByteSource(Uint8List.fromList(<int>[0x50, 0x4B, 0x03, 0x04])),
+        ),
+        throwsA(isA<ArchiveException>()),
+      );
+    });
+
+    test('EOCD 中央目录偏移越出文件末尾时抛 corruptedArchive（P2-6）', () async {
+      final out = BytesBuilder()
+        ..add(const <int>[0x50, 0x4B, 0x03, 0x04, 0, 0, 0, 0]);
+      final eocd = ByteData(22)
+        ..setUint32(0, 0x06054b50, Endian.little)
+        ..setUint16(8, 1, Endian.little)
+        ..setUint16(10, 1, Endian.little)
+        ..setUint32(12, 100, Endian.little)
+        ..setUint32(16, 999999, Endian.little);
+      out.add(eocd.buffer.asUint8List());
+
+      await expectLater(
+        () => readZipCentralDirectory(MemoryByteSource(out.takeBytes())),
+        throwsA(
+          isA<ArchiveException>().having(
+            (e) => e.kind,
+            'kind',
+            ArchiveErrorKind.corruptedArchive,
+          ),
+        ),
+      );
+    });
+
+    test('恶意 TAR 截断载荷不会崩溃，统一抛 ArchiveException（P2-6）', () async {
+      final header = Uint8List(512);
+      // 文件名 "01.png"
+      header.setRange(0, 6, utf8.encode('01.png'));
+      // 八进制声明体积 999999 字节，但文件随后立刻截断
+      header.setRange(124, 135, utf8.encode('00003641077'));
+      header[156] = 0x30; // '0' regular file
+      header.setRange(257, 263, utf8.encode('ustar\x00'));
+      // 计算有效 tar header checksum（148..155 先填空格）
+      for (var i = 148; i < 156; i++) {
+        header[i] = 0x20;
+      }
+      var sum = 0;
+      for (final b in header) {
+        sum += b;
+      }
+      final oct = sum.toRadixString(8).padLeft(6, '0');
+      header.setRange(148, 154, utf8.encode(oct));
+      header[154] = 0;
+      header[155] = 0x20;
+
+      await expectLater(() async {
+        final reader = await TarComicReader.open(
+          MemoryByteSource(header),
+          sniffDimensions: false,
+        );
+        try {
+          await reader.readPage(1);
+        } finally {
+          await reader.close();
+        }
+      }, throwsA(isA<ArchiveException>()));
+    });
   });
 }
 

@@ -165,6 +165,51 @@ void main() {
       );
       expect(await libraryRepo.bookCover('b-ext-folder'), extPng);
       expect(await readerRepo.pageImage('b-ext-folder', 1), extPng);
+
+      // 4) CBR：携带已保存密码走原生归档桥提取封面与读页（P2-6）。
+      await passwordStore.saveBookPassword('b-cbr', 'cbr-secret');
+      final cbrFile = await storage.resolveFile('books/b-cbr/vol.cbr');
+      await cbrFile.parent.create(recursive: true);
+      await cbrFile.writeAsBytes(const <int>[0x52, 0x61, 0x72, 0x21]);
+      await db.insertImportedLocalBook(
+        const LocalBookImportDraft(
+          bookId: 'b-cbr',
+          seriesTitle: 'CBR Series',
+          bookName: 'Vol 1',
+          number: '1',
+          numberSort: 1,
+          storageKind: 'cbr',
+          relativePath: 'books/b-cbr/vol.cbr',
+          sizeBytes: 4,
+          pages: <ArchivePageEntry>[],
+        ),
+        generateSeriesId: () => 's-cbr',
+      );
+      expect(await libraryRepo.bookCover('b-cbr'), cb7Bytes);
+      expect(fakeArchive.lastPassword, 'cbr-secret');
+      expect(await readerRepo.pageImage('b-cbr', 1), cb7Bytes);
+
+      // 5) 外部挂载坏文件 / 不存在的文件：封面回退必须返回 null，绝不抛异常打断书架（P2-6）。
+      await db.insertImportedLocalBook(
+        LocalBookImportDraft(
+          bookId: 'b-missing-ext',
+          seriesTitle: 'Missing Ext',
+          bookName: 'Broken',
+          number: '1',
+          numberSort: 1,
+          storageKind: LocalStorageKind.extZip.wireValue,
+          relativePath: '${tempDir.path}/not_there.cbz',
+          sizeBytes: 100,
+          pages: const <ArchivePageEntry>[],
+          mountRootId: 'root-1',
+        ),
+        generateSeriesId: () => 's-missing',
+      );
+      expect(await libraryRepo.bookCover('b-missing-ext'), isNull);
+      expect(await libraryRepo.seriesCover('s-missing'), isNull);
+
+      // 6) 系列无自定义封面时自动回退到首本的封面提取（P2-6）。
+      expect(await libraryRepo.seriesCover('s-pdf'), pdfBytes);
     },
   );
 }

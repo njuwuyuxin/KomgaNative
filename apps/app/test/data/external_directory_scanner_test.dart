@@ -224,5 +224,154 @@ void main() {
         coverBytes,
       );
     });
+
+    test('损坏压缩包计入 failed 且不阻断同目录其他健康压缩包入库（P2-6）', () async {
+      final sub = Directory('${extDir.path}/Mixed')..createSync();
+      File('${sub.path}/bad.cbz')
+          .writeAsBytesSync(<int>[0x50, 0x4B, 0x03, 0x04]);
+      File('${sub.path}/good.cbz').writeAsBytesSync(
+        _buildCbz(<String, List<int>>{'01.png': _fakePng(800, 1200)}),
+      );
+
+      final root = MountedExternalRoot(
+        id: 'root_mixed',
+        displayName: 'Mixed',
+        uriOrBookmark: extDir.path,
+        kind: ExternalRootKind.localDirectory,
+      );
+      await db.upsertMountedRoot(root);
+
+      final summary = await scanner.scanRoot(root);
+      expect(summary.added, 1);
+      expect(summary.failed, 1);
+      expect((await db.booksForMountedRoot(root.id)), hasLength(1));
+    });
+
+    test(
+      'SAF/Bridge 外部目录挂载按 ExternalRangeByteSource 入库 saf_zip 并回调进度（P2-6）',
+      () async {
+        final cbzBytes = _buildCbz(<String, List<int>>{
+          '01.png': _fakePng(640, 960),
+        });
+        final fakeBridge = _FakeSafBridge(
+          entries: <ExternalTreeEntry>[
+            ExternalTreeEntry(
+              uri: 'content://tree/manga/Vol.1.cbz',
+              relativePath: 'Naruto/Vol.1.cbz',
+              name: 'Vol.1.cbz',
+              sizeBytes: cbzBytes.length,
+              lastModifiedMs: 1700000000000,
+              isDirectory: false,
+            ),
+          ],
+          files: <String, Uint8List>{
+            'content://tree/manga/Vol.1.cbz': cbzBytes,
+          },
+        );
+        final safScanner = ExternalDirectoryScanner(
+          db: db,
+          storage: LocalComicsStorage(rootResolver: () async => sandboxDir),
+          bridge: fakeBridge,
+          coverEncoder: (
+            Uint8List raw, {
+            required ReadingDirection direction,
+          }) async => raw,
+        );
+        const root = MountedExternalRoot(
+          id: 'root_saf_1',
+          displayName: 'SD Card',
+          uriOrBookmark: 'content://tree/manga',
+          kind: ExternalRootKind.androidSaf,
+        );
+        await db.upsertMountedRoot(root);
+
+        final progressEvents = <ExternalScanProgress>[];
+        final summary = await safScanner.scanRoot(
+          root,
+          onProgress: progressEvents.add,
+        );
+
+        expect(summary.added, 1);
+        expect(summary.failed, 0);
+        expect(progressEvents.length, greaterThanOrEqualTo(2));
+        expect(progressEvents.last.scanned, 1);
+        expect(progressEvents.last.total, 1);
+
+        final books = await db.booksForMountedRoot(root.id);
+        expect(books, hasLength(1));
+        expect(books.single.storageKind, 'saf_zip');
+        expect((await db.mountedRootById(root.id))?.booksCount, 1);
+      },
+    );
+
+    test('多级子目录隔离不同系列与各自侧车封面，且清空目录后 booksCount 归零（P2-6）', () async {
+      final dirA = Directory('${extDir.path}/Author/SeriesA')
+        ..createSync(recursive: true);
+      final dirB = Directory('${extDir.path}/Author/SeriesB')
+        ..createSync(recursive: true);
+      final coverA = _fakePng(500, 750);
+      final coverB = _fakePng(600, 900);
+      File('${dirA.path}/Vol.1.cbz').writeAsBytesSync(
+        _buildCbz(<String, List<int>>{'01.png': _fakePng(800, 1200)}),
+      );
+      File('${dirA.path}/cover.png').writeAsBytesSync(coverA);
+      File('${dirB.path}/Vol.1.cbz').writeAsBytesSync(
+        _buildCbz(<String, List<int>>{'01.png': _fakePng(800, 1200)}),
+      );
+      File('${dirB.path}/cover.png').writeAsBytesSync(coverB);
+
+      final root = MountedExternalRoot(
+        id: 'root_nested',
+        displayName: 'Nested',
+        uriOrBookmark: extDir.path,
+        kind: ExternalRootKind.localDirectory,
+      );
+      await db.upsertMountedRoot(root);
+
+      final first = await scanner.scanRoot(root);
+      expect(first.added, 2);
+
+      final allSeries = (await db.queryLocalSeries()).items;
+      expect(allSeries, hasLength(2));
+
+      // 删除外部目录内全部书后复扫：清理全部索引，booksCount 归零。
+      File('${dirA.path}/Vol.1.cbz').deleteSync();
+      File('${dirB.path}/Vol.1.cbz').deleteSync();
+      final second = await scanner.scanRoot(root);
+      expect(second.removed, 2);
+      expect(await db.booksForMountedRoot(root.id), isEmpty);
+      expect((await db.mountedRootById(root.id))?.booksCount, 0);
+    });
+
+    test('discoverAndScanDocumentsDirectory 目录不存在时温和返回空统计且不建根（P2-6）', () async {
+      final missing = Directory('${extDir.path}/does_not_exist');
+      final summary = await scanner.discoverAndScanDocumentsDirectory(missing);
+      expect(summary.added, 0);
+      expect(summary.failed, 0);
+      expect(await db.mountedRootById(kIosFilesRootId), isNull);
+    });
   });
+}
+
+final class _FakeSafBridge extends ChannelExternalRootsBridge {
+  _FakeSafBridge({required this.entries, required this.files});
+
+  final List<ExternalTreeEntry> entries;
+  final Map<String, Uint8List> files;
+
+  @override
+  Future<List<ExternalTreeEntry>> listTree(MountedExternalRoot root) async =>
+      entries;
+
+  @override
+  Future<Uint8List?> readFileRange(
+    String uri,
+    int offset,
+    int length, {
+    MountedExternalRoot? root,
+  }) async {
+    final data = files[uri]!;
+    final end = (offset + length).clamp(0, data.length);
+    return Uint8List.sublistView(data, offset, end);
+  }
 }
