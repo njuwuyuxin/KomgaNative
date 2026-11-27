@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu/src/data/app_settings.dart';
 import 'package:yomu/src/data/library_repository.dart';
+import 'package:yomu/src/data/missing_source_repository.dart';
 import 'package:yomu/src/data/settings_store.dart';
 import 'package:yomu/src/data/shelf_failure.dart';
 import 'package:yomu/src/data/shelf_filter_preset.dart';
@@ -11,6 +12,7 @@ import 'package:yomu/src/data/shelf_view_options.dart';
 import 'package:yomu/src/providers/active_source_provider.dart';
 import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/settings_provider.dart';
+import 'package:yomu/src/session/session_controller.dart';
 
 export 'package:yomu/src/providers/shelf_state.dart';
 
@@ -24,8 +26,14 @@ class ShelfController extends Notifier<ShelfState> {
 
   @override
   ShelfState build() {
-    ref.watch(libraryRepositoryProvider);
+    final repo = ref.watch(libraryRepositoryProvider);
     ref.onDispose(() => _debounce?.cancel());
+    // 服务器列表仍在冷启动加载且目标远程源尚未注册时，保持初始 loading 态，
+    // 绝不把远程筛选预设套到本机库，也不在过渡帧闪错误态（P1-3）。
+    if (repo is MissingSourceRepository &&
+        ref.watch(serverListProvider).isLoading) {
+      return const ShelfState();
+    }
     ref.listen<int>(readStatusEpochProvider, (_, _) {
       unawaited(refreshInPlace());
     });

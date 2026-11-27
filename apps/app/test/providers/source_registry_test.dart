@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:drift/drift.dart' show driftRuntimeOptions;
@@ -14,7 +15,9 @@ import 'package:yomu/src/data/settings_store.dart';
 import 'package:yomu/src/data/shelf_failure.dart';
 import 'package:yomu/src/providers/active_source_provider.dart';
 import 'package:yomu/src/providers/cross_source_reading_provider.dart';
+import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/progress_providers.dart';
+import 'package:yomu/src/providers/reader_providers.dart';
 import 'package:yomu/src/providers/settings_provider.dart';
 import 'package:yomu/src/providers/source_registry_provider.dart';
 import 'package:yomu/src/providers/source_scoped_providers.dart';
@@ -22,6 +25,8 @@ import 'package:yomu/src/session/server_store.dart';
 import 'package:yomu/src/session/session_controller.dart';
 import 'package:yomu_domain/yomu_domain.dart';
 import 'package:yomu_local_archive/yomu_local_archive.dart';
+
+import '../support/test_source_overrides.dart';
 
 void main() {
   group('ActiveSourceController 与 SourceRegistry 多源状态流转', () {
@@ -42,6 +47,7 @@ void main() {
       StoredServer? activeServer,
       List<StoredServer>? allServers,
       AppSettings initialSettings = AppSettings.defaults,
+      List<Override> extraOverrides = const <Override>[],
     }) {
       final db = ProgressDatabase(NativeDatabase.memory());
       final serverStore = allServers != null
@@ -49,13 +55,14 @@ void main() {
           : InMemoryServerStore(activeServer);
       final settingsStore = InMemorySettingsStore(initialSettings);
       final container = ProviderContainer(
-        overrides: [
+        overrides: <Override>[
           progressDatabaseProvider.overrideWithValue(db),
           localComicsStorageProvider.overrideWithValue(
             LocalComicsStorage(rootResolver: () async => tempDir),
           ),
           serverStoreProvider.overrideWithValue(serverStore),
           settingsStoreProvider.overrideWithValue(settingsStore),
+          ...extraOverrides,
         ],
       );
       addTearDown(() async {
@@ -288,5 +295,47 @@ void main() {
         );
       },
     );
+
+    test('activeSourceBundleProvider 远程源未就绪时返回 null，绝不静默回退本机源（P1-3）', () async {
+      const remote = RemoteContentSource(
+        sourceKey: 'https://pending.komga.test',
+        displayName: 'Pending Komga',
+      );
+      final listCompleter = Completer<List<StoredServer>>();
+      final container = buildContainer(
+        extraOverrides: <Override>[
+          activeSourceProvider.overrideWith(
+            () => FixedActiveSourceController(remote),
+          ),
+          serverListProvider.overrideWith((Ref ref) => listCompleter.future),
+        ],
+      );
+
+      // 服务器列表仍在加载期间，activeSourceBundleProvider 必须为 null 而非 localBundle。
+      expect(container.read(activeSourceBundleProvider), isNull);
+      expect(
+        container.read(libraryRepositoryProvider),
+        isA<MissingSourceRepository>(),
+      );
+      expect(
+        container.read(readerRepositoryProvider),
+        isA<MissingSourceRepository>(),
+      );
+      expect(
+        container.read(collectionsRepositoryProvider),
+        isA<MissingSourceRepository>(),
+      );
+      expect(
+        container.read(readStatusRepositoryProvider),
+        isA<MissingSourceRepository>(),
+      );
+
+      // ShelfController 在服务器列表加载期间应停在初始态，不把 Komga 筛选套到本地库，也不抛错。
+      final shelf = container.read(shelfProvider);
+      expect(shelf.series, isEmpty);
+      expect(shelf.failure, isNull);
+      await Future<void>.delayed(Duration.zero);
+      expect(container.read(shelfProvider).failure, isNull);
+    });
   });
 }

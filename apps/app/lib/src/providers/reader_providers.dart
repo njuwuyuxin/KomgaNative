@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yomu_domain/yomu_domain.dart';
+import 'package:yomu/src/data/missing_source_repository.dart';
 import 'package:yomu/src/data/page_border_crop.dart';
 import 'package:yomu/src/data/page_edge_color.dart';
 import 'package:yomu/src/data/reader_repository.dart';
@@ -19,7 +20,9 @@ final Provider<ImageSaver> imageSaverProvider = Provider<ImageSaver>(
 /// 按显式 `sourceKey` 寻址，避免嵌套 `ProviderScope` 作用域逃逸。
 final Provider<ReaderRepository> readerRepositoryProvider =
     Provider<ReaderRepository>((Ref ref) {
-      return ref.watch(activeSourceBundleProvider).reader;
+      final active = ref.watch(activeSourceProvider);
+      return ref.watch(activeSourceBundleProvider)?.reader ??
+          MissingSourceRepository(active.sourceKey);
     });
 
 /// 按源寻址单本书的查询键。

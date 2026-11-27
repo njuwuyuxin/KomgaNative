@@ -160,10 +160,10 @@ activeSourceProvider = NotifierProvider<ActiveSourceController, ContentSource>(
   ActiveSourceController.new,
 );
 
-/// 当前激活内容源对应的 [SourceBundle]（源被删的瞬态帧安全回退本机源）。
-final Provider<SourceBundle> activeSourceBundleProvider =
-    Provider<SourceBundle>((Ref ref) {
+/// 当前激活内容源对应的 [SourceBundle]（源未就绪或已被删除时返回 `null`，绝不静默回退本机源）。
+final Provider<SourceBundle?> activeSourceBundleProvider =
+    Provider<SourceBundle?>((Ref ref) {
       final active = ref.watch(activeSourceProvider);
       final registry = ref.watch(sourceRegistryProvider);
-      return registry.bundleOrNull(active.sourceKey) ?? registry.localBundle;
+      return registry.bundleOrNull(active.sourceKey);
     });

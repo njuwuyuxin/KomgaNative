@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yomu/src/data/collections_repository.dart';
+import 'package:yomu/src/data/missing_source_repository.dart';
 import 'package:yomu/src/providers/active_source_provider.dart';
 import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/providers/source_scoped_providers.dart';
@@ -12,10 +13,12 @@ const int kListPageSize = 30;
 const int _kAllPageSize = 100;
 const int _kAllMaxPages = 20;
 
-/// 收藏集与阅读列表仓库（跟随当前激活内容源：本机或 Komga 服务器）。
+/// 收藏集与阅读列表仓库（跟随当前激活内容源；源未就绪或已删时返回 [MissingSourceRepository]）。
 final Provider<CollectionsRepository> collectionsRepositoryProvider =
     Provider<CollectionsRepository>((Ref ref) {
-      return ref.watch(activeSourceBundleProvider).collections;
+      final active = ref.watch(activeSourceProvider);
+      return ref.watch(activeSourceBundleProvider)?.collections ??
+          MissingSourceRepository(active.sourceKey);
     });
 
 /// 收藏集增量分页控制器（ARC-12）。

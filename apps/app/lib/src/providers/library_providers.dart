@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yomu/src/data/library_repository.dart';
+import 'package:yomu/src/data/missing_source_repository.dart';
 import 'package:yomu/src/data/read_status_repository.dart';
 import 'package:yomu/src/providers/active_source_provider.dart';
 import 'package:yomu/src/providers/collections_providers.dart';
@@ -18,16 +19,20 @@ export 'package:yomu/src/providers/paged_list_controller.dart';
 export 'package:yomu/src/providers/search_providers.dart';
 export 'package:yomu/src/providers/shelf_controller.dart';
 
-/// 书架目录仓库：跟随当前激活内容源（本机或已选 Komga 服务器，ADR 0008）。
+/// 书架目录仓库：跟随当前激活内容源（源未就绪或已删时返回显式 [MissingSourceRepository]，绝不回退本机）。
 final Provider<LibraryRepository> libraryRepositoryProvider =
     Provider<LibraryRepository>((Ref ref) {
-      return ref.watch(activeSourceBundleProvider).library;
+      final active = ref.watch(activeSourceProvider);
+      return ref.watch(activeSourceBundleProvider)?.library ??
+          MissingSourceRepository(active.sourceKey);
     });
 
 /// 已读/未读状态变更仓库（ARC-09 / ADR 0008）。
 final Provider<ReadStatusRepository> readStatusRepositoryProvider =
     Provider<ReadStatusRepository>((Ref ref) {
-      return ref.watch(activeSourceBundleProvider).readStatus;
+      final active = ref.watch(activeSourceProvider);
+      return ref.watch(activeSourceBundleProvider)?.readStatus ??
+          MissingSourceRepository(active.sourceKey);
     });
 
 /// 当前账号可见的库（用于筛选条）。
