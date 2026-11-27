@@ -5,10 +5,9 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:yomu/src/data/byte_cache.dart';
 import 'package:yomu/src/data/local/archive_password_store.dart';
-import 'package:yomu/src/data/local/external_byte_source.dart';
+import 'package:yomu/src/data/local/comic_reader_factory.dart';
 import 'package:yomu/src/data/local/local_catalog_query_dao.dart';
 import 'package:yomu/src/data/local/local_comics_storage.dart';
-import 'package:yomu/src/data/local/native_archive_reader.dart';
 import 'package:yomu/src/data/local/native_pdf_reader.dart';
 import 'package:yomu/src/data/progress/progress_database.dart';
 import 'package:yomu/src/data/reader_repository.dart';
@@ -24,24 +23,24 @@ final class LocalReaderRepository implements ReaderRepository {
 
   LocalReaderRepository(
     this._db,
-    this._storage, {
+    LocalComicsStorage storage, {
     int pageCacheCapacity = defaultPageCacheCapacity,
     ExternalRootsBridge? externalRoots,
     NativePdfBridge? pdfBridge,
     NativeArchiveBridge? archiveBridge,
     ArchivePasswordStore? passwordStore,
   }) : _pages = ByteLruCache(capacity: pageCacheCapacity),
-       _externalRoots = externalRoots ?? ChannelExternalRootsBridge(),
-       _pdfBridge = pdfBridge ?? ChannelNativePdfBridge(),
-       _archiveBridge = archiveBridge ?? ChannelNativeArchiveBridge(),
-       _passwordStore = passwordStore;
+       _readerFactory = ComicReaderFactory(
+         db: _db,
+         storage: storage,
+         externalRoots: externalRoots,
+         pdfBridge: pdfBridge,
+         archiveBridge: archiveBridge,
+         passwordStore: passwordStore,
+       );
 
   final ProgressDatabase _db;
-  final LocalComicsStorage _storage;
-  final ExternalRootsBridge _externalRoots;
-  final NativePdfBridge _pdfBridge;
-  final NativeArchiveBridge _archiveBridge;
-  final ArchivePasswordStore? _passwordStore;
+  final ComicReaderFactory _readerFactory;
   final ByteLruCache _pages;
   final Map<String, Future<Uint8List>> _inFlight =
       <String, Future<Uint8List>>{};
@@ -125,8 +124,7 @@ final class LocalReaderRepository implements ReaderRepository {
     final cached = _pages.get(thumbKey) ?? _pages.peek('$bookId#$page');
     if (cached != null) return cached;
     final bookRow = await _db.localBookRowById(bookId);
-    if (bookRow != null &&
-        (bookRow.storageKind == 'pdf' || bookRow.storageKind == 'ext_pdf')) {
+    if (bookRow != null && LocalStorageKind.parse(bookRow.storageKind).isPdf) {
       final reader = await _acquireReader(bookId, bookRow);
       if (reader is NativePdfComicReader) {
         final bytes = await reader.renderAtWidth(
@@ -219,81 +217,6 @@ final class LocalReaderRepository implements ReaderRepository {
         ),
     ];
 
-    if (row.mountRootId != null) {
-      final savedPassword = await _passwordStore?.getBookPassword(bookId);
-      return openExternalComicReader(
-        db: _db,
-        externalRoots: _externalRoots,
-        pdfBridge: _pdfBridge,
-        row: row,
-        entries: entries,
-        password: savedPassword,
-      );
-    }
-
-    if (row.storageKind == 'folder') {
-      final dir = await _storage.resolveDirectory(row.relativePath);
-      if (!await dir.exists()) {
-        throw const ArchiveException(
-          ArchiveErrorKind.ioError,
-          'Missing folder',
-        );
-      }
-      return entries.isNotEmpty
-          ? FolderComicReader.fromIndexedPages(dir, entries)
-          : FolderComicReader.open(dir);
-    }
-
-    final file = await _storage.resolveFile(row.relativePath);
-    final savedPassword = await _passwordStore?.getBookPassword(bookId);
-    if (row.storageKind == 'pdf') {
-      return entries.isNotEmpty
-          ? NativePdfComicReader.fromIndexedPages(
-              _pdfBridge,
-              file.path,
-              entries,
-              password: savedPassword,
-            )
-          : NativePdfComicReader.open(
-              _pdfBridge,
-              file.path,
-              password: savedPassword,
-            );
-    }
-    if (row.storageKind == 'cb7' || row.storageKind == 'cbr') {
-      final fmt = row.storageKind == 'cb7'
-          ? NativeArchiveFormat.sevenZip
-          : NativeArchiveFormat.rar4;
-      return entries.isNotEmpty
-          ? NativeArchiveComicReader.fromIndexedPages(
-              _archiveBridge,
-              file.path,
-              entries,
-              format: fmt,
-              isSolid: true,
-              password: savedPassword,
-            )
-          : NativeArchiveComicReader.open(
-              _archiveBridge,
-              file.path,
-              password: savedPassword,
-            );
-    }
-    final source = await FileByteSource.open(file);
-    if (row.storageKind == 'tar') {
-      return entries.isNotEmpty
-          ? TarComicReader.fromIndexedPages(source, entries)
-          : TarComicReader.open(source);
-    }
-    if (savedPassword != null && savedPassword.isNotEmpty) {
-      return ZipComicReader.open(
-        source,
-        sniffDimensions: false,
-        password: savedPassword,
-      );
-    }
-    return entries.isNotEmpty
-        ? ZipComicReader.fromIndexedPages(source, entries)
-        : openComicArchive(source);
+    return _readerFactory.open(row, entries: entries);
   }
 }

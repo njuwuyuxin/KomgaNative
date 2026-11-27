@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:yomu/src/data/local/comic_reader_factory.dart';
 import 'package:yomu/src/data/local/cover_thumbnail_generator.dart';
 import 'package:yomu/src/data/local/local_catalog_edit_dao.dart';
 import 'package:yomu/src/data/local/local_catalog_write_dao.dart';
@@ -264,7 +265,7 @@ Future<LocalImportBatchResult> importLocalImageFolderToSandbox({
       coverEncoder: coverEncoder,
       bookId: bookId,
       safeFolder: safeFolder,
-      storageKind: 'folder',
+      storageKind: LocalStorageKind.folder.wireValue,
       relativePath: folderRelPath,
       sizeBytes: totalBytes,
       displayName: folderName,

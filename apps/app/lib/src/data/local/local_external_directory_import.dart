@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:yomu/src/data/local/comic_file_picker.dart';
+import 'package:yomu/src/data/local/comic_reader_factory.dart';
 import 'package:yomu/src/data/local/cover_thumbnail_generator.dart';
 import 'package:yomu/src/data/local/local_archive_import_stream.dart';
 import 'package:yomu/src/data/local/local_comic_importer.dart';
@@ -205,7 +206,7 @@ Future<LocalImportBatchResult> importExternalDirectoryToSandbox({
       coverEncoder: coverEncoder,
       bookId: bookId,
       safeFolder: safeFolder,
-      storageKind: 'folder',
+      storageKind: LocalStorageKind.folder.wireValue,
       relativePath: folderRelPath,
       sizeBytes: totalBytes,
       displayName: folderName,

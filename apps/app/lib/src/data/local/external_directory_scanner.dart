@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:yomu/src/data/local/comic_reader_factory.dart';
 import 'package:yomu/src/data/local/cover_thumbnail_generator.dart';
 import 'package:yomu/src/data/local/external_byte_source.dart';
 import 'package:yomu/src/data/local/external_roots_dao.dart';
@@ -263,8 +264,8 @@ final class ExternalDirectoryScanner {
           number: inferred.number,
           numberSort: inferred.numberSort,
           storageKind: root.kind == ExternalRootKind.localDirectory
-              ? 'ext_zip'
-              : 'saf_zip',
+              ? LocalStorageKind.extZip.wireValue
+              : LocalStorageKind.safZip.wireValue,
           relativePath: entry.uri,
           sizeBytes: entry.sizeBytes,
           pages: const <ArchivePageEntry>[],
@@ -291,19 +292,17 @@ final class ExternalDirectoryScanner {
 
     final reader = await openComicArchive(source);
     try {
-      final prefix = useBridge ? 'saf' : 'ext';
-      final kindSuffix = switch (reader) {
-        EpubComicReader() => 'epub',
-        TarComicReader() => 'tar',
-        _ => 'zip',
-      };
+      final storageKind = LocalStorageKind.forExternalReader(
+        reader,
+        useBridge: useBridge,
+      ).wireValue;
       final committed = await commitComicReaderToDatabase(
         db: _db,
         storage: _storage,
         coverEncoder: _coverEncoder,
         bookId: bookId,
         safeFolder: safeFolder,
-        storageKind: '${prefix}_$kindSuffix',
+        storageKind: storageKind,
         relativePath: entry.uri,
         sizeBytes: entry.sizeBytes,
         displayName: entry.name,

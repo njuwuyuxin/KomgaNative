@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:yomu/src/data/local/archive_password_store.dart';
+import 'package:yomu/src/data/local/comic_reader_factory.dart';
 import 'package:yomu/src/data/local/cover_thumbnail_generator.dart';
 import 'package:yomu/src/data/local/local_comic_importer_models.dart';
 import 'package:yomu/src/data/local/local_comics_storage.dart';
@@ -133,14 +134,7 @@ Future<LocalImportBatchResult> importArchiveOrCollectionStream({
       }
     }
 
-    final storageKind = switch (reader) {
-      NativePdfComicReader() => 'pdf',
-      NativeArchiveComicReader(:final format) =>
-        format == NativeArchiveFormat.sevenZip ? 'cb7' : 'cbr',
-      EpubComicReader() => 'epub',
-      TarComicReader() => 'tar',
-      _ => 'zip',
-    };
+    final storageKind = LocalStorageKind.forManagedReader(reader).wireValue;
     final result = await commitComicReaderToDatabase(
       db: db,
       storage: storage,
