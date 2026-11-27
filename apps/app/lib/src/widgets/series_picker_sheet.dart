@@ -2,14 +2,15 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:yomu_design_system/yomu_design_system.dart';
-import 'package:yomu_domain/yomu_domain.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:yomu/l10n/app_localizations.dart';
 import 'package:yomu/src/l10n/failure_text.dart';
 import 'package:yomu/src/providers/library_providers.dart';
 import 'package:yomu/src/widgets/cover_image.dart';
 import 'package:yomu/src/widgets/load_more_footer.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:yomu/src/widgets/picker_sheet_shell.dart';
+import 'package:yomu_design_system/yomu_design_system.dart';
+import 'package:yomu_domain/yomu_domain.dart';
 
 /// 在收藏集详情页内选择系列加入该收藏集的底部抽屉。
 ///
@@ -63,93 +64,39 @@ class _SeriesPickerSheetState extends ConsumerState<_SeriesPickerSheet> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
     final search = (query: _query, readStatus: null, tag: null);
     final provider = searchSeriesProvider(search);
     final async = ref.watch(provider);
-    final maxHeight = MediaQuery.sizeOf(context).height * 0.78;
 
-    return ConstrainedBox(
-      key: const Key('series-picker-sheet'),
-      constraints: BoxConstraints(maxHeight: maxHeight),
-      child: Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.viewInsetsOf(context).bottom,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.md,
-                0,
-                AppSpacing.md,
-                AppSpacing.xs,
-              ),
-              child: Row(
-                children: <Widget>[
-                  Expanded(
-                    child: Text(
-                      l10n.addSeriesToCollection,
-                      style: theme.textTheme.titleMedium,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.md,
-                0,
-                AppSpacing.md,
-                AppSpacing.xs,
-              ),
-              child: TextField(
-                key: const Key('series-picker-search'),
-                onChanged: _onSearchChanged,
-                decoration: InputDecoration(
-                  hintText: l10n.searchSeriesHint,
-                  prefixIcon: const Icon(Icons.search),
-                  isDense: true,
-                ),
-              ),
-            ),
-            Flexible(
-              child: _buildList(
-                context,
-                l10n,
-                async,
-                onRetry: () => ref.invalidate(provider),
-                onLoadMore: () =>
-                    unawaited(ref.read(provider.notifier).loadMore()),
-              ),
-            ),
-            const Divider(height: AppSizes.hairline),
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              child: SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  key: const Key('series-picker-confirm'),
-                  onPressed: _picked.isEmpty
-                      ? null
-                      : () => Navigator.of(context).pop(_picked.toList()),
-                  child: Text(
-                    _picked.isEmpty
-                        ? l10n.addSeriesToCollection
-                        : l10n.collectionAddButton(_picked.length),
-                  ),
-                ),
-              ),
-            ),
-          ],
+    return PickerSheetShell(
+      sheetKey: const Key('series-picker-sheet'),
+      maxHeightFactor: 0.78,
+      title: l10n.addSeriesToCollection,
+      showSearch: true,
+      searchKey: const Key('series-picker-search'),
+      searchHint: l10n.searchSeriesHint,
+      onSearchChanged: _onSearchChanged,
+      body: _buildList(
+        l10n,
+        async,
+        onRetry: () => ref.invalidate(provider),
+        onLoadMore: () => unawaited(ref.read(provider.notifier).loadMore()),
+      ),
+      footer: FilledButton(
+        key: const Key('series-picker-confirm'),
+        onPressed: _picked.isEmpty
+            ? null
+            : () => Navigator.of(context).pop(_picked.toList()),
+        child: Text(
+          _picked.isEmpty
+              ? l10n.addSeriesToCollection
+              : l10n.collectionAddButton(_picked.length),
         ),
       ),
     );
   }
 
   Widget _buildList(
-    BuildContext context,
     AppLocalizations l10n,
     AsyncValue<PageResult<Series>> async, {
     required VoidCallback onRetry,
